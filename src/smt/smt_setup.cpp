@@ -38,6 +38,7 @@ Revision History:
 #include "smt/theory_pb.h"
 #include "smt/theory_fpa.h"
 #include "smt/theory_str.h"
+#include "smt/theory_str_noodler/theory_str_noodler.h"
 
 namespace smt {
 
@@ -725,6 +726,9 @@ namespace smt {
             setup_QF_BV();
             setup_char();
         }
+        else if (m_params.m_string_solver == "noodler") {
+            setup_str_noodler();
+        }
         else if (m_params.m_string_solver == "auto") {
             setup_unknown();
         }
@@ -930,6 +934,11 @@ namespace smt {
     void setup::setup_str() {
         setup_arith();
         m_context.register_plugin(alloc(theory_str, m_context, m_manager, m_params));
+    }
+
+    void setup::setup_str_noodler() {
+        setup_arith();
+        m_context.register_plugin(alloc(theory_str_noodler, m_context, m_manager, m_params));
     }
 
     void setup::setup_seq() {

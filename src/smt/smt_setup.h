@@ -107,6 +107,7 @@ namespace smt {
         void setup_lra_arith();
         void setup_fpa();
         void setup_str();
+        void setup_str_noodler();
 
     public:
         setup(context & c, smt_params & params);
