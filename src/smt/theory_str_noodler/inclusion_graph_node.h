@@ -16,120 +16,81 @@
 #include <vector>
 #include <stdexcept>
 #include <memory>
+#include <cassert>
 
 namespace smt {
+namespace noodler {
     enum struct EquationTermType {
         Literal,
         Variable,
         CallPredicate,
     };
 
-    class BasicEquationTerm {
-    public:
-        //BasicEquationTerm() = default;
-        BasicEquationTerm(BasicEquationTerm&) = delete;
-        BasicEquationTerm(BasicEquationTerm&&) = default;
+    enum struct PredicateType {
+        Equation,
+        Inequation,
+        Substring,
+        Contains,
+        Length,
+        IndexOf,
+        // TODO: Add additional predicate types.
+    };
 
-        [[nodiscard]] virtual EquationTermType get_type() const = 0;
-        [[nodiscard]] virtual bool equals(const BasicEquationTerm& other) const { return get_type() == other.get_type(); }
-    protected:
+    enum struct BasicTermType {
+        Literal,
+        Variable
+    };
+
+    class BasicTerm {
+    public:
+        explicit BasicTerm(BasicTermType type): type(type) {}
+        BasicTerm(const std::string& name, BasicTermType type): name(name), type(type) {}
+        [[nodiscard]] BasicTermType get_type() const { return type; }
+        [[nodiscard]] const std::string& get_name() const { return name; }
+        [[nodiscard]] bool equals(const BasicTerm& other) const {
+            return type == other.get_type() && name == other.get_name();
+        }
+
+    private:
+        std::string name;
+        BasicTermType type;
     }; // Class BasicEquationTerm.
 
-    bool operator==(const BasicEquationTerm& lhs, const BasicEquationTerm& rhs) { return lhs.equals(rhs); }
+    bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
 
-    using EquationSide = std::vector<std::unique_ptr<BasicEquationTerm>>;
-
-    class LiteralTerm : BasicEquationTerm {
-        LiteralTerm() = default;
-        //LiteralTerm(LiteralTerm&) = delete;
-        //LiteralTerm(LiteralTerm&&) = default;
-        [[nodiscard]] EquationTermType get_type() const override { return EquationTermType::Literal; }
-
-        [[nodiscard]] bool equals(const BasicEquationTerm& other) const override {
-            if (BasicEquationTerm::equals(other)) {
-                // TODO: Type specific comparison.
-                return true;
-            }
-            return false;
-        }
-    }; // Class LiteralTerm.
-
-    class VariableTerm : BasicEquationTerm {
-        VariableTerm() = default;
-        //VariableTerm(VariableTerm&) = delete;
-        //VariableTerm(VariableTerm&&) = default;
-        [[nodiscard]] EquationTermType get_type() const override { return EquationTermType::Variable; }
-
-        [[nodiscard]] bool equals(const BasicEquationTerm& other) const override {
-            if (BasicEquationTerm::equals(other)) {
-                // TODO: Type specific comparison.
-                return true;
-            }
-            return false;
-        }
-    }; // Class VariableTerm.
-
-    class CallPredicateTerm : BasicEquationTerm {
-        CallPredicateTerm() = default;
-        //CallPredicateTerm(CallPredicateTerm&) = delete;
-        //CallPredicateTerm(CallPredicateTerm&&) = default;
-        [[nodiscard]] EquationTermType get_type() const override { return EquationTermType::CallPredicate; }
-
-        [[nodiscard]] bool equals(const BasicEquationTerm& other) const override {
-            if (BasicEquationTerm::equals(other)) {
-                // TODO: Type specific comparison.
-                return true;
-            }
-            return false;
-        }
-    }; // Class CallPredicateTerm.
-
-    class Equation {
+    class Predicate {
     public:
-
         enum struct EquationSideType {
             Left,
             Right,
         };
 
-        Equation(): left_side(), right_side() {}
+        explicit Predicate(const PredicateType type): type(type) {}
 
-        // TODO: Use std::move?
-        Equation(EquationSide left_side, EquationSide right_side)
-            : left_side(std::move(left_side)), right_side(std::move(right_side)) {}
+        PredicateType get_type() { return type; }
+        void set_type(PredicateType new_type) { type = new_type; }
 
-        Equation(const Equation& equation) = delete;
-        Equation(Equation&&) = default;
-
-        void set_side(EquationSideType side, EquationSide side_value) {
-            switch (side) {
-                case EquationSideType::Left:
-                    left_side = std::move(side_value);
-                    break;
-                case EquationSideType::Right:
-                    right_side = std::move(side_value);
-                    break;
-                default:
-                    throw std::runtime_error("unhandled equation side type");
-                    break;
-            }
+        std::vector<BasicTerm>& get_left() {
+            assert(type == PredicateType::Equation || type == PredicateType::Inequation);
+            return params[0];
         }
-
-        EquationSide& get_side(EquationSideType side) {
-            switch (side) {
-                case EquationSideType::Left:
-                    return left_side;
-                    break;
-                case EquationSideType::Right:
-                    return right_side;
-                    break;
-                default:
-                    throw std::runtime_error("unhandled equation side type");
-                    break;
-            }
-        }
+        std::vector<BasicTerm>& get_right() { return params[0]; }
 
         // TODO: Should we implement get_vars() and get_side_vars()?
+
+        std::vector<BasicTerm>& get_side(EquationSideType side) {
+            switch (side) {
+                case EquationSideType::Left:
+                    return params[0];
+                    break;
+                case EquationSideType::Right:
+                    return params[1];
+                    break;
+                default:
+                    throw std::runtime_error("unhandled equation side type");
+                    break;
+            }
+        }
 
         bool multiple_occurrence_of_term_on_side(EquationSideType side) {
             (void) side;
@@ -146,33 +107,32 @@ namespace smt {
             throw std::runtime_error("unimplemented");
         }
 
-        friend bool operator==(const Equation& lhs, const Equation& rhs) {
-            return lhs.left_side == rhs.left_side && lhs.right_side == rhs.right_side;
+        friend bool operator==(const Predicate& lhs, const Predicate& rhs) {
+            return lhs.type == rhs.type; // FIXME: Compare sides (both left and right sides).
         }
 
         // TODO: Additional operations.
 
     private:
-        EquationSide left_side;
-        EquationSide right_side;
-    }; // Class Equation.
+        PredicateType type;
+        std::vector<std::vector<BasicTerm>> params{};
 
-    using FormulaEquations = std::vector<Equation>;
+    }; // Class Predicate.
+
+    using FormulaPredicates = std::vector<Predicate>;
 
     class Formula {
-        Formula(): equations(), inequations() {}
+        Formula(): predicates() {}
 
-        FormulaEquations& get_equations() { return equations; }
-        FormulaEquations& get_inequations() { return inequations; }
+        FormulaPredicates& get_predicates() { return predicates; }
 
         // TODO: Use std::move for both add functions?
-        void add_equation(Equation equation) { equations.push_back(std::move(equation)); }
-        void add_inequation(Equation inequation) { inequations.push_back(std::move(inequation)); }
+        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
 
     private:
-        FormulaEquations equations;
-        FormulaEquations inequations;
+        FormulaPredicates predicates;
     }; // Class Formula.
+} // Namespace noodler.
 } // Namespace smt.
 
 #endif //Z3_INCLUSION_GRAPH_NODE_H
