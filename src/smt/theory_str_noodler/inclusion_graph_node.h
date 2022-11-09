@@ -17,15 +17,10 @@
 #include <stdexcept>
 #include <memory>
 #include <cassert>
+#include <unordered_map>
 
 namespace smt {
 namespace noodler {
-    enum struct EquationTermType {
-        Literal,
-        Variable,
-        CallPredicate,
-    };
-
     enum struct PredicateType {
         Equation,
         Inequation,
@@ -44,17 +39,18 @@ namespace noodler {
     class BasicTerm {
     public:
         explicit BasicTerm(BasicTermType type): type(type) {}
-        BasicTerm(const std::string& name, BasicTermType type): name(name), type(type) {}
+        BasicTerm(BasicTermType type, std::string_view name): type(type), name(name) {}
         [[nodiscard]] BasicTermType get_type() const { return type; }
-        [[nodiscard]] const std::string& get_name() const { return name; }
+        [[nodiscard]] std::string get_name() const { return name; }
+        void set_name(std::string_view new_name) { name = new_name; }
         [[nodiscard]] bool equals(const BasicTerm& other) const {
             return type == other.get_type() && name == other.get_name();
         }
 
     private:
-        std::string name;
         BasicTermType type;
-    }; // Class BasicEquationTerm.
+        std::string name;
+    }; // Class BasicTerm.
 
     bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
 
@@ -65,20 +61,34 @@ namespace noodler {
             Right,
         };
 
-        explicit Predicate(const PredicateType type): type(type) {}
+        explicit Predicate(const PredicateType type): type(type) {
+            if (is_equation() || is_inequation()) {
+                params.resize(2);
+                params.emplace_back();
+                params.emplace_back();
+            }
+        }
+
+        [[nodiscard]] bool is_equation() const { return type == PredicateType::Equation; }
+        [[nodiscard]] bool is_inequation() const { return type == PredicateType::Inequation; }
+        [[nodiscard]] bool is_predicate() const { return !is_equation() && !is_inequation(); }
 
         PredicateType get_type() { return type; }
         void set_type(PredicateType new_type) { type = new_type; }
 
         std::vector<BasicTerm>& get_left() {
-            assert(type == PredicateType::Equation || type == PredicateType::Inequation);
+            assert(is_equation() || is_inequation());
             return params[0];
         }
-        std::vector<BasicTerm>& get_right() { return params[0]; }
+        std::vector<BasicTerm>& get_right() {
+            assert(is_equation() || is_inequation());
+            return params[1];
+        }
 
         // TODO: Should we implement get_vars() and get_side_vars()?
 
-        std::vector<BasicTerm>& get_side(EquationSideType side) {
+        std::vector<BasicTerm>& get_side(const EquationSideType side) {
+            assert(is_equation() || is_inequation());
             switch (side) {
                 case EquationSideType::Left:
                     return params[0];
@@ -92,9 +102,19 @@ namespace noodler {
             }
         }
 
-        bool multiple_occurrence_of_term_on_side(EquationSideType side) {
-            (void) side;
-            throw std::runtime_error("unimplemented");
+        bool multiple_occurrence_of_term_on_side(const EquationSideType side) {
+            assert(is_equation() || is_inequation());
+            const auto terms_begin{ get_side(side).cbegin() };
+            const auto terms_end{ get_side(side).cend() };
+            for (auto term_iter{ terms_begin }; term_iter < terms_end; ++term_iter) {
+                for (auto term_iter_following{ term_iter + 1}; term_iter_following < terms_end; ++term_iter_following) {
+                    if (*term_iter == *term_iter_following) {
+                        return true;
+                        // TODO: How to handle calls of predicates?
+                    }
+                }
+            }
+            return false;
         }
 
         void replace(void* replace_map) {
@@ -108,14 +128,20 @@ namespace noodler {
         }
 
         friend bool operator==(const Predicate& lhs, const Predicate& rhs) {
-            return lhs.type == rhs.type; // FIXME: Compare sides (both left and right sides).
+            if (lhs.type == rhs.type) {
+                if (lhs.is_equation() || lhs.is_inequation()) {
+                    return lhs.params[0] == rhs.params[0] && lhs.params[1] == rhs.params[1];
+                }
+                return true;
+            }
+            return false;
         }
 
         // TODO: Additional operations.
 
     private:
         PredicateType type;
-        std::vector<std::vector<BasicTerm>> params{};
+        std::vector<std::vector<BasicTerm>> params;
 
     }; // Class Predicate.
 
