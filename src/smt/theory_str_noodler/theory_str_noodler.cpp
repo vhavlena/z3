@@ -114,6 +114,26 @@ namespace smt {
     }
 
     void theory_str_noodler::print_ctx(context &ctx) {  // test_hlin
+        ast_manager m = get_manager();
+        expr_ref_vector dis(m);
+        expr_ref_vector vars(m);
+        expr_ref_vector cons(m);
+        expr_ref_vector unfixed(m);
+
+        expr *refinement = nullptr;
+
+        expr_ref_vector con(get_manager());
+        expr_ref_vector un(get_manager());
+
+        ctx.get_assignments(con);
+        std::cout << "Assignment :" << con.size() << " " << un.size() << std::endl;
+        for(expr* e : con) {
+            std::cout << "OOO " << mk_pp(e, m) << " " << ctx.is_relevant(e) << std::endl;
+        }
+
+        return;
+        
+        std::cout << ctx.get_unsat_core_size() << std::endl;
         std::cout << "~~~~~ print ctx start ~~~~~~~\n";
 //        context& ctx = get_context();
         unsigned nFormulas = ctx.get_num_asserted_formulas();
@@ -252,7 +272,7 @@ namespace smt {
     void theory_str_noodler::propagate_basic_string_axioms(enode *str) {
         bool on_screen = false;
 
-        return;
+        return; 
 
         context &ctx = get_context();
         ast_manager &m = get_manager();
@@ -454,13 +474,13 @@ namespace smt {
     }
 
     void theory_str_noodler::new_diseq_eh(theory_var x, theory_var y) {
-        m_word_diseq_var_todo.push_back({x, y});
-
         ast_manager &m = get_manager();
         const expr_ref l{get_enode(x)->get_expr(), m};
         const expr_ref r{get_enode(y)->get_expr(), m};
 
-        m_word_diseq_todo.push_back({l, r});
+        m_word_diseq_var_todo.push_back({x, y});
+        m_word_diseq_todo.push_back({l, r});        
+
         STRACE("str", tout << "new_diseq: " << l << " != " << r << '\n';);
     }
 
@@ -529,25 +549,70 @@ namespace smt {
 
     }
 
+    void theory_str_noodler::remove_irrelevant_eqs() {
+        
+        this->m_word_eq_todo_rel.clear();
+        this->m_word_diseq_todo_rel.clear();
+
+        for (const auto& we : m_word_eq_todo) {
+            app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
+            ctx.internalize(eq, false);
+            if(!ctx.is_relevant(eq.get())) {
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " << 
+                    ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << '\n';);
+                continue;
+            }
+
+            app_ref double_not(m.mk_not(m.mk_not(eq)), m);
+            ctx.internalize(double_not, false);
+            if(ctx.find_assignment(double_not.get()) != l_undef && !ctx.is_relevant(double_not.get())) {
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " << 
+                    ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
+                continue;
+            }
+
+            this->m_word_eq_todo_rel.push_back(we);
+        }
+
+        for (const auto& we : m_word_diseq_todo) {
+            app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
+            app_ref dis(m.mk_not(eq), m);
+            
+            ctx.internalize(dis, false);
+            if(!ctx.is_relevant(dis.get())) {
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(dis.get(), m) << " relevant: " << 
+                    ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
+                continue;
+            }
+            this->m_word_diseq_todo_rel.push_back(we);
+        }
+    }
+
     final_check_status theory_str_noodler::final_check_eh() {
         TRACE("str",  tout << "pop_scope: ";);
         std::cout << "final_check starts\n"<<std::endl;
 
-        if (m_word_eq_todo.empty()) {
-            if (is_over_approximation)
-                return FC_GIVEUP;
-            else
-                return FC_DONE;
-        }
+        //print_ctx(get_context());
 
+        // if (m_word_eq_todo.empty()) {
+        //     if (is_over_approximation)
+        //         return FC_GIVEUP;
+        //     else
+        //         return FC_DONE;
+        // }
 
-        for (const auto& we : m_word_eq_todo) {
-            std::cout<<print_word_term(we.first)<<std::flush;
+        remove_irrelevant_eqs();
+
+        for (const auto& we : this->m_word_eq_todo_rel) {
+            std::cout<<print_word_term(we.first) <<std::flush;
             std::cout<<"="<<std::flush;
-            std::cout<<print_word_term(we.second)<<std::endl;
+            std::cout<<print_word_term(we.second) << std::endl;
         }
-        for (const auto& we : m_word_diseq_todo) {
-            std::cout<<print_word_term(we.first)<<"!="<<print_word_term(we.second)<<std::endl;
+
+        for (const auto& we : this->m_word_diseq_todo_rel) {
+            std::cout<<print_word_term(we.first) <<std::flush;
+            std::cout<<"!="<<std::flush;
+            std::cout<<print_word_term(we.second)<< std::endl;
         }
 
 
@@ -1152,12 +1217,12 @@ namespace smt {
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
         STRACE("str", tout << "[Refinement]\nformulas:\n";);
-        for (const auto& we : m_word_eq_todo) {
+        for (const auto& we : this->m_word_eq_todo_rel) {
             expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
             STRACE("str", tout << we.first << " = " << we.second << '\n';);
         }
-        for (const auto& wi : m_word_diseq_todo) {
+        for (const auto& wi : this->m_word_diseq_todo_rel) {
 //            expr *const e = mk_eq_atom(wi.first, wi.second);
             expr *const e = m.mk_eq(wi.first, wi.second);
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);

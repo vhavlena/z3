@@ -61,6 +61,8 @@ namespace smt {
         scoped_vector<expr_pair> m_word_diseq_todo;
         scoped_vector<expr_pair> m_not_contains_todo;
         scoped_vector<expr_pair> m_membership_todo;
+        vector<expr_pair> m_word_eq_todo_rel;
+        vector<expr_pair> m_word_diseq_todo_rel;
     public:
         char const * get_name() const override { return "noodler"; }
         theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params);
@@ -137,6 +139,9 @@ namespace smt {
         void tightest_prefix(expr*,expr*);
         void print_ast(expr *e);
         void print_ctx(context& ctx);
+
+
+        void remove_irrelevant_eqs();
     };
 }
 
