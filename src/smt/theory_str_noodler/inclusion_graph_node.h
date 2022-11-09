@@ -257,6 +257,6 @@ namespace smt::noodler {
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
-} // Namespace smt.
+} // Namespace smt::noodler.
 
 #endif //Z3_INCLUSION_GRAPH_NODE_H

@@ -1,8 +1,6 @@
 
 #include "inclusion_graph_node.h"
 
-namespace smt {
-namespace noodler {
+namespace smt::noodler {
 
-} // Namespace noodler.
-} // Namespace smt.
+} // Namespace smt::noodler.
