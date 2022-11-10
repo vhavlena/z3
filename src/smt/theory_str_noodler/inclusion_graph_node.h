@@ -20,6 +20,8 @@
 #include <memory>
 #include <cassert>
 #include <unordered_map>
+#include <string>
+#include <string_view>
 
 namespace smt::noodler {
     enum struct PredicateType {
