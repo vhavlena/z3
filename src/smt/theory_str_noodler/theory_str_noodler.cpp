@@ -82,6 +82,15 @@ namespace smt {
 
     bool theory_str_noodler::internalize_term(app *const term) {
         context &ctx = get_context();
+
+        if (m_util_s.str.is_in_re(term)) {
+            if (!ctx.e_internalized(term->get_arg(0))) {
+                ctx.internalize(term->get_arg(0), false);
+                enode* enode = ctx.get_enode(term->get_arg(0));
+                mk_var(enode);
+            }
+        }
+
         if (ctx.e_internalized(term)) {
             enode *e = ctx.get_enode(term);
             mk_var(e);
@@ -93,7 +102,9 @@ namespace smt {
         if (m.is_bool(term)) {
             bool_var bv = ctx.mk_bool_var(term);
             ctx.set_var_theory(bv, get_id());
-            ctx.mark_as_relevant(bv);
+            //We do not want to mark as relevant because it involves 
+            // irrelevant RE solutions comming from the underlying SAT solver.
+            //ctx.mark_as_relevant(bv);
         }
 
         enode *e = nullptr;
@@ -120,15 +131,17 @@ namespace smt {
         expr_ref_vector cons(m);
         expr_ref_vector unfixed(m);
 
-        expr *refinement = nullptr;
-
         expr_ref_vector con(get_manager());
         expr_ref_vector un(get_manager());
 
         ctx.get_assignments(con);
         std::cout << "Assignment :" << con.size() << " " << un.size() << std::endl;
         for(expr* e : con) {
-            std::cout << "OOO " << mk_pp(e, m) << " " << ctx.is_relevant(e) << std::endl;
+            std::cout << "OOO " << mk_pp(e, m) << " " << ctx.is_relevant(e) << " " << ctx.b_internalized(e) << " " << ctx.find_assignment(e);
+            if(ctx.b_internalized(e)) {
+                std::cout << ctx.get_bool_var(e);
+            }
+            std::cout << std::endl;
         }
 
         return;
@@ -191,15 +204,17 @@ namespace smt {
 
     void theory_str_noodler::string_theory_propagation(expr *expr) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+        STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
-        // ast_manager &m = get_manager();
         context &ctx = get_context();
 
         if (!ctx.e_internalized(expr)) {
             ctx.internalize(expr, false);
         }
-        enode *n = ctx.get_enode(expr);
-        ctx.mark_as_relevant(n);
+        //We do not mark the expression as relevant since we do not want bias a 
+        //fresh SAT solution by the newly added theory axioms. 
+        //enode *n = ctx.get_enode(expr);
+        //ctx.mark_as_relevant(n);
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -479,9 +494,14 @@ namespace smt {
         const expr_ref r{get_enode(y)->get_expr(), m};
 
         m_word_diseq_var_todo.push_back({x, y});
-        m_word_diseq_todo.push_back({l, r});        
+        m_word_diseq_todo.push_back({l, r});    
+        
+        app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
+        app_ref neg(m.mk_not(l_eq_r), m);
+        ctx.internalize(neg, false);
 
-        STRACE("str", tout << "new_diseq: " << l << " != " << r << '\n';);
+        STRACE("str", tout << ctx.find_assignment(l_eq_r.get()) << " " << ctx.find_assignment(neg.get()) << '\n';);
+        STRACE("str", tout << "new_diseq: " << l << " != " << r << " @" << m_scope_level<< " " << ctx.get_bool_var(l_eq_r.get()) << " " << ctx.get_bool_var(neg) << '\n';);
     }
 
     bool theory_str_noodler::can_propagate() {
@@ -553,23 +573,23 @@ namespace smt {
         
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
+        this->m_membership_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
-            ctx.internalize(eq, false);
             if(!ctx.is_relevant(eq.get())) {
                 STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " << 
                     ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << '\n';);
                 continue;
-            }
+            }   
 
-            app_ref double_not(m.mk_not(m.mk_not(eq)), m);
-            ctx.internalize(double_not, false);
-            if(ctx.find_assignment(double_not.get()) != l_undef && !ctx.is_relevant(double_not.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " << 
-                    ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
-                continue;
-            }
+            // app_ref double_not(m.mk_not(m.mk_not(eq)), m);
+            // ctx.internalize(double_not, false);
+            // if(ctx.find_assignment(double_not.get()) != l_undef && !ctx.is_relevant(double_not.get())) {
+            //     STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " << 
+            //         ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
+            //     continue;
+            // }
 
             this->m_word_eq_todo_rel.push_back(we);
         }
@@ -577,14 +597,25 @@ namespace smt {
         for (const auto& we : m_word_diseq_todo) {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
-            
-            ctx.internalize(dis, false);
             if(!ctx.is_relevant(dis.get())) {
                 STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(dis.get(), m) << " relevant: " << 
                     ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
                 continue;
             }
             this->m_word_diseq_todo_rel.push_back(we);
+        }
+
+        for (const auto& we : this->m_membership_todo) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
+            if(!std::get<2>(we)){
+                in_app = m.mk_not(in_app);
+            }
+            if(ctx.is_relevant(in_app.get())) {
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(in_app.get(), m) << " relevant: " << 
+                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
+                this->m_membership_todo_rel.push_back(we);
+                continue;
+            }
         }
     }
 
@@ -615,7 +646,15 @@ namespace smt {
             std::cout<<print_word_term(we.second)<< std::endl;
         }
 
+        ast_manager &m = get_manager();
+        for (const auto& we : this->m_membership_todo_rel) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
+            if(!std::get<2>(we)){
+                in_app = m.mk_not(in_app);
+            }
+            std::cout << mk_pp(std::get<0>(we), m) << std::endl;
 
+        }
 
 
 
@@ -728,7 +767,22 @@ namespace smt {
         return bv;
     }
 
+    void theory_str_noodler::add_block_axiom(expr *const e) {
+        STRACE("str", tout <<  __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
 
+        if (!axiomatized_terms.contains(e) || false) {
+            axiomatized_terms.insert(e);
+            if (e == nullptr || get_manager().is_true(e)) return;
+            context &ctx = get_context();
+            if (!ctx.b_internalized(e)) {
+                ctx.internalize(e, false);
+            }
+            ctx.internalize(e, false);
+            literal l{ctx.get_literal(e)};
+            ctx.mk_th_axiom(get_id(), 1, &l);
+            STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e] block: \n", l) << '\n';);
+        }
+    }
 
     void theory_str_noodler::add_axiom(expr *const e) {
         bool on_screen = true;
@@ -1172,24 +1226,20 @@ namespace smt {
         VERIFY(m_util_s.str.is_in_re(e, s, re));
         ast_manager& m = get_manager();
 
-        STRACE("str", tout  << "handle_in_re" << std::endl;);
 
-//        expr_ref tmp{e, m};
-//        m_rewrite(tmp);
-//        if ((m.is_false(tmp) && is_true) || (m.is_true(tmp) && !is_true)) {
-//            literal_vector lv;
-//            lv.push_back(is_true ? mk_literal(e) : ~mk_literal(e));
-//            set_conflict(lv);
-//            return;
-//        }
+
+        STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
+
+    //    expr_ref tmp{e, m};
+    //    m_rewrite(tmp);
+    //    if ((m.is_false(tmp) && is_true) || (m.is_true(tmp) && !is_true)) {
+    //        literal_vector lv;
+    //        lv.push_back(is_true ? mk_literal(e) : ~mk_literal(e));
+    //        set_conflict(lv);
+    //        return;
+    //    }
         expr_ref r{re, m};
-        context& ctx = get_context();
-        literal l = ctx.get_literal(e);
-        if (!is_true) {
-            r = m_util_s.re.mk_complement(re);
-            l.neg();
-        }
-        m_membership_todo.push_back({{s, m}, r});
+        this->m_membership_todo.push_back(std::make_tuple(expr_ref(s, m), r, is_true));
     }
 
     void theory_str_noodler::set_conflict(const literal_vector& lv) {
@@ -1204,6 +1254,7 @@ namespace smt {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         bool on_screen=false;
+        context& ctx = get_context();
 
         if(on_screen) std::cout<<"[block] ";
         for (const auto& we : m_word_eq_var_todo) {
@@ -1218,18 +1269,30 @@ namespace smt {
         expr *refinement = nullptr;
         STRACE("str", tout << "[Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
-            expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            expr *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
             STRACE("str", tout << we.first << " = " << we.second << '\n';);
         }
+
+        literal_vector ls;
         for (const auto& wi : this->m_word_diseq_todo_rel) {
 //            expr *const e = mk_eq_atom(wi.first, wi.second);
-            expr *const e = m.mk_eq(wi.first, wi.second);
+            expr_ref e(ctx.mk_eq_atom(wi.first, wi.second), m);
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
-            STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+            STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
         }
+
+        for (const auto& in : this->m_membership_todo_rel) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
+            if(std::get<2>(in)){
+                in_app = m.mk_not(in_app);
+            }
+            refinement = refinement == nullptr ? in_app : m.mk_or(refinement, in_app);
+            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+        }
+        
         if (refinement != nullptr) {
-            add_axiom(refinement);
+            add_block_axiom(refinement);
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 

@@ -51,6 +51,7 @@ namespace smt {
 
         std::set<std::pair<int,int>> axiomatized_eq_vars;
         using expr_pair = std::pair<expr_ref, expr_ref>;
+        using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
         using tvar_pair = std::pair<theory_var , theory_var >;
 
         scoped_vector<tvar_pair> m_word_eq_var_todo;
@@ -60,9 +61,11 @@ namespace smt {
         scoped_vector<expr_pair> m_word_eq_todo;
         scoped_vector<expr_pair> m_word_diseq_todo;
         scoped_vector<expr_pair> m_not_contains_todo;
-        scoped_vector<expr_pair> m_membership_todo;
+        scoped_vector<expr_pair_flag> m_membership_todo;
         vector<expr_pair> m_word_eq_todo_rel;
         vector<expr_pair> m_word_diseq_todo_rel;
+        vector<expr_pair_flag> m_membership_todo_rel;
+
     public:
         char const * get_name() const override { return "noodler"; }
         theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params);
@@ -98,6 +101,7 @@ namespace smt {
         expr_ref mk_len(expr* s) const { return expr_ref(m_util_s.str.mk_length(s), m); }
 
         void add_axiom(expr *e);
+        void add_block_axiom(expr *const e);
         literal mk_eq_empty(expr* n, bool phase = true);
         expr_ref mk_last(expr* e);
         expr_ref mk_first(expr* e);
