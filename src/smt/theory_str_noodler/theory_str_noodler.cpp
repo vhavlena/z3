@@ -569,7 +569,11 @@ namespace smt {
 
     }
 
-    void theory_str_noodler::remove_irrelevant_eqs() {
+    /*
+    Remove irrelevant string constraints. In particular remove equations, disequations, and 
+    regular constraints that are not relevant for SAT checking.
+    */
+    void theory_str_noodler::remove_irrelevant_constr() {
         
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
@@ -619,6 +623,9 @@ namespace smt {
         }
     }
 
+    /*
+    Final check for an assignment of the underlying boolean skeleton.
+    */
     final_check_status theory_str_noodler::final_check_eh() {
         TRACE("str",  tout << "pop_scope: ";);
         std::cout << "final_check starts\n"<<std::endl;
@@ -632,7 +639,7 @@ namespace smt {
         //         return FC_DONE;
         // }
 
-        remove_irrelevant_eqs();
+        remove_irrelevant_constr();
 
         for (const auto& we : this->m_word_eq_todo_rel) {
             std::cout<<print_word_term(we.first) <<std::flush;
@@ -652,7 +659,7 @@ namespace smt {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            std::cout << mk_pp(std::get<0>(we), m) << std::endl;
+            std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
 
         }
 

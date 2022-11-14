@@ -145,7 +145,7 @@ namespace smt {
         void print_ctx(context& ctx);
 
 
-        void remove_irrelevant_eqs();
+        void remove_irrelevant_constr();
     };
 }
 
