@@ -62,7 +62,7 @@ namespace smt::noodler {
         std::string name;
     }; // Class BasicTerm.
 
-    bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
+    static bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
 
     class Predicate {
     public:
@@ -246,7 +246,7 @@ namespace smt::noodler {
         std::vector<std::vector<BasicTerm>> params;
     }; // Class Predicate.
 
-    bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
+    static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
 
     class Formula {
         Formula(): predicates() {}

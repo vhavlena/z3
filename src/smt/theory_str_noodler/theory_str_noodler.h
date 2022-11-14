@@ -27,10 +27,11 @@ Eternal glory to Yu-Fang.
 #include "util/union_find.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
+#include "inclusion_graph_node.h"
 
 
 
-namespace smt {
+namespace smt::noodler {
 
 
     class theory_str_noodler : public theory {
@@ -146,6 +147,7 @@ namespace smt {
 
 
         void remove_irrelevant_constr();
+        Predicate convertEq(const app* expr);
     };
 }
 

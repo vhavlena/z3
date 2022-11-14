@@ -938,7 +938,7 @@ namespace smt {
 
     void setup::setup_str_noodler() {
         setup_arith();
-        m_context.register_plugin(alloc(theory_str_noodler, m_context, m_manager, m_params));
+        m_context.register_plugin(alloc(noodler::theory_str_noodler, m_context, m_manager, m_params));
     }
 
     void setup::setup_seq() {

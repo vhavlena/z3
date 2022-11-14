@@ -17,7 +17,7 @@ Eternal glory to Yu-Fang.
 #include "ast/reg_decl_plugins.h"
 
 
-namespace smt {
+namespace smt::noodler {
     bool theory_str_noodler::is_over_approximation = false;
 
     namespace {
@@ -1319,5 +1319,9 @@ namespace smt {
                     std::cout <<"**"<< mk_pp(e, m) << (ctx.is_relevant(e) ? "\n" : " (not relevant)\n");
                 }
         );
+    }
+
+    Predicate theory_str_noodler::convertEq(const app* expr) { 
+        return Predicate(PredicateType::Equation); 
     }
 }
