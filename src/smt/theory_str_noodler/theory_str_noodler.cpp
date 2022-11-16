@@ -569,7 +569,7 @@ namespace smt::noodler {
 
     }
 
-    /*
+    /**
     Remove irrelevant string constraints. In particular remove equations, disequations, and 
     regular constraints that are not relevant for SAT checking.
     */
@@ -663,11 +663,14 @@ namespace smt::noodler {
 
         }
 
+        block_len();
+        return FC_DONE;
 
 
         block_curr_assignment();
         TRACE("str", tout << "final_check ends\n";);
         IN_CHECK_FINAL = false;
+        
         return FC_CONTINUE;
     }
 
@@ -1305,6 +1308,43 @@ namespace smt::noodler {
 
     }
 
+    void theory_str_noodler::block_len() {
+        STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+
+        bool on_screen=false;
+        context& ctx = get_context();
+
+        ast_manager& m = get_manager();
+        expr *refinement = nullptr;
+        expr *refinement_len = nullptr;
+        STRACE("str", tout << "[Len Refinement]\nformulas:\n";);
+        for (const auto& we : this->m_word_eq_todo_rel) {
+
+            vector<expr*> vars;
+            this->get_variables(to_app(we.first.get()), vars);
+            this->get_variables(to_app(we.second.get()), vars);
+
+            for(expr * const var : vars) {
+                std::cout << mk_pp(var, m) << std::endl;
+                expr_ref len_str_l(m_util_s.str.mk_length(var), m);
+                SASSERT(len_str_l);
+                // build RHS
+                expr_ref num(m);
+                num = m_util_a.mk_numeral(rational(5), true);
+                app *lhs_eq_rhs_1 = m_util_a.mk_eq(len_str_l, num);
+                refinement_len = refinement_len == nullptr ? lhs_eq_rhs_1 : m.mk_and(refinement_len, lhs_eq_rhs_1);
+            }
+
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+        }
+
+        std::cout << mk_pp(refinement_len, m) << std::endl;
+        refinement = m.mk_or(m.mk_not(refinement), refinement_len);
+
+        add_axiom(refinement);
+    }
+
     void theory_str_noodler::dump_assignments() const {
         STRACE("str", \
                 ast_manager& m = get_manager();
@@ -1321,7 +1361,35 @@ namespace smt::noodler {
         );
     }
 
+    /**
+    Get variable from a given expression @p ex. Append to the output parameter @p res. 
+    @param ex Expression to be checked for variables.
+    @param[out] res Vector of found variables (may contain duplicities).
+    */
+    void theory_str_noodler::get_variables(expr* const ex, vector<expr*>& res) {
+        if(m_util_s.str.is_string(ex)) {
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            res.push_back(ex);
+            return;
+        }
+
+        SASSERT(is_app(ex));
+        app* ex_app = to_app(ex);
+        SASSERT(m_util_s.str.is_concat(ex_app));
+
+        SASSERT(ex_app->get_num_args() == 2);
+        app *a_x = to_app(ex_app->get_arg(0));
+        app *a_y = to_app(ex_app->get_arg(1));
+        this->get_variables(a_x, res);
+        this->get_variables(a_y, res);
+    }
+
     Predicate theory_str_noodler::convertEq(const app* expr) { 
         return Predicate(PredicateType::Equation); 
     }
+
+
 }

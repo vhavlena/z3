@@ -144,9 +144,11 @@ namespace smt::noodler {
         void tightest_prefix(expr*,expr*);
         void print_ast(expr *e);
         void print_ctx(context& ctx);
+        void block_len();
 
 
         void remove_irrelevant_constr();
+        void get_variables(expr* const ex, vector<expr*>& res);
         Predicate convertEq(const app* expr);
     };
 }
