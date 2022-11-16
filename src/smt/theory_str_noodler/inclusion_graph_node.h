@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <string>
 #include <string_view>
+#include <set>
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -32,8 +33,8 @@ namespace smt::noodler {
     };
 
     enum struct BasicTermType {
-        Literal,
         Variable,
+        Literal,
         Length,
         Substring,
         IndexOf,
@@ -63,6 +64,20 @@ namespace smt::noodler {
     }; // Class BasicTerm.
 
     static bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
+    static bool operator!=(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs == rhs); }
+    static bool operator<(const BasicTerm& lhs, const BasicTerm& rhs) {
+        if (lhs.get_type() < rhs.get_type()) {
+            return true;
+        } else if (lhs.get_type() > rhs.get_type()) {
+            return false;
+        }
+        // Types are equal. Compare names.
+        if (lhs.get_name() < rhs.get_name()) {
+            return true;
+        }
+        return false;
+    }
+    static bool operator>(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs < rhs); }
 
     class Predicate {
     public:
@@ -145,9 +160,9 @@ namespace smt::noodler {
          * Get unique variables on both sides of an (in)equation.
          * @return Variables in the (in)equation.
          */
-        [[nodiscard]] std::vector<BasicTerm> get_vars() const {
+        [[nodiscard]] std::set<BasicTerm> get_vars() const {
             assert(is_eq_or_ineq());
-            std::vector<BasicTerm> vars;
+            std::set<BasicTerm> vars;
             for (const auto& side: params) {
                 for (const auto &term: side) {
                     if (term.is_variable()) {
@@ -158,7 +173,7 @@ namespace smt::noodler {
                                 break;
                             }
                         }
-                        if (!found) { vars.push_back(term); }
+                        if (!found) { vars.insert(term); }
                     }
                 }
             }
@@ -170,9 +185,9 @@ namespace smt::noodler {
          * @param[in] side (In)Equation side to get variables from.
          * @return Variables in the (in)equation on specified @p side.
          */
-        [[nodiscard]] std::vector<BasicTerm> get_side_vars(const EquationSideType side) const {
+        [[nodiscard]] std::set<BasicTerm> get_side_vars(const EquationSideType side) const {
             assert(is_eq_or_ineq());
-            std::vector<BasicTerm> vars;
+            std::set<BasicTerm> vars;
             std::vector<BasicTerm> side_terms;
             switch (side) {
                 case EquationSideType::Left:
@@ -195,7 +210,7 @@ namespace smt::noodler {
                             break;
                         }
                     }
-                    if (!found) { vars.push_back(term); }
+                    if (!found) { vars.insert(term); }
                 }
             }
            return vars;
@@ -252,6 +267,7 @@ namespace smt::noodler {
     }; // Class Predicate.
 
     static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
+    static bool operator!=(const Predicate& lhs, const Predicate& rhs) { return !(lhs == rhs); }
 
     class Formula {
         Formula(): predicates() {}
