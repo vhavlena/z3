@@ -50,6 +50,8 @@ namespace smt::noodler {
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
 
+        vector<std::pair<obj_hashtable<expr>,int>> visited;
+
         std::set<std::pair<int,int>> axiomatized_eq_vars;
         using expr_pair = std::pair<expr_ref, expr_ref>;
         using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
@@ -66,6 +68,8 @@ namespace smt::noodler {
         vector<expr_pair> m_word_eq_todo_rel;
         vector<expr_pair> m_word_diseq_todo_rel;
         vector<expr_pair_flag> m_membership_todo_rel;
+
+        int cnt = 1;
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -144,7 +148,7 @@ namespace smt::noodler {
         void tightest_prefix(expr*,expr*);
         void print_ast(expr *e);
         void print_ctx(context& ctx);
-        void block_len();
+        void block_len(int n_cnt);
 
 
         void remove_irrelevant_constr();

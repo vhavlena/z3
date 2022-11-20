@@ -641,7 +641,13 @@ namespace smt::noodler {
 
         remove_irrelevant_constr();
 
+        obj_hashtable<expr> conj;
+
         for (const auto& we : this->m_word_eq_todo_rel) {
+
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            conj.insert(e);
+
             std::cout<<print_word_term(we.first) <<std::flush;
             std::cout<<"="<<std::flush;
             std::cout<<print_word_term(we.second) << std::endl;
@@ -663,7 +669,30 @@ namespace smt::noodler {
 
         }
 
-        block_len();
+        bool found = false;
+        int n_cnt = -1;
+        for(const auto& pr : this->visited) {
+            for(auto* const ex : conj) {
+                found = false;
+                if(!pr.first.contains(ex)) {
+                    break;
+                }
+                found = true;
+            }
+            if(found) {
+                n_cnt = pr.second;
+                break;
+            }
+        }
+
+        if(n_cnt == -1) {
+            n_cnt = this->cnt;
+            std::cout << "not visited" << std::endl;
+        }
+        this->visited.push_back({conj, n_cnt});
+
+        block_len(n_cnt);
+        this->cnt = fmax(this->cnt, n_cnt + 3);
         return FC_DONE;
 
 
@@ -1308,15 +1337,17 @@ namespace smt::noodler {
 
     }
 
-    void theory_str_noodler::block_len() {
+    void theory_str_noodler::block_len(int n_cnt) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
-        bool on_screen=false;
         context& ctx = get_context();
-
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
+        expr *refinement_len_1 = nullptr;
         expr *refinement_len = nullptr;
+        expr *refinement_len_2 = nullptr;
+        expr *refinement_len_3 = nullptr;
+
         STRACE("str", tout << "[Len Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
 
@@ -1330,17 +1361,35 @@ namespace smt::noodler {
                 SASSERT(len_str_l);
                 // build RHS
                 expr_ref num(m);
-                num = m_util_a.mk_numeral(rational(5), true);
-                app *lhs_eq_rhs_1 = m_util_a.mk_eq(len_str_l, num);
-                refinement_len = refinement_len == nullptr ? lhs_eq_rhs_1 : m.mk_and(refinement_len, lhs_eq_rhs_1);
+                num = m_util_a.mk_numeral(rational(n_cnt), true);
+                app *lhs_eq_rhs_1 = m_util_a.mk_le(len_str_l, num);
+
+                refinement_len_1 = refinement_len_1 == nullptr ? lhs_eq_rhs_1 : m.mk_and(refinement_len_1, lhs_eq_rhs_1);
+
+                expr_ref len_str_2(m_util_s.str.mk_length(var), m);
+                SASSERT(len_str_2);
+                // build RHS
+                expr_ref num2(m);
+                num2 = m_util_a.mk_numeral(rational(n_cnt+1), true);
+                app *lhs_eq_rhs_2 = m_util_a.mk_le(len_str_2, num2);
+                refinement_len_2 = refinement_len_2 == nullptr ? lhs_eq_rhs_2 : m.mk_and(refinement_len_2, lhs_eq_rhs_2);
+
+                expr_ref len_str_3(m_util_s.str.mk_length(var), m);
+                SASSERT(len_str_3);
+                // build RHS
+                expr_ref num3(m);
+                num3 = m_util_a.mk_numeral(rational(n_cnt+2), true);
+                app *lhs_eq_rhs_3 = m_util_a.mk_le(len_str_3, num3);
+                refinement_len_3 = refinement_len_3 == nullptr ? lhs_eq_rhs_3 : m.mk_and(refinement_len_3, lhs_eq_rhs_3);
             }
 
             expr *const e = ctx.mk_eq_atom(we.first, we.second);
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
         }
 
-        std::cout << mk_pp(refinement_len, m) << std::endl;
+        refinement_len = refinement_len_2 == nullptr ? refinement_len_1 : m.mk_or(refinement_len_1, m.mk_or(refinement_len_2, refinement_len_3));
         refinement = m.mk_or(m.mk_not(refinement), refinement_len);
+        std::cout << mk_pp(refinement, m) << std::endl;
 
         add_axiom(refinement);
     }
