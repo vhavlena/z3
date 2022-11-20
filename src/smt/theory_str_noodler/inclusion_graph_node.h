@@ -79,6 +79,11 @@ namespace smt::noodler {
             }
         }
 
+        explicit Predicate(const PredicateType type, std::vector<std::vector<BasicTerm>> par): 
+            type(type), 
+            params(par) 
+            { }
+
         PredicateType get_type() { return type; }
         [[nodiscard]] bool is_equation() const { return type == PredicateType::Equation; }
         [[nodiscard]] bool is_inequation() const { return type == PredicateType::Inequation; }
