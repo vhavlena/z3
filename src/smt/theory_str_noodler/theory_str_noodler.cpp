@@ -642,11 +642,13 @@ namespace smt::noodler {
         remove_irrelevant_constr();
 
         obj_hashtable<expr> conj;
+        obj_hashtable<app> conj_instance;
 
         for (const auto& we : this->m_word_eq_todo_rel) {
 
-            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
+            conj_instance.insert(e);
 
             std::cout<<print_word_term(we.first) <<std::flush;
             std::cout<<"="<<std::flush;
@@ -654,6 +656,9 @@ namespace smt::noodler {
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
+            app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
+            conj_instance.insert(e);
+
             std::cout<<print_word_term(we.first) <<std::flush;
             std::cout<<"!="<<std::flush;
             std::cout<<print_word_term(we.second)<< std::endl;
@@ -668,6 +673,9 @@ namespace smt::noodler {
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
 
         }
+
+        Formula instance;
+        this->conj_instance(conj_instance, instance);
 
         bool found = false;
         int n_cnt = -1;
@@ -1436,8 +1444,65 @@ namespace smt::noodler {
         this->get_variables(a_y, res);
     }
 
-    Predicate theory_str_noodler::convertEq(const app* expr) { 
-        return Predicate(PredicateType::Equation); 
+    /**
+    Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 
+    to the output parameter @p terms. 
+    @param ex Expression to be checked for basic terms.
+    @param[out] terms Vector of found BasicTerm (in right order).
+    */
+    void theory_str_noodler::collect_terms(const app* ex, std::vector<BasicTerm>& terms) { 
+        if(m_util_s.str.is_string(ex)) {
+            std::string lit = ex->get_parameter(0).get_zstring().encode();
+            terms.push_back(BasicTerm(BasicTermType::Literal, lit));
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            std::string var = ex->get_decl()->get_name().str();
+            terms.push_back(BasicTerm(BasicTermType::Variable, var));
+            return;
+        }
+
+        SASSERT(m_util_s.str.is_concat(ex));
+        SASSERT(ex->get_num_args() == 2);
+        app *a_x = to_app(ex->get_arg(0));
+        app *a_y = to_app(ex->get_arg(1));
+        this->collect_terms(a_x, terms);
+        this->collect_terms(a_y, terms);
+    }
+
+    /**
+    Convert equation/disaequation @p ex to the instance of Predicate.
+    @param ex Z3 expression to be converted to Predicate.
+    @return Instance of predicate
+    */
+    Predicate theory_str_noodler::conv_eq_pred(const app* ex) { 
+        const app* eq = ex;
+        if(m.is_not(ex)) {
+            SASSERT(is_app(ex->get_arg(0)));
+            SASSERT(ex->get_num_args() == 1);
+            eq = to_app(ex->get_arg(0));
+        }
+        SASSERT(ex->get_num_args() == 2);
+        SASSERT(eq->get_arg(0));
+        SASSERT(eq->get_arg(1));
+
+        std::vector<BasicTerm> left, right;
+        this->collect_terms(to_app(eq->get_arg(0)), left);
+        this->collect_terms(to_app(eq->get_arg(1)), right);
+
+        return Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>{left, right}); 
+    }
+
+    /**
+    Convert conjunction of equations/disequations to the instance of Formula.
+    @param conj Conjunction in the form of a set of (dis)equations
+    @param[out] res Resulting formula
+    */
+    void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
+        for(app *const pred : conj) {
+            res.add_predicate(this->conv_eq_pred(pred));
+        } 
     }
 
 

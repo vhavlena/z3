@@ -254,6 +254,8 @@ namespace smt::noodler {
     static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
 
     class Formula {
+    
+    public:
         Formula(): predicates() {}
 
         std::vector<Predicate>& get_predicates() { return predicates; }

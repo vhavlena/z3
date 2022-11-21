@@ -153,7 +153,10 @@ namespace smt::noodler {
 
         void remove_irrelevant_constr();
         void get_variables(expr* const ex, vector<expr*>& res);
-        Predicate convertEq(const app* expr);
+
+        void collect_terms(const app* ex, std::vector<BasicTerm>& terms);
+        Predicate conv_eq_pred(const app* expr);
+        void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };
 }
 
