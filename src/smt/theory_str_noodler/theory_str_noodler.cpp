@@ -1502,7 +1502,9 @@ namespace smt::noodler {
     */
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
         for(app *const pred : conj) {
-            res.add_predicate(this->conv_eq_pred(pred));
+            Predicate inst = this->conv_eq_pred(pred);
+            STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
+            res.add_predicate(inst);
         } 
     }
 

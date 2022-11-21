@@ -33,7 +33,7 @@ namespace smt::noodler {
         // TODO: Add additional predicate types.
     };
 
-    [[nodiscard]] std::string to_string(PredicateType predicate_type) {
+    [[nodiscard]] static std::string to_string(PredicateType predicate_type) {
         switch (predicate_type) {
             case PredicateType::Default:
                 return "Default";
@@ -57,7 +57,7 @@ namespace smt::noodler {
         // TODO: Add additional basic term types.
     };
 
-    [[nodiscard]] std::string to_string(BasicTermType term_type) {
+    [[nodiscard]] static std::string to_string(BasicTermType term_type) {
         switch (term_type) {
             case BasicTermType::Variable:
                 return "Variable";
@@ -96,13 +96,12 @@ namespace smt::noodler {
                 case BasicTermType::Literal: {
                     std::string result{};
                     if (!name.empty()) {
-                        result += "\"" + name + "\" ";
+                        result += "\"" + name + "\"";
                     }
-                    result += "(" + noodler::to_string(type) + ")";
                     return result;
                 }
                 case BasicTermType::Variable:
-                    return name + " (" + noodler::to_string(type) + ")";
+                    return name;
                 case BasicTermType::Length:
                 case BasicTermType::Substring:
                 case BasicTermType::IndexOf:
@@ -118,7 +117,7 @@ namespace smt::noodler {
         std::string name;
     }; // Class BasicTerm.
 
-    [[nodiscard]] std::string to_string(const BasicTerm& basic_term) {
+    [[nodiscard]] static std::string to_string(const BasicTerm& basic_term) {
         return basic_term.to_string();
     }
 
@@ -327,11 +326,11 @@ namespace smt::noodler {
                 case PredicateType::Equation: {
                     std::string result{ "Equation:" };
                     for (const auto& item: get_left_side()) {
-                        result += " . " + item.to_string();
+                        result += " " + item.to_string();
                     }
                     result += " =";
                     for (const auto& item: get_right_side()) {
-                        result += " . " + item.to_string();
+                        result += " " + item.to_string();
                     }
                     return result;
                 }
@@ -339,11 +338,11 @@ namespace smt::noodler {
                 case PredicateType::Inequation: {
                     std::string result{ "Inequation:" };
                     for (const auto& item: get_left_side()) {
-                        result += " . " + item.to_string();
+                        result += " " + item.to_string();
                     }
                     result += " !=";
                     for (const auto& item: get_right_side()) {
-                        result += " . " + item.to_string();
+                        result += " " + item.to_string();
                     }
                     return result;
                 }
@@ -365,11 +364,11 @@ namespace smt::noodler {
         std::vector<std::vector<BasicTerm>> params;
     }; // Class Predicate.
 
-    [[nodiscard]] std::string to_string(const Predicate& predicate) {
+    [[nodiscard]] static std::string to_string(const Predicate& predicate) {
         return predicate.to_string();
     }
 
-    std::ostream& operator<<(std::ostream& os, const Predicate& predicate) {
+    static std::ostream& operator<<(std::ostream& os, const Predicate& predicate) {
         os << predicate.to_string();
         return os;
     }
