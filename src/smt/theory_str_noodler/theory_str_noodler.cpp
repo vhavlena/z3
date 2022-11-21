@@ -6,6 +6,7 @@ Eternal glory to Yu-Fang.
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+#include <cmath>
 #include "ast/ast_pp.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "smt/smt_context.h"
