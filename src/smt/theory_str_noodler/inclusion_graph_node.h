@@ -369,6 +369,11 @@ namespace smt::noodler {
         return predicate.to_string();
     }
 
+    std::ostream& operator<<(std::ostream& os, const Predicate& predicate) {
+        os << predicate.to_string();
+        return os;
+    }
+
     static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
     static bool operator!=(const Predicate& lhs, const Predicate& rhs) { return !(lhs == rhs); }
 

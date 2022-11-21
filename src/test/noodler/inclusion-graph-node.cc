@@ -59,5 +59,12 @@ TEST_CASE("Conversion to strings") {
     } } };
 
     CHECK(pred.to_string() == "Equation: . \"4\" (Literal) . x_42 (Variable) = . xyz (Variable) . y_58 (Variable)");
+
+    auto pred_ineq{ Predicate{ PredicateType::Inequation, {
+            { { BasicTermType::Literal, "4" }, { BasicTermType::Variable, "x_42" } } ,
+            { { BasicTermType::Variable, "xyz" }, { BasicTermType::Variable, "y_58" } },
+    } } };
+
+    CHECK(pred_ineq.to_string() == "Inequation: . \"4\" (Literal) . x_42 (Variable) != . xyz (Variable) . y_58 (Variable)");
 }
 
