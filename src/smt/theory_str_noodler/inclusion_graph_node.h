@@ -26,11 +26,27 @@
 
 namespace smt::noodler {
     enum struct PredicateType {
+        Default,
         Equation,
         Inequation,
         Contains,
         // TODO: Add additional predicate types.
     };
+
+    [[nodiscard]] std::string to_string(PredicateType predicate_type) {
+        switch (predicate_type) {
+            case PredicateType::Default:
+                return "Default";
+            case PredicateType::Equation:
+                return "Equation";
+            case PredicateType::Inequation:
+                return "Inequation";
+            case PredicateType::Contains:
+                return "Contains";
+        }
+
+        throw std::runtime_error("Unhandled predicate type passed to to_string().");
+    }
 
     enum struct BasicTermType {
         Variable,
@@ -40,6 +56,23 @@ namespace smt::noodler {
         IndexOf,
         // TODO: Add additional basic term types.
     };
+
+    [[nodiscard]] std::string to_string(BasicTermType term_type) {
+        switch (term_type) {
+            case BasicTermType::Variable:
+                return "Variable";
+            case BasicTermType::Literal:
+                return "Literal";
+            case BasicTermType::Length:
+                return "Length";
+            case BasicTermType::Substring:
+                return "Substring";
+            case BasicTermType::IndexOf:
+                return "IndexOf";
+        }
+
+        throw std::runtime_error("Unhandled basic term type passed to to_string().");
+    }
 
     class BasicTerm {
     public:
@@ -58,10 +91,36 @@ namespace smt::noodler {
             return type == other.get_type() && name == other.get_name();
         }
 
+        [[nodiscard]] std::string to_string() const {
+            switch (type) {
+                case BasicTermType::Literal: {
+                    std::string result{};
+                    if (!name.empty()) {
+                        result += "\"" + name + "\" ";
+                    }
+                    result += "(" + noodler::to_string(type) + ")";
+                    return result;
+                }
+                case BasicTermType::Variable:
+                    return name + " (" + noodler::to_string(type) + ")";
+                case BasicTermType::Length:
+                case BasicTermType::Substring:
+                case BasicTermType::IndexOf:
+                    return name + " (" + noodler::to_string(type) + ")";
+                    // TODO: Decide what will have names and when to use them.
+            }
+
+            throw std::runtime_error("Unhandled basic term type passed as 'this' to to_string().");
+        }
+
     private:
         BasicTermType type;
         std::string name;
     }; // Class BasicTerm.
+
+    [[nodiscard]] std::string to_string(const BasicTerm& basic_term) {
+        return basic_term.to_string();
+    }
 
     static bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
     static bool operator!=(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs == rhs); }
@@ -86,6 +145,7 @@ namespace smt::noodler {
             Right,
         };
 
+        Predicate() : type(PredicateType::Default) {}
         explicit Predicate(const PredicateType type): type(type) {
             if (is_equation() || is_inequation()) {
                 params.resize(2);
@@ -259,12 +319,55 @@ namespace smt::noodler {
             return false;
         }
 
+        [[nodiscard]] std::string to_string() const {
+            switch (type) {
+                case PredicateType::Default: {
+                    return "Default (missing type and data)";
+                }
+                case PredicateType::Equation: {
+                    std::string result{ "Equation:" };
+                    for (const auto& item: get_left_side()) {
+                        result += " . " + item.to_string();
+                    }
+                    result += " =";
+                    for (const auto& item: get_right_side()) {
+                        result += " . " + item.to_string();
+                    }
+                    return result;
+                }
+
+                case PredicateType::Inequation: {
+                    std::string result{ "Inequation:" };
+                    for (const auto& item: get_left_side()) {
+                        result += " . " + item.to_string();
+                    }
+                    result += " !=";
+                    for (const auto& item: get_right_side()) {
+                        result += " . " + item.to_string();
+                    }
+                    return result;
+                }
+
+                // TODO: Implement prints for other predicates.
+
+                case PredicateType::Contains: {
+                    break;
+                }
+            }
+
+            throw std::runtime_error("Unhandled predicate type passed as 'this' to to_string().");
+        }
+
         // TODO: Additional operations.
 
     private:
         PredicateType type;
         std::vector<std::vector<BasicTerm>> params;
     }; // Class Predicate.
+
+    [[nodiscard]] std::string to_string(const Predicate& predicate) {
+        return predicate.to_string();
+    }
 
     static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
     static bool operator!=(const Predicate& lhs, const Predicate& rhs) { return !(lhs == rhs); }
