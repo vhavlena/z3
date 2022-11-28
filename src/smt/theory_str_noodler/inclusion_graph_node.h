@@ -112,6 +112,14 @@ namespace smt::noodler {
             throw std::runtime_error("Unhandled basic term type passed as 'this' to to_string().");
         }
 
+        struct HashFunction {
+            size_t operator() (const BasicTerm& basic_term) const {
+                size_t row_hash = std::hash<BasicTermType>()(basic_term.type);
+                size_t col_hash = std::hash<std::string>()(basic_term.name) << 1;
+                return row_hash ^ col_hash;
+            }
+        };
+
     private:
         BasicTermType type;
         std::string name;
@@ -357,6 +365,22 @@ namespace smt::noodler {
             throw std::runtime_error("Unhandled predicate type passed as 'this' to to_string().");
         }
 
+        struct HashFunction {
+            size_t operator()(const Predicate& predicate) const {
+                size_t res{};
+                size_t row_hash = std::hash<PredicateType>()(predicate.type);
+                for (const auto& term: predicate.get_left_side()) {
+                    size_t col_hash = BasicTerm::HashFunction()(term) << 1;
+                    res ^= col_hash;
+                }
+                for (const auto& term: predicate.get_right_side()) {
+                    size_t col_hash = BasicTerm::HashFunction()(term) << 1;
+                    res ^= col_hash;
+                }
+                return row_hash ^ res;
+            }
+        };
+
         // TODO: Additional operations.
 
     private:
@@ -390,5 +414,23 @@ namespace smt::noodler {
         std::vector<Predicate> predicates;
     }; // Class Formula.
 } // Namespace smt::noodler.
+
+namespace std {
+    template<>
+    struct hash<smt::noodler::Predicate> {
+        inline size_t operator()(const smt::noodler::Predicate& predicate) const {
+            size_t accum = smt::noodler::Predicate::HashFunction()(predicate);
+            return accum;
+        }
+    };
+
+    template<>
+    struct hash<smt::noodler::BasicTerm> {
+        inline size_t operator()(const smt::noodler::BasicTerm& basic_term) const {
+            size_t accum = smt::noodler::BasicTerm::HashFunction()(basic_term);
+            return accum;
+        }
+    };
+}
 
 #endif //Z3_INCLUSION_GRAPH_NODE_H
