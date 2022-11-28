@@ -23,6 +23,7 @@
 #include <string>
 #include <string_view>
 #include <set>
+#include <CXXGraph/CXXGraph.hpp>
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -413,6 +414,7 @@ namespace smt::noodler {
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
+
 } // Namespace smt::noodler.
 
 namespace std {

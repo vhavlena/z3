@@ -73,22 +73,15 @@ TEST_CASE("Integration of inclusion graph") {
     auto mtp = Predicate{ PredicateType::Equation };
     auto tmp = Predicate{ PredicateType::Equation };
     CXXGRAPH::Node<Predicate> node0("0", Predicate{ PredicateType::Equation });
-    std::cout << node0.getId() << "\n";
-    std::cout << node0.getData().to_string() << "\n";
     CXXGRAPH::Node<Predicate> node1("1", Predicate{ PredicateType::Equation });
 
     CXXGRAPH::UndirectedEdge<Predicate> edge1{ 0, node0, node1};
 
-
     CXXGRAPH::T_EdgeSet<Predicate> edgeSet;
     edgeSet.insert(&edge1);
-
-    // Can print out the edges for debugging
-    std::cout << edge1 << "\n";
 
     CXXGRAPH::Graph<Predicate> graph{ edgeSet };
     graph.setEdgeSet(edgeSet);
     auto res = graph.dijkstra(node0, node1);
-
-    std::cout << "Dijkstra Result: " << res.result << "\n";
+    CHECK(res.result >= 1.79769e+307);
 }

@@ -1,3 +1,5 @@
+include_directories("theory_str_noodler/3rdparty/include")
+
 z3_add_component(smt
   SOURCES
     arith_eq_adapter.cpp
