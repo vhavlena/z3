@@ -165,6 +165,8 @@ namespace smt::noodler {
         [[nodiscard]] bool is_predicate() const { return !is_eq_or_ineq(); }
         [[nodiscard]] bool is(const PredicateType predicate_type) const { return predicate_type == this->type; }
 
+        const std::vector<std::vector<BasicTerm>>& get_params() const { return this->params; }
+
         std::vector<BasicTerm>& get_left_side() {
             assert(is_eq_or_ineq());
             return params[0];
@@ -381,7 +383,7 @@ namespace smt::noodler {
     public:
         Formula(): predicates() {}
 
-        std::vector<Predicate>& get_predicates() { return predicates; }
+        const std::vector<Predicate>& get_predicates() const { return predicates; }
 
         // TODO: Use std::move for both add functions?
         void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }

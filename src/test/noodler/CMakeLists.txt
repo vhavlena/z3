@@ -6,6 +6,7 @@ z3_add_component(noodler
     NOT_LIBZ3_COMPONENT # Don't put this component inside libz3
     SOURCES
         inclusion-graph-node.cc
+        formula-preprocess.cpp
     COMPONENT_DEPENDENCIES
         smt
 )
