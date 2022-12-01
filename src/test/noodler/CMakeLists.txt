@@ -14,6 +14,7 @@ add_executable(test-noodler
         ${z3_test_extra_object_files}
         main.cc
         inclusion-graph-node.cc
+        formula-preprocess.cpp
 )
 z3_add_install_tactic_rule(${z3_test_deps})
 z3_add_memory_initializer_rule(${z3_test_deps})
