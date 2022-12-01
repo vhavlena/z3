@@ -13,7 +13,6 @@ namespace smt::noodler {
         }
     }
 
-
     void FormulaVar::update_varmap(const Predicate& pred, size_t index) {
         assert(pred.is_equation());
         int mult = -1;
