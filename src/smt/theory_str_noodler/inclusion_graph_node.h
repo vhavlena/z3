@@ -23,7 +23,7 @@
 #include <string>
 #include <string_view>
 #include <set>
-#include <CXXGraph/CXXGraph.hpp>
+#include <unordered_set>
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -92,26 +92,7 @@ namespace smt::noodler {
             return type == other.get_type() && name == other.get_name();
         }
 
-        [[nodiscard]] std::string to_string() const {
-            switch (type) {
-                case BasicTermType::Literal: {
-                    std::string result{};
-                    if (!name.empty()) {
-                        result += "\"" + name + "\"";
-                    }
-                    return result;
-                }
-                case BasicTermType::Variable:
-                    return name;
-                case BasicTermType::Length:
-                case BasicTermType::Substring:
-                case BasicTermType::IndexOf:
-                    return name + " (" + noodler::to_string(type) + ")";
-                    // TODO: Decide what will have names and when to use them.
-            }
-
-            throw std::runtime_error("Unhandled basic term type passed as 'this' to to_string().");
-        }
+        [[nodiscard]] std::string to_string() const;
 
         struct HashFunction {
             size_t operator() (const BasicTerm& basic_term) const {
@@ -167,13 +148,15 @@ namespace smt::noodler {
             params(par) 
             { }
 
-        PredicateType get_type() { return type; }
+        [[nodiscard]] PredicateType get_type() const { return type; }
         [[nodiscard]] bool is_equation() const { return type == PredicateType::Equation; }
         [[nodiscard]] bool is_inequation() const { return type == PredicateType::Inequation; }
         [[nodiscard]] bool is_eq_or_ineq() const { return is_equation() || is_inequation(); }
         [[nodiscard]] bool is_predicate() const { return !is_eq_or_ineq(); }
         [[nodiscard]] bool is(const PredicateType predicate_type) const { return predicate_type == this->type; }
 
+        [[nodiscard]] std::vector<std::vector<BasicTerm>>& get_params() { return params; }
+        [[nodiscard]] const std::vector<std::vector<BasicTerm>>& get_params() const { return params; }
         std::vector<BasicTerm>& get_left_side() {
             assert(is_eq_or_ineq());
             return params[0];
@@ -194,118 +177,34 @@ namespace smt::noodler {
             return params[1];
         }
 
-        std::vector<BasicTerm>& get_side(const EquationSideType side) {
-            assert(is_eq_or_ineq());
-            switch (side) {
-                case EquationSideType::Left:
-                    return params[0];
-                    break;
-                case EquationSideType::Right:
-                    return params[1];
-                    break;
-                default:
-                    throw std::runtime_error("unhandled equation side type");
-                    break;
-            }
-        }
+        std::vector<BasicTerm>& get_side(EquationSideType side);
 
-        [[nodiscard]] const std::vector<BasicTerm>& get_side(const EquationSideType side) const {
+        [[nodiscard]] const std::vector<BasicTerm>& get_side(EquationSideType side) const;
+
+        [[nodiscard]] Predicate get_switched_sides_predicate() const {
             assert(is_eq_or_ineq());
-            switch (side) {
-                case EquationSideType::Left:
-                    return params[0];
-                    break;
-                case EquationSideType::Right:
-                    return params[1];
-                    break;
-                default:
-                    throw std::runtime_error("unhandled equation side type");
-                    break;
-            }
+            return Predicate{ type, { get_right_side(), get_left_side() } };
         }
 
         /**
          * Get unique variables on both sides of an (in)equation.
          * @return Variables in the (in)equation.
          */
-        [[nodiscard]] std::set<BasicTerm> get_vars() const {
-            assert(is_eq_or_ineq());
-            std::set<BasicTerm> vars;
-            for (const auto& side: params) {
-                for (const auto &term: side) {
-                    if (term.is_variable()) {
-                        bool found{false};
-                        for (const auto &var: vars) {
-                            if (var == term) {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) { vars.insert(term); }
-                    }
-                }
-            }
-            return vars;
-        }
+        [[nodiscard]] std::set<BasicTerm> get_vars() const;
 
         /**
          * Get unique variables on a single @p side of an (in)equation.
          * @param[in] side (In)Equation side to get variables from.
          * @return Variables in the (in)equation on specified @p side.
          */
-        [[nodiscard]] std::set<BasicTerm> get_side_vars(const EquationSideType side) const {
-            assert(is_eq_or_ineq());
-            std::set<BasicTerm> vars;
-            std::vector<BasicTerm> side_terms;
-            switch (side) {
-                case EquationSideType::Left:
-                    side_terms = get_left_side();
-                    break;
-                case EquationSideType::Right:
-                    side_terms = get_right_side();
-                    break;
-                default:
-                    throw std::runtime_error("unhandled equation side_terms type");
-                    break;
-            }
-
-            for (const auto &term: side_terms) {
-                if (term.is_variable()) {
-                    bool found{false};
-                    for (const auto &var: vars) {
-                        if (var == term) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) { vars.insert(term); }
-                }
-            }
-           return vars;
-        }
+        [[nodiscard]] std::set<BasicTerm> get_side_vars(EquationSideType side) const;
 
         /**
          * Decide whether the @p side contains multiple occurrences of a single variable (with a same name).
          * @param side Side to check.
          * @return True if there are multiple occurrences of a single variable. False otherwise.
          */
-        [[nodiscard]] bool mult_occurr_var_side(const EquationSideType side) const {
-            assert(is_eq_or_ineq());
-            const auto terms_begin{ get_side(side).cbegin() };
-            const auto terms_end{ get_side(side).cend() };
-            for (auto term_iter{ terms_begin }; term_iter < terms_end; ++term_iter) {
-                if (term_iter->is_variable()) {
-                    for (auto term_iter_following{ term_iter + 1}; term_iter_following < terms_end;
-                         ++term_iter_following) {
-                        if (*term_iter == *term_iter_following) {
-                            return true;
-                            // TODO: How to handle calls of predicates?
-                        }
-                    }
-                }
-            }
-            return false;
-        }
+        [[nodiscard]] bool mult_occurr_var_side(EquationSideType side) const;
 
         void replace(void* replace_map) {
             (void) replace_map;
@@ -317,54 +216,9 @@ namespace smt::noodler {
             throw std::runtime_error("unimplemented");
         }
 
-        [[nodiscard]] bool equals(const Predicate& other) const {
-            if (type == other.type) {
-                if (is_eq_or_ineq()) {
-                    return params[0] == other.params[0] && params[1] == other.params[1];
-                }
-                return true;
-            }
-            return false;
-        }
+        [[nodiscard]] bool equals(const Predicate& other) const;
 
-        [[nodiscard]] std::string to_string() const {
-            switch (type) {
-                case PredicateType::Default: {
-                    return "Default (missing type and data)";
-                }
-                case PredicateType::Equation: {
-                    std::string result{ "Equation:" };
-                    for (const auto& item: get_left_side()) {
-                        result += " " + item.to_string();
-                    }
-                    result += " =";
-                    for (const auto& item: get_right_side()) {
-                        result += " " + item.to_string();
-                    }
-                    return result;
-                }
-
-                case PredicateType::Inequation: {
-                    std::string result{ "Inequation:" };
-                    for (const auto& item: get_left_side()) {
-                        result += " " + item.to_string();
-                    }
-                    result += " !=";
-                    for (const auto& item: get_right_side()) {
-                        result += " " + item.to_string();
-                    }
-                    return result;
-                }
-
-                // TODO: Implement prints for other predicates.
-
-                case PredicateType::Contains: {
-                    break;
-                }
-            }
-
-            throw std::runtime_error("Unhandled predicate type passed as 'this' to to_string().");
-        }
+        [[nodiscard]] std::string to_string() const;
 
         struct HashFunction {
             size_t operator()(const Predicate& predicate) const {
@@ -400,6 +254,19 @@ namespace smt::noodler {
 
     static bool operator==(const Predicate& lhs, const Predicate& rhs) { return lhs.equals(rhs); }
     static bool operator!=(const Predicate& lhs, const Predicate& rhs) { return !(lhs == rhs); }
+    static bool operator<(const Predicate& lhs, const Predicate& rhs) {
+        if (lhs.get_type() < rhs.get_type()) {
+            return true;
+        } else if (lhs.get_type() > rhs.get_type()) {
+            return false;
+        }
+        // Types are equal. Compare data.
+        if (lhs.get_params() < rhs.get_params()) {
+            return true;
+        }
+        return false;
+    }
+    static bool operator>(const Predicate& lhs, const Predicate& rhs) { return !(lhs < rhs); }
 
     class Formula {
     
@@ -414,7 +281,6 @@ namespace smt::noodler {
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
-
 } // Namespace smt::noodler.
 
 namespace std {
