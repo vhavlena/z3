@@ -4,6 +4,7 @@
 #include <mata/nfa.hh>
 
 #include <smt/theory_str_noodler/inclusion_graph_node.h>
+#include "smt/theory_str_noodler/inclusion_graph.h"
 
 using namespace smt::noodler;
 
@@ -86,4 +87,26 @@ TEST_CASE("Mata integration") {
     CHECK(nfa.has_trans(0, 42, 1));
     CHECK(!nfa.has_trans(1, 42, 1));
     CHECK(!nfa.has_no_transitions());
+}
+
+TEST_CASE("Splitting graph", "[noodler]") {
+    Graph graph;
+
+    SECTION("yx=xy") {
+        BasicTerm x{ BasicTermType::Variable, "x" };
+        BasicTerm y{ BasicTermType::Variable, "y" };
+        Predicate predicate{ PredicateType::Equation, { { x, y }, {y, x} } };
+        CHECK(predicate.to_string() == "Equation: x y = y x");
+
+        Formula formula;
+        formula.add_predicate(predicate);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() } });
+        REQUIRE(graph.edges.size() == 2);
+        CHECK(graph.edges.begin()->first->get_predicate().to_string() == predicate.get_switched_sides_predicate().to_string());
+        CHECK(graph.edges.begin()->first == *graph.edges.begin()->second.begin());
+        CHECK((++graph.edges.begin())->first->get_predicate().to_string() == predicate.to_string());
+        CHECK((++graph.edges.begin())->first == *(++graph.edges.begin())->second.begin());
+
+    }
 }

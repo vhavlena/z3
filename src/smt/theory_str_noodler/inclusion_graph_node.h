@@ -268,19 +268,38 @@ namespace smt::noodler {
     }
     static bool operator>(const Predicate& lhs, const Predicate& rhs) { return !(lhs < rhs); }
 
-    class Formula {
-    
+    class GraphNode {
     public:
-        Formula(): predicates() {}
+        GraphNode() = default;
+        explicit GraphNode(const Predicate& predicate) : node_predicate(predicate) {}
 
-        std::vector<Predicate>& get_predicates() { return predicates; }
+        void set_predicate(const Predicate& predicate) { this->node_predicate = predicate; }
+        Predicate& get_predicate() { return node_predicate; }
+        const Predicate& get_predicate() const { return node_predicate; }
 
-        // TODO: Use std::move for both add functions?
-        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
+        struct HashFunction {
+            size_t operator()(const GraphNode& graph_node) const {
+                return Predicate::HashFunction()(graph_node.node_predicate);
+            }
+        };
+
+        [[nodiscard]] bool equals(const GraphNode& other) const {
+            return this->node_predicate == other.node_predicate;
+        }
 
     private:
-        std::vector<Predicate> predicates;
-    }; // Class Formula.
+         Predicate node_predicate;
+    }; // Class GraphNode.
+
+    static bool operator==(const GraphNode& lhs, const GraphNode& rhs) { return lhs.equals(rhs); }
+    static bool operator!=(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs == rhs); }
+    static bool operator<(const GraphNode& lhs, const GraphNode& rhs) {
+        if (lhs.get_predicate() < rhs.get_predicate()) {
+            return true;
+        }
+        return false;
+    }
+    static bool operator>(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs < rhs); }
 } // Namespace smt::noodler.
 
 namespace std {
