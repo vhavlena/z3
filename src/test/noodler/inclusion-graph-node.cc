@@ -46,25 +46,30 @@ TEST_CASE( "Inclusion graph node", "[noodler]" ) {
     CHECK(term != term_var);
 }
 
-TEST_CASE("Conversion to strings") {
+TEST_CASE("Conversion to strings", "[noodler]") {
     CHECK(smt::noodler::to_string(BasicTermType::Literal) == "Literal");
     CHECK(smt::noodler::to_string(BasicTermType::Variable) == "Variable");
-    CHECK(BasicTerm{ BasicTermType::Literal }.to_string() == "(Literal)");
-    CHECK(BasicTerm{ BasicTermType::Literal, "4" }.to_string() == "\"4\" (Literal)");
-    CHECK(BasicTerm{ BasicTermType::Variable, "x_42" }.to_string() == "x_42 (Variable)");
+    CHECK(BasicTerm{ BasicTermType::Literal }.to_string().empty());
+    CHECK(BasicTerm{ BasicTermType::Literal, "4" }.to_string() == "\"4\"");
+    CHECK(BasicTerm{ BasicTermType::Variable, "x_42" }.to_string() == "x_42");
 
     auto pred{ Predicate{ PredicateType::Equation, {
         { { BasicTermType::Literal, "4" }, { BasicTermType::Variable, "x_42" } } ,
         { { BasicTermType::Variable, "xyz" }, { BasicTermType::Variable, "y_58" } },
     } } };
 
-    CHECK(pred.to_string() == "Equation: . \"4\" (Literal) . x_42 (Variable) = . xyz (Variable) . y_58 (Variable)");
+    CHECK(pred.to_string() == "Equation: \"4\" x_42 = xyz y_58");
 
     auto pred_ineq{ Predicate{ PredicateType::Inequation, {
             { { BasicTermType::Literal, "4" }, { BasicTermType::Variable, "x_42" } } ,
             { { BasicTermType::Variable, "xyz" }, { BasicTermType::Variable, "y_58" } },
     } } };
 
-    CHECK(pred_ineq.to_string() == "Inequation: . \"4\" (Literal) . x_42 (Variable) != . xyz (Variable) . y_58 (Variable)");
-}
+    CHECK(pred_ineq.to_string() == "Inequation: \"4\" x_42 != xyz y_58");
 
+    CHECK(pred_ineq.get_vars() == std::set{
+          BasicTerm{ BasicTermType::Variable, "x_42" },
+          BasicTerm{ BasicTermType::Variable, "xyz" },
+          BasicTerm{ BasicTermType::Variable, "y_58" }
+    } );
+}
