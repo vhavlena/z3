@@ -30,16 +30,20 @@ TEST_CASE( "Preprocess to strings", "[noodler]" ) {
 
     Predicate predicate2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({term_lit, term_var}), std::vector<BasicTerm>({term_lit2, term_var2}) })  );
 
-    INFO(predicate1.to_string());
-    INFO(predicate2.to_string());
-
     Formula conj;
     conj.add_predicate(predicate1);
     conj.add_predicate(predicate2);
     FormulaVar fvar(conj);
-    INFO(fvar.to_string());
 
-    CHECK(false);
+    VarNode v1{.var = "x_1", .eq_index = 0, .position = -1};
+    VarNode v2{.var = "x_1", .eq_index = 0, .position = -1};
+
+    CHECK(v1 == v2);
+    INFO(fvar.to_string());
+    CHECK(fvar.get_var_positions(predicate1, 0) == std::set<VarNode>({ {.var = "x_1", .eq_index = 0, .position = -1 }, 
+        {.var = "x_1", .eq_index = 0, .position = -3 }, 
+        {.var = "x_2", .eq_index = 0, .position = 1 }, 
+        {.var = "x_2", .eq_index = 0, .position = 2 } }));
 }
 
 TEST_CASE( "Remove regular", "[noodler]" ) {

@@ -29,6 +29,10 @@ namespace smt::noodler {
 
         VarNode& operator=(const VarNode&) = default;
 
+        bool operator==(const VarNode& other) const {
+            return var == other.var && eq_index == other.eq_index && position == other.position;
+        }
+
         std::string to_string() const {
             std::string ret;
             ret += "( " + var + ";" + std::to_string(eq_index) + ";" + std::to_string(position) + ")";
@@ -72,6 +76,7 @@ namespace smt::noodler {
         const std::set<VarNode>& get_var_occurr(const std::string& var) { return this->varmap[var]; };
         const Predicate& get_predicate(size_t index) const { return this->predicates.at(index); };
         void get_side_regulars(std::vector<std::pair<size_t, Predicate>>& out) const;
+        std::set<VarNode> get_var_positions(const Predicate& pred, size_t index) const;
 
         bool single_occurr(const std::set<BasicTerm>& items) const;
         bool is_side_regular(const Predicate& p, Predicate& out) const;
@@ -89,7 +94,7 @@ namespace smt::noodler {
         FormulaVar formula;
 
     protected:
-        void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) { };
+        void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
 
     public:
         FormulaPreprocess(const Formula& conj) : formula(conj) { };

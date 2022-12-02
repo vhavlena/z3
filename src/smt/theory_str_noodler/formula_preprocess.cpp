@@ -22,22 +22,39 @@ namespace smt::noodler {
      */
     void FormulaVar::update_varmap(const Predicate& pred, size_t index) {
         assert(pred.is_equation());
+        for(const VarNode& vr : get_var_positions(pred, index)) {
+            VarMap::iterator iter = this->varmap.find(vr.var);
+            if(iter != this->varmap.end()) {
+                iter->second.insert(vr);
+            } else {
+                this->varmap[vr.var] = std::set<VarNode>({vr});
+            }
+        }
+    }
+
+    /**
+     * @brief Get VarNode (structure representing variable position in the equation) for each 
+     * variable in the equation @p pred.
+     * 
+     * @param pred Equation
+     * @param index Index of the equation @p pred
+     * @return std::set<VarNode> Set if VarNodes for each occurrence of a variable.
+     */
+    std::set<VarNode> FormulaVar::get_var_positions(const Predicate& pred, size_t index) const {
+        assert(pred.is_equation());
+        std::set<VarNode> ret;
         int mult = -1;
         for(const std::vector<BasicTerm>& side : pred.get_params()) {
             for(size_t i = 0; i < side.size(); i++) {
                 if(side[i].is_variable()) {
-                    VarMap::iterator iter = this->varmap.find(side[i].get_name());
                     VarNode new_item = {.var = side[i].get_name(), .eq_index = index, .position = mult*int(i+1) };
-
-                    if(iter != this->varmap.end()) {
-                        iter->second.insert(new_item);
-                    } else {
-                        this->varmap[side[i].get_name()] = std::set<VarNode>({new_item});
-                    }
+                    ret.insert(new_item);
                 }
             }
             mult *= -1;
         }
+
+        return ret;
     }
 
     std::string FormulaVar::to_string() const {
