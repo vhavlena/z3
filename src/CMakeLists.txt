@@ -165,6 +165,14 @@ endif()
 # shared library the dependent libraries are specified on the link command line
 # so that if those are also shared libraries they are referenced by `libz3.so`.
 target_link_libraries(libz3 PRIVATE ${Z3_DEPENDENT_LIBS})
+target_include_directories(libz3 PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
+target_link_libraries(libz3 PRIVATE mata re2 simlib)
+target_link_directories(libz3 PRIVATE
+        ${PROJECT_BINARY_DIR}
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/src
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/re2
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/simlib
+)
 
 # This is currently only for the OpenMP flags. It needs to be set
 # via `target_link_libraries()` rather than `z3_append_linker_flag_list_to_target()`
