@@ -41,3 +41,30 @@ TEST_CASE( "Preprocess to strings", "[noodler]" ) {
 
     CHECK(false);
 }
+
+TEST_CASE( "Remove regular", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm a{ BasicTermType::Literal, "a"};
+    BasicTerm b{ BasicTermType::Literal, "b"};
+    
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x1, x1}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1}), std::vector<BasicTerm>({x2, x6, a}) })  );
+    Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x3, b, x4, b}), std::vector<BasicTerm>({x2}) })  );
+    Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5}), std::vector<BasicTerm>({x4}) })  );
+
+    Formula conj;
+    conj.add_predicate(eq1);
+    conj.add_predicate(eq2);
+    conj.add_predicate(eq3);
+    conj.add_predicate(eq4);
+    FormulaPreprocess prep(conj);
+    prep.remove_regular();
+
+    CHECK(prep.get_formula().get_predicate(0) == eq1);
+}
