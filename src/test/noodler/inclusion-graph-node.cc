@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <catch2/catch_test_macros.hpp>
+#include <mata/nfa.hh>
 
 #include <smt/theory_str_noodler/inclusion_graph_node.h>
 
@@ -72,4 +73,17 @@ TEST_CASE("Conversion to strings", "[noodler]") {
           BasicTerm{ BasicTermType::Variable, "xyz" },
           BasicTerm{ BasicTermType::Variable, "y_58" }
     } );
+}
+
+TEST_CASE("Mata integration") {
+    auto nfa = Mata::Nfa::Nfa(3);
+    nfa.initial_states = { 0, 1};
+    nfa.final_states = { 3, 1};
+    nfa.add_trans(0, 42, 1);
+    nfa.add_trans(1, 42, 2);
+    CHECK(nfa.has_final(1));
+    CHECK(!nfa.has_final(0));
+    CHECK(nfa.has_trans(0, 42, 1));
+    CHECK(!nfa.has_trans(1, 42, 1));
+    CHECK(!nfa.has_no_transitions());
 }

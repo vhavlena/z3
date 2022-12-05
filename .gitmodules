@@ -1,0 +1,4 @@
+[submodule "extern/lib/mata"]
+	path = extern/lib/mata
+	url = https://github.com/Adda0/mata.git
+	branch = z3_import
