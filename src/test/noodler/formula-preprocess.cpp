@@ -35,15 +35,15 @@ TEST_CASE( "Preprocess to strings", "[noodler]" ) {
     conj.add_predicate(predicate2);
     FormulaVar fvar(conj);
 
-    VarNode v1{.var = "x_1", .eq_index = 0, .position = -1};
-    VarNode v2{.var = "x_1", .eq_index = 0, .position = -1};
+    VarNode v1{.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1};
+    VarNode v2{.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1};
 
     CHECK(v1 == v2);
     INFO(fvar.to_string());
-    CHECK(fvar.get_var_positions(predicate1, 0) == std::set<VarNode>({ {.var = "x_1", .eq_index = 0, .position = -1 }, 
-        {.var = "x_1", .eq_index = 0, .position = -3 }, 
-        {.var = "x_2", .eq_index = 0, .position = 1 }, 
-        {.var = "x_2", .eq_index = 0, .position = 2 } }));
+    CHECK(fvar.get_var_positions(predicate1, 0) == std::set<VarNode>({ {.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1 }, 
+        {.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -3 }, 
+        {.term = BasicTerm(BasicTermType::Variable, "x_2"), .eq_index = 0, .position = 1 }, 
+        {.term = BasicTerm(BasicTermType::Variable, "x_2"), .eq_index = 0, .position = 2 } }));
 }
 
 TEST_CASE( "Remove regular", "[noodler]" ) {
@@ -71,4 +71,33 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
     prep.remove_regular();
 
     CHECK(prep.get_formula().get_predicate(0) == eq1);
+}
+
+TEST_CASE( "Generate identities", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm a{ BasicTermType::Literal, "a"};
+    BasicTerm b{ BasicTermType::Literal, "b"};
+    
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1, a, x1}), std::vector<BasicTerm>({y1, x1, x1}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, b}), std::vector<BasicTerm>({x2, b}) })  );
+
+    Formula conj;
+    conj.add_predicate(eq1);
+    conj.add_predicate(eq2);
+    FormulaPreprocess prep(conj);
+    prep.generate_identities();
+
+    // Formula res;
+    // res.add_predicate(eq1);
+    // res.add_predicate(eq2);
+    // res.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a}), std::vector<BasicTerm>({y1, x1, x1}) })  ))
+    // FormulaPreprocess prep()
+
+    CHECK(prep.get_formula().get_predicates() == eq1);
 }

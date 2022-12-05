@@ -20,7 +20,7 @@ namespace smt::noodler {
      * Negative value means left side, positive right side. 
      */
     struct VarNode {
-        std::string var;
+        BasicTerm term;
         size_t eq_index;
         int position;
 
@@ -30,12 +30,12 @@ namespace smt::noodler {
         VarNode& operator=(const VarNode&) = default;
 
         bool operator==(const VarNode& other) const {
-            return var == other.var && eq_index == other.eq_index && position == other.position;
+            return term == other.term && eq_index == other.eq_index && position == other.position;
         }
 
         std::string to_string() const {
             std::string ret;
-            ret += "( " + var + ";" + std::to_string(eq_index) + ";" + std::to_string(position) + ")";
+            ret += "( " + term.to_string() + ";" + std::to_string(eq_index) + ";" + std::to_string(position) + ")";
             return ret;
         };
     };
@@ -43,8 +43,8 @@ namespace smt::noodler {
     inline bool operator<(const VarNode& lhs, const VarNode& rhs) {
         if(lhs.position == rhs.position) {
             if(lhs.eq_index == rhs.eq_index) {
-                if(lhs.var == rhs.var) return false;
-                return lhs.var < rhs.var;
+                if(lhs.term == rhs.term) return false;
+                return lhs.term < rhs.term;
             }
             return lhs.eq_index < rhs.eq_index;
         }
@@ -52,7 +52,7 @@ namespace smt::noodler {
     }
 
     using VarMap = std::map<std::string, std::set<VarNode>>;
-
+    using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
 
     /**
      * @brief Class representing a formula with efficient handling of variable occurrences.
@@ -63,6 +63,7 @@ namespace smt::noodler {
         std::map<size_t, Predicate> predicates; // formula
         VarMap varmap; // mapping of a variable name to a set of its occurrences in the formula
         size_t input_size; // number of equations in the input formula
+        size_t max_index; // maximum occupied index 
 
     protected:
         void update_varmap(const Predicate& pred, size_t index);
@@ -75,13 +76,15 @@ namespace smt::noodler {
 
         const std::set<VarNode>& get_var_occurr(const std::string& var) { return this->varmap[var]; };
         const Predicate& get_predicate(size_t index) const { return this->predicates.at(index); };
+        const std::map<size_t, Predicate>& get_predicates() const { return this->predicates; };
         void get_side_regulars(std::vector<std::pair<size_t, Predicate>>& out) const;
-        std::set<VarNode> get_var_positions(const Predicate& pred, size_t index) const;
+        std::set<VarNode> get_var_positions(const Predicate& pred, size_t index, bool incl_lit=false) const;
 
         bool single_occurr(const std::set<BasicTerm>& items) const;
         bool is_side_regular(const Predicate& p, Predicate& out) const;
     
         void remove_predicate(size_t index);
+        void add_predicate(const Predicate& pred);
     };
 
 
@@ -95,6 +98,9 @@ namespace smt::noodler {
 
     protected:
         void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
+        std::set<VarNodeSymDiff> get_eq_sym_diff(const Predicate& eq1, size_t ind1, 
+            const Predicate& eq2, size_t ind2) const;
+        bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
 
     public:
         FormulaPreprocess(const Formula& conj) : formula(conj) { };
@@ -103,6 +109,7 @@ namespace smt::noodler {
         std::string to_string() const { return this->formula.to_string(); };
 
         void remove_regular();
+        void generate_identities();
     };
 
     /**
@@ -121,6 +128,14 @@ namespace smt::noodler {
             else
                 it++;
         }
+    }
+
+    template<typename T>
+    std::set<T> set_difference(std::set<T>& t1, std::set<T>& t2) {
+        std::set<T> diff;
+        std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
+            std::inserter(diff, diff.begin()));
+        return diff;
     }
     
 } // Namespace smt::noodler.
