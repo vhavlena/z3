@@ -11,6 +11,12 @@ set(Z3_FULL_VERSION_STR "${Z3_VERSION}") # Note this might be modified
 message(STATUS "Z3 version ${Z3_VERSION}")
 
 ################################################################################
+# Extern Libraries
+################################################################################
+
+add_subdirectory(extern/lib/mata)
+
+################################################################################
 # Message for polluted source tree sanity checks
 ################################################################################
 set(z3_polluted_tree_msg

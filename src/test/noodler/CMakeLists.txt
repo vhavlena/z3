@@ -15,6 +15,16 @@ add_executable(test-noodler
         main.cc
         inclusion-graph-node.cc
 )
+
+target_include_directories(test-noodler PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
+target_link_libraries(test-noodler PRIVATE mata re2 simlib)
+target_link_directories(test-noodler PRIVATE
+        ${PROJECT_BINARY_DIR}
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/src
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/re2
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/simlib
+)
+
 z3_add_install_tactic_rule(${z3_test_deps})
 z3_add_memory_initializer_rule(${z3_test_deps})
 z3_add_gparams_register_modules_rule(${z3_test_deps})

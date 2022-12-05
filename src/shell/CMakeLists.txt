@@ -42,6 +42,15 @@ set_target_properties(shell PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON)
 
+target_include_directories(shell PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
+target_link_libraries(shell PRIVATE mata re2 simlib)
+target_link_directories(shell PRIVATE
+        ${PROJECT_BINARY_DIR}
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/src
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/re2
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/simlib
+        )
+
 z3_add_install_tactic_rule(${shell_deps})
 z3_add_memory_initializer_rule(${shell_deps})
 z3_add_gparams_register_modules_rule(${shell_deps})
