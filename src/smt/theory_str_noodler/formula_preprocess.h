@@ -90,6 +90,8 @@ namespace smt::noodler {
         void remove_predicate(size_t index);
         void add_predicate(const Predicate& pred, int index = -1);
         void add_predicates(const std::set<Predicate>& preds);
+
+        void replace(const BasicTerm& find, const std::vector<BasicTerm>& replace);
     };
 
 

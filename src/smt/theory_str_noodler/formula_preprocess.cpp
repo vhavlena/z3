@@ -203,6 +203,26 @@ namespace smt::noodler {
     } 
 
     /**
+     * @brief Replace @p find in the formula (in all predicates).
+     * 
+     * @param find Find 
+     * @param replace Replace
+     */
+    void FormulaVar::replace(const BasicTerm& find, const std::vector<BasicTerm>& replace) {
+        std::vector<std::pair<size_t, Predicate>> replace_map;
+        for(const auto& pr : this->predicates) {
+            Predicate rpl;
+            if(pr.second.replace(find, replace, rpl)) { // changed, result is stored in rpl
+                replace_map.push_back({pr.first, rpl});
+            }
+        }
+        for(const auto& pr : replace_map) {
+            remove_predicate(pr.first);
+            add_predicate(pr.second, pr.first);
+        } 
+    }
+
+    /**
      * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where 
      * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable 
      * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system 

@@ -187,6 +187,53 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Replace BasicTerm @p find in the given concatenation
+         * 
+         * @param concat Concatenation to be searche/replaced
+         * @param find  Find
+         * @param replace Replace
+         * @param res Result
+         * @return Does the concatenation contain at least one occurrence of @p find ?
+         */
+        static bool replace_concat(
+                const std::vector<BasicTerm>& concat, 
+                const BasicTerm& find, 
+                const std::vector<BasicTerm>& replace,
+                std::vector<BasicTerm>& res) {
+            bool modif = false;
+            for(const BasicTerm& t: concat) {
+                if(t == find) {
+                    res.insert(res.end(), replace.begin(), replace.end());
+                    modif = true;
+                } else {
+                    res.push_back(t);
+                }
+            }
+            return modif;
+        }
+
+        /**
+         * @brief Replace BasicTerm @p find in the predicate (do not modify the current one).
+         * 
+         * @param find Find
+         * @param replace Replace
+         * @param res Where to store the modified predicate
+         * @return Does the predicate contain at least one occurrence of @p find ?
+         */
+        bool replace(const BasicTerm& find, const std::vector<BasicTerm>& replace, Predicate& res) const {
+            std::vector<std::vector<BasicTerm>> new_params;
+            bool modif = false;
+            for(const std::vector<BasicTerm>& p : this->params) {
+                std::vector<BasicTerm> res;
+                bool r = Predicate::replace_concat(p, find, replace, res);
+                new_params.push_back(res);
+                modif = modif || r;
+            }
+            res = Predicate(this->type, new_params);
+            return modif;
+        }
+
+        /**
          * Get unique variables on both sides of an (in)equation.
          * @return Variables in the (in)equation.
          */
