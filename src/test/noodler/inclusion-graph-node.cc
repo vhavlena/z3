@@ -91,14 +91,15 @@ TEST_CASE("Mata integration") {
 
 TEST_CASE("Splitting graph", "[noodler]") {
     Graph graph;
+    Formula formula;
+
+    BasicTerm x{ BasicTermType::Variable, "x" };
+    BasicTerm y{ BasicTermType::Variable, "y" };
 
     SECTION("yx=xy") {
-        BasicTerm x{ BasicTermType::Variable, "x" };
-        BasicTerm y{ BasicTermType::Variable, "y" };
         Predicate predicate{ PredicateType::Equation, { { x, y }, {y, x} } };
         CHECK(predicate.to_string() == "Equation: x y = y x");
 
-        Formula formula;
         formula.add_predicate(predicate);
         graph = create_simplified_splitting_graph(formula);
         CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() } });
@@ -110,12 +111,9 @@ TEST_CASE("Splitting graph", "[noodler]") {
     }
 
     SECTION("yx=yx") {
-        BasicTerm x{ BasicTermType::Variable, "x" };
-        BasicTerm y{ BasicTermType::Variable, "y" };
         Predicate predicate{ PredicateType::Equation, { { y, x }, {y, x} } };
         CHECK(predicate.to_string() == "Equation: y x = y x");
 
-        Formula formula;
         formula.add_predicate(predicate);
         graph = create_simplified_splitting_graph(formula);
         CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate } });
@@ -123,11 +121,9 @@ TEST_CASE("Splitting graph", "[noodler]") {
     }
 
     SECTION("xx=xx") {
-        BasicTerm x{ BasicTermType::Variable, "x" };
         Predicate predicate{ PredicateType::Equation, { { x, x }, {x, x} } };
         CHECK(predicate.to_string() == "Equation: x x = x x");
 
-        Formula formula;
         formula.add_predicate(predicate);
         graph = create_simplified_splitting_graph(formula);
         CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() } });
@@ -137,8 +133,6 @@ TEST_CASE("Splitting graph", "[noodler]") {
     }
 
     SECTION("x=xy") {
-        BasicTerm x{ BasicTermType::Variable, "x" };
-        BasicTerm y{ BasicTermType::Variable, "y" };
         Predicate predicate{ PredicateType::Equation, { { x }, {x, y} } };
         CHECK(predicate.to_string() == "Equation: x = x y");
 
@@ -151,5 +145,20 @@ TEST_CASE("Splitting graph", "[noodler]") {
         CHECK(graph.edges.begin()->first == *graph.edges.begin()->second.begin());
         CHECK((++graph.edges.begin())->first->get_predicate().to_string() == predicate.to_string());
         CHECK((++graph.edges.begin())->first == *(++graph.edges.begin())->second.begin());
+    }
+
+    SECTION("x=xy && xy = yx") {
+        Predicate predicate{ PredicateType::Equation, { { x }, { x, y } } };
+        Predicate predicate2{ PredicateType::Equation, { { x, y }, { y, x } } };
+
+        formula.add_predicate(predicate);
+        formula.add_predicate(predicate2);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{
+            GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() },
+            GraphNode{ predicate2 }, GraphNode{ predicate2.get_switched_sides_predicate() },
+        });
+        REQUIRE(graph.edges.size() == 4);
+        REQUIRE(graph.get_num_of_edges() == 12);
     }
 }

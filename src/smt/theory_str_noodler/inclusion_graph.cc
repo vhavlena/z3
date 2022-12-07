@@ -20,6 +20,8 @@ namespace {
 Graph smt::noodler::create_inclusion_graph(const Formula& predicates) {
     Graph splitting_graph{ create_simplified_splitting_graph(predicates) };
 
+    // TODO: Add assert that two equal equations are fail as well as equal sides in one equation.
+
     // TODO: Create inclusion graph from splitting graph.
 
     return splitting_graph;
@@ -29,8 +31,8 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
     Graph graph;
 
 
-    // TODO: Add asssert taht two equal equations are fail.
 
+    // Add all nodes which are not already present in direct and switched form.
     for (const auto& predicate: formula.get_predicates()) {
         if (graph.nodes.find(GraphNode{ predicate }) == graph.nodes.end()) {
             graph.nodes.emplace(predicate);
@@ -51,6 +53,8 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
             auto& source_predicate{ source_node.get_predicate() };
             auto& target_predicate{ target_node.get_predicate() };
             auto& source_left_side{ source_predicate.get_left_side() };
+            auto& source_right_side{ source_predicate.get_right_side() };
+            auto& target_left_side{ target_predicate.get_left_side() };
             auto& target_right_side{ target_predicate.get_right_side() };
 
             if (!have_same_var(source_left_side, target_right_side)) {
@@ -58,10 +62,15 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
             } else if (source_left_side == target_right_side) {
                 // Have same var and sides are equal.
 
-                if (!source_predicate.mult_occurr_var_side(Predicate::EquationSideType::Left)) {
-                    // Does not have multiple occurrences of one var. Hence, cannot have an edge.
-                    continue;
+                if (source_right_side == target_left_side) { // In the same equation.
+                    if (!source_predicate.mult_occurr_var_side(Predicate::EquationSideType::Left)) {
+                        // Does not have multiple occurrences of one var. Hence, cannot have an edge.
+                        continue;
+                    }
+                } else {
+                    
                 }
+
             } else {
                 // Have same var and sides are not equal, automatically add a new edge.
             }

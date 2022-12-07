@@ -16,6 +16,14 @@ namespace smt::noodler {
             edges[source].insert(target);
         }
 
+        size_t get_num_of_edges() {
+            size_t num_of_edges{ 0 };
+            for (const auto& edge_set: edges) {
+                num_of_edges += edge_set.second.size();
+            }
+            return num_of_edges;
+        }
+
         // TODO: Method to get edges from node.
     }; // Class Graph.
 
