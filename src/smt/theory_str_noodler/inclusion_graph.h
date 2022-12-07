@@ -2,11 +2,15 @@
 #ifndef Z3_INCLUSION_GRAPH_H
 #define Z3_INCLUSION_GRAPH_H
 
+#include <optional>
 #include "inclusion_graph_node.h"
 
 namespace smt::noodler {
     class Graph {
     public:
+        using TargetNodes = std::unordered_set<GraphNode*>;
+        using Edges = std::unordered_map<GraphNode*, TargetNodes>;
+
         Graph() = default;
 
         std::set<GraphNode> nodes;
@@ -22,6 +26,16 @@ namespace smt::noodler {
                 num_of_edges += edge_set.second.size();
             }
             return num_of_edges;
+        }
+
+        const Edges& get_edges() const { return edges; }
+
+        std::optional<const std::reference_wrapper<TargetNodes>> get_edges(const GraphNode* const source) {
+            const auto source_edges{ edges.find(const_cast<GraphNode*>(source)) };
+            if (source_edges != edges.end()) {
+                return std::make_optional<const std::reference_wrapper<TargetNodes>>(source_edges->second);
+            }
+            return std::nullopt;
         }
 
         // TODO: Method to get edges from node.

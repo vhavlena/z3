@@ -8,6 +8,22 @@
 
 using namespace smt::noodler;
 
+TEST_CASE("Graph::get_edges()", "[noodler]") {
+    Graph graph;
+    Formula formula;
+    BasicTerm x{ BasicTermType::Variable, "x" };
+    BasicTerm y{ BasicTermType::Variable, "y" };
+    Predicate predicate{ PredicateType::Equation, { { x }, { x, y } } };
+    Predicate predicate2{ PredicateType::Equation, { { x, y }, { y, x } } };
+    formula.add_predicate(predicate);
+    formula.add_predicate(predicate2);
+    graph = create_simplified_splitting_graph(formula);
+
+    auto edges{ graph.get_edges(&(*graph.nodes.begin())) };
+    REQUIRE(edges.has_value());
+    CHECK((*edges.value().get().begin())->get_predicate().to_string() == "Equation: y x = x y");
+}
+
 TEST_CASE( "Inclusion graph node", "[noodler]" ) {
     auto predicate{ Predicate(PredicateType::Equation) };
     auto predicate_ineq{ Predicate(PredicateType::Inequation) };
@@ -76,7 +92,7 @@ TEST_CASE("Conversion to strings", "[noodler]") {
     } );
 }
 
-TEST_CASE("Mata integration") {
+TEST_CASE("Mata integration", "[noodler]") {
     auto nfa = Mata::Nfa::Nfa(3);
     nfa.initial_states = { 0, 1};
     nfa.final_states = { 3, 1};
