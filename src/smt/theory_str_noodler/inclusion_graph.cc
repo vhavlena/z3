@@ -20,15 +20,26 @@ namespace {
 Graph smt::noodler::create_inclusion_graph(const Formula& predicates) {
     Graph splitting_graph{ create_simplified_splitting_graph(predicates) };
 
+    // TODO: Create inclusion graph from splitting graph.
+
     return splitting_graph;
 }
 
 Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
     Graph graph;
 
+
+    // TODO: Add asssert taht two equal equations are fail.
+
     for (const auto& predicate: formula.get_predicates()) {
-        graph.nodes.emplace(predicate);
-        graph.nodes.emplace(predicate.get_switched_sides_predicate());
+        if (graph.nodes.find(GraphNode{ predicate }) == graph.nodes.end()) {
+            graph.nodes.emplace(predicate);
+        }
+
+        const Predicate switched_predicate{ predicate.get_switched_sides_predicate() };
+        if (graph.nodes.find(GraphNode{ switched_predicate }) == graph.nodes.end()) {
+            graph.nodes.emplace(switched_predicate);
+        }
     }
 
     if (graph.nodes.empty()) {
@@ -56,41 +67,6 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
             }
 
             graph.add_edge(const_cast<GraphNode*>(&source_node), const_cast<GraphNode*>(&target_node));
-
-            //graph.edges.emplace(&source_node, std::unordered_set<GraphNode*>{ &target_node });
-
-            //if (source_node != target_node) {
-            //    // The CXXGraph node IDs differ. We work with different graph graph_nodes.
-
-            //    if (source_predicate.get_switched_sides_predicate() != target_predicate) {
-            //        // Nodes are not their switched variants (duals).
-
-            //        const auto source_vars{ source_predicate.get_side_vars(Predicate::EquationSideType::Left) };
-            //        const auto target_vars{ target_predicate.get_side_vars(Predicate::EquationSideType::Right) };
-
-            //        if (source_vars.)
-            //    }
-            //} else {
-            //    // We work with the same node (of the same CXXGraph node ID). Check whether to add self-loops.
-
-            //
-            //    if (source_left_side == target_right_side) {
-            //        // Left and right side are equal. Look for the same variable in different positions.
-            //
-            //        if (source_predicate.mult_occurr_var_side(Predicate::EquationSideType::Left)) {
-            //
-            //        }
-            //    } else {
-            //        // Left and right sides differ. Check for same variables in different positions.
-
-            //        for (size_t source_term_index{ 0 }; source_term_index < source_left_side.size(); ++source_term_index) {
-            //            for (size_t target_term_index{ source_term_index }; target_term_index < target_predicate.get_right_side().size();
-            //                 ++target_term_index) {
-            //            }
-            //        }
-            //    }
-
-            //}
         }
     }
 

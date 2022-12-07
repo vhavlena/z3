@@ -107,6 +107,49 @@ TEST_CASE("Splitting graph", "[noodler]") {
         CHECK(graph.edges.begin()->first == *graph.edges.begin()->second.begin());
         CHECK((++graph.edges.begin())->first->get_predicate().to_string() == predicate.to_string());
         CHECK((++graph.edges.begin())->first == *(++graph.edges.begin())->second.begin());
+    }
 
+    SECTION("yx=yx") {
+        BasicTerm x{ BasicTermType::Variable, "x" };
+        BasicTerm y{ BasicTermType::Variable, "y" };
+        Predicate predicate{ PredicateType::Equation, { { y, x }, {y, x} } };
+        CHECK(predicate.to_string() == "Equation: y x = y x");
+
+        Formula formula;
+        formula.add_predicate(predicate);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate } });
+        REQUIRE(graph.edges.empty());
+    }
+
+    SECTION("xx=xx") {
+        BasicTerm x{ BasicTermType::Variable, "x" };
+        Predicate predicate{ PredicateType::Equation, { { x, x }, {x, x} } };
+        CHECK(predicate.to_string() == "Equation: x x = x x");
+
+        Formula formula;
+        formula.add_predicate(predicate);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() } });
+        REQUIRE(graph.edges.size() == 1);
+        CHECK(graph.edges.begin()->first->get_predicate().to_string() == predicate.to_string());
+        CHECK(graph.edges.begin()->first == *graph.edges.begin()->second.begin());
+    }
+
+    SECTION("x=xy") {
+        BasicTerm x{ BasicTermType::Variable, "x" };
+        BasicTerm y{ BasicTermType::Variable, "y" };
+        Predicate predicate{ PredicateType::Equation, { { x }, {x, y} } };
+        CHECK(predicate.to_string() == "Equation: x = x y");
+
+        Formula formula;
+        formula.add_predicate(predicate);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{ GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() } });
+        REQUIRE(graph.edges.size() == 2);
+        CHECK(graph.edges.begin()->first->get_predicate().to_string() == predicate.get_switched_sides_predicate().to_string());
+        CHECK(graph.edges.begin()->first == *graph.edges.begin()->second.begin());
+        CHECK((++graph.edges.begin())->first->get_predicate().to_string() == predicate.to_string());
+        CHECK((++graph.edges.begin())->first == *(++graph.edges.begin())->second.begin());
     }
 }

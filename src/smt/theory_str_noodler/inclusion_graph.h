@@ -15,6 +15,8 @@ namespace smt::noodler {
         void add_edge(GraphNode* source, GraphNode* target) {
             edges[source].insert(target);
         }
+
+        // TODO: Method to get edges from node.
     }; // Class Graph.
 
     class Formula {
