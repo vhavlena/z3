@@ -3,14 +3,16 @@
 
 namespace smt::noodler {
 
-    FormulaVar::FormulaVar(const Formula& conj) {
+    FormulaVar::FormulaVar(const Formula& conj) : allpreds(), input_size(0) {
         const std::vector<Predicate>& preds = conj.get_predicates();
-        this->input_size = preds.size();
-        this->max_index = this->input_size - 1;
-
         for(size_t i = 0; i < preds.size(); i++) {
-            this->predicates[i] = preds[i];
-            this->update_varmap(preds[i], i);
+            if(this->allpreds.find(preds[i]) == this->allpreds.end()) {
+                this->predicates[i] = preds[i];
+                this->allpreds.insert(preds[i]);
+                this->update_varmap(preds[i], i);
+                this->max_index = i;
+                this->input_size++;
+            }
         }
     }
 
@@ -47,18 +49,36 @@ namespace smt::noodler {
         std::set<VarNode> ret;
         int mult = -1;
         for(const std::vector<BasicTerm>& side : pred.get_params()) {
-            for(size_t i = 0; i < side.size(); i++) {
-                if(incl_lit || side[i].is_variable()) {
-                    VarNode new_item = {.term = side[i], .eq_index = index, .position = mult*int(i+1) };
-                    ret.insert(new_item);
-                }
-            }
+            update_var_positions_side(side, ret, index, incl_lit, mult);
             mult *= -1;
         }
 
         return ret;
     }
 
+    /**
+     * @brief Update BasicTerm positions in the concatenation
+     * 
+     * @param side Concatenation of BasicTerms
+     * @param[out] res Set of positions (VarNodes)
+     * @param index Index of the equation the @p side belongs to
+     * @param incl_lit Include literals or just take variables?
+     * @param mult Multiplicative constant of each position (used to distinguish between left (negative positions) and right side of an equation).
+     */
+    void FormulaVar::update_var_positions_side(const std::vector<BasicTerm>& side, std::set<VarNode>& res, size_t index, bool incl_lit, int mult) const {
+        for(size_t i = 0; i < side.size(); i++) {
+            if(incl_lit || side[i].is_variable()) {
+                VarNode new_item = {.term = side[i], .eq_index = index, .position = mult*int(i+1) };
+                    res.insert(new_item);
+                }
+            }
+    }
+
+    /**
+     * @brief String representation of FormulaVar.
+     * 
+     * @return String representation
+     */
     std::string FormulaVar::to_string() const {
         std::string ret;
         for(const auto& item : this->predicates) {
@@ -137,7 +157,6 @@ namespace smt::noodler {
      * @param index Index of the predicate to be removed.
      */
     void FormulaVar::remove_predicate(size_t index) {
-        this->predicates[index];
         std::set<BasicTerm> vars = this->predicates[index].get_vars();
 
         const auto& filter = [&index](const VarNode& n) { return n.eq_index == index; };
@@ -145,14 +164,43 @@ namespace smt::noodler {
             std::set<VarNode>& occurr = this->varmap[v.get_name()]; 
             remove_if(occurr, filter);
         }
+        this->allpreds.erase(this->predicates[index]);
         this->predicates.erase(index);
     }
 
+    /**
+     * @brief Add predicate to the formula (with updating the variable map).
+     * 
+     * @param pred New predicate
+     * @param index Index of the new predicate (if set to -1, first higher index than top is chosen)
+     */
+    void FormulaVar::add_predicate(const Predicate& pred, int index) {
+        if(this->allpreds.find(pred) != this->allpreds.end()) 
+            return;
+        if(index == -1) {
+            assert(this->predicates.find(index) == this->predicates.end()); // check if the position is free
+            this->max_index++;
+            index = int(this->max_index);
+        } else {
+            assert(index >= 0);
+            this->max_index = std::max(this->max_index, size_t(index));
+        }
 
-    void FormulaVar::add_predicate(const Predicate& pred) {
-        this->max_index++;
-        this->predicates[max_index] = pred;
+        this->predicates[index] = pred;
+        this->allpreds.insert(pred);
+        update_varmap(pred, size_t(index));
     }
+
+    /**
+     * @brief Add a set of new predicates.
+     * 
+     * @param preds Set of new predicates to be added
+     */
+    void FormulaVar::add_predicates(const std::set<Predicate>& preds) {
+        for(const Predicate& p : preds) {
+            add_predicate(p);
+        }
+    } 
 
     /**
      * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where 
@@ -186,23 +234,30 @@ namespace smt::noodler {
         }
     }
 
-    // Rewrite to vector<BasicTerm>, vector<BasicTerm>
-    std::set<VarNodeSymDiff> FormulaPreprocess::get_eq_sym_diff(const Predicate& eq1, 
-        size_t ind1, const Predicate& eq2, size_t ind2) const {
-        assert(eq1.is_equation());
-        assert(eq2.is_equation());
-
-        std::set<VarNodeSymDiff> ret;
-        std::set<VarNode> p1 = this->formula.get_var_positions(eq1, ind1, true); // include positions of literals
-        std::set<VarNode> p2 = this->formula.get_var_positions(eq2, ind2, true); 
-        ret.insert({set_difference(p1, p2), set_difference(p2, p1)});
-
-        p1 = this->formula.get_var_positions(eq1.get_switched_sides_predicate(), ind1, true); // include positions of literals
-        p2 = this->formula.get_var_positions(eq2, ind2, true); 
-        ret.insert({set_difference(p1, p2), set_difference(p2, p1)});
-        return ret;
+    /**
+     * @brief Get symmetrical difference of occurrences of BasicTerms within two concatenations. For instance for X.Y.X and X.Y.W.Z 
+     * it returns ({{X,3}}, {{W,3}, {Z,4}}). It includes both variables and literals.
+     * 
+     * @param cat1 First concatenation
+     * @param cat2 Second concatenation
+     * @return Symmetrical difference 
+     */
+    VarNodeSymDiff FormulaPreprocess::get_eq_sym_diff(const std::vector<BasicTerm>& cat1, const std::vector<BasicTerm>& cat2) const {
+        std::set<VarNode> p1, p2;
+        this->formula.update_var_positions_side(cat1, p1, 0, true); // include positions of literals, set equation index to 0
+        this->formula.update_var_positions_side(cat2, p2, 0, true);
+        return {set_difference(p1, p2), set_difference(p2, p1)};
     }
 
+    /**
+     * @brief Check whether symmetric difference of term occurrences is suitable for generating identities. The 
+     * symmetric difference contains different BasicTerms that are on the different positions in the contatenations. If so, 
+     * set @p new_pred with the new predicate that was generated from the difference.
+     * 
+     * @param diff Symmetric difference of two equivalent terms (concatenation) 
+     * @param[out] new_pred Newly created identity
+     * @return Is it suitable for gen identity (was some identity created?)
+     */
     bool FormulaPreprocess::generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const {
         if(diff.first.size() == 1 && diff.second.size() == 1) {
             VarNode val1 = *diff.first.begin();
@@ -213,26 +268,46 @@ namespace smt::noodler {
                     std::vector<BasicTerm>({val2.term})}));
                 return true;
             }
-        }
+        } // TODO: allow to generate X = eps
         return false;
     }
 
+    /**
+     * @brief Generate indentities. It covers two cases (a) X1 X X2 = X1 Y X2 => X = Y 
+     * (b) X1 X X2 = Z and Z = X1 Y X2 => X = Y. Where each term can be both literal and variable.
+     */
     void FormulaPreprocess::generate_identities() {
+        std::set<Predicate> new_preds;
         for(const auto& pr1 : this->formula.get_predicates()) {
             for(const auto& pr2 : this->formula.get_predicates()) {
-                if(pr1.first >= pr2.first) 
+                if(pr1.first > pr2.first) 
                     continue;
 
-                std::set<VarNodeSymDiff> diffs = get_eq_sym_diff(pr1.second, pr1.first, pr2.second, pr2.first);
+                VarNodeSymDiff diff;
+                if(pr1.first == pr2.first) { // two equations are the same
+                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
+                // L1 = R1 and L2 = R2 and L1 = L2 => R1 = R2
+                } else if(pr1.second.get_left_side() == pr2.second.get_left_side()) { 
+                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_right_side());
+                // L1 = R1 and L2 = R2 and L1 = R2 => R1 = L2
+                } else if(pr1.second.get_left_side() == pr2.second.get_right_side()) { 
+                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_left_side());
+                // L1 = R1 and L2 = R2 and R1 = L2 => L2 = R1
+                } else if(pr1.second.get_right_side() == pr2.second.get_left_side()) { 
+                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
+                // L1 = R1 and L2 = R2 and R1 = R2 => L1 = L2
+                } else if(pr1.second.get_right_side() == pr2.second.get_right_side()) { 
+                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_left_side());
+                }
+
                 Predicate new_pred;
-                for(const VarNodeSymDiff& d : diffs) {
-                    if(generate_identities_suit(d, new_pred)) {
-                        this->formula.add_predicate(new_pred);
-                        break;
-                    }
-                } 
+                if(generate_identities_suit(diff, new_pred)) {
+                    this->formula.add_predicate(new_pred);
+                    new_preds.insert(new_pred);
+                }
             }
         }
+        this->formula.add_predicates(new_preds);
     }
 
 } // Namespace smt::noodler.

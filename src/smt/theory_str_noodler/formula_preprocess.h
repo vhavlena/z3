@@ -61,6 +61,7 @@ namespace smt::noodler {
     
     private:
         std::map<size_t, Predicate> predicates; // formula
+        std::set<Predicate> allpreds; // all predicates in a set
         VarMap varmap; // mapping of a variable name to a set of its occurrences in the formula
         size_t input_size; // number of equations in the input formula
         size_t max_index; // maximum occupied index 
@@ -77,14 +78,18 @@ namespace smt::noodler {
         const std::set<VarNode>& get_var_occurr(const std::string& var) { return this->varmap[var]; };
         const Predicate& get_predicate(size_t index) const { return this->predicates.at(index); };
         const std::map<size_t, Predicate>& get_predicates() const { return this->predicates; };
+        const std::set<Predicate>& get_predicates_set() const { return this->allpreds; };
         void get_side_regulars(std::vector<std::pair<size_t, Predicate>>& out) const;
+
         std::set<VarNode> get_var_positions(const Predicate& pred, size_t index, bool incl_lit=false) const;
+        void update_var_positions_side(const std::vector<BasicTerm>& side, std::set<VarNode>& res, size_t index, bool incl_lit=false, int mult=1) const;
 
         bool single_occurr(const std::set<BasicTerm>& items) const;
         bool is_side_regular(const Predicate& p, Predicate& out) const;
     
         void remove_predicate(size_t index);
-        void add_predicate(const Predicate& pred);
+        void add_predicate(const Predicate& pred, int index = -1);
+        void add_predicates(const std::set<Predicate>& preds);
     };
 
 
@@ -98,8 +103,7 @@ namespace smt::noodler {
 
     protected:
         void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
-        std::set<VarNodeSymDiff> get_eq_sym_diff(const Predicate& eq1, size_t ind1, 
-            const Predicate& eq2, size_t ind2) const;
+        VarNodeSymDiff get_eq_sym_diff(const std::vector<BasicTerm>& cat1, const std::vector<BasicTerm>& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
 
     public:

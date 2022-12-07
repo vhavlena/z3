@@ -82,8 +82,7 @@ TEST_CASE( "Generate identities", "[noodler]" ) {
     BasicTerm x5{ BasicTermType::Variable, "x_5"};
     BasicTerm x6{ BasicTermType::Variable, "x_6"};
     BasicTerm a{ BasicTermType::Literal, "a"};
-    BasicTerm b{ BasicTermType::Literal, "b"};
-    
+    BasicTerm b{ BasicTermType::Literal, "b"};    
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1, a, x1}), std::vector<BasicTerm>({y1, x1, x1}) })  );
     Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, b}), std::vector<BasicTerm>({x2, b}) })  );
 
@@ -92,12 +91,10 @@ TEST_CASE( "Generate identities", "[noodler]" ) {
     conj.add_predicate(eq2);
     FormulaPreprocess prep(conj);
     prep.generate_identities();
-
-    // Formula res;
-    // res.add_predicate(eq1);
-    // res.add_predicate(eq2);
-    // res.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a}), std::vector<BasicTerm>({y1, x1, x1}) })  ))
-    // FormulaPreprocess prep()
-
-    CHECK(prep.get_formula().get_predicates() == eq1);
+    std::set<Predicate> res;
+    res.insert(eq1);
+    res.insert(eq2);
+    res.insert(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a}), std::vector<BasicTerm>({x1}) })  ));
+    res.insert(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1}), std::vector<BasicTerm>({x2}) })  ));
+    CHECK(prep.get_formula().get_predicates_set() == res);
 }
