@@ -198,3 +198,33 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
     CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
     CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
 }
+
+TEST_CASE( "Remove duplicates", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm a{ BasicTermType::Literal, "a"};
+    BasicTerm b{ BasicTermType::Literal, "b"};    
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x2}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x2}) })  );
+    Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1}), std::vector<BasicTerm>({x3}) })  );
+    Formula conj;
+    conj.add_predicate(eq1);
+    conj.add_predicate(eq3);
+    conj.add_predicate(eq2);
+    FormulaPreprocess prep(conj);
+
+    Formula res_conj;
+    res_conj.add_predicate(eq1);
+    res_conj.add_predicate(eq3);
+    FormulaPreprocess prep_res(res_conj);
+
+    INFO(prep.to_string());
+    INFO(prep_res.to_string());
+    CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
+    CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
+}
