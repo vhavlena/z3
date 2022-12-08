@@ -24,6 +24,7 @@
 #include <string_view>
 #include <set>
 #include <unordered_set>
+#include <iostream>
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -224,9 +225,9 @@ namespace smt::noodler {
             std::vector<std::vector<BasicTerm>> new_params;
             bool modif = false;
             for(const std::vector<BasicTerm>& p : this->params) {
-                std::vector<BasicTerm> res;
-                bool r = Predicate::replace_concat(p, find, replace, res);
-                new_params.push_back(res);
+                std::vector<BasicTerm> res_vec;
+                bool r = Predicate::replace_concat(p, find, replace, res_vec);
+                new_params.push_back(res_vec);
                 modif = modif || r;
             }
             res = Predicate(this->type, new_params);

@@ -151,6 +151,26 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Get simple equations. Simple equation is of the form X = Y where |X| = |Y| = 1.
+     * 
+     * @param[out] out Vector of simple equations with the corresponding index in the map predicates
+     */
+    void FormulaVar::get_simple_eqs(std::vector<std::pair<size_t, Predicate>>& out) const {
+        for(const auto& item : this->predicates) {
+            if(is_simple_eq(item.second))
+                out.push_back({item.first, item.second});
+        }
+    }
+
+    /**
+     * @brief Clean occurrences of variables that have empty set of occurrences from varmap. 
+     * In other words remove items from varmap s.t. (x, {}).
+     */
+    void FormulaVar::clean_varmap() {
+        remove_if(this->varmap, [](const auto& n) { return n.second.size() == 0; });
+    };
+
+    /**
      * @brief Remove predicate from the formula. Updates the variable map (if the variable is no further present in 
      * the system, it is not removed, only the set of occurrences is set to {}).
      * 
@@ -213,7 +233,8 @@ namespace smt::noodler {
         for(const auto& pr : this->predicates) {
             Predicate rpl;
             if(pr.second.replace(find, replace, rpl)) { // changed, result is stored in rpl
-                replace_map.push_back({pr.first, rpl});
+                assert(rpl != pr.second);
+                replace_map.push_back({pr.first, std::move(rpl)});
             }
         }
         for(const auto& pr : replace_map) {
@@ -239,7 +260,7 @@ namespace smt::noodler {
     
             assert(pr.second.get_left_side().size() == 1);
             update_reg_constr(pr.second.get_left_side()[0], pr.second.get_right_side());
-        
+
             std::set<BasicTerm> vars = pr.second.get_vars();
             this->formula.remove_predicate(pr.first);
             for(const BasicTerm& v : vars) {
@@ -253,6 +274,37 @@ namespace smt::noodler {
             }
         }
     }
+
+    /**
+     * @brief Propagate variables. Propagate all equations of the form X=Y 
+     * (find all Y in the formula and replace with X).
+     */
+    void FormulaPreprocess::propagate_variables() {
+        std::vector<std::pair<size_t, Predicate>> regs;
+        this->formula.get_simple_eqs(regs);
+        std::deque<size_t> worklist;
+
+        std::transform(regs.begin(), regs.end(), std::back_inserter(worklist),
+            [](auto const& pair){ return pair.first; });
+
+        while(!worklist.empty()) {
+            size_t index = worklist.front();
+            worklist.pop_front();
+            Predicate eq = this->formula.get_predicate(index);
+    
+            assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
+            BasicTerm v_left = eq.get_left_side()[0]; // X
+            BasicTerm v_right = eq.get_right_side()[0]; // Y
+            update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
+        
+            this->formula.replace(v_right, eq.get_left_side()); // find Y, replace for X
+            this->formula.remove_predicate(index);
+
+            STRACE("str", tout << "propagate_variables\n";);
+        }
+
+        assert(!this->formula.contains_simple_eqs());
+    } 
 
     /**
      * @brief Get symmetrical difference of occurrences of BasicTerms within two concatenations. For instance for X.Y.X and X.Y.W.Z 
