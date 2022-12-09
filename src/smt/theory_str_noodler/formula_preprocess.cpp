@@ -314,7 +314,7 @@ namespace smt::noodler {
      * @param cat2 Second concatenation
      * @return Symmetrical difference 
      */
-    VarNodeSymDiff FormulaPreprocess::get_eq_sym_diff(const std::vector<BasicTerm>& cat1, const std::vector<BasicTerm>& cat2) const {
+    VarNodeSymDiff FormulaPreprocess::get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const {
         std::set<VarNode> p1, p2;
         this->formula.update_var_positions_side(cat1, p1, 0, true); // include positions of literals, set equation index to 0
         this->formula.update_var_positions_side(cat2, p2, 0, true);
@@ -336,7 +336,7 @@ namespace smt::noodler {
             VarNode val2 = *diff.second.begin();
             if(val1.position == val2.position) {
                 new_pred = Predicate(PredicateType::Equation, 
-                    std::vector<std::vector<BasicTerm>>({std::vector<BasicTerm>({val1.term}), 
+                    std::vector<Concat>({Concat({val1.term}), 
                     std::vector<BasicTerm>({val2.term})}));
                 return true;
             }
@@ -380,6 +380,67 @@ namespace smt::noodler {
             }
         }
         this->formula.add_predicates(new_preds);
+    }
+
+
+    void FormulaPreprocess::get_var_succ(std::map<std::string, std::set<BasicTerm>>& res) const {
+        assert(res.empty());
+
+        for(const Predicate& pr : this->formula.get_predicates_set()) {
+            for(const std::vector<BasicTerm>& side : pr.get_params()) {
+                for(size_t i = 0; i < side.size(); i++) {
+                    if(!side[i].is_variable())  continue; // take only variables
+
+                    std::string name = side[i].get_name();
+                    // we use variable with empty name to denote that the variable varname is at the end of the side
+                    BasicTerm succ = BasicTerm(BasicTermType::Variable, "");
+                    if (i < side.size() - 1) {
+                        succ = side[i+1];
+                    }
+
+                    auto iter = res.find(name);
+                    if(iter != res.end()) {
+                        iter->second.insert(succ);
+                    } else {
+                        res[name] = std::set<BasicTerm>({succ});
+                    }
+                }
+            }
+        }
+    }
+
+    void FormulaPreprocess::get_regular_sublists(std::map<Concat, unsigned>& res) const {
+        std::map<std::string, std::set<BasicTerm>> var_succ;
+        get_var_succ(var_succ);
+
+        std::map<Concat, unsigned> sublists;
+        std::set<Concat> all_sublists, max_sublists;
+
+        for(const Predicate& pr : this->formula.get_predicates_set()) {
+            for(const std::vector<BasicTerm>& side : pr.get_params()) {
+                Concat sub;
+                for(size_t i = 0; i < side.size(); i++) {
+                    BasicTerm t = side[i];
+                    if(!t.is_variable() && sub.size() == 0) // sublist should not start with literal
+                        continue;
+                    sub.push_back(t);
+
+                    if((t.is_variable() && var_succ[t.get_name()].size() > 1) || i == side.size() - 1) {
+                        if(sub.size() > 1) {
+                            all_sublists.insert(sub);
+                            map_increment(sublists, sub);
+                        }
+                        sub.clear();
+                    }
+                }
+            }
+        }
+        for(const Concat& sub : all_sublists) {
+            res[sub] = sublists[sub];
+            for(const Concat& small : set_filter(max_sublists, [&sub](const Concat& val) { return is_subvector(val, sub); })) {
+                res[sub] += sublists[small];
+            }
+        }
     }
 
 } // Namespace smt::noodler.

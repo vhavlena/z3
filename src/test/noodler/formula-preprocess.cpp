@@ -228,3 +228,31 @@ TEST_CASE( "Remove duplicates", "[noodler]" ) {
     CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
     CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
 }
+
+
+TEST_CASE( "Sublists", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm a{ BasicTermType::Literal, "a"};
+    BasicTerm b{ BasicTermType::Literal, "b"};    
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4, b}), std::vector<BasicTerm>({x1, x1, x2}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b, x3, x4, b}), std::vector<BasicTerm>({x2, x1, x2}) })  );
+    Formula conj;
+    conj.add_predicate(eq1);
+    conj.add_predicate(eq2);
+    FormulaPreprocess prep(conj);
+    std::map<Concat, unsigned> res;
+    prep.get_regular_sublists(res);
+    
+    // for(const auto& c : res) {
+    //     std::cout << concat_to_string(c.first) << " : " << c.second << std::endl;
+    // }
+
+    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x3, x4, b}), 2}  }));
+
+}

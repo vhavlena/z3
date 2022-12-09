@@ -54,6 +54,7 @@ namespace smt::noodler {
 
     using VarMap = std::map<std::string, std::set<VarNode>>;
     using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
+    using Concat = std::vector<BasicTerm>;
 
     /**
      * @brief Class representing a formula with efficient handling of variable occurrences.
@@ -117,14 +118,16 @@ namespace smt::noodler {
 
     protected:
         void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
-        VarNodeSymDiff get_eq_sym_diff(const std::vector<BasicTerm>& cat1, const std::vector<BasicTerm>& cat2) const;
+        VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
+        void get_var_succ(std::map<std::string, std::set<BasicTerm>>& res) const;
 
     public:
         FormulaPreprocess(const Formula& conj) : formula(conj) { };
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
+        void get_regular_sublists(std::map<Concat, unsigned>& res) const; 
 
         void remove_regular();
         void propagate_variables();
@@ -133,6 +136,15 @@ namespace smt::noodler {
         void replace(const BasicTerm& find, const std::vector<BasicTerm>& replace) { this->formula.replace(find, replace); };
         void clean_varmap() { this->formula.clean_varmap(); };
     };
+
+
+    static std::string concat_to_string(const Concat& cat) {
+        std::string ret;
+        for(const BasicTerm& t : cat) {
+            ret += t.to_string() + " ";
+        }
+        return ret;
+    }
 
     /**
      * @brief Remove from the container @p st all items satisfying the predicate @p pred.
@@ -166,6 +178,28 @@ namespace smt::noodler {
         std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
             std::inserter(diff, diff.begin()));
         return diff;
+    }
+
+    template<typename T>
+    bool is_subvector(const std::vector<T>& vec, const std::vector<T>& check) { // insufficient
+        return std::search(vec.begin(), vec.end(), check.begin(), check.end()) != vec.end();
+    }
+
+    template<typename T, typename P>
+    std::set<T> set_filter(std::set<T>& st, P pred) {
+        std::set<T> ret;
+        std::copy_if (st.begin(), st.end(), std::inserter(ret, ret.begin()), pred );
+        return ret;
+    }
+
+    template<typename T>
+    void map_increment(std::map<T, unsigned>& mp, const T& val) {
+         auto iter = mp.find(val);
+        if(iter != mp.end()) {
+            iter->second++;
+        } else {
+            mp[val] = 1;
+        }
     }
     
 } // Namespace smt::noodler.
