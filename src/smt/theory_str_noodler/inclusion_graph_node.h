@@ -178,6 +178,15 @@ namespace smt::noodler {
             return params[1];
         }
 
+        std::set<BasicTerm> get_items() const {
+            std::set<BasicTerm> ret;
+            for(const auto& side : this->params) {
+                for(const BasicTerm& t : side)
+                    ret.insert(t);
+            }
+            return ret;
+        }
+
         std::vector<BasicTerm>& get_side(EquationSideType side);
 
         [[nodiscard]] const std::vector<BasicTerm>& get_side(EquationSideType side) const;
@@ -198,16 +207,21 @@ namespace smt::noodler {
          */
         static bool replace_concat(
                 const std::vector<BasicTerm>& concat, 
-                const BasicTerm& find, 
+                const std::vector<BasicTerm>& find, 
                 const std::vector<BasicTerm>& replace,
                 std::vector<BasicTerm>& res) {
             bool modif = false;
-            for(const BasicTerm& t: concat) {
-                if(t == find) {
+            for(auto it = concat.begin(); it != concat.end(); ) {
+                if(concat.end() - it < find.size())
+                    break;
+                ;
+                if(std::equal(it, it+find.size(), find.begin(), find.end())) {
                     res.insert(res.end(), replace.begin(), replace.end());
                     modif = true;
+                    it += find.size();
                 } else {
-                    res.push_back(t);
+                    res.push_back(*it);
+                    it++;
                 }
             }
             return modif;
@@ -221,7 +235,7 @@ namespace smt::noodler {
          * @param res Where to store the modified predicate
          * @return Does the predicate contain at least one occurrence of @p find ?
          */
-        bool replace(const BasicTerm& find, const std::vector<BasicTerm>& replace, Predicate& res) const {
+        bool replace(const std::vector<BasicTerm>& find, const std::vector<BasicTerm>& replace, Predicate& res) const {
             std::vector<std::vector<BasicTerm>> new_params;
             bool modif = false;
             for(const std::vector<BasicTerm>& p : this->params) {

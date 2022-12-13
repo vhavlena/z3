@@ -15,6 +15,129 @@ namespace smt::noodler {
 
     typedef std::string Var;
 
+
+    /**
+     * @brief Remove from the container @p st all items satisfying the predicate @p pred.
+     * 
+     * @tparam T Container type
+     * @tparam P Predicate type
+     * @param st Set
+     * @param pred predicate
+     */
+    template<typename T, typename P>
+    void remove_if(T& st, P pred) {
+        for(auto it{st.begin()}, end{st.end()}; it != st.end();) {
+            if(pred(*it))
+                it = st.erase(it);
+            else
+                it++;
+        }
+    }
+
+    /**
+     * @brief Set difference
+     * 
+     * @tparam T type of sets
+     * @param t1 First set
+     * @param t2 Second set
+     * @return @p t1 \ @p t2
+     */
+    template<typename T>
+    std::set<T> set_difference(std::set<T>& t1, std::set<T>& t2) {
+        std::set<T> diff;
+        std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
+            std::inserter(diff, diff.begin()));
+        return diff;
+    }
+
+    template<typename T, typename S, typename P>
+    std::set<S> set_map(const std::set<T>& st, P pred) {
+        std::set<S> ret;
+        std::transform (st.begin(), st.end(), std::inserter(ret, ret.begin()), pred);
+        return ret;
+    }
+
+    template<typename T>
+    bool is_subvector(const std::vector<T>& vec, const std::vector<T>& check) { // insufficient
+        return std::search(vec.begin(), vec.end(), check.begin(), check.end()) != vec.end();
+    }
+
+    template<typename T, typename P>
+    std::set<T> set_filter(std::set<T>& st, P pred) {
+        std::set<T> ret;
+        std::copy_if (st.begin(), st.end(), std::inserter(ret, ret.begin()), pred );
+        return ret;
+    }
+
+    template<typename T>
+    void map_increment(std::map<T, unsigned>& mp, const T& val) {
+         auto iter = mp.find(val);
+        if(iter != mp.end()) {
+            iter->second++;
+        } else {
+            mp[val] = 1;
+        }
+    }
+
+    template<typename T, typename P>
+    void map_set_insert(std::map<T, std::set<P>>& mp, const T& key, const P& val) {
+        auto iter = mp.find(key);
+        if(iter != mp.end()) {
+            iter->second.insert(val);
+        } else {
+            mp[key] = std::set<P>({val});
+        }
+    }
+
+
+    using ConcatGraphEdges = std::map<std::pair<BasicTerm,BasicTerm>, unsigned>;
+
+    class ConcatGraph {
+    public:
+        ConcatGraphEdges edges;
+        std::map<BasicTerm, std::set<BasicTerm>> pred;
+        std::map<BasicTerm, std::set<BasicTerm>> succ;
+
+    public:
+        ConcatGraph() : edges(), pred(), succ() { };
+        ConcatGraph(const ConcatGraph&) = default;
+
+        void add_edge(const BasicTerm& from, const BasicTerm& to) {
+            map_increment(this->edges, {from, to});
+            map_set_insert(this->pred, to, from);
+            map_set_insert(this->succ, from, to);
+        };
+
+        unsigned get_edge_cost(const BasicTerm& from, const BasicTerm& to) const {
+            return this->edges.at({from, to});
+        }; 
+
+        std::set<BasicTerm> get_succ(const BasicTerm& t) const { 
+            return this->succ.at(t); 
+        };
+
+        bool is_init(const BasicTerm& t) const { return t.get_name() == ""; };
+
+        BasicTerm init() const { return BasicTerm(BasicTermType::Variable, "");  };
+
+        std::set<BasicTerm> get_init_vars() const {
+            std::set<BasicTerm> ret;
+            for(const auto& pr : this->succ) {
+                if(is_init(pr.first))   continue;
+                if(pr.second.size() > 1)    continue;
+                if(!pr.first.is_variable())    continue;
+
+                std::set<BasicTerm> pred_set = this->pred.at(pr.first);
+                if(pred_set.size() > 1) 
+                    ret.insert(pr.first);
+                if(pred_set.size() == 1 && is_init(*pred_set.begin()))
+                    ret.insert(pr.first);
+            }
+            return ret;
+        }
+    };
+
+
     /**
      * @brief Representation of a variable in an equation. Var is the variable name, eq_index 
      * is the equation index, and position represents the position of the variable in the equation. 
@@ -77,7 +200,7 @@ namespace smt::noodler {
         
         std::string to_string() const;
 
-        const std::set<VarNode>& get_var_occurr(const std::string& var) { return this->varmap[var]; };
+        const std::set<VarNode>& get_var_occurr(const std::string& var) const { return this->varmap.at(var); };
         const Predicate& get_predicate(size_t index) const { return this->predicates.at(index); };
         const std::map<size_t, Predicate>& get_predicates() const { return this->predicates; };
         const std::set<Predicate>& get_predicates_set() const { return this->allpreds; };
@@ -103,8 +226,10 @@ namespace smt::noodler {
         void add_predicate(const Predicate& pred, int index = -1);
         void add_predicates(const std::set<Predicate>& preds);
 
-        void replace(const BasicTerm& find, const std::vector<BasicTerm>& replace);
+        void replace(const Concat& find, const Concat& replace);
         void clean_varmap();
+
+        static int increment_side_index(int val, size_t incr) { return val > 0 ? val + incr : val - incr; };
     };
 
 
@@ -115,15 +240,18 @@ namespace smt::noodler {
 
     private:
         FormulaVar formula;
+        unsigned fresh_var_cnt;
 
     protected:
         void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
         VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
-        void get_var_succ(std::map<std::string, std::set<BasicTerm>>& res) const;
+        ConcatGraph get_concat_graph() const;
+
+        BasicTerm create_fresh_var();
 
     public:
-        FormulaPreprocess(const Formula& conj) : formula(conj) { };
+        FormulaPreprocess(const Formula& conj) : formula(conj), fresh_var_cnt(0) { };
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
@@ -132,8 +260,9 @@ namespace smt::noodler {
         void remove_regular();
         void propagate_variables();
         void generate_identities();
+        void reduce_regular_sequence();
 
-        void replace(const BasicTerm& find, const std::vector<BasicTerm>& replace) { this->formula.replace(find, replace); };
+        void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
         void clean_varmap() { this->formula.clean_varmap(); };
     };
 
@@ -146,62 +275,7 @@ namespace smt::noodler {
         return ret;
     }
 
-    /**
-     * @brief Remove from the container @p st all items satisfying the predicate @p pred.
-     * 
-     * @tparam T Container type
-     * @tparam P Predicate type
-     * @param st Set
-     * @param pred predicate
-     */
-    template<typename T, typename P>
-    void remove_if(T& st, P pred) {
-        for(auto it{st.begin()}, end{st.end()}; it != st.end();) {
-            if(pred(*it))
-                it = st.erase(it);
-            else
-                it++;
-        }
-    }
-
-    /**
-     * @brief Set difference
-     * 
-     * @tparam T type of sets
-     * @param t1 First set
-     * @param t2 Second set
-     * @return @p t1 \ @p t2
-     */
-    template<typename T>
-    std::set<T> set_difference(std::set<T>& t1, std::set<T>& t2) {
-        std::set<T> diff;
-        std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
-            std::inserter(diff, diff.begin()));
-        return diff;
-    }
-
-    template<typename T>
-    bool is_subvector(const std::vector<T>& vec, const std::vector<T>& check) { // insufficient
-        return std::search(vec.begin(), vec.end(), check.begin(), check.end()) != vec.end();
-    }
-
-    template<typename T, typename P>
-    std::set<T> set_filter(std::set<T>& st, P pred) {
-        std::set<T> ret;
-        std::copy_if (st.begin(), st.end(), std::inserter(ret, ret.begin()), pred );
-        return ret;
-    }
-
-    template<typename T>
-    void map_increment(std::map<T, unsigned>& mp, const T& val) {
-         auto iter = mp.find(val);
-        if(iter != mp.end()) {
-            iter->second++;
-        } else {
-            mp[val] = 1;
-        }
-    }
-    
+        
 } // Namespace smt::noodler.
 
 #endif //Z3_STR_FORMULA_PREPROCESS_H_

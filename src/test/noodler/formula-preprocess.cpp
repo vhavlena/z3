@@ -9,19 +9,10 @@
 using namespace smt::noodler;
 
 TEST_CASE( "Preprocess to strings", "[noodler]" ) {
-    auto predicate1{ Predicate(PredicateType::Equation) };
-
-    constexpr auto term_name{ "x_1" };
-    auto term{ BasicTerm(BasicTermType::Variable, term_name) };
-    auto& left{ predicate1.get_left_side() };
-    left.emplace_back(term);
-    left.emplace_back( BasicTermType::Literal, "lit" );
-    left.emplace_back(term);
-
-    auto term2{ BasicTerm(BasicTermType::Variable, "x_2") };
-    auto& right{ predicate1.get_right_side() };
-    right.emplace_back(term2);
-    right.emplace_back(term2);
+    BasicTerm term{ BasicTermType::Variable, "x_6"};
+    BasicTerm lit (BasicTermType::Literal, "lit" );
+    BasicTerm term2{ BasicTerm(BasicTermType::Variable, "x_2") };
+    Predicate predicate1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({term, term, lit}), std::vector<BasicTerm>({lit, term2, term2}) })   );
 
     BasicTerm term_lit{ BasicTermType::Literal, "3"};
     BasicTerm term_lit2{ BasicTermType::Literal, "5"};
@@ -40,10 +31,13 @@ TEST_CASE( "Preprocess to strings", "[noodler]" ) {
 
     CHECK(v1 == v2);
     INFO(fvar.to_string());
-    CHECK(fvar.get_var_positions(predicate1, 0) == std::set<VarNode>({ {.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1 }, 
-        {.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -3 }, 
-        {.term = BasicTerm(BasicTermType::Variable, "x_2"), .eq_index = 0, .position = 1 }, 
-        {.term = BasicTerm(BasicTermType::Variable, "x_2"), .eq_index = 0, .position = 2 } }));
+    CHECK(fvar.get_var_positions(predicate1, 0, true) == std::set<VarNode>({ 
+        {.term = term, .eq_index = 0, .position = -1 }, 
+        {.term = term, .eq_index = 0, .position = -2 }, 
+        {.term = lit, .eq_index = 0, .position = -3 }, 
+        {.term = lit, .eq_index = 0, .position = 1 }, 
+        {.term = term2, .eq_index = 0, .position = 2 },
+        {.term = term2, .eq_index = 0, .position = 3 } }));
 }
 
 TEST_CASE( "Remove regular", "[noodler]" ) {
@@ -115,25 +109,27 @@ TEST_CASE( "Replace", "[noodler]" ) {
     Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x2}) })  );
 
     Predicate res;
-    CHECK(eq1.replace(y1, std::vector<BasicTerm>({y1, a, x1}), res));
+    CHECK(eq1.replace(Concat({y1}), std::vector<BasicTerm>({y1, a, x1}), res));
     CHECK(res == Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1, a, x1, a, x1}), std::vector<BasicTerm>({y1, a, x1, x1, x1}) })  ));
-    CHECK(eq1.replace(x1, std::vector<BasicTerm>(), res));
+    CHECK(eq1.replace(Concat({x1}), std::vector<BasicTerm>(), res));
     CHECK(res == Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1, a}), std::vector<BasicTerm>({y1}) })  ));
-    CHECK(eq2.replace(x1, std::vector<BasicTerm>(), res));
+    CHECK(eq2.replace(Concat({x1}), std::vector<BasicTerm>(), res));
     CHECK(res == Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>(), std::vector<BasicTerm>({x2, b}) })  ));
-    CHECK(!eq2.replace(y1, std::vector<BasicTerm>(), res));
-    CHECK(eq4.replace(x2, std::vector<BasicTerm>({x1}), res));
+    CHECK(!eq2.replace(Concat({x3}), std::vector<BasicTerm>(), res));
+    CHECK(eq4.replace(Concat({x2}), std::vector<BasicTerm>({x1}), res));
     CHECK(res == Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x1}) })  ));
 
     Formula conj;
     conj.add_predicate(eq1);
     conj.add_predicate(eq3);
     FormulaPreprocess prep(conj);
-    prep.replace(y1, std::vector<BasicTerm>({y1, a, x1}));
+    prep.replace(Concat({y1}), std::vector<BasicTerm>({y1, a, x1}));
     Formula res_conj;
     res_conj.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1, a, x1, a, x1}), std::vector<BasicTerm>({y1, a, x1, x1, x1}) })));
     res_conj.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1}), std::vector<BasicTerm>({y1, a, x1, b}) })));
     FormulaPreprocess prep_res(res_conj);
+    INFO(prep.get_formula().to_string());
+    INFO(prep_res.get_formula().to_string());
     CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
 }
 
@@ -156,7 +152,7 @@ TEST_CASE( "Replace 2", "[noodler]" ) {
     conj2.add_predicate(eq5);
     conj2.add_predicate(eq6);
     FormulaPreprocess prep2(conj2);
-    prep2.replace(x2, std::vector<BasicTerm>({x1}));
+    prep2.replace(Concat({x2}), std::vector<BasicTerm>({x1}));
     prep2.clean_varmap();
     Formula res_conj2;
     res_conj2.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x1}) })));
@@ -242,17 +238,17 @@ TEST_CASE( "Sublists", "[noodler]" ) {
     BasicTerm b{ BasicTermType::Literal, "b"};    
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4, b}), std::vector<BasicTerm>({x1, x1, x2}) })  );
     Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b, x3, x4, b}), std::vector<BasicTerm>({x2, x1, x2}) })  );
+    Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5, x1, x2, x3}), std::vector<BasicTerm>({x4, x1, x2}) })  );
     Formula conj;
     conj.add_predicate(eq1);
     conj.add_predicate(eq2);
     FormulaPreprocess prep(conj);
     std::map<Concat, unsigned> res;
-    prep.get_regular_sublists(res);
-    
-    // for(const auto& c : res) {
-    //     std::cout << concat_to_string(c.first) << " : " << c.second << std::endl;
-    // }
 
-    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x3, x4, b}), 2}  }));
-
+    Formula conj2;
+    conj2.add_predicate(eq3);
+    FormulaPreprocess prep2(conj2);
+    res.clear();
+    prep2.get_regular_sublists(res);
+    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x1, x2}), 2}  }));
 }

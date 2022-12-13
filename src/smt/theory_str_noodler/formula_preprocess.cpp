@@ -25,7 +25,7 @@ namespace smt::noodler {
      */
     void FormulaVar::update_varmap(const Predicate& pred, size_t index) {
         assert(pred.is_equation());
-        for(const VarNode& vr : get_var_positions(pred, index)) {
+        for(const VarNode& vr : get_var_positions(pred, index, true)) {
             VarMap::iterator iter = this->varmap.find(vr.term.get_name());
             if(iter != this->varmap.end()) {
                 iter->second.insert(vr);
@@ -177,10 +177,10 @@ namespace smt::noodler {
      * @param index Index of the predicate to be removed.
      */
     void FormulaVar::remove_predicate(size_t index) {
-        std::set<BasicTerm> vars = this->predicates[index].get_vars();
+        std::set<BasicTerm> items = this->predicates[index].get_items();
 
         const auto& filter = [&index](const VarNode& n) { return n.eq_index == index; };
-        for(const BasicTerm& v : vars) {
+        for(const BasicTerm& v : items) {
             std::set<VarNode>& occurr = this->varmap[v.get_name()]; 
             remove_if(occurr, filter);
         }
@@ -228,7 +228,7 @@ namespace smt::noodler {
      * @param find Find 
      * @param replace Replace
      */
-    void FormulaVar::replace(const BasicTerm& find, const std::vector<BasicTerm>& replace) {
+    void FormulaVar::replace(const Concat& find, const Concat& replace) {
         std::vector<std::pair<size_t, Predicate>> replace_map;
         for(const auto& pr : this->predicates) {
             Predicate rpl;
@@ -294,10 +294,9 @@ namespace smt::noodler {
     
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
-            BasicTerm v_right = eq.get_right_side()[0]; // Y
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
         
-            this->formula.replace(v_right, eq.get_left_side()); // find Y, replace for X
+            this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             this->formula.remove_predicate(index);
 
             STRACE("str", tout << "propagate_variables\n";);
@@ -382,65 +381,103 @@ namespace smt::noodler {
         this->formula.add_predicates(new_preds);
     }
 
-
-    void FormulaPreprocess::get_var_succ(std::map<std::string, std::set<BasicTerm>>& res) const {
-        assert(res.empty());
+    /**
+     * @brief Create concatenation graph. Oriented graph where each term is node and two terms 
+     * (variable/litaral) t1 and t2 are connected (t1 -> t2) if t1.t2 occurs in some equation. 
+     * Moreover each edge is labelled by number of occurrences of such concatenation in the formula.
+     * 
+     * @return ConcatGraph of the formula.
+     */
+    ConcatGraph FormulaPreprocess::get_concat_graph() const {
+        ConcatGraph graph;
 
         for(const Predicate& pr : this->formula.get_predicates_set()) {
             for(const std::vector<BasicTerm>& side : pr.get_params()) {
-                for(size_t i = 0; i < side.size(); i++) {
-                    if(!side[i].is_variable())  continue; // take only variables
-
-                    std::string name = side[i].get_name();
+                for(size_t i = 0; i <= side.size(); i++) {
                     // we use variable with empty name to denote that the variable varname is at the end of the side
-                    BasicTerm succ = BasicTerm(BasicTermType::Variable, "");
-                    if (i < side.size() - 1) {
-                        succ = side[i+1];
+                    BasicTerm from = graph.init();
+                    BasicTerm to = graph.init();
+                    if (i > 0) {
+                        from = side[i-1];
                     }
-
-                    auto iter = res.find(name);
-                    if(iter != res.end()) {
-                        iter->second.insert(succ);
-                    } else {
-                        res[name] = std::set<BasicTerm>({succ});
+                    if(i < side.size()) {
+                        to = side[i];
                     }
+                    graph.add_edge(from, to);
                 }
+            }
+        }
+        return graph;
+    }
+
+    /**
+     * @brief Get regular sublists, i.e., concatenations X1...Xk such that each Xi occurrs in the 
+     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then 
+     * X+ ... Xk do not occurr in the formula anymore (except in V). 
+     * 
+     * @param res Regular sublists with the number of their occurrences.
+     */
+    void FormulaPreprocess::get_regular_sublists(std::map<Concat, unsigned>& res) const {
+        ConcatGraph graph = get_concat_graph();
+
+        for(const BasicTerm& t : graph.get_init_vars()) {
+            Concat sub;
+            // Get all occurrences of t
+            std::set<VarNode> occurrs = this->formula.get_var_occurr(t.get_name());
+            // Get predicate of a first equation containing t; and side containing t
+            Predicate act_pred = this->formula.get_predicate(occurrs.begin()->eq_index);
+            Concat side = occurrs.begin()->position > 0 ? act_pred.get_right_side() : act_pred.get_left_side();
+
+            int start = std::abs(occurrs.begin()->position) - 1;
+            for(int i = start; i < side.size(); i++) {
+                std::set<VarNode> vns;
+                // Construct the set of supposed occurences of the symbol side[i]
+                for(const VarNode& vn : occurrs) {
+                    vns.insert({
+                        .term = side[i], 
+                        .eq_index = vn.eq_index, 
+                        .position = FormulaVar::increment_side_index(vn.position, i-start)
+                    });
+                }
+                // Compare the supposed occurrences with real occurrences.
+                std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i].get_name());
+
+                if(side[i].is_variable() && vns != occurs_act) {
+                    break;
+                }
+                if(side[i].is_literal() && std::includes(vns.begin(), 
+                    vns.end(), occurs_act.begin(), occurs_act.end())) {
+                    break;
+                }
+                sub.push_back(side[i]);
+            }
+
+            if(sub.size() > 1) {
+                res[sub] = occurrs.size();
             }
         }
     }
 
-    void FormulaPreprocess::get_regular_sublists(std::map<Concat, unsigned>& res) const {
-        std::map<std::string, std::set<BasicTerm>> var_succ;
-        get_var_succ(var_succ);
+    /**
+     * @brief Create a fresh variable.
+     * 
+     * @return BasicTerm Corresponding to a fresh variable.
+     */
+    BasicTerm FormulaPreprocess::create_fresh_var() {
+        return BasicTerm(BasicTermType::Variable, "__tmp__var_" + std::to_string(this->fresh_var_cnt++));
+    }
 
-        std::map<Concat, unsigned> sublists;
-        std::set<Concat> all_sublists, max_sublists;
+    void FormulaPreprocess::reduce_regular_sequence() {
+        std::map<Concat, unsigned> regs;
+        std::set<Predicate> new_eqs;
+        get_regular_sublists(regs);
 
-        for(const Predicate& pr : this->formula.get_predicates_set()) {
-            for(const std::vector<BasicTerm>& side : pr.get_params()) {
-                Concat sub;
-                for(size_t i = 0; i < side.size(); i++) {
-                    BasicTerm t = side[i];
-                    if(!t.is_variable() && sub.size() == 0) // sublist should not start with literal
-                        continue;
-                    sub.push_back(t);
-
-                    if((t.is_variable() && var_succ[t.get_name()].size() > 1) || i == side.size() - 1) {
-                        if(sub.size() > 1) {
-                            all_sublists.insert(sub);
-                            map_increment(sublists, sub);
-                        }
-                        sub.clear();
-                    }
-                }
+        for(const auto& pr : regs) {
+            if(pr.second >= 2) {
+                // this->formula.replace()
             }
         }
-        for(const Concat& sub : all_sublists) {
-            res[sub] = sublists[sub];
-            for(const Concat& small : set_filter(max_sublists, [&sub](const Concat& val) { return is_subvector(val, sub); })) {
-                res[sub] += sublists[small];
-            }
-        }
+
     }
 
 } // Namespace smt::noodler.
