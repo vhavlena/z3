@@ -241,6 +241,8 @@ namespace smt::noodler {
     private:
         PredicateType type;
         std::vector<std::vector<BasicTerm>> params;
+
+        // TODO: Add additional attributes such as cost, etc.
     }; // Class Predicate.
 
     [[nodiscard]] static std::string to_string(const Predicate& predicate) {
@@ -274,8 +276,8 @@ namespace smt::noodler {
         explicit GraphNode(const Predicate& predicate) : node_predicate(predicate) {}
 
         void set_predicate(const Predicate& predicate) { this->node_predicate = predicate; }
-        Predicate& get_predicate() { return node_predicate; }
-        const Predicate& get_predicate() const { return node_predicate; }
+        [[nodiscard]] Predicate& get_predicate() { return node_predicate; }
+        [[nodiscard]] const Predicate& get_predicate() const { return node_predicate; }
 
         struct HashFunction {
             size_t operator()(const GraphNode& graph_node) const {
@@ -288,7 +290,9 @@ namespace smt::noodler {
         }
 
     private:
-         Predicate node_predicate;
+        Predicate node_predicate;
+
+        // TODO: Add additional attributes such as cost, etc.
     }; // Class GraphNode.
 
     static bool operator==(const GraphNode& lhs, const GraphNode& rhs) { return lhs.equals(rhs); }

@@ -8,8 +8,8 @@
 namespace smt::noodler {
     class Graph {
     public:
-        using TargetNodes = std::unordered_set<GraphNode*>;
-        using Edges = std::unordered_map<GraphNode*, TargetNodes>;
+        using Nodes = std::unordered_set<GraphNode*>;
+        using Edges = std::unordered_map<GraphNode*, Nodes>;
 
         Graph() = default;
 
@@ -30,15 +30,29 @@ namespace smt::noodler {
 
         const Edges& get_edges() const { return edges; }
 
-        std::optional<const std::reference_wrapper<TargetNodes>> get_edges(const GraphNode* const source) {
+        std::optional<const std::reference_wrapper<Nodes>> get_edges(const GraphNode* const source) {
             const auto source_edges{ edges.find(const_cast<GraphNode*>(source)) };
             if (source_edges != edges.end()) {
-                return std::make_optional<const std::reference_wrapper<TargetNodes>>(source_edges->second);
+                return std::make_optional<const std::reference_wrapper<Nodes>>(source_edges->second);
             }
             return std::nullopt;
         }
 
-        // TODO: Method to get edges from node.
+        Nodes get_edges_to(GraphNode* const target) const {
+            Nodes source_nodes{};
+            for (const auto& source_edges: edges) {
+                if (source_edges.second.find(target) != source_edges.second.end()) {
+                    source_nodes.insert(source_edges.first);
+                }
+            }
+            return source_nodes;
+        }
+
+        GraphNode* get_node(Predicate predicate) {
+            auto node{ nodes.find(GraphNode{ predicate }) };
+            if (node == nodes.end()) { return nullptr; }
+            return const_cast<GraphNode*>(&*node);
+        }
     }; // Class Graph.
 
     class Formula {
@@ -60,6 +74,7 @@ namespace smt::noodler {
     Graph create_simplified_splitting_graph(const Formula& formula);
 
     Graph create_inclusion_graph(const Graph& simplified_splitting_graph);
+
 }
 
 

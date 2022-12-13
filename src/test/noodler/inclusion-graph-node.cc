@@ -105,6 +105,24 @@ TEST_CASE("Mata integration", "[noodler]") {
     CHECK(!nfa.has_no_transitions());
 }
 
+TEST_CASE("Graph::get_edges_to", "[noodler]") {
+    Graph graph;
+    Formula formula;
+    BasicTerm x{ BasicTermType::Variable, "x" };
+    BasicTerm y{ BasicTermType::Variable, "y" };
+    Predicate predicate{ PredicateType::Equation, { { x }, { x, y } } };
+    Predicate predicate2{ PredicateType::Equation, { { x, y }, { y, x } } };
+
+    formula.add_predicate(predicate);
+    formula.add_predicate(predicate2);
+    graph = create_simplified_splitting_graph(formula);
+    auto target{ graph.get_node(predicate) };
+    auto edges_to_target{ graph.get_edges_to(target) };
+    CHECK(edges_to_target.find(graph.get_node(predicate)) != edges_to_target.end());
+    CHECK(edges_to_target.find(graph.get_node(predicate2)) != edges_to_target.end());
+    CHECK(edges_to_target.find(graph.get_node(predicate2.get_switched_sides_predicate())) != edges_to_target.end());
+}
+
 TEST_CASE("Splitting graph", "[noodler]") {
     Graph graph;
     Formula formula;
