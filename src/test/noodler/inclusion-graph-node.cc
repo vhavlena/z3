@@ -123,6 +123,27 @@ TEST_CASE("Graph::get_edges_to", "[noodler]") {
     CHECK(edges_to_target.find(graph.get_node(predicate2.get_switched_sides_predicate())) != edges_to_target.end());
 }
 
+TEST_CASE("Create inclusion graph", "[noodler]") {
+    Graph graph;
+    Formula formula;
+
+    BasicTerm u{ BasicTermType::Variable, "u" };
+    BasicTerm z{ BasicTermType::Variable, "z" };
+    BasicTerm v{ BasicTermType::Variable, "v" };
+    BasicTerm x{ BasicTermType::Variable, "x" };
+    Predicate predicate{ PredicateType::Equation, { { u }, { z } } };
+    Predicate predicate2{ PredicateType::Equation, { { v }, { u } } };
+    Predicate predicate3{ PredicateType::Equation, { { x }, { u, v, x } } };
+
+    formula.add_predicate(predicate);
+    formula.add_predicate(predicate2);
+    formula.add_predicate(predicate3);
+    graph = create_inclusion_graph(formula);
+    CHECK(graph.nodes.size() == 5);
+    CHECK(graph.edges.size() == 5);
+    CHECK(graph.get_num_of_edges() == 12);
+}
+
 TEST_CASE("Splitting graph", "[noodler]") {
     Graph graph;
     Formula formula;

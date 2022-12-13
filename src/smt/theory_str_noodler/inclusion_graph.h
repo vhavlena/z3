@@ -20,6 +20,29 @@ namespace smt::noodler {
             edges[source].insert(target);
         }
 
+        void remove_edge(GraphNode* source, GraphNode* target) {
+            auto source_edges{ edges[source] };
+            source_edges.erase(target);
+            if (source_edges.empty()) {
+                edges.erase(source);
+            }
+        }
+
+        void remove_edges_from(GraphNode* source) {
+            edges.erase(source);
+        }
+
+        void remove_edges_to(GraphNode* target) {
+            for (auto& source: get_edges_to(target)) {
+                remove_edge(source, target);
+            }
+        }
+
+        void remove_edges_with(GraphNode* node) {
+            remove_edges_from(node);
+            remove_edges_to(node);
+        }
+
         size_t get_num_of_edges() {
             size_t num_of_edges{ 0 };
             for (const auto& edge_set: edges) {
@@ -38,9 +61,9 @@ namespace smt::noodler {
             return std::nullopt;
         }
 
-        Nodes get_edges_to(GraphNode* const target) const {
+        Nodes get_edges_to(GraphNode* target) {
             Nodes source_nodes{};
-            for (const auto& source_edges: edges) {
+            for (auto& source_edges: edges) {
                 if (source_edges.second.find(target) != source_edges.second.end()) {
                     source_nodes.insert(source_edges.first);
                 }
@@ -48,7 +71,7 @@ namespace smt::noodler {
             return source_nodes;
         }
 
-        GraphNode* get_node(Predicate predicate) {
+        GraphNode* get_node(const Predicate& predicate) {
             auto node{ nodes.find(GraphNode{ predicate }) };
             if (node == nodes.end()) { return nullptr; }
             return const_cast<GraphNode*>(&*node);
@@ -69,11 +92,11 @@ namespace smt::noodler {
         std::unordered_set<Predicate, Predicate::HashFunction> predicates;
     }; // Class Formula.
 
-    Graph create_inclusion_graph(const Formula& predicates);
+    Graph create_inclusion_graph(const Formula& formula);
 
     Graph create_simplified_splitting_graph(const Formula& formula);
 
-    Graph create_inclusion_graph(const Graph& simplified_splitting_graph);
+    Graph create_inclusion_graph(Graph simplified_splitting_graph);
 
 }
 
