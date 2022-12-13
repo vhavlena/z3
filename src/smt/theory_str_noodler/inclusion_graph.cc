@@ -27,18 +27,18 @@ Graph smt::noodler::create_inclusion_graph(const Formula& formula) {
             );
         }
 
-        for (auto iter{predicates.begin()}; iter != predicates.end(); ++iter) {
-            auto next_iter{iter};
-            next_iter++;
-            for (; next_iter != predicates.end(); ++next_iter) {
-                assert(*iter != *next_iter && "Two equal equations should never appear here in our algorithm");
+        for (auto predicate_iter{predicates.begin()}; predicate_iter != predicates.end(); ++predicate_iter) {
+            auto next_predicate_iter{predicate_iter};
+            next_predicate_iter++;
+            for (; next_predicate_iter != predicates.end(); ++next_predicate_iter) {
+                assert(*predicate_iter != *next_predicate_iter && "Two equal equations should never appear here in our algorithm");
             }
 
         }
     }
 
     Graph splitting_graph{ create_simplified_splitting_graph(formula) };
-    return create_inclusion_graph(std::move(splitting_graph));;
+    return create_inclusion_graph(splitting_graph);
 }
 
 Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
@@ -94,7 +94,7 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
     return graph;
 }
 
-Graph smt::noodler::create_inclusion_graph(Graph simplified_splitting_graph) {
+Graph smt::noodler::create_inclusion_graph(Graph& simplified_splitting_graph) {
     Graph inclusion_graph{};
 
     bool splitting_graph_changed{ true };
@@ -105,7 +105,6 @@ Graph smt::noodler::create_inclusion_graph(Graph simplified_splitting_graph) {
             auto node{ const_cast<GraphNode *>(&const_node) };
             if (simplified_splitting_graph.get_edges_to(node).empty()) {
                 inclusion_graph.nodes.insert(*node);
-                splitting_graph_changed = true;
 
                 auto switched_node{ simplified_splitting_graph.get_node(node->get_predicate().get_switched_sides_predicate()) };
 
@@ -115,6 +114,9 @@ Graph smt::noodler::create_inclusion_graph(Graph simplified_splitting_graph) {
 
                 simplified_splitting_graph.nodes.erase(*node);
                 simplified_splitting_graph.nodes.erase(*switched_node);
+
+                splitting_graph_changed = true;
+                break;
             }
         }
     }

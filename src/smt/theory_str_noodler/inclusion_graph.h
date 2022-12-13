@@ -96,7 +96,7 @@ namespace smt::noodler {
 
     Graph create_simplified_splitting_graph(const Formula& formula);
 
-    Graph create_inclusion_graph(Graph simplified_splitting_graph);
+    Graph create_inclusion_graph(Graph& simplified_splitting_graph);
 
 }
 
