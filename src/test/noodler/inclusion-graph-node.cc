@@ -194,6 +194,36 @@ TEST_CASE("Inclusion graph", "[noodler]") {
         });
         CHECK(graph.edges.empty());
     }
+
+    SECTION("x=yx && u = x") {
+        Predicate predicate{ PredicateType::Equation, { { x }, { y, x } } };
+        Predicate predicate2{ PredicateType::Equation, { { u }, { x } } };
+
+        formula.add_predicate(predicate);
+        formula.add_predicate(predicate2);
+        graph = create_inclusion_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{
+                GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() },
+                GraphNode{ predicate2.get_switched_sides_predicate() },
+        });
+        CHECK(graph.edges.size() == 3);
+        CHECK(graph.get_num_of_edges() == 6);
+    }
+
+    SECTION("x=y && u = v") {
+        Predicate predicate{ PredicateType::Equation, { { x }, { y } } };
+        Predicate predicate2{ PredicateType::Equation, { { u }, { v } } };
+
+        formula.add_predicate(predicate);
+        formula.add_predicate(predicate2);
+        graph = create_inclusion_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{
+                GraphNode{ predicate },
+                GraphNode{ predicate2 },
+        });
+        CHECK(graph.nodes.size() == 2);
+        CHECK(graph.edges.empty());
+    }
 }
 
 TEST_CASE("Splitting graph", "[noodler]") {
@@ -284,5 +314,34 @@ TEST_CASE("Splitting graph", "[noodler]") {
         });
         CHECK(graph.edges.size() == 2);
         CHECK(graph.get_num_of_edges() == 2);
+    }
+
+    SECTION("x=yx && u = x") {
+        Predicate predicate{ PredicateType::Equation, { { x }, { y, x } } };
+        Predicate predicate2{ PredicateType::Equation, { { u }, { x } } };
+
+        formula.add_predicate(predicate);
+        formula.add_predicate(predicate2);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{
+                GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() },
+                GraphNode{ predicate2 }, GraphNode{ predicate2.get_switched_sides_predicate() },
+        });
+        CHECK(graph.edges.size() == 3);
+        CHECK(graph.get_num_of_edges() == 6);
+    }
+
+    SECTION("x=y && u = v") {
+        Predicate predicate{ PredicateType::Equation, { { x }, { y } } };
+        Predicate predicate2{ PredicateType::Equation, { { u }, { v } } };
+
+        formula.add_predicate(predicate);
+        formula.add_predicate(predicate2);
+        graph = create_simplified_splitting_graph(formula);
+        CHECK(graph.nodes == std::set<GraphNode>{
+                GraphNode{ predicate }, GraphNode{ predicate.get_switched_sides_predicate() },
+                GraphNode{ predicate2 }, GraphNode{ predicate2.get_switched_sides_predicate() },
+        });
+        CHECK(graph.edges.empty());
     }
 }
