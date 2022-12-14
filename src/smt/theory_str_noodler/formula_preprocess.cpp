@@ -26,11 +26,11 @@ namespace smt::noodler {
     void FormulaVar::update_varmap(const Predicate& pred, size_t index) {
         assert(pred.is_equation());
         for(const VarNode& vr : get_var_positions(pred, index, true)) {
-            VarMap::iterator iter = this->varmap.find(vr.term.get_name());
+            VarMap::iterator iter = this->varmap.find(vr.term);
             if(iter != this->varmap.end()) {
                 iter->second.insert(vr);
             } else {
-                this->varmap[vr.term.get_name()] = std::set<VarNode>({vr});
+                this->varmap[vr.term] = std::set<VarNode>({vr});
             }
         }
     }
@@ -92,7 +92,7 @@ namespace smt::noodler {
                     st.append(", ").append(val.to_string());
                 });
             }
-            ret += item.first + ": {" + st + "}\n";
+            ret += item.first.to_string() + ": {" + st + "}\n";
         }
         return ret;
     }
@@ -106,7 +106,7 @@ namespace smt::noodler {
     bool FormulaVar::single_occurr(const std::set<BasicTerm>& items) const {
         for(const BasicTerm& t : items) {
             assert(t.get_type() == BasicTermType::Variable);
-            if(this->varmap.at(t.get_name()).size() > 1) {
+            if(this->varmap.at(t).size() > 1) {
                 return false;
             }
         }
@@ -181,7 +181,7 @@ namespace smt::noodler {
 
         const auto& filter = [&index](const VarNode& n) { return n.eq_index == index; };
         for(const BasicTerm& v : items) {
-            std::set<VarNode>& occurr = this->varmap[v.get_name()]; 
+            std::set<VarNode>& occurr = this->varmap[v]; 
             remove_if(occurr, filter);
         }
         this->allpreds.erase(this->predicates[index]);
@@ -264,7 +264,7 @@ namespace smt::noodler {
             std::set<BasicTerm> vars = pr.second.get_vars();
             this->formula.remove_predicate(pr.first);
             for(const BasicTerm& v : vars) {
-                std::set<VarNode> occurrs = this->formula.get_var_occurr(v.get_name());
+                std::set<VarNode> occurrs = this->formula.get_var_occurr(v);
                 if(occurrs.size() == 1) {
                     Predicate reg_pred;
                     if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
@@ -423,7 +423,7 @@ namespace smt::noodler {
         for(const BasicTerm& t : graph.get_init_vars()) {
             Concat sub;
             // Get all occurrences of t
-            std::set<VarNode> occurrs = this->formula.get_var_occurr(t.get_name());
+            std::set<VarNode> occurrs = this->formula.get_var_occurr(t);
             // Get predicate of a first equation containing t; and side containing t
             Predicate act_pred = this->formula.get_predicate(occurrs.begin()->eq_index);
             Concat side = occurrs.begin()->position > 0 ? act_pred.get_right_side() : act_pred.get_left_side();
@@ -440,7 +440,7 @@ namespace smt::noodler {
                     });
                 }
                 // Compare the supposed occurrences with real occurrences.
-                std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i].get_name());
+                std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i]);
 
                 if(side[i].is_variable() && vns != occurs_act) {
                     break;

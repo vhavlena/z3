@@ -15,6 +15,7 @@ namespace smt::noodler {
 
     typedef std::string Var;
 
+    //----------------------------------------------------------------------------------------------------------------------------------
 
     /**
      * @brief Remove from the container @p st all items satisfying the predicate @p pred.
@@ -89,9 +90,15 @@ namespace smt::noodler {
         }
     }
 
+    //----------------------------------------------------------------------------------------------------------------------------------
 
     using ConcatGraphEdges = std::map<std::pair<BasicTerm,BasicTerm>, unsigned>;
 
+    /**
+     * @brief Concatenation graph. Oriented graph where each term (literal/variable) is node and two terms 
+     * t1 and t2 are connected by a labelled oriented edge (t1 -> t2) if t1.t2 occurs in some equation. 
+     * Moreover each edge is labelled by the number of occurrences of such concatenation in the formula.
+     */
     class ConcatGraph {
     public:
         ConcatGraphEdges edges;
@@ -116,10 +123,24 @@ namespace smt::noodler {
             return this->succ.at(t); 
         };
 
+
         bool is_init(const BasicTerm& t) const { return t.get_name() == ""; };
 
+        /**
+         * @brief Special node s (variable with empty name) denoting beginning and end of a concatenation. If there is 
+         * an edge between this special node s->t, t is at the beginning of some equation. If there is an edge t->s, 
+         * t is at the end of an equation.
+         * 
+         * @return Special node (called init).
+         */
         BasicTerm init() const { return BasicTerm(BasicTermType::Variable, "");  };
 
+        /**
+         * @brief Returns nodes (variables) having only one sucessor and moreover having more than one 
+         * predecessors (or a predecessor is init node) .
+         * 
+         * @return Set of BasicTerms (variable terms). 
+         */
         std::set<BasicTerm> get_init_vars() const {
             std::set<BasicTerm> ret;
             for(const auto& pr : this->succ) {
@@ -137,6 +158,7 @@ namespace smt::noodler {
         }
     };
 
+    //----------------------------------------------------------------------------------------------------------------------------------
 
     /**
      * @brief Representation of a variable in an equation. Var is the variable name, eq_index 
@@ -175,7 +197,9 @@ namespace smt::noodler {
         return lhs.position < rhs.position;
     }
 
-    using VarMap = std::map<std::string, std::set<VarNode>>;
+    //----------------------------------------------------------------------------------------------------------------------------------
+
+    using VarMap = std::map<BasicTerm, std::set<VarNode>>;
     using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
     using Concat = std::vector<BasicTerm>;
 
@@ -200,7 +224,7 @@ namespace smt::noodler {
         
         std::string to_string() const;
 
-        const std::set<VarNode>& get_var_occurr(const std::string& var) const { return this->varmap.at(var); };
+        const std::set<VarNode>& get_var_occurr(const BasicTerm& var) const { return this->varmap.at(var); };
         const Predicate& get_predicate(size_t index) const { return this->predicates.at(index); };
         const std::map<size_t, Predicate>& get_predicates() const { return this->predicates; };
         const std::set<Predicate>& get_predicates_set() const { return this->allpreds; };
@@ -229,9 +253,18 @@ namespace smt::noodler {
         void replace(const Concat& find, const Concat& replace);
         void clean_varmap();
 
+        /**
+         * @brief Increment index pointing to a side (taking into account that left side has negative numbers 
+         * from 1 and right side positive numbers from 1).
+         * 
+         * @param val Index 
+         * @param incr Increment
+         * @return @p incr th successor of @p val
+         */
         static int increment_side_index(int val, size_t incr) { return val > 0 ? val + incr : val - incr; };
     };
 
+    //----------------------------------------------------------------------------------------------------------------------------------
 
     /**
      * @brief Class for formula preprocessing.
