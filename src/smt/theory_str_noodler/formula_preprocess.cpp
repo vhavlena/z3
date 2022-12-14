@@ -177,7 +177,7 @@ namespace smt::noodler {
      * @param index Index of the predicate to be removed.
      */
     void FormulaVar::remove_predicate(size_t index) {
-        std::set<BasicTerm> items = this->predicates[index].get_items();
+        std::set<BasicTerm> items = this->predicates[index].get_set();
 
         const auto& filter = [&index](const VarNode& n) { return n.eq_index == index; };
         for(const BasicTerm& v : items) {
@@ -242,6 +242,22 @@ namespace smt::noodler {
             add_predicate(pr.second, pr.first);
         } 
     }
+
+    /**
+     * @brief Remove equations with both sides empty. 
+     */
+    void FormulaVar::clean_predicates() {
+        std::vector<size_t> rem_ids;
+        for(const auto& pr : this->predicates) {
+            if(!pr.second.is_equation())
+                continue;
+            if(pr.second.get_left_side().size() == 0 && pr.second.get_right_side().size() == 0)
+                rem_ids.push_back(pr.first);
+        }
+        for(size_t id : rem_ids) {
+            remove_predicate(id);
+        }
+    };
 
     /**
      * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where 
@@ -491,7 +507,81 @@ namespace smt::noodler {
         for(const Predicate& eq : new_eqs) {
             this->formula.add_predicate(eq);
         }
+    }
 
+    /**
+     * @brief Get all epsilon terms (variables with the language containing eps only and 
+     * epsilon literals).
+     * 
+     * @param res All terms with epsilon semantics.
+     */
+    void FormulaPreprocess::get_eps_terms(std::set<BasicTerm>& res) const {
+        for(const auto& pr : get_formula().get_varmap()) {
+            if(pr.first.is_variable() && is_var_eps(pr.first)) {
+                res.insert(pr.first);
+            }
+            if(pr.first.is_literal() && pr.first.get_name() == "") {
+                res.insert(pr.first);
+            }
+                
+        }
+    }
+
+    /**
+     * @brief Transitively ropagate epsilon variables. The epsilon variables and the epsilon 
+     * literal remove from the formula and set the corresponding languages appropriately.
+     */
+    void FormulaPreprocess::propagate_eps() {
+        std::set<BasicTerm> eps_set;
+        get_eps_terms(eps_set);
+        std::deque<size_t> worklist;
+        std::set<size_t> eps_eq_id;
+
+        // get indices of equations containing at least one eps term
+        for(const BasicTerm& t : eps_set) {
+            std::set<VarNode> nds = get_formula().get_var_occurr(t);
+            std::transform(nds.begin(), nds.end(), std::back_inserter(worklist),
+                [](const VarNode& n){ return n.eq_index ; });
+        }
+
+        while(!worklist.empty()) {
+            size_t index = worklist.front();            
+            worklist.pop_front();
+            // eps_eq_id contains indices of equations that were reduced to eps = eps (one side is eps)
+            if(eps_eq_id.find(index) != eps_eq_id.end())
+                continue;
+
+            std::set<BasicTerm> new_eps; // newly added epsilon terms
+            Predicate eq = this->formula.get_predicate(index);
+            assert(eq.is_equation());
+
+            std::set<BasicTerm> left = eq.get_left_set();
+            std::set<BasicTerm> right = eq.get_right_set();
+            if(is_subset(left, eps_set)) {
+                new_eps = set_difference(eq.get_side_vars(Predicate::EquationSideType::Right), eps_set);
+                eps_eq_id.insert(index);
+            } else if(is_subset(right, eps_set)) {
+                new_eps = set_difference(eq.get_side_vars(Predicate::EquationSideType::Left), eps_set);
+                eps_eq_id.insert(index);
+            }
+
+            for(const BasicTerm& t : new_eps) {
+                eps_set.insert(t);
+                std::set<VarNode> nds = get_formula().get_var_occurr(t);
+                std::transform(nds.begin(), nds.end(), std::back_inserter(worklist),
+                    [](const VarNode& n){ return n.eq_index ; });
+            }
+        }
+
+        for(const BasicTerm& t : eps_set) {
+            if(t.is_variable()) {
+                update_reg_constr(t, Concat()); // t = L(t) \cap {\eps}
+            }
+            this->formula.replace(Concat({t}), Concat()); 
+            assert(t.is_variable() || t.get_name() == "");
+        }
+
+        this->formula.clean_predicates();
     }
 
 } // Namespace smt::noodler.

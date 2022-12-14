@@ -178,12 +178,28 @@ namespace smt::noodler {
             return params[1];
         }
 
-        std::set<BasicTerm> get_items() const {
+        std::set<BasicTerm> get_set() const {
             std::set<BasicTerm> ret;
             for(const auto& side : this->params) {
                 for(const BasicTerm& t : side)
                     ret.insert(t);
             }
+            return ret;
+        }
+
+        std::set<BasicTerm> get_left_set() const {
+            assert(is_eq_or_ineq());
+            std::set<BasicTerm> ret;
+            for(const BasicTerm& t : this->params[0])
+                ret.insert(t);
+            return ret;
+        }
+
+        std::set<BasicTerm> get_right_set() const {
+            assert(is_eq_or_ineq());
+            std::set<BasicTerm> ret;
+            for(const BasicTerm& t : this->params[1])
+                ret.insert(t);
             return ret;
         }
 

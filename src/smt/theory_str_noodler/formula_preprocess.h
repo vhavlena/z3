@@ -27,7 +27,7 @@ namespace smt::noodler {
      */
     template<typename T, typename P>
     void remove_if(T& st, P pred) {
-        for(auto it{st.begin()}, end{st.end()}; it != st.end();) {
+        for(auto it{st.begin()}; it != st.end();) {
             if(pred(*it))
                 it = st.erase(it);
             else
@@ -44,7 +44,7 @@ namespace smt::noodler {
      * @return @p t1 \ @p t2
      */
     template<typename T>
-    std::set<T> set_difference(std::set<T>& t1, std::set<T>& t2) {
+    std::set<T> set_difference(const std::set<T>& t1, const std::set<T>& t2) {
         std::set<T> diff;
         std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
             std::inserter(diff, diff.begin()));
@@ -56,6 +56,11 @@ namespace smt::noodler {
         std::set<S> ret;
         std::transform (st.begin(), st.end(), std::inserter(ret, ret.begin()), pred);
         return ret;
+    }
+
+    template<typename T>
+    bool is_subset(const std::set<T>& s1, const std::set<T>& s2) {
+        return std::includes(s2.begin(), s2.end(), s1.begin(), s1.end());
     }
 
     template<typename T>
@@ -252,6 +257,7 @@ namespace smt::noodler {
 
         void replace(const Concat& find, const Concat& replace);
         void clean_varmap();
+        void clean_predicates();
 
         /**
          * @brief Increment index pointing to a side (taking into account that left side has negative numbers 
@@ -276,10 +282,11 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
 
     protected:
-        void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {/** TODO */ };
+        void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {/** TODO: */ };
         VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
         ConcatGraph get_concat_graph() const;
+        bool is_var_eps(const BasicTerm& t) const { /** TODO: */ return false; };
 
         BasicTerm create_fresh_var();
 
@@ -289,9 +296,11 @@ namespace smt::noodler {
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
         void get_regular_sublists(std::map<Concat, unsigned>& res) const; 
+        void get_eps_terms(std::set<BasicTerm>& res) const;
 
         void remove_regular();
         void propagate_variables();
+        void propagate_eps();
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
 
@@ -303,6 +312,14 @@ namespace smt::noodler {
     static std::string concat_to_string(const Concat& cat) {
         std::string ret;
         for(const BasicTerm& t : cat) {
+            ret += t.to_string() + " ";
+        }
+        return ret;
+    }
+
+    static std::string set_term_to_string(const std::set<BasicTerm>& st) {
+        std::string ret;
+        for(const BasicTerm& t : st) {
             ret += t.to_string() + " ";
         }
         return ret;

@@ -246,27 +246,34 @@ TEST_CASE( "Sublists", "[noodler]" ) {
     Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b, x3, x4, b}), std::vector<BasicTerm>({x2, x1, x2}) })  );
     Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5, x1, x2, x3}), std::vector<BasicTerm>({x4, x1, x2}) })  );
     Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5, x1, x2, x3}), std::vector<BasicTerm>({x4, a, b}) })  );
-    Formula conj;
-    conj.add_predicate(eq1);
-    conj.add_predicate(eq2);
-    FormulaPreprocess prep(conj);
-    std::map<Concat, unsigned> res;
-    prep.get_regular_sublists(res);
-    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x3, x4, b}), 2}  }));
 
-    Formula conj2;
-    conj2.add_predicate(eq3);
-    FormulaPreprocess prep2(conj2);
-    res.clear();
-    prep2.get_regular_sublists(res);
-    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x1, x2}), 2}  }));
+    SECTION("sub1") {
+        Formula conj;
+        conj.add_predicate(eq1);
+        conj.add_predicate(eq2);
+        FormulaPreprocess prep(conj);
+        std::map<Concat, unsigned> res;
+        prep.get_regular_sublists(res);
+        CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x3, x4, b}), 2}  }));
+    }
 
-    Formula conj3;
-    conj3.add_predicate(eq4);
-    FormulaPreprocess prep3(conj3);
-    res.clear();
-    prep3.get_regular_sublists(res);
-    CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x5, x1, x2, x3}), 1}, {std::vector<BasicTerm>({x4, a, b}), 1}  }));
+    SECTION("sub2") {
+        Formula conj;
+        std::map<Concat, unsigned> res;
+        conj.add_predicate(eq3);
+        FormulaPreprocess prep(conj);
+        prep.get_regular_sublists(res);
+        CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x1, x2}), 2}  }));
+    }
+
+    SECTION("sub3") {
+        Formula conj;
+        std::map<Concat, unsigned> res;
+        conj.add_predicate(eq4);
+        FormulaPreprocess prep(conj);
+        prep.get_regular_sublists(res);
+        CHECK(res == std::map<Concat, unsigned>({ {std::vector<BasicTerm>({x5, x1, x2, x3}), 1}, {std::vector<BasicTerm>({x4, a, b}), 1}  }));
+    }
 }
 
 TEST_CASE( "Reduce regular", "[noodler]" ) {
@@ -285,24 +292,67 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
     Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({b, x3, x4, b}) })  );
     Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5, x1, x2, x3}), std::vector<BasicTerm>({x4, x1, x2}) })  );
     Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x5, x1, x2, x3}), std::vector<BasicTerm>({x4, a, b}) })  );
-    Formula conj;
-    conj.add_predicate(eq1);
-    conj.add_predicate(eq2);
-    FormulaPreprocess prep(conj);
-    prep.reduce_regular_sequence(2);
-    CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, tmp0}), std::vector<BasicTerm>({x1, x1, x2}) })), 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({b, tmp0}) })), 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x3, x4, b}) })  ) 
-    }));
 
-    Formula conj2;
-    conj2.add_predicate(eq4);
-    FormulaPreprocess prep2(conj2);
-    prep2.reduce_regular_sequence(1);
-    CHECK(prep2.get_formula().get_predicates_set() == std::set<Predicate>({ 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({x5, x1, x2, x3}) })), 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
-        Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({tmp0}) })  ) 
-    }));
+    SECTION("basic") {
+        Formula conj;
+        conj.add_predicate(eq1);
+        conj.add_predicate(eq2);
+        FormulaPreprocess prep(conj);
+        prep.reduce_regular_sequence(2);
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, tmp0}), std::vector<BasicTerm>({x1, x1, x2}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({b, tmp0}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x3, x4, b}) })  ) 
+        }));
+    }
+
+    SECTION("two fresh") {
+        Formula conj;
+        conj.add_predicate(eq4);
+        FormulaPreprocess prep(conj);
+        prep.reduce_regular_sequence(1);
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({x5, x1, x2, x3}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({tmp0}) })  ) 
+        }));
+    }
+}
+
+TEST_CASE( "Propagate eps", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm eps{ BasicTermType::Literal, ""};
+    BasicTerm b{ BasicTermType::Literal, "b"};   
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({eps}), std::vector<BasicTerm>({x1, x2}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({x3, x4}) })  );
+    Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x3, b, x4}), std::vector<BasicTerm>({x5, x1}) })  );
+    Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b, x1}), std::vector<BasicTerm>({eps}) })  );
+    
+    SECTION("basic") {
+        Formula conj;
+        conj.add_predicate(eq1);
+        conj.add_predicate(eq2);
+        conj.add_predicate(eq3);
+        FormulaPreprocess prep(conj);
+        prep.propagate_eps();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>({x5}) })  )
+        }));
+    }
+
+    SECTION("empty side") {
+        Formula conj;
+        conj.add_predicate(eq4);
+        FormulaPreprocess prep(conj);
+        prep.propagate_eps();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>() })  )
+        }));
+    }
 }
