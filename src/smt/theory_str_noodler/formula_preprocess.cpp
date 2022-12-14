@@ -411,7 +411,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get regular sublists, i.e., concatenations X1...Xk such that each Xi occurrs in the 
+     * @brief Get regular sublists, i.e., concatenations X1...Xk such that each Xi occurrs (if it is a variable) in the 
      * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then 
      * X+ ... Xk do not occurr in the formula anymore (except in V). 
      * 
@@ -445,8 +445,8 @@ namespace smt::noodler {
                 if(side[i].is_variable() && vns != occurs_act) {
                     break;
                 }
-                if(side[i].is_literal() && std::includes(vns.begin(), 
-                    vns.end(), occurs_act.begin(), occurs_act.end())) {
+                if(side[i].is_literal() && !std::includes(occurs_act.begin(), 
+                    occurs_act.end(), vns.begin(), vns.end())) {
                     break;
                 }
                 sub.push_back(side[i]);
@@ -467,15 +467,29 @@ namespace smt::noodler {
         return BasicTerm(BasicTermType::Variable, "__tmp__var_" + std::to_string(this->fresh_var_cnt++));
     }
 
-    void FormulaPreprocess::reduce_regular_sequence() {
+    /**
+     * @brief Replace regular sequences with a fresh variables. The regular sequence is a concatenations X1...Xk 
+     * such that each Xi occurrs (if it is a variable) in the 
+     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then 
+     * variables from X1 ... Xk do not occurr in the formula anymore (except in V). 
+     * 
+     * @param mn Minimum number of occurrences of a regular sequence to be replaced with a fresh variable.
+     */
+    void FormulaPreprocess::reduce_regular_sequence(unsigned mn) {
         std::map<Concat, unsigned> regs;
         std::set<Predicate> new_eqs;
         get_regular_sublists(regs);
 
         for(const auto& pr : regs) {
-            if(pr.second >= 2) {
-                // this->formula.replace()
+            if(pr.second >= mn) {
+                BasicTerm fresh_var = create_fresh_var();
+                this->formula.replace(pr.first, Concat({fresh_var}));
+                update_reg_constr(fresh_var, pr.first);
+                new_eqs.insert(Predicate(PredicateType::Equation, std::vector<Concat>({Concat({fresh_var}), pr.first})));
             }
+        }
+        for(const Predicate& eq : new_eqs) {
+            this->formula.add_predicate(eq);
         }
 
     }

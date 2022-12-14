@@ -212,9 +212,6 @@ namespace smt::noodler {
                 std::vector<BasicTerm>& res) {
             bool modif = false;
             for(auto it = concat.begin(); it != concat.end(); ) {
-                if(concat.end() - it < find.size())
-                    break;
-                ;
                 if(std::equal(it, it+find.size(), find.begin(), find.end())) {
                     res.insert(res.end(), replace.begin(), replace.end());
                     modif = true;

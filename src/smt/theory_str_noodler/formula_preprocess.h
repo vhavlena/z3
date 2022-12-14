@@ -276,7 +276,7 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
 
     protected:
-        void update_reg_constr(const BasicTerm& var, std::vector<BasicTerm>& upd) {/** TODO */ };
+        void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {/** TODO */ };
         VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
         ConcatGraph get_concat_graph() const;
@@ -293,7 +293,7 @@ namespace smt::noodler {
         void remove_regular();
         void propagate_variables();
         void generate_identities();
-        void reduce_regular_sequence();
+        void reduce_regular_sequence(unsigned mn);
 
         void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
         void clean_varmap() { this->formula.clean_varmap(); };
