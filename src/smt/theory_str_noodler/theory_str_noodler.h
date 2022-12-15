@@ -28,6 +28,8 @@ Eternal glory to Yu-Fang.
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
+#include <mata/nfa.hh>
+
 #include "inclusion_graph_node.h"
 #include "inclusion_graph.h"
 
