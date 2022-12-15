@@ -205,6 +205,9 @@ endif()
 list(APPEND Z3_COMPONENT_EXTRA_INCLUDE_DIRS
   "${PROJECT_BINARY_DIR}/src"
   "${PROJECT_SOURCE_DIR}/src"
+  "${PROJECT_SOURCE_DIR}/extern/lib/mata/include"
+  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/re2"
+  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/simlib/include"
 )
 
 ################################################################################

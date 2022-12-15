@@ -16,6 +16,7 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_context.h"
 #include "ast/seq_decl_plugin.h"
 #include "ast/reg_decl_plugins.h"
+#include <mata/nfa.hh>
 
 
 namespace smt::noodler {
