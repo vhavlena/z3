@@ -96,3 +96,8 @@ CMakeSettings.json
 .DS_Store
 dbg/**
 .idea
+CMakeFiles
+cli/CTestTestfile.cmake
+cli/cmake_install.cmake
+cli/version.cc
+cli/Makefile

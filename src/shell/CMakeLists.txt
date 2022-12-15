@@ -43,7 +43,7 @@ set_target_properties(shell PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON)
 
 target_include_directories(shell PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
-target_link_libraries(shell PRIVATE mata re2 simlib)
+target_link_libraries(shell PRIVATE libmata re2 simlib)
 target_link_directories(shell PRIVATE
         ${PROJECT_BINARY_DIR}
         ${PROJECT_BINARY_DIR}/extern/lib/mata/src
