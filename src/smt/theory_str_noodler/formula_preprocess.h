@@ -10,6 +10,8 @@
 
 #include <util/trace.h>
 #include "inclusion_graph.h"
+#include "aut_assignment.h"
+#include <mata/nfa.hh>
 
 namespace smt::noodler {
 
@@ -280,23 +282,28 @@ namespace smt::noodler {
     private:
         FormulaVar formula;
         unsigned fresh_var_cnt;
+        AutAssignment aut_ass;
 
     protected:
-        void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {/** TODO: */ };
+        void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd);
         VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
         ConcatGraph get_concat_graph() const;
-        bool is_var_eps(const BasicTerm& t) const { /** TODO: */ return false; };
+        bool is_var_eps(const BasicTerm& t) const { assert(t.is_variable()); return this->aut_ass.is_epsilon(t); };
 
         BasicTerm create_fresh_var();
 
     public:
-        FormulaPreprocess(const Formula& conj) : formula(conj), fresh_var_cnt(0) { };
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass) : 
+            formula(conj), 
+            fresh_var_cnt(0),
+            aut_ass(ass) { };
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
         void get_regular_sublists(std::map<Concat, unsigned>& res) const; 
         void get_eps_terms(std::set<BasicTerm>& res) const;
+        const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
 
         void remove_regular();
         void propagate_variables();
@@ -304,6 +311,12 @@ namespace smt::noodler {
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
 
+        /**
+         * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
+         * 
+         * @param find Find
+         * @param replace Replace
+         */
         void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
         void clean_varmap() { this->formula.clean_varmap(); };
     };

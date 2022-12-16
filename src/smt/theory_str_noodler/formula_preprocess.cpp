@@ -260,6 +260,23 @@ namespace smt::noodler {
     };
 
     /**
+     * @brief Update automata assignment of @p var. If var exists in the aut assignment, we set 
+     * L(var) = L(var) \cap L(upd). Otherwise we set L(var) = L(upd). 
+     * 
+     * @param var Basic term to be updated
+     * @param upd Concatenation of terms for updating @p var.
+     */
+    void FormulaPreprocess::update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {
+        Mata::Nfa::Nfa concat = Mata::Nfa::remove_epsilon(this->aut_ass.get_automaton_concat(upd));
+        auto iter = this->aut_ass.find(var);
+        if(iter != this->aut_ass.end()) {
+            this->aut_ass[var] = Mata::Nfa::reduce(Mata::Nfa::intersection(iter->second, concat));
+        } else {
+            this->aut_ass[var] = Mata::Nfa::reduce(concat);
+        }
+    }
+
+    /**
      * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where 
      * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable 
      * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system 
