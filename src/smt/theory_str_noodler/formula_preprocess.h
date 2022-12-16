@@ -209,6 +209,7 @@ namespace smt::noodler {
     using VarMap = std::map<BasicTerm, std::set<VarNode>>;
     using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
     using Concat = std::vector<BasicTerm>;
+    using SepEqsGather = std::vector<std::pair<std::set<BasicTerm>, unsigned>>;
 
     /**
      * @brief Class representing a formula with efficient handling of variable occurrences.
@@ -292,6 +293,8 @@ namespace smt::noodler {
         bool is_var_eps(const BasicTerm& t) const { assert(t.is_variable()); return this->aut_ass.is_epsilon(t); };
 
         BasicTerm create_fresh_var();
+        void get_concat_gather(const Concat& concat, SepEqsGather& res) const;
+        void separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const;
 
     public:
         FormulaPreprocess(const Formula& conj, const AutAssignment& ass) : 
@@ -310,6 +313,7 @@ namespace smt::noodler {
         void propagate_eps();
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
+        void separate_eqs();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.

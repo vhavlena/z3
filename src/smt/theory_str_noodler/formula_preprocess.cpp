@@ -592,7 +592,7 @@ namespace smt::noodler {
 
         for(const BasicTerm& t : eps_set) {
             if(t.is_variable()) {
-                update_reg_constr(t, Concat()); // t = L(t) \cap {\eps}
+                update_reg_constr(t, Concat()); // L(t) = L(t) \cap {\eps}
             }
             this->formula.replace(Concat({t}), Concat()); 
             assert(t.is_variable() || t.get_name() == "");
@@ -600,5 +600,106 @@ namespace smt::noodler {
 
         this->formula.clean_predicates();
     }
+
+    /**
+     * @brief Gather information about a concatenation for equation separation.
+     * 
+     * @param concat Concatenation
+     * @param res vector where i-th position contains a pair (S,n) where S is a set of variables 
+     *  preceeding position i in @p concat and n is a length of all literals preceeding @p concat.
+     */
+    void FormulaPreprocess::get_concat_gather(const Concat& concat, SepEqsGather& res) const {
+        std::pair<std::set<BasicTerm>, unsigned> prev = { std::set<BasicTerm>(), 0 };
+        for(const BasicTerm& t : concat) {
+            std::pair<std::set<BasicTerm>, unsigned> new_val(prev);
+            if(t.is_variable()) {
+                new_val.first.insert(t);
+            } else if(t.is_literal()) {
+                new_val.second += t.get_name().size();
+            } else {
+                assert(false);
+            }
+            res.push_back(new_val);
+            prev = new_val;
+        }
+    }
+
+    /**
+     * @brief Separate equations into a set of new equations.
+     * 
+     * @param eq Equation
+     * @param gather_left Gathered informaiton about left side 
+     * @param gather_right Gathered informaiton about right side
+     * @param res Set of new equations
+     */
+    void FormulaPreprocess::separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const {
+        Concat left = eq.get_left_side();
+        Concat right = eq.get_right_side();
+        auto it_left = left.begin();
+        auto it_right = right.begin();
+        assert(eq.is_equation());
+
+        for(size_t i = 0; i < gather_left.size(); i++) {
+            for(size_t j = 0; j < gather_right.size(); j++) {
+                if(gather_left[i] == gather_right[j]) {
+                    res.insert(Predicate(PredicateType::Equation, std::vector<Concat>({
+                        Concat(it_left, left.begin()+i+1), 
+                        Concat(it_right, right.begin()+j+1)
+                    })));
+                    it_left = left.begin()+i+1;
+                    it_right = right.begin()+j+1;
+                }
+            }
+        }
+        Concat left_rest = Concat(it_left, left.end());
+        Concat right_rest = Concat(it_right, right.end());
+        if(left_rest.empty() && right_rest.empty()) // nothing to be added
+            return;
+        if(left_rest.empty())
+            left_rest.push_back(BasicTerm(BasicTermType::Literal, "")); // avoid empty side by putting there epsilon
+        if(right_rest.empty())
+            right_rest.push_back(BasicTerm(BasicTermType::Literal, "")); // avoid empty side by putting there epsilon
+        Predicate rest = Predicate(PredicateType::Equation, std::vector<Concat>({
+            left_rest,
+            right_rest
+        }));
+        res.insert(rest);
+    }
+
+    /**
+     * @brief Separate equations.
+     */
+    void FormulaPreprocess::separate_eqs() {
+        std::set<Predicate> add_eqs;
+        std::set<size_t> rem_ids;
+
+        for(const auto& pr : this->formula.get_predicates()) {
+            assert(pr.second.is_equation());
+            SepEqsGather gather_left, gather_right;
+            std::set<Predicate> res;
+            get_concat_gather(pr.second.get_left_side(), gather_left);
+            get_concat_gather(pr.second.get_right_side(), gather_right);
+            separate_eq(pr.second, gather_left, gather_right, res);
+            
+            if(res.size() > 1) {
+                add_eqs.insert(res.begin(), res.end());
+                rem_ids.insert(pr.first);
+            }
+
+            // for(const auto& v : res) {
+            //     std::cout << v.to_string() << std::endl;;
+            // } 
+        }
+
+        for(const Predicate& p : add_eqs) {
+            this->formula.add_predicate(p);
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+
+    }
+
+
 
 } // Namespace smt::noodler.

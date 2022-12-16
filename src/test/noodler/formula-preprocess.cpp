@@ -488,3 +488,76 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
         }));
     }
 }
+
+TEST_CASE( "Separate eqs", "[noodler]" ) {
+    BasicTerm y1{ BasicTermType::Variable, "y_1"};
+    BasicTerm x1{ BasicTermType::Variable, "x_1"};
+    BasicTerm x2{ BasicTermType::Variable, "x_2"};
+    BasicTerm x3{ BasicTermType::Variable, "x_3"};
+    BasicTerm x4{ BasicTermType::Variable, "x_4"};
+    BasicTerm x5{ BasicTermType::Variable, "x_5"};
+    BasicTerm x6{ BasicTermType::Variable, "x_6"};
+    BasicTerm eps{ BasicTermType::Literal, ""};
+    BasicTerm a{ BasicTermType::Literal, "a"};  
+    BasicTerm b{ BasicTermType::Literal, "b"};  
+    BasicTerm ab{ BasicTermType::Literal, "ab"};     
+    AutAssignment aut_ass = AutAssignment({
+        {y1, regex_to_nfa("(a|b)*")},
+        {x1, regex_to_nfa("(a|b)*")},
+        {x2, regex_to_nfa("(a|b)*")},
+        {x3, regex_to_nfa("(a|b)*")},
+        {x4, regex_to_nfa("(a|b)*")},
+        {x5, regex_to_nfa("(a|b)*")},
+        {x6, regex_to_nfa("(a|b)*")},
+        {b, regex_to_nfa("b")},
+    });
+
+    Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2, x4, a, b, x5, x6}), std::vector<BasicTerm>({x2, b, x1, x5, b, x4, a}) })  );
+    Predicate eq2(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2, x4, ab, x5, x6}), std::vector<BasicTerm>({x2, b, x1, x5, b, x4, a}) })  );
+    Predicate eq3(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2}), std::vector<BasicTerm>({x2, b, x2}) })  );
+    Predicate eq4(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2}), std::vector<BasicTerm>({x2, b}) })  );
+    
+    SECTION("multiple") {
+        Formula conj;
+        conj.add_predicate(eq1);
+        FormulaPreprocess prep(conj, aut_ass);
+        prep.separate_eqs();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2}), std::vector<BasicTerm>({x2, b, x1}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, a, b, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  ) 
+        }));
+    }
+
+    SECTION("longer literals") {
+        Formula conj;
+        conj.add_predicate(eq2);
+        FormulaPreprocess prep(conj, aut_ass);
+        prep.separate_eqs();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1, a, x2}), std::vector<BasicTerm>({x2, b, x1}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, ab, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })), 
+            Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  ) 
+        }));
+    }
+
+    SECTION("no match 1") {
+        Formula conj;
+        conj.add_predicate(eq3);
+        FormulaPreprocess prep(conj, aut_ass);
+        prep.separate_eqs();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            eq3
+        }));
+    }
+
+    SECTION("no match 2") {
+        Formula conj;
+        conj.add_predicate(eq4);
+        FormulaPreprocess prep(conj, aut_ass);
+        prep.separate_eqs();
+        CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
+            eq4
+        }));
+    }
+}
