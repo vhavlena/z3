@@ -8,7 +8,7 @@
 #include <queue>
 #include <string>
 
-#include "util/trace.h"
+#include <util/trace.h>
 #include "inclusion_graph.h"
 
 namespace smt::noodler {

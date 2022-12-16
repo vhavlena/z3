@@ -32,6 +32,16 @@ namespace smt::noodler {
             edges.erase(source);
         }
 
+        Nodes get_edges_to(GraphNode* target) {
+            Nodes source_nodes{};
+            for (auto& source_edges: edges) {
+                if (source_edges.second.find(target) != source_edges.second.end()) {
+                    source_nodes.insert(source_edges.first);
+                }
+            }
+            return source_nodes;
+        }
+
         void remove_edges_to(GraphNode* target) {
             for (auto& source: get_edges_to(target)) {
                 remove_edge(source, target);
@@ -59,16 +69,6 @@ namespace smt::noodler {
                 return std::make_optional<const std::reference_wrapper<Nodes>>(source_edges->second);
             }
             return std::nullopt;
-        }
-
-        Nodes get_edges_to(GraphNode* target) {
-            Nodes source_nodes{};
-            for (auto& source_edges: edges) {
-                if (source_edges.second.find(target) != source_edges.second.end()) {
-                    source_nodes.insert(source_edges.first);
-                }
-            }
-            return source_nodes;
         }
 
         GraphNode* get_node(const Predicate& predicate) {
