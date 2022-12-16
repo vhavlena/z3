@@ -9,7 +9,7 @@
 #include <string>
 
 #include "util/trace.h"
-#include "inclusion_graph_node.h"
+#include "inclusion_graph.h"
 
 namespace smt::noodler {
 

@@ -27,7 +27,11 @@ Eternal glory to Yu-Fang.
 #include "util/union_find.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
+
+#include <mata/nfa.hh>
+
 #include "inclusion_graph_node.h"
+#include "inclusion_graph.h"
 
 
 

@@ -17,12 +17,14 @@ add_executable(test-noodler
         formula-preprocess.cpp
 )
 
-target_include_directories(test-noodler PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
-target_link_libraries(test-noodler PRIVATE mata re2 simlib)
+target_include_directories(test-noodler PRIVATE
+        "${PROJECT_SOURCE_DIR}/extern/lib/mata/include"
+        )
+target_link_libraries(test-noodler PRIVATE libmata re2 simlib)
 target_link_directories(test-noodler PRIVATE
         ${PROJECT_BINARY_DIR}
         ${PROJECT_BINARY_DIR}/extern/lib/mata/src
-        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/re2
+        ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty
         ${PROJECT_BINARY_DIR}/extern/lib/mata/3rdparty/simlib
 )
 
