@@ -85,7 +85,7 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
 
     AutAssignment ret = prep.get_aut_assignment();
     CHECK(Mata::Nfa::are_equivalent(ret.at(x4), regex_to_nfa("a*")));
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x5), regex_to_nfa("(a|b)*")));
+    CHECK(Mata::Nfa::are_equivalent(ret.at(x5), regex_to_nfa("a*")));
     CHECK(Mata::Nfa::are_equivalent(ret.at(x2), regex_to_nfa("(a|b)*b(a*)b")));
     CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({eq1}));
 }
