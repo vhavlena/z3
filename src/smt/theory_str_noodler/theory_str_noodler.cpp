@@ -32,7 +32,8 @@ namespace smt::noodler {
         m_rewrite(m), 
         m_util_a(m),
         m_util_s(m),
-        m_length(m)
+        m_length(m),
+        state_len()
         {}
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -456,6 +457,10 @@ namespace smt::noodler {
             }
         } else if (m_util_s.str.is_in_re(e)) {
             handle_in_re(e, is_true);
+        } else if(m.is_bool(e)) {
+            ensure_enode(e);
+            TRACE("str", tout << "bool literal " << mk_pp(e, m) << " " << is_true << "\n" );
+            // UNREACHABLE();
         } else {
             TRACE("str", tout << "unhandled literal " << mk_pp(e, m) << "\n";);
             UNREACHABLE();
@@ -512,6 +517,9 @@ namespace smt::noodler {
 
     void theory_str_noodler::propagate() {
         STRACE("str", if (!IN_CHECK_FINAL) tout << "o propagate" << '\n';);
+
+        // for(const expr_ref& ex : this->len_state_axioms)
+        //     add_axiom(ex);
     }
 
     void theory_str_noodler::push_scope_eh() {
@@ -536,6 +544,9 @@ namespace smt::noodler {
         m_rewrite.reset();
         STRACE("str", if (!IN_CHECK_FINAL)
             tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
+        this->axiomatized_terms.reset();
+        this->reset_occurred = true;
+        
     }
 
     void theory_str_noodler::reset_eh() {
@@ -629,17 +640,7 @@ namespace smt::noodler {
     Final check for an assignment of the underlying boolean skeleton.
     */
     final_check_status theory_str_noodler::final_check_eh() {
-        TRACE("str",  tout << "pop_scope: ";);
         std::cout << "final_check starts\n"<<std::endl;
-
-        //print_ctx(get_context());
-
-        // if (m_word_eq_todo.empty()) {
-        //     if (is_over_approximation)
-        //         return FC_GIVEUP;
-        //     else
-        //         return FC_DONE;
-        // }
 
         remove_irrelevant_constr();
 
@@ -701,7 +702,47 @@ namespace smt::noodler {
         }
         this->visited.push_back({conj, n_cnt});
 
-        block_len(n_cnt);
+        if(!this->state_len.visited(conj)){
+            this->state_len.add_visited(conj);
+            for(int i = 0; i < 10; i++) {
+                expr *refinement = nullptr;
+                expr_ref refinement_len(m);
+                app* atom;
+                for (const auto& we : this->m_word_eq_todo_rel) {
+
+                    vector<expr*> vars;
+                    this->get_variables(to_app(we.first.get()), vars);
+                    this->get_variables(to_app(we.second.get()), vars);
+
+                    for(expr * const var : vars) {
+                        expr_ref len_str_l(m_util_s.str.mk_length(var), m);
+                        SASSERT(len_str_l);
+                        expr_ref num(m);
+                        num = m_util_a.mk_numeral(rational(i), true);
+                        atom = m_util_a.mk_le(len_str_l, num);
+                        refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
+                    }
+                }
+
+                int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
+                m_int_solver.initialize(get_context());
+
+                if(m_int_solver.check_sat(refinement_len) == l_true) {
+                    return FC_DONE;
+                }
+                TRACE("str", tout << "len unsat\n";);
+            }
+
+            // all len solutions are unsat, we block the current assignment
+            block_curr_assignment();
+            return FC_CONTINUE;
+
+        } else {
+            TRACE("str", tout << "already visited\n";);
+            UNREACHABLE();
+            return FC_CONTINUE;
+        }        
+
         this->cnt = fmax(this->cnt, n_cnt + 3);
         return FC_DONE;
 
@@ -855,6 +896,8 @@ namespace smt::noodler {
             ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
+        } else {
+            // std::cout << "already contains " << mk_pp(e, m) << std::endl;
         }
     }
 
@@ -1404,6 +1447,58 @@ namespace smt::noodler {
         add_axiom(refinement);
     }
 
+    void theory_str_noodler::block_len_single(int n_cnt, const app_ref& bool_var, expr_ref& refine) {
+        STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+
+        context& ctx = get_context();
+        ast_manager& m = get_manager();
+        expr *refinement = nullptr;
+        expr_ref refinement_len(m);
+        app* atom;
+
+        STRACE("str", tout << "[Len Refinement]\nformulas:\n";);
+        for (const auto& we : this->m_word_eq_todo_rel) {
+
+            vector<expr*> vars;
+            this->get_variables(to_app(we.first.get()), vars);
+            this->get_variables(to_app(we.second.get()), vars);
+
+            for(expr * const var : vars) {
+                // std::cout << mk_pp(var, m) << std::endl;
+                expr_ref len_str_l(m_util_s.str.mk_length(var), m);
+                SASSERT(len_str_l);
+                // build RHS
+                expr_ref num(m);
+                num = m_util_a.mk_numeral(rational(n_cnt), true);
+                atom = m_util_a.mk_le(len_str_l, num);
+                refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
+                // refinement_len = m_util_a.mk_le(len_str_l, num);
+            }
+
+            // std::cout << "DONE" << std::endl;
+
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+        }
+        
+        if(bool_var == nullptr) {
+            UNREACHABLE();
+        }
+        refinement = m.mk_and(refinement, bool_var);
+
+        refinement = m.mk_or(m.mk_not(refinement), refinement_len);
+        // if(axiom != nullptr) {
+        //     std::cout << "NULL" << std::endl;
+        //     refinement = m.mk_and(refinement, axiom);
+        // }
+        std::cout << mk_pp(refinement, m) << std::endl;
+
+        this->len_state_axioms.push_back(expr_ref(refinement, m));
+
+        //refine = refinement;
+        add_axiom(refinement);
+    }
+
     void theory_str_noodler::dump_assignments() const {
         STRACE("str", \
                 ast_manager& m = get_manager();
@@ -1508,6 +1603,4 @@ namespace smt::noodler {
             res.add_predicate(inst);
         } 
     }
-
-
 }
