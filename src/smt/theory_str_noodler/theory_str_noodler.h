@@ -34,6 +34,7 @@ Eternal glory to Yu-Fang.
 #include "inclusion_graph.h"
 #include "state_len.h"
 #include "expr_solver.h"
+#include "util.h"
 
 namespace smt::noodler {
 
@@ -46,19 +47,14 @@ namespace smt::noodler {
         arith_util m_util_a;
         seq_util m_util_s;
         //ast_manager& m;
-        StateLen state_len;
 
+        StateLen<bool> state_len;
+        AbstractDecisionProcedure* adec_proc;
 
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
-
-        vector<expr_ref> len_state_axioms;
-        app* var_match = nullptr;
-
-        vector<std::pair<obj_hashtable<expr>,int>> visited;
-        bool reset_occurred = false;
 
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
         obj_map<expr, unsigned> bool_var_int;
@@ -80,8 +76,6 @@ namespace smt::noodler {
         vector<expr_pair> m_word_eq_todo_rel;
         vector<expr_pair> m_word_diseq_todo_rel;
         vector<expr_pair_flag> m_membership_todo_rel;
-
-        int cnt = 1;
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -129,6 +123,10 @@ namespace smt::noodler {
         void add_length(expr* e);
         void enforce_length(expr* n);
 
+        ~theory_str_noodler() {
+            delete this->adec_proc;
+        }
+
     private:
         bool is_of_this_theory(expr *e) const;
         bool is_string_sort(expr *e) const;
@@ -169,14 +167,11 @@ namespace smt::noodler {
         std::vector<app_ref> find_state_var(const obj_hashtable<expr>& conj);
 
         void remove_irrelevant_constr();
-        void get_variables(expr* const ex, vector<expr*>& res);
+        // static void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, vector<expr*>& res);
 
         void collect_terms(const app* ex, std::vector<BasicTerm>& terms);
         Predicate conv_eq_pred(const app* expr);
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
-
-        
-
     };
 }
 

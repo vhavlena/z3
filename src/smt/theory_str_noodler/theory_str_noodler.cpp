@@ -32,9 +32,10 @@ namespace smt::noodler {
         m_rewrite(m), 
         m_util_a(m),
         m_util_s(m),
-        m_length(m),
-        state_len()
-        {}
+        state_len(),
+        m_length(m) {
+        this->adec_proc = new DecisionProcedureDebug(m, m_util_s, m_util_a);
+    }
 
     void theory_str_noodler::display(std::ostream &os) const {
         os << "theory_str display" << std::endl;
@@ -543,10 +544,7 @@ namespace smt::noodler {
         m_not_contains_todo.pop_scope(num_scopes);
         m_rewrite.reset();
         STRACE("str", if (!IN_CHECK_FINAL)
-            tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
-        this->axiomatized_terms.reset();
-        this->reset_occurred = true;
-        
+            tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);       
     }
 
     void theory_str_noodler::reset_eh() {
@@ -680,54 +678,15 @@ namespace smt::noodler {
         Formula instance;
         this->conj_instance(conj_instance, instance);
 
-        bool found = false;
-        int n_cnt = -1;
-        for(const auto& pr : this->visited) {
-            for(auto* const ex : conj) {
-                found = false;
-                if(!pr.first.contains(ex)) {
-                    break;
-                }
-                found = true;
-            }
-            if(found) {
-                n_cnt = pr.second;
-                break;
-            }
-        }
+        if(!this->state_len.contains(conj)){
+            this->adec_proc->initialize(conj);
+            this->state_len.add(conj, true);
 
-        if(n_cnt == -1) {
-            n_cnt = this->cnt;
-            std::cout << "not visited" << std::endl;
-        }
-        this->visited.push_back({conj, n_cnt});
-
-        if(!this->state_len.visited(conj)){
-            this->state_len.add_visited(conj);
-            for(int i = 0; i < 10; i++) {
-                expr *refinement = nullptr;
-                expr_ref refinement_len(m);
-                app* atom;
-                for (const auto& we : this->m_word_eq_todo_rel) {
-
-                    vector<expr*> vars;
-                    this->get_variables(to_app(we.first.get()), vars);
-                    this->get_variables(to_app(we.second.get()), vars);
-
-                    for(expr * const var : vars) {
-                        expr_ref len_str_l(m_util_s.str.mk_length(var), m);
-                        SASSERT(len_str_l);
-                        expr_ref num(m);
-                        num = m_util_a.mk_numeral(rational(i), true);
-                        atom = m_util_a.mk_le(len_str_l, num);
-                        refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
-                    }
-                }
-
+            expr_ref len_constr(m);
+            while(this->adec_proc->get_another_solution(conj, len_constr)) {
                 int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
                 m_int_solver.initialize(get_context());
-
-                if(m_int_solver.check_sat(refinement_len) == l_true) {
+                if(m_int_solver.check_sat(len_constr) == l_true) {
                     return FC_DONE;
                 }
                 TRACE("str", tout << "len unsat\n";);
@@ -743,7 +702,6 @@ namespace smt::noodler {
             return FC_CONTINUE;
         }        
 
-        this->cnt = fmax(this->cnt, n_cnt + 3);
         return FC_DONE;
 
 
@@ -1405,8 +1363,8 @@ namespace smt::noodler {
         for (const auto& we : this->m_word_eq_todo_rel) {
 
             vector<expr*> vars;
-            this->get_variables(to_app(we.first.get()), vars);
-            this->get_variables(to_app(we.second.get()), vars);
+            util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
+            util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
 
             for(expr * const var : vars) {
                 std::cout << mk_pp(var, m) << std::endl;
@@ -1460,8 +1418,8 @@ namespace smt::noodler {
         for (const auto& we : this->m_word_eq_todo_rel) {
 
             vector<expr*> vars;
-            this->get_variables(to_app(we.first.get()), vars);
-            this->get_variables(to_app(we.second.get()), vars);
+            util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
+            util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
 
             for(expr * const var : vars) {
                 // std::cout << mk_pp(var, m) << std::endl;
@@ -1493,8 +1451,6 @@ namespace smt::noodler {
         // }
         std::cout << mk_pp(refinement, m) << std::endl;
 
-        this->len_state_axioms.push_back(expr_ref(refinement, m));
-
         //refine = refinement;
         add_axiom(refinement);
     }
@@ -1520,26 +1476,26 @@ namespace smt::noodler {
     @param ex Expression to be checked for variables.
     @param[out] res Vector of found variables (may contain duplicities).
     */
-    void theory_str_noodler::get_variables(expr* const ex, vector<expr*>& res) {
-        if(m_util_s.str.is_string(ex)) {
-            return;
-        }
+    // void theory_str_noodler::get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, vector<expr*>& res) {
+    //     if(m_util_s.str.is_string(ex)) {
+    //         return;
+    //     }
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            res.push_back(ex);
-            return;
-        }
+    //     if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+    //         res.push_back(ex);
+    //         return;
+    //     }
 
-        SASSERT(is_app(ex));
-        app* ex_app = to_app(ex);
-        SASSERT(m_util_s.str.is_concat(ex_app));
+    //     SASSERT(is_app(ex));
+    //     app* ex_app = to_app(ex);
+    //     SASSERT(m_util_s.str.is_concat(ex_app) || m.is_eq(ex_app));
 
-        SASSERT(ex_app->get_num_args() == 2);
-        app *a_x = to_app(ex_app->get_arg(0));
-        app *a_y = to_app(ex_app->get_arg(1));
-        this->get_variables(a_x, res);
-        this->get_variables(a_y, res);
-    }
+    //     SASSERT(ex_app->get_num_args() == 2);
+    //     app *a_x = to_app(ex_app->get_arg(0));
+    //     app *a_y = to_app(ex_app->get_arg(1));
+    //     theory_str_noodler::get_variables(a_x, m_util_s, m, res);
+    //     theory_str_noodler::get_variables(a_y, m_util_s, m, res);
+    // }
 
     /**
     Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 

@@ -24,7 +24,12 @@
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
+#include "util.h"
+
 namespace smt::noodler {
+
+    using Instance = obj_hashtable<expr>; // this likely needs to be refined
+    using LengthConstr = expr_ref;  // this likely needs to be refined
 
     template<typename T>
     bool obj_hashtable_equal(const obj_hashtable<T>& ht1, const obj_hashtable<T>& ht2) {
@@ -38,26 +43,117 @@ namespace smt::noodler {
         return true;
     } 
 
+    /**
+     * @brief Class representing the map Set(expr) -> T. Used for storing sets of processed 
+     * conjunctions of string atoms. It can be used for storing the current state of computation 
+     * for a given instance (set of string atoms). 
+     * 
+     * @tparam T Type of values for storing along with an instance
+     */
+    template<typename T>
     class StateLen {
     private:
-        vector<obj_hashtable<expr>> state_visited;
+        vector<std::pair<obj_hashtable<expr>, T>> state_visited;
 
     public:
         StateLen() : state_visited() { }
 
-        bool visited(const obj_hashtable<expr>& state) {
+        bool contains(const obj_hashtable<expr>& state) {
             for(const auto& st : this->state_visited) {
-                if(obj_hashtable_equal(st, state))
+                if(obj_hashtable_equal(st.first, state))
                     return true;
             }            
             return false;
         }
 
-        void add_visited(const obj_hashtable<expr>& state) {
-            if(!visited(state)){
-                this->state_visited.push_back(state);
+        void add(const obj_hashtable<expr>& state, const T& def) {
+            if(!contains(state)){
+                this->state_visited.push_back({state, def});
             }
         }
+
+        const T& get_val(const Instance& inst) const {
+            for(const auto& st : this->state_visited) {
+                if(obj_hashtable_equal(st.first, inst))
+                    return st.second;
+            }            
+            UNREACHABLE();
+        }
+
+        void update_val(const Instance& inst, const T& val) {
+            for(auto& st : this->state_visited) {
+                if(obj_hashtable_equal(st.first, inst)) {
+                    st.second = val;   
+                    return;
+                }
+            } 
+        }
+    };
+
+    /**
+     * @brief Abstract decision procedure. Defines interface for decision 
+     * procedures to be used within z3.
+     */
+    class AbstractDecisionProcedure {
+    public:
+        virtual void initialize(const Instance& inst) =0;
+        virtual bool get_another_solution(const Instance& inst, LengthConstr& out) =0;
+
+        virtual ~AbstractDecisionProcedure() {}
+    };
+
+    /**
+     * @brief Debug instance of the Decision procedure. Always says SAT and return some length 
+     * constraints. Simulates the situation when each instance has exactly 10 noodles.
+     */
+    class DecisionProcedureDebug : public AbstractDecisionProcedure {
+    private:
+        StateLen<int> state;
+        ast_manager& m;
+        seq_util& m_util_s;
+        arith_util& m_util_a;
+
+    public:
+        DecisionProcedureDebug(ast_manager& mn, seq_util& util_s, arith_util& util_a) : 
+            state(), 
+            m(mn), 
+            m_util_s(util_s), 
+            m_util_a(util_a) 
+            { }
+
+        void initialize(const Instance& inst) override {
+            this->state.add(inst, 0);
+        }
+
+        bool get_another_solution(const Instance& inst, LengthConstr& out) override {
+            int cnt = this->state.get_val(inst);
+            if(cnt >= 10) {
+                return false;
+            }
+
+            expr_ref refinement_len(m);
+            app* atom;
+            for (const auto& eq : inst) {
+                vector<expr*> vars;
+                util::get_variables(to_app(eq), this->m_util_s, this->m, vars);
+
+                for(expr * const var : vars) {
+                    expr_ref len_str_l(m_util_s.str.mk_length(var), m);
+                    SASSERT(len_str_l);
+                    expr_ref num(m);
+                    num = this->m_util_a.mk_numeral(rational(cnt), true);
+                    atom = this->m_util_a.mk_le(len_str_l, num);
+                    refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
+                }
+            }
+
+            this->state.update_val(inst, cnt+1);
+            out = refinement_len;
+            return true;
+        }
+
+        ~DecisionProcedureDebug() { }
+    
     };
 }
 
