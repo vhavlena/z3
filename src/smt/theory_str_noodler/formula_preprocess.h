@@ -296,6 +296,8 @@ namespace smt::noodler {
         void get_concat_gather(const Concat& concat, SepEqsGather& res) const;
         void separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const;
 
+        void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
+
     public:
         FormulaPreprocess(const Formula& conj, const AutAssignment& ass) : 
             formula(conj), 
@@ -314,6 +316,7 @@ namespace smt::noodler {
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
         void separate_eqs();
+        void remove_extension();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
@@ -322,6 +325,16 @@ namespace smt::noodler {
          * @param replace Replace
          */
         void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
+        /**
+         * @brief Update predicate with the given index.
+         * 
+         * @param index Index of the predicate to be updated
+         * @param pred New predicate
+         */
+        void update_predicate(size_t index, const Predicate& pred) { 
+            this->formula.remove_predicate(index);
+            this->formula.add_predicate(pred, index);
+        }
         void clean_varmap() { this->formula.clean_varmap(); };
     };
 

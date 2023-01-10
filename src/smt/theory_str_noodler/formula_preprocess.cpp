@@ -700,6 +700,113 @@ namespace smt::noodler {
 
     }
 
+    /**
+     * @brief Gather variables allowing left/right extension. A variable X is left extensible if 
+     * L(X) = \Sigma^*.L(X) (right extensibility analogously). \Sigma is collected among all 
+     * automata in the assignment.
+     * 
+     * @param side Left/right extension
+     * @param res Extensible variables
+     */
+    void FormulaPreprocess::gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res) {
+        Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+        for(const auto& pr : this->formula.get_varmap()) {
+            if(pr.second.size() > 0) {
+                Mata::Nfa::Nfa concat;
+                if(side == Predicate::EquationSideType::Left)
+                    concat = Mata::Nfa::concatenate(sigma_star, this->aut_ass[pr.first]);
+                else 
+                    concat = Mata::Nfa::concatenate(this->aut_ass[pr.first], sigma_star);
+            
+                if(Mata::Nfa::are_equivalent(sigma_star, concat)) {
+                    res.insert(pr.first);
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Remove extensible variables from beginning/end of an equation: 
+     * X = Y1 Y2 Y3 if Y1 occurrs always first (and X is the left side) and 
+     * Y2 is left extensible. We can remove Y1 (similarly the right extensibility and removing from 
+     * the end of the equation).
+     */
+    void FormulaPreprocess::remove_extension() {
+        std::set<BasicTerm> begin_star, end_star;
+        gather_extended_vars(Predicate::EquationSideType::Left, begin_star);
+        gather_extended_vars(Predicate::EquationSideType::Right, end_star);
+
+        using ExtVarMap = std::map<BasicTerm, std::vector<BasicTerm>>;
+        ExtVarMap b_map, e_map;
+        VarMap varmap = this->formula.get_varmap();
+
+        auto flt = [&varmap](ExtVarMap& mp) {
+            std::map<BasicTerm,BasicTerm> ret;
+            for(const auto pr : mp) {
+                std::set<BasicTerm> sing(pr.second.begin(), pr.second.end());
+                if(varmap[pr.first].size() == pr.second.size() && sing.size() == 1) {
+                    ret.insert({pr.first, *sing.begin()});
+                }
+            }
+            return ret;
+        };
+
+        for(const auto& pr : this->formula.get_predicates()) {
+            assert(pr.second.is_equation());
+            Concat left = pr.second.get_left_side();
+            Concat right = pr.second.get_right_side();
+            /**
+             * TODO: Extend to both sides (so far just the left side is considered)
+             */
+            if(left.size() == 1 && right.size() > 1) {
+                if(right[0].is_variable() && left[0].is_variable() 
+                    && right[1].is_variable() && begin_star.find(right[1]) != begin_star.end() 
+                    && varmap[right[1]].size() == 1) {
+                    b_map.insert({right[0], {}});
+                    b_map[right[0]].push_back(left[0]);
+                }
+                if(right[right.size()-1].is_variable() && left[0].is_variable() 
+                    && right[right.size()-2].is_variable() && end_star.find(right[right.size()-2]) != end_star.end() 
+                    && varmap[right[right.size()-2]].size() == 1) {
+                    e_map.insert({right[right.size()-1], {}});
+                    e_map[right[right.size()-1]].push_back(left[0]);
+                }
+            }
+        }
+
+        std::map<BasicTerm,BasicTerm> b_rem = flt(b_map);
+        std::map<BasicTerm,BasicTerm> e_rem = flt(e_map);
+        std::map<size_t, Predicate> updates;
+        for(const auto& pr : this->formula.get_predicates()) {
+            Predicate pred = pr.second;
+            if(pred.get_left_side().size() > 1) continue;
+            if(pred.get_right_side().size() < 2) continue;
+
+            Concat right_side = pred.get_right_side();
+            bool modif = false;
+            for(const auto& beg : b_rem) {
+                if(pred.get_left_side()[0] == beg.second && right_side[0] == beg.first) {        
+                    pred = Predicate(PredicateType::Equation, std::vector<Concat>{pred.get_left_side(), Concat(right_side.begin()+1, right_side.end())} );
+                    modif = true;
+                    break;
+                }
+            }
+            right_side = pred.get_right_side();
+            for(const auto& end : e_rem) {
+                if(pred.get_left_side()[0] == end.second && *(right_side.end()-1) == end.first) {
+                    pred = Predicate(PredicateType::Equation, std::vector<Concat>{pred.get_left_side(), Concat(right_side.begin(), right_side.end()-1)} );
+                    modif = true;
+                    break;
+                }
+            }
+            if(modif) updates.insert({pr.first, pred});
+        }
+
+        for(const auto& pr : updates) {
+            this->update_predicate(pr.first, pr.second);
+        }
+    }
+
 
 
 } // Namespace smt::noodler.
