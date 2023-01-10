@@ -17,6 +17,24 @@ namespace {
     }
 } // Anonymous namespace.
 
+Graph smt::noodler::Graph::deep_copy() const {
+    Graph new_graph;
+    std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> this_to_new_node;
+
+    for (const auto &this_node : get_nodes()) {
+        this_to_new_node[this_node] = new_graph.add_node(this_node->get_predicate());
+    }
+
+    for (const auto &edge : get_edges()) {
+        const auto &source = edge.first;
+        for (const auto &target : edge.second) {
+            new_graph.add_edge(this_to_new_node[source], this_to_new_node[target]);
+        }
+    }
+
+    return new_graph;
+}
+
 Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula) {
     // Assert block.
     {

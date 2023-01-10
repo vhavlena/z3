@@ -22,7 +22,7 @@ namespace smt::noodler {
         std::unordered_set<std::shared_ptr<GraphNode>> nodes_not_on_cycle;
     public:
 
-        const Nodes& get_nodes() { return nodes; }
+        const Nodes& get_nodes() const { return nodes; }
 
         void add_edge(std::shared_ptr<GraphNode> source, std::shared_ptr<GraphNode> target) {
             edges[source].insert(target);
@@ -87,6 +87,8 @@ namespace smt::noodler {
             nodes.insert(new_node);
             return new_node;
         }
+
+        Graph deep_copy() const;
 
         // assumes that formula does not contain same equalities
         static Graph create_inclusion_graph(const Formula& formula);
