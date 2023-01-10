@@ -6,21 +6,29 @@
 #include "inclusion_graph_node.h"
 
 namespace smt::noodler {
+
+    using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
+    using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
     class Graph {
+    protected:
+        Nodes nodes;
+        Edges edges;
+        // set of nodes that do not have edge coming to them
+        // it is guaranteed to be correct ONLY after creating splitting/inclusion graph
+        // methods adding/removing edges DO NOT UPDATE this set, i.e. IT MIGHT NOT BE CORRECT
+        std::unordered_set<std::shared_ptr<GraphNode>> initial_nodes;
+        // set of nodes that are NOT on some cycle
+        // it is guaranteed to be correct ONLY after creating inclusion graph???
+        std::unordered_set<std::shared_ptr<GraphNode>> nodes_not_on_cycle;
     public:
-        using Nodes = std::unordered_set<GraphNode*>;
-        using Edges = std::unordered_map<GraphNode*, Nodes>;
 
-        Graph() = default;
+        const Nodes& get_nodes() { return nodes; }
 
-        std::set<GraphNode> nodes;
-        std::unordered_map<GraphNode*, std::unordered_set<GraphNode*>> edges;
-
-        void add_edge(GraphNode* source, GraphNode* target) {
+        void add_edge(std::shared_ptr<GraphNode> source, std::shared_ptr<GraphNode> target) {
             edges[source].insert(target);
         }
 
-        void remove_edge(GraphNode* source, GraphNode* target) {
+        void remove_edge(std::shared_ptr<GraphNode> source, std::shared_ptr<GraphNode> target) {
             auto source_edges{ edges[source] };
             source_edges.erase(target);
             if (source_edges.empty()) {
@@ -28,11 +36,11 @@ namespace smt::noodler {
             }
         }
 
-        void remove_edges_from(GraphNode* source) {
+        void remove_edges_from(std::shared_ptr<GraphNode> source) {
             edges.erase(source);
         }
 
-        Nodes get_edges_to(GraphNode* target) {
+        Nodes get_edges_to(std::shared_ptr<GraphNode> target) const {
             Nodes source_nodes{};
             for (auto& source_edges: edges) {
                 if (source_edges.second.find(target) != source_edges.second.end()) {
@@ -42,18 +50,18 @@ namespace smt::noodler {
             return source_nodes;
         }
 
-        void remove_edges_to(GraphNode* target) {
+        void remove_edges_to(std::shared_ptr<GraphNode> target) {
             for (auto& source: get_edges_to(target)) {
                 remove_edge(source, target);
             }
         }
 
-        void remove_edges_with(GraphNode* node) {
+        void remove_edges_with(std::shared_ptr<GraphNode> node) {
             remove_edges_from(node);
             remove_edges_to(node);
         }
 
-        size_t get_num_of_edges() {
+        size_t get_num_of_edges() const {
             size_t num_of_edges{ 0 };
             for (const auto& edge_set: edges) {
                 num_of_edges += edge_set.second.size();
@@ -63,19 +71,27 @@ namespace smt::noodler {
 
         const Edges& get_edges() const { return edges; }
 
-        std::optional<const std::reference_wrapper<Nodes>> get_edges(const GraphNode* const source) {
-            const auto source_edges{ edges.find(const_cast<GraphNode*>(source)) };
-            if (source_edges != edges.end()) {
-                return std::make_optional<const std::reference_wrapper<Nodes>>(source_edges->second);
-            }
-            return std::nullopt;
+        const Nodes& get_edges_from(std::shared_ptr<GraphNode> source) {
+            return edges[source];
         }
 
-        GraphNode* get_node(const Predicate& predicate) {
-            auto node{ nodes.find(GraphNode{ predicate }) };
+        std::shared_ptr<GraphNode> get_node(const Predicate& predicate) {
+            auto node = std::find_if(nodes.begin(), nodes.end(), [&predicate](std::shared_ptr<GraphNode> el){ return (el->get_predicate() == predicate);});
             if (node == nodes.end()) { return nullptr; }
-            return const_cast<GraphNode*>(&*node);
+            return *node;
         }
+
+        std::shared_ptr<GraphNode> add_node(const Predicate& predicate) {
+            // TODO check if added node already does not exists??? by calling get_node?
+            std::shared_ptr<GraphNode> new_node = std::make_shared<GraphNode>(predicate);
+            nodes.insert(new_node);
+            return new_node;
+        }
+
+        // assumes that formula does not contain same equalities
+        static Graph create_inclusion_graph(const Formula& formula);
+        static Graph create_simplified_splitting_graph(const Formula& formula);
+        static Graph create_inclusion_graph(Graph& simplified_splitting_graph);
     }; // Class Graph.
 
     class Formula {
@@ -92,11 +108,6 @@ namespace smt::noodler {
         std::vector<Predicate> predicates;
     }; // Class Formula.
 
-    Graph create_inclusion_graph(const Formula& formula);
-
-    Graph create_simplified_splitting_graph(const Formula& formula);
-
-    Graph create_inclusion_graph(Graph& simplified_splitting_graph);
 
 }
 

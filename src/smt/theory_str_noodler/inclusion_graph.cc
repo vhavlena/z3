@@ -17,7 +17,7 @@ namespace {
     }
 } // Anonymous namespace.
 
-Graph smt::noodler::create_inclusion_graph(const Formula& formula) {
+Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula) {
     // Assert block.
     {
         const auto &predicates{formula.get_predicates()};
@@ -41,29 +41,23 @@ Graph smt::noodler::create_inclusion_graph(const Formula& formula) {
     return create_inclusion_graph(splitting_graph);
 }
 
-Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
+Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& formula) {
     Graph graph;
 
     // Add all nodes which are not already present in direct and switched form.
     for (const auto& predicate: formula.get_predicates()) {
-        if (graph.nodes.find(GraphNode{ predicate }) == graph.nodes.end()) {
-            graph.nodes.emplace(predicate);
-        }
-
-        const Predicate switched_predicate{ predicate.get_switched_sides_predicate() };
-        if (graph.nodes.find(GraphNode{ switched_predicate }) == graph.nodes.end()) {
-            graph.nodes.emplace(switched_predicate);
-        }
+        graph.add_node(predicate);
+        graph.add_node(predicate.get_switched_sides_predicate());
     }
 
     if (graph.nodes.empty()) {
         return Graph{};
     }
 
-    for (const GraphNode& source_node: graph.nodes ) {
-        for (const GraphNode& target_node: graph.nodes) {
-            auto& source_predicate{ source_node.get_predicate() };
-            auto& target_predicate{ target_node.get_predicate() };
+    for (auto &source_node: graph.get_nodes() ) {
+        for (auto &target_node: graph.get_nodes()) {
+            auto& source_predicate{ source_node->get_predicate() };
+            auto& target_predicate{ target_node->get_predicate() };
             auto& source_left_side{ source_predicate.get_left_side() };
             auto& source_right_side{ source_predicate.get_right_side() };
             auto& target_left_side{ target_predicate.get_left_side() };
@@ -87,24 +81,34 @@ Graph smt::noodler::create_simplified_splitting_graph(const Formula& formula) {
                 // Have same var and sides are not equal, automatically add a new edge.
             }
 
-            graph.add_edge(const_cast<GraphNode*>(&source_node), const_cast<GraphNode*>(&target_node));
+            graph.add_edge(source_node, target_node);
+        }
+    }
+
+    for (auto& node: graph.get_nodes()) {
+        // auto node{ const_cast<GraphNode *>(&const_node) };
+        if (graph.get_edges_to(node).empty()) {
+            graph.initial_nodes.insert(node);
         }
     }
 
     return graph;
 }
 
-Graph smt::noodler::create_inclusion_graph(Graph& simplified_splitting_graph) {
+Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph) {
     Graph inclusion_graph{};
 
     bool splitting_graph_changed{ true };
     while(splitting_graph_changed) {
         splitting_graph_changed = false;
 
-        for (auto& const_node: simplified_splitting_graph.nodes) {
-            auto node{ const_cast<GraphNode *>(&const_node) };
+        for (auto& node: simplified_splitting_graph.get_nodes()) {
             if (simplified_splitting_graph.get_edges_to(node).empty()) {
-                inclusion_graph.nodes.insert(*node);
+                inclusion_graph.nodes.insert(node);
+                inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
+                if (simplified_splitting_graph.initial_nodes.count(node) > 0) {
+                    inclusion_graph.initial_nodes.insert(node);
+                } 
 
                 auto switched_node{ simplified_splitting_graph.get_node(node->get_predicate().get_switched_sides_predicate()) };
 
@@ -112,29 +116,32 @@ Graph smt::noodler::create_inclusion_graph(Graph& simplified_splitting_graph) {
                 simplified_splitting_graph.remove_edges_with(node);
                 simplified_splitting_graph.remove_edges_with(switched_node);
 
-                simplified_splitting_graph.nodes.erase(*node);
-                simplified_splitting_graph.nodes.erase(*switched_node);
+                simplified_splitting_graph.nodes.erase(node);
+                simplified_splitting_graph.nodes.erase(switched_node);
 
                 splitting_graph_changed = true;
                 break;
             }
         }
     }
+
+    // we add rest of the nodes (the ones on the cycle) to the inclusion graph and make them initial
+    for (auto& node: simplified_splitting_graph.get_nodes()) {
+        inclusion_graph.initial_nodes.insert(node);
+    }
     inclusion_graph.nodes.merge(simplified_splitting_graph.nodes);
 
-    for (const GraphNode& source_node: inclusion_graph.nodes ) {
-        for (const GraphNode& target_node: inclusion_graph.nodes) {
-            auto& source_predicate{ source_node.get_predicate() };
-            auto& target_predicate{ target_node.get_predicate() };
+    for (auto& source_node: inclusion_graph.get_nodes() ) {
+        for (auto& target_node: inclusion_graph.get_nodes()) {
+            auto& source_predicate{ source_node->get_predicate() };
+            auto& target_predicate{ target_node->get_predicate() };
             auto& source_left_side{ source_predicate.get_left_side() };
             auto& target_right_side{ target_predicate.get_right_side() };
 
-            if (!have_same_var(source_left_side, target_right_side)) {
-                continue;
+            if (have_same_var(source_left_side, target_right_side)) {
+                // Have same var, automatically add a new edge.
+                inclusion_graph.add_edge(source_node, target_node);
             }
-
-            // Have same var, automatically add a new edge.
-            inclusion_graph.add_edge(const_cast<GraphNode*>(&source_node), const_cast<GraphNode*>(&target_node));
         }
     }
 
