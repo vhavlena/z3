@@ -18,24 +18,84 @@ namespace {
 } // Anonymous namespace.
 
 Graph smt::noodler::Graph::deep_copy() const {
+    std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
+    return deep_copy(node_mapping);
+}
+
+Graph smt::noodler::Graph::deep_copy(std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping) const {
     Graph new_graph;
-    std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> this_to_new_node;
 
     for (const auto &this_node : get_nodes()) {
-        this_to_new_node[this_node] = new_graph.add_node(this_node->get_predicate());
+        node_mapping[this_node] = new_graph.add_node(this_node->get_predicate());
     }
 
     for (const auto &edge : get_edges()) {
         const auto &source = edge.first;
         for (const auto &target : edge.second) {
-            new_graph.add_edge(this_to_new_node[source], this_to_new_node[target]);
+            new_graph.add_edge(node_mapping[source], node_mapping[target]);
         }
     }
 
     return new_graph;
 }
 
-Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula) {
+void smt::noodler::Graph::add_inclusion_graph_edges() {
+    for (auto& source_node: get_nodes() ) {
+        for (auto& target_node: get_nodes()) {
+            if (source_node == target_node) {
+                continue;
+            }
+
+            auto& source_predicate{ source_node->get_predicate() };
+            auto& target_predicate{ target_node->get_predicate() };
+            auto& source_left_side{ source_predicate.get_left_side() };
+            auto& target_right_side{ target_predicate.get_right_side() };
+
+            if (have_same_var(source_left_side, target_right_side)) {
+                // Have same var, automatically add a new edge.
+                add_edge(source_node, target_node);
+            }
+        }
+    }
+}
+
+void smt::noodler::Graph::substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map, std::unordered_set<std::shared_ptr<GraphNode>> &out_deleted_nodes) {
+    auto substitute_vector = [&substitution_map](std::vector<BasicTerm> &vector) {
+        std::vector<BasicTerm> result;
+        for (const BasicTerm &var : vector) {
+            if (substitution_map.count(var) == 0) {
+                result.push_back(var);
+            } else {
+                const auto &to_this = substitution_map.at(var);
+                result.insert(result.end(), to_this.begin(), to_this.end());
+            }
+        }
+        return result;
+    };
+
+    for (std::shared_ptr<GraphNode> node : get_nodes()) {
+        Predicate &node_predicate = node->get_predicate();
+        std::vector<BasicTerm> new_left_side = substitute_vector(node_predicate.get_left_side());
+        std::vector<BasicTerm> new_right_side = substitute_vector(node_predicate.get_right_side());
+        node_predicate.set_left_side(std::move(new_left_side));
+        node_predicate.set_right_side(std::move(new_right_side));
+    }
+
+    // merge same nodes
+    std::set<GraphNode> unique_nodes;
+    for (const auto &node : get_nodes()) {
+        if (unique_nodes.count(*node) == 0) {
+            unique_nodes.insert(*node);
+        } else {
+            out_deleted_nodes.insert(node);
+        }
+    }
+    for (const auto &node : out_deleted_nodes) {
+        nodes.erase(node);
+    }
+}
+
+Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> out_node_order) {
     // Assert block.
     {
         const auto &predicates{formula.get_predicates()};
@@ -56,7 +116,7 @@ Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula) {
     }
 
     Graph splitting_graph{ create_simplified_splitting_graph(formula) };
-    return create_inclusion_graph(splitting_graph);
+    return create_inclusion_graph(splitting_graph, out_node_order);
 }
 
 Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& formula) {
@@ -74,6 +134,9 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
 
     for (auto &source_node: graph.get_nodes() ) {
         for (auto &target_node: graph.get_nodes()) {
+            if (source_node == target_node) {
+                continue;
+            }
             auto& source_predicate{ source_node->get_predicate() };
             auto& target_predicate{ target_node->get_predicate() };
             auto& source_left_side{ source_predicate.get_left_side() };
@@ -103,9 +166,10 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
         }
     }
 
+    // initial nodes TODO: do we need them???
     for (auto& node: graph.get_nodes()) {
         // auto node{ const_cast<GraphNode *>(&const_node) };
-        if (graph.get_edges_to(node).empty()) {
+        if (graph.inverse_edges.count(node) == 0) {
             graph.initial_nodes.insert(node);
         }
     }
@@ -113,7 +177,7 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
     return graph;
 }
 
-Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph) {
+Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> out_node_order) {
     Graph inclusion_graph{};
 
     bool splitting_graph_changed{ true };
@@ -121,12 +185,14 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
         splitting_graph_changed = false;
 
         for (auto& node: simplified_splitting_graph.get_nodes()) {
-            if (simplified_splitting_graph.get_edges_to(node).empty()) {
+            if (simplified_splitting_graph.inverse_edges.count(node) == 0) {
                 inclusion_graph.nodes.insert(node);
                 inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
                 if (simplified_splitting_graph.initial_nodes.count(node) > 0) {
                     inclusion_graph.initial_nodes.insert(node);
                 } 
+
+                out_node_order.push_back(node);
 
                 auto switched_node{ simplified_splitting_graph.get_node(node->get_predicate().get_switched_sides_predicate()) };
 
@@ -134,6 +200,7 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
                 simplified_splitting_graph.remove_edges_with(node);
                 simplified_splitting_graph.remove_edges_with(switched_node);
 
+                // we can erase nodes, because we are breaking from the for loop (so no problem with invalidating iterators)
                 simplified_splitting_graph.nodes.erase(node);
                 simplified_splitting_graph.nodes.erase(switched_node);
 
@@ -146,22 +213,11 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
     // we add rest of the nodes (the ones on the cycle) to the inclusion graph and make them initial
     for (auto& node: simplified_splitting_graph.get_nodes()) {
         inclusion_graph.initial_nodes.insert(node);
+        out_node_order.push_back(node);
     }
     inclusion_graph.nodes.merge(simplified_splitting_graph.nodes);
 
-    for (auto& source_node: inclusion_graph.get_nodes() ) {
-        for (auto& target_node: inclusion_graph.get_nodes()) {
-            auto& source_predicate{ source_node->get_predicate() };
-            auto& target_predicate{ target_node->get_predicate() };
-            auto& source_left_side{ source_predicate.get_left_side() };
-            auto& target_right_side{ target_predicate.get_right_side() };
-
-            if (have_same_var(source_left_side, target_right_side)) {
-                // Have same var, automatically add a new edge.
-                inclusion_graph.add_edge(source_node, target_node);
-            }
-        }
-    }
+    inclusion_graph.add_inclusion_graph_edges();
 
     return inclusion_graph;
 }
