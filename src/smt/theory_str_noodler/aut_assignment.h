@@ -14,7 +14,7 @@
 
 namespace smt::noodler {
 
-    class AutAssignment : public std::map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>> {
+    class AutAssignment : public std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>> {
 
     public:
 
@@ -44,6 +44,8 @@ namespace smt::noodler {
 
         // adds all mappings of variables from other to this assigment except those which already exists in this assignment
         // i.e. if this[var] exists, then nothing happens for var, if it does not, then this[var] = other[var]
+        // TODO: probably this is the same as just doing this->insert(other.begin(), other.end())
+        // TODO: or even better, if we do not care what happens with other, we can use this->merge(other)
         void add_to_assignment(const AutAssignment &other) {
             for (const auto &it : other) {
                 if (this->count(it.first) == 0) {
