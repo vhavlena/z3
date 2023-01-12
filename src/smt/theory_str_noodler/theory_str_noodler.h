@@ -50,6 +50,7 @@ namespace smt::noodler {
 
         StateLen<bool> state_len;
         AbstractDecisionProcedure* adec_proc;
+        obj_hashtable<expr> len_vars;
 
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> propgated_string_theory;

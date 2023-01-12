@@ -199,6 +199,12 @@ namespace smt::noodler {
         context &ctx = get_context();
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {
+            obj_hashtable<app> lens;
+            util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
+            for (app* const a : lens) {
+                util::get_variables(a, this->m_util_s, m, this->len_vars);
+            }
+
             expr *ex = ctx.get_asserted_formula(i);
             string_theory_propagation(ex);
         }
@@ -641,6 +647,17 @@ namespace smt::noodler {
         std::cout << "final_check starts\n"<<std::endl;
 
         remove_irrelevant_constr();
+
+        unsigned num = ctx.get_num_asserted_formulas();
+        for(unsigned i = 0; i < num; i++) {
+            obj_hashtable<app> lens;
+            util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
+            for (app* const a : lens) {
+                std::cout << mk_pp(a, m) << std::endl;
+            }
+            // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
+        }
+        std::cout << std::endl;
 
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
@@ -1362,7 +1379,7 @@ namespace smt::noodler {
         STRACE("str", tout << "[Len Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
 
-            vector<expr*> vars;
+            obj_hashtable<expr> vars;
             util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
             util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
 
@@ -1417,7 +1434,7 @@ namespace smt::noodler {
         STRACE("str", tout << "[Len Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
 
-            vector<expr*> vars;
+            obj_hashtable<expr> vars;
             util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
             util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
 

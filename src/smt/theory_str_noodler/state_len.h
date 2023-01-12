@@ -134,7 +134,7 @@ namespace smt::noodler {
             expr_ref refinement_len(m);
             app* atom;
             for (const auto& eq : inst) {
-                vector<expr*> vars;
+                obj_hashtable<expr> vars;
                 util::get_variables(to_app(eq), this->m_util_s, this->m, vars);
 
                 for(expr * const var : vars) {
