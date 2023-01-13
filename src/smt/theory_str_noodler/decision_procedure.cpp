@@ -107,25 +107,9 @@ namespace smt::noodler {
                 right_side_division.push_back(next_division);
             }
             /** end of right side combining **/
-            
-
-            for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
-                if (is_node_to_process_on_cycle) {
-                    // if the node_to_process is on cycle, we need to do BFS
-                    element_to_process.push_back_unique(node);
-                } else {
-                    // if it is not on cycle, we can do DFS
-                    // TODO: can we really do DFS?? 
-                    element_to_process.push_front_unique(node);
-                }
-            }
-            
 
             if (!is_there_length_on_right) {
-                // we have no length-aware variables on the right hand side
-                // so we are doing only FM shit???
-                
-                // test inclusion 
+                // we have no length-aware variables on the right hand side => we need to check if inclusion holds
                 // TODO probably we should try shortest words, it might work correctly
                 if (is_node_to_process_on_cycle // TODO should we not test inclusion if we have node that is not on cycle? because we will not go back to it, so it should make sense to just do noodlification
                     && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_automata), right_side_automata[0])) { // there should be exactly one element in right_side_automata as we do not have length variables
@@ -135,12 +119,30 @@ namespace smt::noodler {
                         return true;
                     }
                 }
+            }
+
+            // we are going to change the automata on the left side (potentially also split some on the right side, but that should not have impact)
+            // so we need to add all nodes whose variable assignments are going to change on the right side (i.e. we follow inclusion graph) for processing
+            for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
+                // we push only those nodes which are not already in nodes_to_process
+                // if the node_to_process is on cycle, we need to do BFS
+                // if it is not on cycle, we can do DFS
+                // TODO: can we really do DFS?? 
+                element_to_process.push_unique(node, is_node_to_process_on_cycle);
+            }
+            
+
+            if (!is_there_length_on_right) {
+                // we have no length-aware variables on the right hand side
+                // so we are doing only FM shit???
+
+                assert(right_side_automata.size() == 1);
 
                 /* TODO we call old noodlification here? we do not want unnecessary copies of inclusion graph, so this could be better, but a problem of this
-                 * is that we do not process empty word automata in any way, which might be a bit problematic
-                 * We could call the new noodlification and try to postpone making the copy of the inclusion graph until we actually need it
+                 * is that we do not process resulting empty word automata in noodles in any way, which might be a bit problematic
+                 * To fix this, we could call the new noodlification and try to postpone making the copy of the inclusion graph until we actually need it
                  */
-                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
+                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata[0]);
                 const unsigned num_of_left_vars = left_side_vars.size();
                 for (const auto &noodle : noodles) {
                     AutAssignment new_assignment;
@@ -187,12 +189,12 @@ namespace smt::noodler {
 
 
                 /**
-                 * TODO: I do not know how noodlification works yet, I assume I will get noodles where each noodle is connected with some pairs of numbers
-                 * So for example if we have some noodle and automaton noodle[i].first, then noodle[i].second is a pair, where first element
-                 * i_l = noodle[i].second.first tells us that automaton noodle[i].first belongs to the i_l-th left var (i.e. left_side_vars[i_l])
-                 * and the second element i_r = noodle[i].second.second tell us that it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
+                 * We get noodles where each noodle consists of automata connected with a vector of numbers
+                 * So for example if we have some noodle and automaton noodle[i].first, then noodle[i].second is a vector, where first element
+                 * i_l = noodle[i].second[0] tells us that automaton noodle[i].first belongs to the i_l-th left var (i.e. left_side_vars[i_l])
+                 * and the second element i_r = noodle[i].second[1] tell us that it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
                  **/
-                std::vector<std::vector<std::pair<std::shared_ptr<Mata::Nfa::Nfa>, std::pair<unsigned,unsigned>>>> noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
+                std::vector<std::vector<std::pair<std::shared_ptr<Mata::Nfa::Nfa>, std::vector<unsigned>>>> noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
 
                 for (const auto &noodle : noodles) {
                     WorklistElement new_element = element_to_process;
@@ -208,8 +210,8 @@ namespace smt::noodler {
                         // TODO do not make a new_var if we can replace it with one left or right var (i.e. new_var is exactly left or right var)
                         // TODO also if we can substitute with epsilon, we should do that first? or generally process epsilon substitutions better, in some sort of 'preprocessing'
                         BasicTerm new_var(BasicTermType::Variable, VAR_PREFIX + std::string("_") + std::to_string(noodlification_no) + std::string("_") + std::to_string(i));
-                        left_side_vars_to_new_vars[noodle[i].second.first].push_back(new_var);
-                        right_side_divisions_to_new_vars[noodle[i].second.second].push_back(new_var);
+                        left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
+                        right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
                         new_element.aut_ass[new_var] = noodle[i].first; // we assign the automaton to new_var
                     }
 
@@ -290,89 +292,13 @@ namespace smt::noodler {
 
                     // TODO: should we do something more here??
 
-                    ++noodlification_no; // TODO: when to do this increment??
-
                 }
+                
+                ++noodlification_no; // TODO: when to do this increment??
             }
         }
 
         return false;
     }
 
-
-
-    bool is_sat_FM(const Graph &inclusion_graph, const AutAssignment &initial_assignments) {
-        std::queue<std::pair<AutAssignment, std::queue<const GraphNode*>>> branches;
-
-        std::queue<const GraphNode*> initial_nodes;
-        for (const auto &node : inclusion_graph.nodes) {
-            // which nodes to push???
-            initial_nodes.push(&node);
-        }
-        branches.push(std::make_pair(initial_assignments, std::move(initial_nodes)));
-
-        while (branches.size() != 0) {
-            std::pair<AutAssignment, std::queue<const GraphNode*>> branch = std::move(branches.front());
-            branches.pop();
-
-            if (branch.second.empty()) {
-                //probably save the state of solving here??
-                return true;
-            }
-
-            const GraphNode *inclusion_to_check = branch.second.front();
-            branch.second.pop();
-
-            Mata::Nfa::Nfa right_side = branch.first.get_automaton_concat(inclusion_to_check->get_predicate().get_right_side());
-            
-            //Mata::Nfa::Nfa left_side = branch.first.get_automaton_concat(inclusion_to_check.get_predicate().get_left_side());
-            // TODO!!!!! TEST shortest_words_of_left_side is subset of right_side
-
-
-
-            Mata::Nfa::AutPtrSequence left_side;
-            for (const auto &l_var : inclusion_to_check->get_predicate().get_left_side()) {
-                left_side.push_back(branch.first.at(l_var).get());
-            }
-            
-
-            // auto it = inclusion_to_check.get_predicate().get_left_side().begin();
-            // auto end = inclusion_to_check.get_predicate().get_left_side().end();
-            // Mata::Nfa::Nfa left_side = *it;
-            // ++it;
-            // for (; it != end; ++it) {
-            //     left_side = Mata::Nfa::concatenate(left_side, branch.first.at(*it), true);
-            // }
-
-            std::queue vertices_to_check = branch.second;
-            for (const auto &vertex : inclusion_graph.edges.at(const_cast<GraphNode*>(inclusion_to_check))) {
-                vertices_to_check.push(vertex);
-            }
-
-            auto noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side, right_side);//, false, Mata::Nfa::StringMap{{"reduce", "forward"}})
-            for (const auto &noodle : noodles) {
-                const auto &left_side_vars = inclusion_to_check->get_predicate().get_left_side();
-                const unsigned num_of_left_vars = left_side_vars.size();
-                AutAssignment newAssignment;
-                for (unsigned i = 0; i < num_of_left_vars; ++i) {
-                    const auto &left_var = left_side_vars[i];
-                    if (newAssignment.count(left_var) == 0) {
-                        newAssignment[left_var] = noodle[i];
-                        // emptiness check is not needed, we only get noodles that do not have empty automata
-                    } else {
-                        Mata::Nfa::Nfa result = Mata::Nfa::intersection(*(newAssignment.at(left_var)), *(noodle[i]));
-                        // TODO simulation?
-                        if (Mata::Nfa::is_lang_empty(result)) {
-                            // ??? empty assignment means we end this noodle?
-                            continue;
-                        } else {
-                            newAssignment[left_var] = std::make_shared<Mata::Nfa::Nfa>(result);
-                        }
-                    }
-                }
-                newAssignment.add_to_assignment(branch.first);
-                branches.push(std::make_pair(newAssignment, vertices_to_check));
-            }
-        }
-    }
-}
+} // namespace smt::nodler
