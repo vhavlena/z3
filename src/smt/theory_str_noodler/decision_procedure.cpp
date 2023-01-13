@@ -5,86 +5,111 @@
 #include "decision_procedure.h"
 
 namespace smt::noodler {
-    void DecisionProcedure::initialize(const Instance& inst) {
-        WorklistElement initialWlEl;
-        initialWlEl.length_sensitive_vars = get_length_sensitive_vars(inst); // TODO how????
-        initialWlEl.aut_ass = get_init_aut_ass(inst); // TODO how????
-        Formula equalities = get_equalities(inst); // TODO how????
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process)); 
-        // TODO: should we add initial nodes to the nodes we want to process (the order of processing might be a bit weird then), or should we add all nodes here and get the order based on the creation of inclusion graph
-        // initialWlEl.nodes_to_process.insert(initialWlEl.nodes_to_process.end(), initialWlEl.inclusion_graph->initial_nodes.begin(), initialWlEl.inclusion_graph->initial_nodes.end());
-        // some mapping of variables to vector of variables (representing substituting after splitting)???? => this might work only for chain-free
+    DecisionProcedure::DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars) {
+        Mata::Nfa::Nfa aut_empty_word;
+        auto state = aut_empty_word.add_state();
+        aut_empty_word.make_initial(state);
+        aut_empty_word.make_final(state);
+        // TODO probably something with alphabet too
+        automaton_with_empty_word = std::make_shared<Mata::Nfa::Nfa>(aut_empty_word);
 
-        worklist.push(initialWlEl);
+
+
+        WorklistElement initialWlEl;
+        initialWlEl.length_sensitive_vars = std::move(init_length_sensitive_vars);
+        initialWlEl.aut_ass = std::move(init_aut_ass);
+        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
+        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process)); 
+        
+        worklist.push_back(initialWlEl);
     }
 
-    bool DecisionProcedure::get_another_solution(const Instance& inst, LengthConstr& out) {
+    bool DecisionProcedure::get_another_solution() {
 
         while (!worklist.empty()) {
             WorklistElement element_to_process = std::move(worklist.front());
             worklist.pop_front();
 
             if (element_to_process.nodes_to_process.empty()) {
-                // TODO do some arithmetic shit
+                // TODO do some arithmetic shit?
                 return true;
             }
 
             std::shared_ptr<GraphNode> node_to_process = element_to_process.nodes_to_process.front();
             element_to_process.nodes_to_process.pop_front();
 
-            // TODO add check if both sides are same; if they are, just remove
-            
-            /** Combine the right side into automata where we concatenate non-length-aware vars next to each other **/
-            std::vector<std::shared_ptr<Mata::Nfa::Nfa>> right_side_automata;
-            // each right side automaton corresponds to either concatenation of non-length-aware vars (vector of basic terms) or one lenght-aware var (vector of one basic term)
-            std::vector<std::vector<BasicTerm>> right_side_division;
+            bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
 
-            assert(!node_to_process->get_predicate().get_right_side().empty()); // TODO: we should be able to process even situation where right/left side is empty (i.e. representing empty word)
-            auto right_var_it = node_to_process->get_predicate().get_right_side().begin();
-            auto right_side_end = node_to_process->get_predicate().get_right_side().end();
-
-            std::shared_ptr<Mata::Nfa::Nfa> next_aut = std::make_shared<Mata::Nfa::Nfa>(element_to_process.aut_ass[*right_var_it]);
-            std::vector<BasicTerm> next_division{ *right_var_it };
-            bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
-            ++right_var_it;
-
-            for (; right_var_it != right_side_end; ++right_var_it) {
-                std::shared_ptr<Mata::Nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
-                if (element_to_process.length_sensitive_vars.count(*right_var_it) > 0) {
-                    // current right_var is length-aware
-                    right_side_automata.push_back(next_aut);
-                    right_side_division.push_back(next_division);
-                    next_aut = right_var_aut;
-                    next_division = std::vector<BasicTerm>{ *right_var_it };
-                    last_was_length = true;
-                } else {
-                    // current right_var is not length-aware
-                    if (last_was_length) {
-                        right_side_automata.push_back(next_aut);
-                        right_side_division.push_back(next_division);
-                        next_aut = right_var_aut;
-                        next_division = std::vector<BasicTerm>{ *right_var_it };
-                    } else {
-                        next_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*next_aut, *right_var_aut));
-                        next_division.push_back(*right_var_it);
-                        // TODO probably reduce size here
-                    }
-                    last_was_length = false;
-                }
-            }
-            right_side_automata.push_back(next_aut);
-            right_side_division.push_back(next_division);
-            /** end of right side combining **/
-            
+            // TODO left_side_vars can be empty, we need to do something special then
+            /** process left side **/
             std::vector<std::shared_ptr<Mata::Nfa::Nfa>> left_side_automata;
             const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
             }
+            if (left_side_vars.empty()) {
+                // left side is empty => left side accepts only empty word, we need to add the automaton accepting only empty word
+                // it should not be problematic, there will be just one empty noodle (or none, if right side does not accept empty word)
+                // so we will substitute each lenght-aware right var with empty concatenation while we process that noodle
+                left_side_automata.push_back(automaton_with_empty_word);
+            }
+            /** end of left side processing **/
 
-            bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
 
-            for (const auto &node : element_to_process.inclusion_graph->edges.at(node_to_process)) {
+            /** Combine the right side into automata where we concatenate non-length-aware vars next to each other **/
+            std::vector<std::shared_ptr<Mata::Nfa::Nfa>> right_side_automata;
+            const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
+            // each right side automaton corresponds to either concatenation of non-length-aware vars (vector of basic terms) or one lenght-aware var (vector of one basic term)
+            std::vector<std::vector<BasicTerm>> right_side_division;
+            bool is_there_length_on_right = false;
+
+            if (right_side_vars.empty()) {
+                // right side is empty, i.e. there is only empty word
+                // because there is no length variable, it can be easily processed by FM noodlification
+                // TODO do we want to do FM noodlification tho? we will end up with aut_assignment where some vars are mapped to aut accepting empty word
+                right_side_automata.push_back(automaton_with_empty_word);
+            } else {
+                auto right_var_it = right_side_vars.begin();
+                auto right_side_end = right_side_vars.end();
+
+                std::shared_ptr<Mata::Nfa::Nfa> next_aut = std::make_shared<Mata::Nfa::Nfa>(element_to_process.aut_ass[*right_var_it]);
+                std::vector<BasicTerm> next_division{ *right_var_it };
+                bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
+                is_there_length_on_right = last_was_length;
+                ++right_var_it;
+
+                for (; right_var_it != right_side_end; ++right_var_it) {
+                    std::shared_ptr<Mata::Nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
+                    if (element_to_process.length_sensitive_vars.count(*right_var_it) > 0) {
+                        // current right_var is length-aware
+                        right_side_automata.push_back(next_aut);
+                        right_side_division.push_back(next_division);
+                        next_aut = right_var_aut;
+                        next_division = std::vector<BasicTerm>{ *right_var_it };
+                        last_was_length = true;
+                        is_there_length_on_right = true;
+                    } else {
+                        // current right_var is not length-aware
+                        if (last_was_length) {
+                            right_side_automata.push_back(next_aut);
+                            right_side_division.push_back(next_division);
+                            next_aut = right_var_aut;
+                            next_division = std::vector<BasicTerm>{ *right_var_it };
+                        } else {
+                            next_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*next_aut, *right_var_aut));
+                            next_division.push_back(*right_var_it);
+                            // TODO probably reduce size here
+                        }
+                        last_was_length = false;
+                    }
+                }
+                right_side_automata.push_back(next_aut);
+                right_side_division.push_back(next_division);
+            }
+            /** end of right side combining **/
+            
+
+            for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
                 if (is_node_to_process_on_cycle) {
                     // if the node_to_process is on cycle, we need to do BFS
                     element_to_process.push_back_unique(node);
@@ -96,15 +121,26 @@ namespace smt::noodler {
             }
             
 
-            if (right_side_automata.size() == 1) {
+            if (!is_there_length_on_right) {
                 // we have no length-aware variables on the right hand side
                 // so we are doing only FM shit???
                 
-                // TODO test inclusion (should we do it if we have node that is not on cycle? and what about shortest words, now we probably have to do the prorper inclusion?)
-                // after succesful test we should probably check if element_to_process.nodes_to_process contained only node_to_process, if yes => sat
+                // test inclusion 
+                // TODO probably we should try shortest words, it might work correctly
+                if (is_node_to_process_on_cycle // TODO should we not test inclusion if we have node that is not on cycle? because we will not go back to it, so it should make sense to just do noodlification
+                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_automata), right_side_automata[0])) { // there should be exactly one element in right_side_automata as we do not have length variables
+                    if (element_to_process.nodes_to_process.empty()) {
+                        // TODO do some other shit?
+                        sat_element = std::move(element_to_process);
+                        return true;
+                    }
+                }
 
-
-                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata); // we call old noodlification here? or should we somehow process if we get automata accepting empty words
+                /* TODO we call old noodlification here? we do not want unnecessary copies of inclusion graph, so this could be better, but a problem of this
+                 * is that we do not process empty word automata in any way, which might be a bit problematic
+                 * We could call the new noodlification and try to postpone making the copy of the inclusion graph until we actually need it
+                 */
+                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
                 const unsigned num_of_left_vars = left_side_vars.size();
                 for (const auto &noodle : noodles) {
                     AutAssignment new_assignment;
@@ -124,12 +160,26 @@ namespace smt::noodler {
                             }
                         }
                     }
-                    new_assignment.add_to_assignment(element_to_process.aut_ass);
+                    // insert rest of vars which were not updated into new_assignment
+                    new_assignment.insert(element_to_process.aut_ass.begin(), element_to_process.aut_ass.end());
                     WorklistElement new_element(std::move(new_assignment), 
                                                 element_to_process.nodes_to_process,
                                                 element_to_process.inclusion_graph,
-                                                element_to_process.length_sensitive_vars);
-                    worklist.push(new_element);
+                                                element_to_process.length_sensitive_vars,
+                                                element_to_process.substitution_map);
+
+                    if (new_element.nodes_to_process.empty()) {
+                        // TODO do something more??
+                        sat_element = std::move(new_element);
+                        return true;
+                    } else {
+                        // TODO should we really push to front when not on cycle?
+                        if (!is_node_to_process_on_cycle) {
+                            worklist.push_front(new_element);
+                        } else {
+                            worklist.push_back(new_element);
+                        }
+                    }
                 }
             } else {
                 // we have length-aware vars on the right hand side
@@ -147,12 +197,16 @@ namespace smt::noodler {
                 for (const auto &noodle : noodles) {
                     WorklistElement new_element = element_to_process;
                     // we need to make a deep copy, because we will be updating this graph
-                    new_element.make_deep_copy_of_inclusion_graph_only_nodes();
+                    auto new_node_to_process = new_element.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
+
+                    //remove processed inclusion from the inclusion graph
+                    new_element.inclusion_graph->remove_node(new_node_to_process); // TODO: is this safe?
 
                     std::vector<std::vector<BasicTerm>> left_side_vars_to_new_vars(left_side_vars.size());
                     std::vector<std::vector<BasicTerm>> right_side_divisions_to_new_vars(right_side_division.size());
                     for (unsigned i = 0; i < noodle.size(); ++i) {
-                        // TODO do not make a new_var if we can replace it with left or right var (i.e. new_var is exactly left or right var)
+                        // TODO do not make a new_var if we can replace it with one left or right var (i.e. new_var is exactly left or right var)
+                        // TODO also if we can substitute with epsilon, we should do that first? or generally process epsilon substitutions better, in some sort of 'preprocessing'
                         BasicTerm new_var(BasicTermType::Variable, VAR_PREFIX + std::string("_") + std::to_string(noodlification_no) + std::string("_") + std::to_string(i));
                         left_side_vars_to_new_vars[noodle[i].second.first].push_back(new_var);
                         right_side_divisions_to_new_vars[noodle[i].second.second].push_back(new_var);
@@ -210,14 +264,13 @@ namespace smt::noodler {
                             new_element.aut_ass.erase(left_var);
                             // update the length variables
                             // TODO: is this enough to update variables only when substituting?
-                            for (const BasicTerm &new_var : left_side_vars_to_new_vars[i]) {
-                                new_element.length_sensitive_vars.insert(new_var);
+                            if (new_element.length_sensitive_vars.count(left_var) > 0) { // if left_var is length-aware => substituted vars should become length-aware
+                                for (const BasicTerm &new_var : left_side_vars_to_new_vars[i]) {
+                                    new_element.length_sensitive_vars.insert(new_var);
+                                }
                             }
                         }
                     }
-
-                    //remove processed inclusion from the inclusion graph
-                    new_element.inclusion_graph->remove_node(node_to_process); // TODO: is this safe?
 
                     // do substitution in the inclusion graph
                     new_element.substitute_vars(substitution_map);
@@ -228,7 +281,7 @@ namespace smt::noodler {
                     // update the substitution_map of new_element by the new substitutions
                     new_element.substitution_map.merge(substitution_map);
 
-                    // TODO should we push to front when not on cycle?
+                    // TODO should we really push to front when not on cycle?
                     if (!is_node_to_process_on_cycle) {
                         worklist.push_front(new_element);
                     } else {

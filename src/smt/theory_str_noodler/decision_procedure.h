@@ -16,6 +16,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
         // substitution_map[x] maps variable x to the concatenation of variables for which x was substituted
+        // each variable should be either assigned in aut_ass or substituted in this map
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
         WorklistElement() = default;
@@ -52,10 +53,12 @@ namespace smt::noodler {
             }
         }
 
-        // inclusion_graph will become a new deep copy of existing inclusion_graph
+        // inclusion_graph will become a new deep copy of the existing inclusion_graph
         // edges are removed
-        // nodes_to_process are updated so that the pointers point to the new graph
-        void make_deep_copy_of_inclusion_graph_only_nodes() {
+        // nodes_to_process are updated so that the pointers point to the nodes of this deep copy
+        // processed_node is the node that is being processed, the return value is this node in the deep copy
+        // TODO this function is really ugly, I should do something about it
+        std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
             Graph graph_to_copy = *inclusion_graph;
             graph_to_copy.remove_all_edges();
             std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
@@ -66,9 +69,10 @@ namespace smt::noodler {
                 nodes_to_process.pop_front();
             }
             nodes_to_process = new_nodes_to_process;
+            return node_mapping.at(processed_node);
         }
 
-        // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process
+        // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process (and also nodes that have same sides are deleted)
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map) {
             std::unordered_set<std::shared_ptr<GraphNode>> deleted_nodes;
             inclusion_graph->substitute_vars(substitution_map, deleted_nodes);
@@ -80,35 +84,27 @@ namespace smt::noodler {
         }
     };
 
-    // represents deque that does not contain the same element twice
-    // class UniqueDeque {
-    //     std::deque<T> elements;
-
-    //     void push_back( const T& value ) {
-    //         if (std::find(elements.begin(), elements.end(), value) == elements.end()) {
-    //             elements.push_back(value);
-    //         }
-    //     }
-    //     void push_back( T&& value ) {
-    //         if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
-    //             elements.push_back(node);
-    //         }
-    //     }
-    // };
-
-    class DecisionProcedure : public AbstractDecisionProcedure {
+    class DecisionProcedure  {
     private:
         // prefix of newly created vars during the procedure
         const std::string VAR_PREFIX = "tmp";
         // counter of noodlifications, so that newly created variables will have unique names per noodlification
-        // by for example setting the name to VAR_PREFIX + noodlification_no 
+        // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
         unsigned noodlification_no = 0;
 
         std::deque<WorklistElement> worklist;
-        //worklist = {(AutAssignment, set nodes_to_process, pointer? InclusionGraph)}
+
+        std::shared_ptr<Mata::Nfa::Nfa> automaton_with_empty_word;
     public:
-        void initialize(const Instance& inst) override;
-        bool get_another_solution(const Instance& inst, LengthConstr& out) override;
+
+
+        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm> init_length_sensitive_vars);
+
+        bool get_another_solution();
+        WorklistElement sat_element;
+
+        // void initialize(const Instance& inst) override;
+        // bool get_another_solution(const Instance& inst, LengthConstr& out) override;
     };
 }
 
