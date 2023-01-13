@@ -53,6 +53,14 @@ namespace smt::noodler {
         return diff;
     }
 
+    template<typename T>
+    bool set_disjoint(const std::set<T>& t1, const std::set<T>& t2) {
+        std::set<T> inter;
+        std::set_intersection(t1.begin(), t1.end(), t2.begin(), t2.end(),
+            std::inserter(inter, inter.begin()));
+        return inter.empty();
+    }
+
     template<typename T, typename S, typename P>
     std::set<S> set_map(const std::set<T>& st, P pred) {
         std::set<S> ret;
@@ -284,6 +292,8 @@ namespace smt::noodler {
         FormulaVar formula;
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
+        std::vector<LenNode*> len_formulae;
+        std::set<BasicTerm> len_variables;
 
     protected:
         void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd);
@@ -299,10 +309,11 @@ namespace smt::noodler {
         void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
 
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass) : 
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::set<BasicTerm>& lv) : 
             formula(conj), 
             fresh_var_cnt(0),
-            aut_ass(ass) { };
+            aut_ass(ass),
+            len_variables(lv) { };
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };

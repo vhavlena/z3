@@ -292,6 +292,11 @@ namespace smt::noodler {
             worklist.pop_front();
     
             assert(pr.second.get_left_side().size() == 1);
+
+            // right side containts len variables; skip
+            if(!set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
+                continue;
+            }
             update_reg_constr(pr.second.get_left_side()[0], pr.second.get_right_side());
 
             std::set<BasicTerm> vars = pr.second.get_vars();
@@ -328,6 +333,7 @@ namespace smt::noodler {
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
+            this->len_formulae.push_back(eq.get_formula_eq()); // add len constraint |X| = |Y|
         
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             this->formula.remove_predicate(index);
@@ -475,6 +481,10 @@ namespace smt::noodler {
                 // Compare the supposed occurrences with real occurrences.
                 std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i]);
 
+                // do not include length variables
+                if(this->len_variables.find(side[i]) != this->len_variables.end()) {
+                    break;
+                }
                 if(side[i].is_variable() && vns != occurs_act) {
                     break;
                 }
@@ -595,6 +605,8 @@ namespace smt::noodler {
                 update_reg_constr(t, Concat()); // L(t) = L(t) \cap {\eps}
             }
             this->formula.replace(Concat({t}), Concat()); 
+            // add len constraint |X| = 0
+            this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
             assert(t.is_variable() || t.get_name() == "");
         }
 
@@ -742,7 +754,7 @@ namespace smt::noodler {
 
         auto flt = [&varmap](ExtVarMap& mp) {
             std::map<BasicTerm,BasicTerm> ret;
-            for(const auto pr : mp) {
+            for(const auto& pr : mp) {
                 std::set<BasicTerm> sing(pr.second.begin(), pr.second.end());
                 if(varmap[pr.first].size() == pr.second.size() && sing.size() == 1) {
                     ret.insert({pr.first, *sing.begin()});
@@ -761,13 +773,17 @@ namespace smt::noodler {
             if(left.size() == 1 && right.size() > 1) {
                 if(right[0].is_variable() && left[0].is_variable() 
                     && right[1].is_variable() && begin_star.find(right[1]) != begin_star.end() 
-                    && varmap[right[1]].size() == 1) {
+                    && varmap[right[1]].size() == 1
+                    && this->len_variables.find(right[0]) == this->len_variables.end() 
+                    && this->len_variables.find(right[1]) == this->len_variables.end() ) {
                     b_map.insert({right[0], {}});
                     b_map[right[0]].push_back(left[0]);
                 }
                 if(right[right.size()-1].is_variable() && left[0].is_variable() 
                     && right[right.size()-2].is_variable() && end_star.find(right[right.size()-2]) != end_star.end() 
-                    && varmap[right[right.size()-2]].size() == 1) {
+                    && varmap[right[right.size()-2]].size() == 1
+                    && this->len_variables.find(right[right.size()-1]) == this->len_variables.end() 
+                    && this->len_variables.find(right[right.size()-2]) == this->len_variables.end() ) {
                     e_map.insert({right[right.size()-1], {}});
                     e_map[right[right.size()-1]].push_back(left[0]);
                 }
@@ -785,8 +801,10 @@ namespace smt::noodler {
             Concat right_side = pred.get_right_side();
             bool modif = false;
             for(const auto& beg : b_rem) {
-                if(pred.get_left_side()[0] == beg.second && right_side[0] == beg.first) {        
-                    pred = Predicate(PredicateType::Equation, std::vector<Concat>{pred.get_left_side(), Concat(right_side.begin()+1, right_side.end())} );
+                if(pred.get_left_side()[0] == beg.second && right_side[0] == beg.first) {
+                    // X = Y1 Y2 ... 
+                    Concat modif_side(right_side.begin()+1, right_side.end());
+                    pred = Predicate(PredicateType::Equation, std::vector<Concat>{pred.get_left_side(), modif_side} );
                     modif = true;
                     break;
                 }

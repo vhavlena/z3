@@ -128,6 +128,42 @@ namespace smt::noodler {
     }
     static bool operator>(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs < rhs); }
 
+    //----------------------------------------------------------------------------------------------------------------------------------
+
+    enum struct LenFormulaType {
+        PLUS,
+        EQ,
+        LEQ,
+        LEAF,
+    };
+
+    struct LenNode {
+        LenFormulaType type;
+        BasicTerm atom_val;
+        std::vector<struct LenNode*> succ;
+
+        LenNode(LenFormulaType tp, const BasicTerm& val, const std::vector<struct LenNode*>& s) : type(tp), atom_val(val), succ(s) { };
+        LenNode(LenFormulaType tp, const std::vector<struct LenNode*>& s) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
+
+        ~LenNode() { // as a matter of fact do not clean the whole formula (root is not cleaned; but I don't care)
+            for(size_t i = 0; i < succ.size(); i++) {
+                delete succ[i];
+            }
+        }
+    };
+
+    class LenFormula {
+    private:
+        LenNode* root;
+
+    public:
+        LenFormula(LenNode* rt) : root(rt) { };
+        ~LenFormula() { delete this->root; };
+
+    };
+
+    //----------------------------------------------------------------------------------------------------------------------------------
+
     class Predicate {
     public:
         enum struct EquationSideType {
@@ -201,6 +237,34 @@ namespace smt::noodler {
             for(const BasicTerm& t : this->params[1])
                 ret.insert(t);
             return ret;
+        }
+
+        /**
+         * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
+         * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
+         * 
+         * @return LenNode* Root of the length formula
+         */
+        LenNode* get_formula_eq() const {
+            assert(is_equation());
+            LenNode* left, *right;
+
+            auto plus_chain = [&](const std::vector<BasicTerm>& side) {
+                std::vector<LenNode*> ops;
+                if(side.size() == 0) {
+                    return new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Literal, "0"), {});
+                }
+                for(const BasicTerm& t : side) {
+                    LenNode *n = new LenNode(LenFormulaType::LEAF, t, {});
+                    ops.push_back(n);
+                } 
+                return new LenNode(LenFormulaType::PLUS, ops);
+            };
+
+            left = plus_chain(this->params[0]);
+            right = plus_chain(this->params[1]);
+            LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+            return eq;         
         }
 
         std::vector<BasicTerm>& get_side(EquationSideType side);
@@ -379,6 +443,7 @@ namespace smt::noodler {
         return false;
     }
     static bool operator>(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs < rhs); }
+
 } // Namespace smt::noodler.
 
 namespace std {
