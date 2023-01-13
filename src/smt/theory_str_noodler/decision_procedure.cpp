@@ -109,10 +109,12 @@ namespace smt::noodler {
             /** end of right side combining **/
 
             if (!is_there_length_on_right) {
+                assert(right_side_automata.size() == 1);
+
                 // we have no length-aware variables on the right hand side => we need to check if inclusion holds
                 // TODO probably we should try shortest words, it might work correctly
                 if (is_node_to_process_on_cycle // TODO should we not test inclusion if we have node that is not on cycle? because we will not go back to it, so it should make sense to just do noodlification
-                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_automata), right_side_automata[0])) { // there should be exactly one element in right_side_automata as we do not have length variables
+                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *(right_side_automata[0]))) { // there should be exactly one element in right_side_automata as we do not have length variables
                     if (element_to_process.nodes_to_process.empty()) {
                         // TODO do some other shit?
                         sat_element = std::move(element_to_process);
