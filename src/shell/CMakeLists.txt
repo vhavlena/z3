@@ -42,6 +42,8 @@ set_target_properties(shell PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON)
 
+# target_link_libraries(shell PRIVATE libmata)
+find_library(LIBMATA mata)
 target_link_libraries(shell PRIVATE libmata)
 
 z3_add_install_tactic_rule(${shell_deps})
