@@ -10,11 +10,28 @@ namespace smt::noodler {
 
     using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
     using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
+
+
+    class Formula {
+    public:
+        Formula(): predicates() {}
+
+        std::vector<Predicate>& get_predicates() { return predicates; }
+        const std::vector<Predicate>& get_predicates() const { return predicates; }
+
+        // TODO: Use std::move for both add functions?
+        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
+
+    private:
+        std::vector<Predicate> predicates;
+    }; // Class Formula.
+
     class Graph {
     private:
         Nodes nodes;
         Edges edges;
         Edges inverse_edges;
+        static const Nodes empty_nodes;
         // set of nodes that do not have edge coming to them
         // it is guaranteed to be correct ONLY after creating splitting/inclusion graph
         // methods adding/removing edges DO NOT UPDATE this set, i.e. IT MIGHT NOT BE CORRECT
@@ -96,14 +113,20 @@ namespace smt::noodler {
 
         const Edges& get_edges() const { return edges; }
 
-        // assumes there are some edges coming from the source
         const Nodes& get_edges_from(std::shared_ptr<GraphNode> source) {
-            return edges.at(source);
+            if (edges.count(source) != 0) {
+                return edges.at(source);
+            } else {
+                return empty_nodes;
+            }
         }
 
-        // assumes there are some edges going to the target
         const Nodes& get_edges_to(std::shared_ptr<GraphNode> target) const {
-            return inverse_edges.at(target);
+            if (inverse_edges.count(target) != 0) {
+                return inverse_edges.at(target);
+            } else {
+                return empty_nodes;
+            }
         }
 
         std::shared_ptr<GraphNode> get_node(const Predicate& predicate) {
@@ -152,22 +175,6 @@ namespace smt::noodler {
         static Graph create_simplified_splitting_graph(const Formula& formula);
         static Graph create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> out_node_order);
     }; // Class Graph.
-
-    class Formula {
-    public:
-        Formula(): predicates() {}
-
-        std::vector<Predicate>& get_predicates() { return predicates; }
-        const std::vector<Predicate>& get_predicates() const { return predicates; }
-
-        // TODO: Use std::move for both add functions?
-        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
-
-    private:
-        std::vector<Predicate> predicates;
-    }; // Class Formula.
-
-
 }
 
 

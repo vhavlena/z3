@@ -81,9 +81,13 @@ void smt::noodler::Graph::substitute_vars(std::unordered_map<BasicTerm, std::vec
         node_predicate.set_right_side(std::move(new_right_side));
     }
 
-    // merge same nodes
+    // merge same nodes and delete nodes with the same right and left side
     std::set<GraphNode> unique_nodes;
     for (const auto &node : get_nodes()) {
+        if (node->get_predicate().get_left_side() == node->get_predicate().get_right_side()) {
+            out_deleted_nodes.insert(node);
+        }
+
         if (unique_nodes.count(*node) == 0) {
             unique_nodes.insert(*node);
         } else {
