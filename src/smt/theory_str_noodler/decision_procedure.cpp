@@ -137,6 +137,7 @@ namespace smt::noodler {
              * right now if we test sat at the beginning it should work, but it is probably better to immediatly return sat if we have
              * empty elements_to_process, however, we need to remmeber the state of the algorithm, we would need to return back to noodles
              * and process them if z3 realizes that the result is actually not sat (because of lengths)
+             */
             
 
             if (!is_there_length_on_right) {
