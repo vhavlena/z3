@@ -132,6 +132,11 @@ namespace smt::noodler {
                 // TODO: can we really do DFS?? 
                 element_to_process.push_unique(node, is_node_to_process_on_cycle);
             }
+
+            /* TODO check here if we have empty elements_to_process, if we do, then every noodle we get should finish and return sat
+             * right now if we test sat at the beginning it should work, but it is probably better to immediatly return sat if we have
+             * empty elements_to_process, however, we need to remmeber the state of the algorithm, we would need to return back to noodles
+             * and process them if z3 realizes that the result is actually not sat (because of lengths)
             
 
             if (!is_there_length_on_right) {
