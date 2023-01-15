@@ -32,26 +32,38 @@ namespace smt::noodler::util {
     @param m AST manager
     @param[out] res Vector of found variables (may contain duplicities).
     */
-    static void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, vector<expr*>& res) {
+    static void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {
         if(m_util_s.str.is_string(ex)) {
             return;
         }
 
         if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            res.push_back(ex);
+            res.insert(ex);
             return;
         }
 
         SASSERT(is_app(ex));
         app* ex_app = to_app(ex);
-        SASSERT(m_util_s.str.is_concat(ex_app) || m.is_eq(ex_app));
 
-        SASSERT(ex_app->get_num_args() == 2);
-        app *a_x = to_app(ex_app->get_arg(0));
-        app *a_y = to_app(ex_app->get_arg(1));
-        get_variables(a_x, m_util_s, m, res);
-        get_variables(a_y, m_util_s, m, res);
+        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+            SASSERT(is_app(ex_app->get_arg(i)));
+            app *arg = to_app(ex_app->get_arg(i));
+            get_variables(arg, m_util_s, m, res);
+        }
     };
+
+    static void get_len_exprs(app* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res) {
+        if(m_util_s.str.is_length(ex)) {
+            res.insert(ex);
+            return;
+        }
+
+        for(unsigned i = 0; i < ex->get_num_args(); i++) {
+            SASSERT(is_app(ex->get_arg(i)));
+            app *arg = to_app(ex->get_arg(i));
+            get_len_exprs(arg, m_util_s, m, res);
+        }
+    }
     
 }
 
