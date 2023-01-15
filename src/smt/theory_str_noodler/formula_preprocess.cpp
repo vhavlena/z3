@@ -334,7 +334,11 @@ namespace smt::noodler {
             BasicTerm v_left = eq.get_left_side()[0]; // X
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
             this->len_formulae.push_back(eq.get_formula_eq()); // add len constraint |X| = |Y|
-        
+            // propagate len variables: if Y is in len_variables, include also X
+            if(this->len_variables.find(eq.get_right_side()[0]) != this->len_variables.end()) {
+                this->len_variables.insert(v_left);
+            }
+
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             this->formula.remove_predicate(index);
 
