@@ -260,7 +260,7 @@ namespace smt::noodler {
          * @param p Equation
          * @return Is simple?
          */
-        bool is_simple_eq(const Predicate& p) const { assert(p.is_equation()); return p.get_left_side().size() == 1 && p.get_right_side().size() == 1; };
+        bool is_simple_eq(const Predicate& p) const { return p.is_equation() && p.get_left_side().size() == 1 && p.get_right_side().size() == 1; };
     
         void remove_predicate(size_t index);
         void add_predicate(const Predicate& pred, int index = -1);

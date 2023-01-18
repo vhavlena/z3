@@ -24,7 +24,6 @@ namespace smt::noodler {
      * @param index Index of the given equation @p pred.
      */
     void FormulaVar::update_varmap(const Predicate& pred, size_t index) {
-        assert(pred.is_equation());
         for(const VarNode& vr : get_var_positions(pred, index, true)) {
             VarMap::iterator iter = this->varmap.find(vr.term);
             if(iter != this->varmap.end()) {
@@ -45,7 +44,6 @@ namespace smt::noodler {
      * @return std::set<VarNode> Set if VarNodes for each occurrence of a variable.
      */
     std::set<VarNode> FormulaVar::get_var_positions(const Predicate& pred, size_t index, bool incl_lit) const {
-        assert(pred.is_equation());
         std::set<VarNode> ret;
         int mult = -1;
         for(const std::vector<BasicTerm>& side : pred.get_params()) {
@@ -123,6 +121,10 @@ namespace smt::noodler {
      */
     bool FormulaVar::is_side_regular(const Predicate& p, Predicate& out) const {
         std::vector<BasicTerm> side;
+
+        if(!p.is_equation()) {
+            return false;
+        }
 
         if(p.get_left_side().size() == 1 && single_occurr(p.get_side_vars(Predicate::EquationSideType::Right))) {
             out = p;
@@ -393,7 +395,11 @@ namespace smt::noodler {
     void FormulaPreprocess::generate_identities() {
         std::set<Predicate> new_preds;
         for(const auto& pr1 : this->formula.get_predicates()) {
+            if(!pr1.second.is_equation())
+                continue;
             for(const auto& pr2 : this->formula.get_predicates()) {
+                if(!pr2.second.is_equation())
+                    continue;
                 if(pr1.first > pr2.first) 
                     continue;
 
@@ -584,7 +590,8 @@ namespace smt::noodler {
 
             std::set<BasicTerm> new_eps; // newly added epsilon terms
             Predicate eq = this->formula.get_predicate(index);
-            assert(eq.is_equation());
+            if(!eq.is_equation())
+                continue;
 
             std::set<BasicTerm> left = eq.get_left_set();
             std::set<BasicTerm> right = eq.get_right_set();
@@ -690,7 +697,8 @@ namespace smt::noodler {
         std::set<size_t> rem_ids;
 
         for(const auto& pr : this->formula.get_predicates()) {
-            assert(pr.second.is_equation());
+            if(!pr.second.is_equation())
+                continue;
             SepEqsGather gather_left, gather_right;
             std::set<Predicate> res;
             get_concat_gather(pr.second.get_left_side(), gather_left);
@@ -701,10 +709,6 @@ namespace smt::noodler {
                 add_eqs.insert(res.begin(), res.end());
                 rem_ids.insert(pr.first);
             }
-
-            // for(const auto& v : res) {
-            //     std::cout << v.to_string() << std::endl;;
-            // } 
         }
 
         for(const Predicate& p : add_eqs) {
@@ -768,7 +772,8 @@ namespace smt::noodler {
         };
 
         for(const auto& pr : this->formula.get_predicates()) {
-            assert(pr.second.is_equation());
+            if(!pr.second.is_equation())
+                continue;
             Concat left = pr.second.get_left_side();
             Concat right = pr.second.get_right_side();
             /**
@@ -799,6 +804,7 @@ namespace smt::noodler {
         std::map<size_t, Predicate> updates;
         for(const auto& pr : this->formula.get_predicates()) {
             Predicate pred = pr.second;
+            if(!pred.is_equation()) continue;
             if(pred.get_left_side().size() > 1) continue;
             if(pred.get_right_side().size() < 2) continue;
 
