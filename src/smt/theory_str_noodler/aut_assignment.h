@@ -42,10 +42,10 @@ namespace smt::noodler {
 
         Mata::Nfa::Nfa sigma_star_automaton() const {
             Mata::Nfa::Nfa nfa(1);
-            nfa.initial_states = {0};
-            nfa.final_states = {0};
+            nfa.initial = {0};
+            nfa.final = {0};
             for (const Mata::Nfa::Symbol& symb : this->alphabet) {
-                nfa.add_trans(0, symb, 0);
+                nfa.delta.add(0, symb, 0);
             }
             return nfa;
         }
