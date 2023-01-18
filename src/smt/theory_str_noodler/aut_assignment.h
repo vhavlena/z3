@@ -22,8 +22,8 @@ namespace smt::noodler {
 
         Mata::Nfa::Nfa eps_automaton() const {
             Mata::Nfa::Nfa nfa(1);
-            nfa.initial_states = {0};
-            nfa.final_states = {0};
+            nfa.initial = {0};
+            nfa.final = {0};
             return nfa;
         }
 
@@ -37,7 +37,7 @@ namespace smt::noodler {
 
         bool is_epsilon(const BasicTerm &t) const {
             Mata::Nfa::Nfa v = Mata::Nfa::minimize(Mata::Nfa::remove_epsilon(this->at(t))); // if we are sure that we have epsilon-free automata, we can skip remove_epsilon
-            return v.get_num_of_trans() == 0 && v.initial_states.size() == 1 && v.final_states.size();
+            return v.get_num_of_trans() == 0 && v.initial.size() == 1 && v.final.size();
         }
 
     };
