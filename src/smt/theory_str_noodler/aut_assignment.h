@@ -8,7 +8,7 @@
 #include <queue>
 #include <string>
 
-#include "inclusion_graph.h"
+#include "formula.h"
 #include <mata/nfa.hh>
 
 namespace smt::noodler {

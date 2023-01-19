@@ -9,7 +9,7 @@
 #include <string>
 
 #include <util/trace.h>
-#include "inclusion_graph.h"
+#include "formula.h"
 #include "aut_assignment.h"
 #include <mata/nfa.hh>
 

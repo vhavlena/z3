@@ -30,7 +30,7 @@ Eternal glory to Yu-Fang.
 
 #include <mata/nfa.hh>
 
-#include "inclusion_graph_node.h"
+#include "formula.h"
 #include "inclusion_graph.h"
 #include "state_len.h"
 #include "expr_solver.h"

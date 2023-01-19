@@ -3,7 +3,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <mata/nfa.hh>
 
-#include <smt/theory_str_noodler/inclusion_graph_node.h>
 #include "smt/theory_str_noodler/inclusion_graph.h"
 
 using namespace smt::noodler;

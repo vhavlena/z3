@@ -2,7 +2,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <smt/theory_str_noodler/inclusion_graph_node.h>
 #include <smt/theory_str_noodler/formula_preprocess.h>
 #include <smt/theory_str_noodler/theory_str_noodler.h>
 #include <mata/re2parser.hh>
