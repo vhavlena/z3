@@ -737,8 +737,8 @@ namespace smt::noodler {
                     concat = Mata::Nfa::concatenate(sigma_star, this->aut_ass[pr.first]);
                 else 
                     concat = Mata::Nfa::concatenate(this->aut_ass[pr.first], sigma_star);
-            
-                if(Mata::Nfa::are_equivalent(sigma_star, concat)) {
+
+                if(Mata::Nfa::are_equivalent(this->aut_ass[pr.first], concat)) {
                     res.insert(pr.first);
                 }
             }
