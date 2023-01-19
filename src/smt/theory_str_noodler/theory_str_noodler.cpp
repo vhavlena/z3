@@ -1489,79 +1489,28 @@ namespace smt::noodler {
     }
 
     /**
-    Get variable from a given expression @p ex. Append to the output parameter @p res. 
-    @param ex Expression to be checked for variables.
-    @param[out] res Vector of found variables (may contain duplicities).
-    */
-    // void theory_str_noodler::get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, vector<expr*>& res) {
-    //     if(m_util_s.str.is_string(ex)) {
-    //         return;
-    //     }
-
-    //     if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-    //         res.push_back(ex);
-    //         return;
-    //     }
-
-    //     SASSERT(is_app(ex));
-    //     app* ex_app = to_app(ex);
-    //     SASSERT(m_util_s.str.is_concat(ex_app) || m.is_eq(ex_app));
-
-    //     SASSERT(ex_app->get_num_args() == 2);
-    //     app *a_x = to_app(ex_app->get_arg(0));
-    //     app *a_y = to_app(ex_app->get_arg(1));
-    //     theory_str_noodler::get_variables(a_x, m_util_s, m, res);
-    //     theory_str_noodler::get_variables(a_y, m_util_s, m, res);
-    // }
-
-    /**
-    Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 
-    to the output parameter @p terms. 
-    @param ex Expression to be checked for basic terms.
-    @param[out] terms Vector of found BasicTerm (in right order).
-    */
-    void theory_str_noodler::collect_terms(const app* ex, std::vector<BasicTerm>& terms) { 
-        if(m_util_s.str.is_string(ex)) {
-            std::string lit = ex->get_parameter(0).get_zstring().encode();
-            terms.push_back(BasicTerm(BasicTermType::Literal, lit));
-            return;
-        }
-
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            std::string var = ex->get_decl()->get_name().str();
-            terms.push_back(BasicTerm(BasicTermType::Variable, var));
-            return;
-        }
-
-        SASSERT(m_util_s.str.is_concat(ex));
-        SASSERT(ex->get_num_args() == 2);
-        app *a_x = to_app(ex->get_arg(0));
-        app *a_y = to_app(ex->get_arg(1));
-        this->collect_terms(a_x, terms);
-        this->collect_terms(a_y, terms);
-    }
-
-    /**
     Convert equation/disaequation @p ex to the instance of Predicate.
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
     */
     Predicate theory_str_noodler::conv_eq_pred(const app* ex) { 
         const app* eq = ex;
+        PredicateType ptype = PredicateType::Equation;
         if(m.is_not(ex)) {
             SASSERT(is_app(ex->get_arg(0)));
             SASSERT(ex->get_num_args() == 1);
             eq = to_app(ex->get_arg(0));
+            ptype = PredicateType::Inequation;
         }
         SASSERT(ex->get_num_args() == 2);
         SASSERT(eq->get_arg(0));
         SASSERT(eq->get_arg(1));
 
         std::vector<BasicTerm> left, right;
-        this->collect_terms(to_app(eq->get_arg(0)), left);
-        this->collect_terms(to_app(eq->get_arg(1)), right);
+        util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, left);
+        util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, right);
 
-        return Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>{left, right}); 
+        return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right}); 
     }
 
     /**
