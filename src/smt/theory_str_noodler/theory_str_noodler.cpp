@@ -672,7 +672,7 @@ namespace smt::noodler {
             conj.insert(e);
             conj_instance.insert(e);
 
-            std::cout<<print_word_term(we.first) <<std::flush;
+            std::cout<<print_word_term(we.first) << std::flush;
             std::cout<<"="<<std::flush;
             std::cout<<print_word_term(we.second) << std::endl;
         }
@@ -1746,15 +1746,55 @@ namespace smt::noodler {
     }
 
     /**
-    Convert conjunction of equations/disequations to the instance of Formula.
+    Convert conjunction of equations/disequations to the instance of @c Formula.
     @param conj Conjunction in the form of a set of (dis)equations
     @param[out] res Resulting formula
     */
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
         for(app *const pred : conj) {
+            print_ast(pred);
             Predicate inst = this->conv_eq_pred(pred);
             STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
             res.add_predicate(inst);
         }
+    }
+
+    std::string theory_str_noodler::conv_to_regex(const app *expr) {
+        std::string regex{};
+        if (m_util_s.re.is_to_re(expr)) {
+            // FIXME: What to do?
+        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
+            SASSERT(expr->get_num_args() == 2);
+            const auto left{expr->get_arg(0)};
+            const auto right{expr->get_arg(1)};
+            SASSERT(is_app(left));
+            SASSERT(is_app(right));
+            regex = "((" + conv_to_regex(to_app(left)) + ")(" + conv_to_regex(to_app(right)) + "))";
+        } else if (m.is_or(expr)) { // Handle or. // FIXME: where is RE_or?
+            SASSERT(expr->get_num_args() == 2);
+            const auto left{ expr->get_arg(0) };
+            const auto right{ expr->get_arg(1) };
+            SASSERT(is_app(left));
+            SASSERT(is_app(right));
+            regex = "((" + conv_to_regex(to_app(left)) + ")|(" + conv_to_regex(to_app(right)) + "))";
+        } else if (m_util_s.re.is_star(expr)) { // Handle iteration.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            regex = "((" + conv_to_regex(to_app(child)) + ")*)";
+        } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            regex = "((" + conv_to_regex(to_app(child)) + ")+)";
+        } else if(m_util_s.str.is_string(expr)) { // Handle literal.
+            SASSERT(expr->get_num_args() == 1);
+            regex = expr->get_parameter(0).get_zstring().encode();
+        } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable. // TODO: Necessary?
+            //SASSERT(expr->get_num_args() == 1);
+            regex = expr->get_decl()->get_parameter(0).get_symbol().str()[0];
+        }
+        // TODO: Option, range, ...
+        return regex;
     }
 }

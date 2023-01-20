@@ -176,7 +176,8 @@ namespace smt::noodler {
 
         void remove_irrelevant_constr();
 
-        Predicate conv_eq_pred(app* const expr);
+        Predicate conv_eq_pred(const app* expr);
+        std::string conv_to_regex(const app* expr);
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };
 }

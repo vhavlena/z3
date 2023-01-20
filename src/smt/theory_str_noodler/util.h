@@ -65,13 +65,13 @@ namespace smt::noodler::util {
 
         if(m_util_s.str.is_string(ex)) {
             std::string lit = ex->get_parameter(0).get_zstring().encode();
-            terms.push_back(BasicTerm(BasicTermType::Literal, lit));
+            terms.emplace_back(BasicTermType::Literal, lit);
             return;
         }
 
         if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
             std::string var = ex->get_decl()->get_name().str();
-            terms.push_back(BasicTerm(BasicTermType::Variable, var));
+            terms.emplace_back(BasicTermType::Variable, var);
             return;
         }
 
