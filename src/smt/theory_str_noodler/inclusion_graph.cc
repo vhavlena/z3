@@ -17,6 +17,8 @@ namespace {
     }
 } // Anonymous namespace.
 
+const Nodes smt::noodler::Graph::empty_nodes = Nodes();
+
 Graph smt::noodler::Graph::deep_copy() const {
     std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
     return deep_copy(node_mapping);
@@ -99,7 +101,7 @@ void smt::noodler::Graph::substitute_vars(std::unordered_map<BasicTerm, std::vec
     }
 }
 
-Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> out_node_order) {
+Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> &out_node_order) {
     // Assert block.
     {
         const auto &predicates{formula.get_predicates()};
@@ -181,7 +183,7 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
     return graph;
 }
 
-Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> out_node_order) {
+Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> &out_node_order) {
     Graph inclusion_graph{};
 
     bool splitting_graph_changed{ true };

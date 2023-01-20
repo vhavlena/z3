@@ -1,5 +1,7 @@
 #include <queue>
 #include <utility>
+#include <algorithm>
+
 #include <mata/nfa-strings.hh>
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -8,8 +10,8 @@ namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars) {
         Mata::Nfa::Nfa aut_empty_word;
         auto state = aut_empty_word.add_state();
-        aut_empty_word.make_initial(state);
-        aut_empty_word.make_final(state);
+        aut_empty_word.initial.add(state);
+        aut_empty_word.final.add(state);
         // TODO probably something with alphabet too
         automaton_with_empty_word = std::make_shared<Mata::Nfa::Nfa>(aut_empty_word);
 
@@ -32,6 +34,7 @@ namespace smt::noodler {
 
             if (element_to_process.nodes_to_process.empty()) {
                 // TODO do some arithmetic shit?
+                sat_element = std::move(element_to_process);
                 return true;
             }
 
@@ -72,7 +75,7 @@ namespace smt::noodler {
                 auto right_var_it = right_side_vars.begin();
                 auto right_side_end = right_side_vars.end();
 
-                std::shared_ptr<Mata::Nfa::Nfa> next_aut = std::make_shared<Mata::Nfa::Nfa>(element_to_process.aut_ass[*right_var_it]);
+                std::shared_ptr<Mata::Nfa::Nfa> next_aut = element_to_process.aut_ass[*right_var_it];
                 std::vector<BasicTerm> next_division{ *right_var_it };
                 bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
                 is_there_length_on_right = last_was_length;
@@ -150,7 +153,9 @@ namespace smt::noodler {
                  * is that we do not process resulting empty word automata in noodles in any way, which might be a bit problematic
                  * To fix this, we could call the new noodlification and try to postpone making the copy of the inclusion graph until we actually need it
                  */
-                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata[0]);
+                std::vector<Mata::Nfa::Nfa*> left_side_automata_raw_ptrs(left_side_automata.size());
+                std::transform(left_side_automata.begin(), left_side_automata.end(), left_side_automata_raw_ptrs.begin(), [](std::shared_ptr<Mata::Nfa::Nfa> input) { return input.get(); });
+                Mata::Strings::SegNfa::NoodleSequence noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata_raw_ptrs, *right_side_automata[0]);
                 const unsigned num_of_left_vars = left_side_vars.size();
                 for (const auto &noodle : noodles) {
                     AutAssignment new_assignment;

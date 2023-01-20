@@ -171,9 +171,9 @@ namespace smt::noodler {
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map, std::unordered_set<std::shared_ptr<GraphNode>> &out_deleted_nodes);
 
         // assumes that formula does not contain same equalities
-        static Graph create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> out_node_order);
+        static Graph create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> &out_node_order);
         static Graph create_simplified_splitting_graph(const Formula& formula);
-        static Graph create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> out_node_order);
+        static Graph create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> &out_node_order);
     }; // Class Graph.
 }
 
