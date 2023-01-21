@@ -85,9 +85,9 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
     prep.remove_regular();
 
     AutAssignment ret = prep.get_aut_assignment();
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x4), regex_to_nfa("a*")));
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x5), regex_to_nfa("a*")));
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x2), regex_to_nfa("(a|b)*b(a*)b")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x4), regex_to_nfa("a*")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x5), regex_to_nfa("a*")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x2), regex_to_nfa("(a|b)*b(a*)b")));
     CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({eq1, eq2, ieq1}));
 
     SECTION("length vars") {
@@ -291,9 +291,9 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
     FormulaPreprocess prep_res(res_conj, aut_ass, {});
 
     AutAssignment ret = prep.get_aut_assignment();
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x1), regex_to_nfa("")));
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x2), regex_to_nfa("(a|b)*")));
-    CHECK(Mata::Nfa::are_equivalent(ret.at(x3), regex_to_nfa("(b|c)*")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x1), regex_to_nfa("")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x2), regex_to_nfa("(a|b)*")));
+    CHECK(Mata::Nfa::are_equivalent(*ret.at(x3), regex_to_nfa("(b|c)*")));
     CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
     CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
 }
@@ -438,7 +438,7 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
         FormulaPreprocess prep(conj, aut_ass, {});
         prep.reduce_regular_sequence(2);
         AutAssignment ret = prep.get_aut_assignment();
-        CHECK(Mata::Nfa::are_equivalent(ret.at(tmp0), regex_to_nfa("a*b*b")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp0), regex_to_nfa("a*b*b")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Inequation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, tmp0}), std::vector<BasicTerm>({x1, x1, x2}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({b, tmp0}) })), 
@@ -452,8 +452,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
         FormulaPreprocess prep(conj, aut_ass, {});
         prep.reduce_regular_sequence(1);
         AutAssignment ret = prep.get_aut_assignment();
-        CHECK(Mata::Nfa::are_equivalent(ret.at(tmp0), regex_to_nfa("b*ab")));
-        CHECK(Mata::Nfa::are_equivalent(ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp0), regex_to_nfa("b*ab")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({x5, x1, x2, x3}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
@@ -467,8 +467,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
         FormulaPreprocess prep(conj, aut_ass, {x2});
         prep.reduce_regular_sequence(1);
         AutAssignment ret = prep.get_aut_assignment();
-        CHECK(Mata::Nfa::are_equivalent(ret.at(tmp0), regex_to_nfa("b*ab")));
-        CHECK(Mata::Nfa::are_equivalent(ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp0), regex_to_nfa("b*ab")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({x5, x1}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
@@ -513,10 +513,10 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
         FormulaPreprocess prep(conj, aut_ass, {});
         prep.propagate_eps();
         AutAssignment ret = prep.get_aut_assignment();
-        CHECK(Mata::Nfa::are_equivalent(ret.at(x1), regex_to_nfa("")));
-        CHECK(Mata::Nfa::are_equivalent(ret.at(x2), regex_to_nfa("")));
-        CHECK(Mata::Nfa::are_equivalent(ret.at(x3), regex_to_nfa("")));
-        CHECK(Mata::Nfa::are_equivalent(ret.at(x4), regex_to_nfa("")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(x1), regex_to_nfa("")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(x2), regex_to_nfa("")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(x3), regex_to_nfa("")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(x4), regex_to_nfa("")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>({x5}) })  ),
             Predicate(PredicateType::Inequation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({}), std::vector<BasicTerm>({}) })  ),
@@ -529,7 +529,7 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
         FormulaPreprocess prep(conj, aut_ass, {});
         prep.propagate_eps();
         AutAssignment ret = prep.get_aut_assignment();
-        CHECK(Mata::Nfa::are_equivalent(ret.at(x1), regex_to_nfa("")));
+        CHECK(Mata::Nfa::are_equivalent(*ret.at(x1), regex_to_nfa("")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>() })  )
         }));
