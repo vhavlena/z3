@@ -734,11 +734,11 @@ namespace smt::noodler {
             if(pr.second.size() > 0) {
                 Mata::Nfa::Nfa concat;
                 if(side == Predicate::EquationSideType::Left)
-                    concat = Mata::Nfa::concatenate(sigma_star, *(this->aut_ass[pr.first]));
+                    concat = Mata::Nfa::concatenate(sigma_star, *(this->aut_ass.at(pr.first)));
                 else 
-                    concat = Mata::Nfa::concatenate(*(this->aut_ass[pr.first]), sigma_star);
+                    concat = Mata::Nfa::concatenate(*(this->aut_ass.at(pr.first)), sigma_star);
 
-                if(Mata::Nfa::are_equivalent(*(this->aut_ass[pr.first]), concat)) {
+                if(Mata::Nfa::are_equivalent(*(this->aut_ass.at(pr.first)), concat)) {
                     res.insert(pr.first);
                 }
             }
