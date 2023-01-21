@@ -632,6 +632,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
         {x5, regex_to_nfa("(a|b)*")},
         {x6, regex_to_nfa("(a|b)*")},
         {b, regex_to_nfa("b")},
+        {a, regex_to_nfa("a")},
     });
 
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x1, x2, a, x4}) })  );
@@ -700,6 +701,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
         {x5, regex_to_nfa("(a|b)*")},
         {x6, regex_to_nfa("(a|b)*")},
         {b, regex_to_nfa("def")},
+        {a, regex_to_nfa("a")},
     });
     SECTION("infeasible") {
         Formula conj;
