@@ -13,7 +13,12 @@
 #include <mata/nfa.hh>
 
 namespace smt::noodler {
-
+    
+    /**
+     * hints for using AutAssignment:
+     *   - use at() instead of [] operator for getting the value, use [] only for assigning
+     *   - if you want to assign some NFA, use std::make_shared<Mata::Nfa::Nfa>(NFA)
+     */
     class AutAssignment : public std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>> {
 
     private:
