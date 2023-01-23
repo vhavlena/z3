@@ -272,9 +272,9 @@ namespace smt::noodler {
         Mata::Nfa::Nfa concat = Mata::Nfa::remove_epsilon(this->aut_ass.get_automaton_concat(upd));
         auto iter = this->aut_ass.find(var);
         if(iter != this->aut_ass.end()) {
-            this->aut_ass[var] = Mata::Nfa::reduce(Mata::Nfa::intersection(iter->second, concat));
+            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(Mata::Nfa::intersection(*(iter->second), concat)));
         } else {
-            this->aut_ass[var] = Mata::Nfa::reduce(concat);
+            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(concat));
         }
     }
 
@@ -734,11 +734,11 @@ namespace smt::noodler {
             if(pr.second.size() > 0) {
                 Mata::Nfa::Nfa concat;
                 if(side == Predicate::EquationSideType::Left)
-                    concat = Mata::Nfa::concatenate(sigma_star, this->aut_ass.at(pr.first));
+                    concat = Mata::Nfa::concatenate(sigma_star, *(this->aut_ass.at(pr.first)));
                 else 
-                    concat = Mata::Nfa::concatenate(this->aut_ass.at(pr.first), sigma_star);
+                    concat = Mata::Nfa::concatenate(*(this->aut_ass.at(pr.first)), sigma_star);
 
-                if(Mata::Nfa::are_equivalent(this->aut_ass.at(pr.first), concat)) {
+                if(Mata::Nfa::are_equivalent(*(this->aut_ass.at(pr.first)), concat)) {
                     res.insert(pr.first);
                 }
             }
