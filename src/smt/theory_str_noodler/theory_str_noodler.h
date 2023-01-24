@@ -177,7 +177,14 @@ namespace smt::noodler {
         void remove_irrelevant_constr();
 
         Predicate conv_eq_pred(const app* expr);
+
+        /**
+         * Convert expression @p expr to regex.
+         * @param[in] expr Expression to be converted to regex.
+         * @return The resulting regex.
+         */
         std::string conv_to_regex(const app* expr);
+
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };
 }

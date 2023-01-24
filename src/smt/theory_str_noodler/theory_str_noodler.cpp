@@ -1761,10 +1761,10 @@ namespace smt::noodler {
 
     std::string theory_str_noodler::conv_to_regex(const app *expr) {
         std::string regex{};
-        if (m_util_s.re.is_to_re(expr)) {
-            // Assume that expression inside the re.to_re() function is a string of characters.
+        if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
+            // Assume that expression inside re.to_re() function is a string of characters.
             SASSERT(expr->get_num_args() == 1);
-            auto arg{ expr->get_arg(0) };
+            const auto arg{ expr->get_arg(0) };
             SASSERT(is_string_sort(arg));
             regex = conv_to_regex(to_app(arg));
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
@@ -1774,6 +1774,38 @@ namespace smt::noodler {
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             regex = "((" + conv_to_regex(to_app(left)) + ")(" + conv_to_regex(to_app(right)) + "))";
+        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union. // TODO: What is this?
+            assert(false && "re.is_antimirov_union(expr)");
+        } else if (m_util_s.re.is_complement(expr)) { // Handle complement. // TODO: What is this?
+            assert(false && "re.is_complement(expr)");
+        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative. // TODO: What is this?
+            assert(false && "re.is_derivative(expr)");
+        } else if (m_util_s.re.is_diff(expr)) { // Handle diff. // TODO: What is this?
+            assert(false && "re.is_diff(expr)");
+        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus. // TODO: What is this?
+            assert(false && "re.is_dot_plus(expr)");
+        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string. // TODO: What is this?
+            assert(false && "re.is_empty(expr)");
+        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: What is this?
+            assert(false && "re.is_epsilon(expr)");
+        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char. // TODO: What is this?
+            assert(false && "re.is_full_char(expr)");
+        } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence. // TODO: What is this?
+            assert(false && "re.is_full_seq(expr)");
+        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection. // TODO: What is this?
+            assert(false && "re.is_intersection(expr)");
+        } else if (m_util_s.re.is_loop(expr)) { // Handle loop. // TODO: What is this?
+            assert(false && "re.is_loop(expr)");
+        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate. // TODO: What is this?
+            assert(false && "re.is_of_pred(expr)");
+        } else if (m_util_s.re.is_opt(expr)) { // Handle optional. // TODO: What is this?
+            assert(false && "re.is_opt(expr)");
+        } else if (m_util_s.re.is_range(expr)) { // Handle range. // TODO: What is this?
+            assert(false && "re.is_range(expr)");
+        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse. // TODO: What is this?
+            assert(false && "re.is_reverse(expr)");
+        } else if (m_util_s.re.is_union(expr)) { // Handle union. // TODO: What is this?
+            assert(false && "re.is_union(expr)");
         } else if (m.is_or(expr)) { // Handle or. // FIXME: where is RE_or?
             SASSERT(expr->get_num_args() == 2);
             const auto left{ expr->get_arg(0) };
@@ -1799,7 +1831,6 @@ namespace smt::noodler {
             // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
             regex = "(" + expr->get_decl()->get_parameter(0).get_symbol().str() + ")";
         }
-        // TODO: Option, range, ...
         return regex;
     }
 }
