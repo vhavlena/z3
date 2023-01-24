@@ -1,4 +1,0 @@
-[submodule "extern/lib/mata"]
-	path = extern/lib/mata
-	url = https://github.com/VeriFIT/mata.git
-	branch = z3_import
