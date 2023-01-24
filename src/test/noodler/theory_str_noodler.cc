@@ -18,7 +18,7 @@ public:
     ast_manager& m_pub() { return m; }
 };
 
-TEST_CASE("theory_str_noodler::conv_to_regex()", "[noodler]") {
+TEST_CASE("theory_str_noodler", "[noodler]") {
     memory::initialize(0);
     smt_params params;
     ast_manager ast_m;
@@ -29,13 +29,25 @@ TEST_CASE("theory_str_noodler::conv_to_regex()", "[noodler]") {
     auto& m_util_s{ noodler.m_util_s_pub() };
     auto& m{ noodler.m_pub() };
 
-    auto expr_x = m_util_s.re.mk_to_re(m_util_s.str.mk_string("x"));
-    auto expr_y = m_util_s.re.mk_to_re(m_util_s.str.mk_string("y"));
-    auto expr_star{m_util_s.re.mk_star(expr_x) };
-    m.display(std::cout);
-    auto expr_plus{m_util_s.re.mk_plus(expr_y) };
-    auto expr_concat{ m_util_s.re.mk_concat(expr_star, expr_plus) };
+    SECTION("theory_str_noodler::conv_to_regex()") {
+        auto expr_x = m_util_s.re.mk_to_re(m_util_s.str.mk_string("x"));
+        auto regex{ noodler.conv_to_regex_pub(expr_x) };
+        CHECK(regex == "(x)");
 
-    auto regex{ noodler.conv_to_regex_pub(expr_x) };
-    CHECK(regex == "((x)|(y))");
+        auto expr_y = m_util_s.re.mk_to_re(m_util_s.str.mk_string("y"));
+        regex = noodler.conv_to_regex_pub(expr_y);
+        CHECK(regex == "(y)");
+
+        auto expr_star{m_util_s.re.mk_star(expr_x) };
+        regex = noodler.conv_to_regex_pub(expr_star);
+        CHECK(regex == "(((x))*)");
+
+        auto expr_plus{m_util_s.re.mk_plus(expr_y) };
+        regex = noodler.conv_to_regex_pub(expr_plus);
+        CHECK(regex == "(((y))+)");
+
+        auto expr_concat{ m_util_s.re.mk_concat(expr_star, expr_plus) };
+        regex = noodler.conv_to_regex_pub(expr_concat);
+        CHECK(regex == "(((((x))*)(((y))+)))");
+    }
 }

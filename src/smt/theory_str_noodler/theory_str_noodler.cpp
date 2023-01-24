@@ -1762,7 +1762,11 @@ namespace smt::noodler {
     std::string theory_str_noodler::conv_to_regex(const app *expr) {
         std::string regex{};
         if (m_util_s.re.is_to_re(expr)) {
-            // FIXME: What to do?
+            // Assume that expression inside the re.to_re() function is a string of characters.
+            SASSERT(expr->get_num_args() == 1);
+            auto arg{ expr->get_arg(0) };
+            SASSERT(is_string_sort(arg));
+            regex = conv_to_regex(to_app(arg));
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
             const auto left{expr->get_arg(0)};
@@ -1789,10 +1793,11 @@ namespace smt::noodler {
             regex = "((" + conv_to_regex(to_app(child)) + ")+)";
         } else if(m_util_s.str.is_string(expr)) { // Handle literal.
             SASSERT(expr->get_num_args() == 1);
-            regex = expr->get_parameter(0).get_zstring().encode();
+            regex = "(" + expr->get_parameter(0).get_zstring().encode() + ")";
         } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable. // TODO: Necessary?
-            //SASSERT(expr->get_num_args() == 1);
-            regex = expr->get_decl()->get_parameter(0).get_symbol().str()[0];
+            SASSERT(expr->get_num_args() == 1);
+            // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
+            regex = "(" + expr->get_decl()->get_parameter(0).get_symbol().str() + ")";
         }
         // TODO: Option, range, ...
         return regex;
