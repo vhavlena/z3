@@ -666,7 +666,8 @@ namespace smt::noodler {
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 
-        for (const auto& we : this->m_word_eq_todo_rel) {
+        for (const auto& we : this->m_word_eq_todo_rel) { // TODO: Equations
+            // Function to read app and recursively look for symbols.
 
             app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
@@ -677,7 +678,8 @@ namespace smt::noodler {
             std::cout<<print_word_term(we.second) << std::endl;
         }
 
-        for (const auto& we : this->m_word_diseq_todo_rel) {
+        for (const auto& we : this->m_word_diseq_todo_rel) { // TODO: Disequations.
+
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             conj_instance.insert(e);
 
@@ -687,13 +689,15 @@ namespace smt::noodler {
         }
 
         ast_manager &m = get_manager();
-        for (const auto& we : this->m_membership_todo_rel) {
+        for (const auto& we : this->m_membership_todo_rel) { // TODO: Regexes.
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
-
+            std::cout << "start conv_to_regex.\n";
+            conv_to_regex(to_app(std::get<1>(we)));
+            std::cout << "end conv_to_regex.\n";
         }
 
         Formula instance;
@@ -1760,20 +1764,40 @@ namespace smt::noodler {
     }
 
     std::string theory_str_noodler::conv_to_regex(const app *expr) {
+        for (int id{ 0 }; id < expr->get_num_parameters(); ++id) {
+            mk_pp(const_cast<app*>(expr), m);
+        }
         std::string regex{};
         if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
             // Assume that expression inside re.to_re() function is a string of characters.
             SASSERT(expr->get_num_args() == 1);
             const auto arg{ expr->get_arg(0) };
             SASSERT(is_string_sort(arg));
-            regex = conv_to_regex(to_app(arg));
+            auto string_literal{ conv_to_regex(to_app(arg)) };
+            size_t string_literal_size{ string_literal.size() };
+            for (size_t index{ 0 }; index < string_literal_size; ++index) {
+                if (index + 3 < string_literal_size) {
+                    if (string_literal[index] == '\\' && string_literal[index + 1] == 'x') {
+                        // Conversion of string of hexadecimal numbers can be further optimized.
+                        //  See https://stackoverflow.com/a/3790707.
+                        std::string hex_value{ string_literal.substr(index + 2, 2) };
+                        auto ascii_character{ static_cast<char>(std::stoul(hex_value, nullptr, 16)) };
+                        regex += ascii_character;
+                        index += 3;
+                    } else {
+                        regex += string_literal[index];
+                    }
+                } else {
+                    regex += string_literal[index];
+                }
+            }
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
             const auto left{expr->get_arg(0)};
             const auto right{expr->get_arg(1)};
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = "((" + conv_to_regex(to_app(left)) + ")(" + conv_to_regex(to_app(right)) + "))";
+            regex = conv_to_regex(to_app(left)) + conv_to_regex(to_app(right));
         } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union. // TODO: What is this?
             assert(false && "re.is_antimirov_union(expr)");
         } else if (m_util_s.re.is_complement(expr)) { // Handle complement. // TODO: What is this?
@@ -1786,51 +1810,55 @@ namespace smt::noodler {
             assert(false && "re.is_dot_plus(expr)");
         } else if (m_util_s.re.is_empty(expr)) { // Handle empty string. // TODO: What is this?
             assert(false && "re.is_empty(expr)");
-        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: What is this?
+        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: Maybe ignore completely.
             assert(false && "re.is_epsilon(expr)");
         } else if (m_util_s.re.is_full_char(expr)) { // Handle full char. // TODO: What is this?
             assert(false && "re.is_full_char(expr)");
-        } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence. // TODO: What is this?
-            assert(false && "re.is_full_seq(expr)");
+        } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
+            regex = "."; // Fixme: Enumerate symbols of alphabet.
         } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection. // TODO: What is this?
             assert(false && "re.is_intersection(expr)");
         } else if (m_util_s.re.is_loop(expr)) { // Handle loop. // TODO: What is this?
             assert(false && "re.is_loop(expr)");
         } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate. // TODO: What is this?
             assert(false && "re.is_of_pred(expr)");
-        } else if (m_util_s.re.is_opt(expr)) { // Handle optional. // TODO: What is this?
-            assert(false && "re.is_opt(expr)");
+        } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            regex = "(" + conv_to_regex(to_app(child)) + ")?";
         } else if (m_util_s.re.is_range(expr)) { // Handle range. // TODO: What is this?
             assert(false && "re.is_range(expr)");
         } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse. // TODO: What is this?
             assert(false && "re.is_reverse(expr)");
-        } else if (m_util_s.re.is_union(expr)) { // Handle union. // TODO: What is this?
-            assert(false && "re.is_union(expr)");
-        } else if (m.is_or(expr)) { // Handle or. // FIXME: where is RE_or?
+        } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
             SASSERT(expr->get_num_args() == 2);
             const auto left{ expr->get_arg(0) };
             const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = "((" + conv_to_regex(to_app(left)) + ")|(" + conv_to_regex(to_app(right)) + "))";
-        } else if (m_util_s.re.is_star(expr)) { // Handle iteration.
+            regex = "(" + conv_to_regex(to_app(left)) + ")|(" + conv_to_regex(to_app(right)) + ")";
+        } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "((" + conv_to_regex(to_app(child)) + ")*)";
+            regex = "(" + conv_to_regex(to_app(child)) + ")*";
         } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "((" + conv_to_regex(to_app(child)) + ")+)";
-        } else if(m_util_s.str.is_string(expr)) { // Handle literal.
+            regex = "(" + conv_to_regex(to_app(child)) + ")+";
+        } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_args() == 1);
-            regex = "(" + expr->get_parameter(0).get_zstring().encode() + ")";
-        } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable. // TODO: Necessary?
-            SASSERT(expr->get_num_args() == 1);
+            regex = expr->get_parameter(0).get_zstring().encode();
+        } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
+            assert(false && "is_variable(expr)");
+            // TODO: How to represent variables?
+            //SASSERT(expr->get_num_args() == 1);
             // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
-            regex = "(" + expr->get_decl()->get_parameter(0).get_symbol().str() + ")";
+            //regex = "(" + expr->get_decl()->get_parameter(0).get_symbol().str() + ")";
         }
+        std::cout << regex << "\n";
         return regex;
     }
 }
