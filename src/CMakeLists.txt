@@ -164,8 +164,11 @@ endif()
 # The `PRIVATE` usage requirement is specified so that when building Z3 as a
 # shared library the dependent libraries are specified on the link command line
 # so that if those are also shared libraries they are referenced by `libz3.so`.
-target_include_directories(libz3 PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
-target_link_libraries(libz3 PRIVATE libmata)
+# target_include_directories(libz3 PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
+# target_link_libraries(libz3 PRIVATE libmata)
+
+find_library(LIBMATA mata)
+target_link_libraries(libz3 ${LIBMATA})
 
 # This is currently only for the OpenMP flags. It needs to be set
 # via `target_link_libraries()` rather than `z3_append_linker_flag_list_to_target()`

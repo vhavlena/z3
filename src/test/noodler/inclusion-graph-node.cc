@@ -3,7 +3,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <mata/nfa.hh>
 
-#include <smt/theory_str_noodler/inclusion_graph_node.h>
 #include "smt/theory_str_noodler/inclusion_graph.h"
 
 using namespace smt::noodler;
@@ -94,15 +93,15 @@ TEST_CASE("Conversion to strings", "[noodler]") {
 
 TEST_CASE("Mata integration", "[noodler]") {
     auto nfa = Mata::Nfa::Nfa(3);
-    nfa.initial_states = { 0, 1};
-    nfa.final_states = { 3, 1};
-    nfa.add_trans(0, 42, 1);
-    nfa.add_trans(1, 42, 2);
-    CHECK(nfa.has_final(1));
-    CHECK(!nfa.has_final(0));
-    CHECK(nfa.has_trans(0, 42, 1));
-    CHECK(!nfa.has_trans(1, 42, 1));
-    CHECK(!nfa.has_no_transitions());
+    nfa.initial = { 0, 1};
+    nfa.final = { 3, 1};
+    nfa.delta.add(0, 42, 1);
+    nfa.delta.add(1, 42, 2);
+    CHECK(nfa.final[1]);
+    CHECK(!nfa.final[0]);
+    CHECK(nfa.delta.contains(0, 42, 1));
+    CHECK(!nfa.delta.contains(1, 42, 1));
+    CHECK(!nfa.delta.empty());
 }
 
 TEST_CASE("Graph::get_edges_to", "[noodler]") {

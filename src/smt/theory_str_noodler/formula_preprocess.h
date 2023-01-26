@@ -9,7 +9,7 @@
 #include <string>
 
 #include <util/trace.h>
-#include "inclusion_graph.h"
+#include "formula.h"
 #include "aut_assignment.h"
 #include <mata/nfa.hh>
 
@@ -51,6 +51,14 @@ namespace smt::noodler {
         std::set_difference(t1.begin(), t1.end(), t2.begin(), t2.end(),
             std::inserter(diff, diff.begin()));
         return diff;
+    }
+
+    template<typename T>
+    bool set_disjoint(const std::set<T>& t1, const std::set<T>& t2) {
+        std::set<T> inter;
+        std::set_intersection(t1.begin(), t1.end(), t2.begin(), t2.end(),
+            std::inserter(inter, inter.begin()));
+        return inter.empty();
     }
 
     template<typename T, typename S, typename P>
@@ -252,7 +260,7 @@ namespace smt::noodler {
          * @param p Equation
          * @return Is simple?
          */
-        bool is_simple_eq(const Predicate& p) const { assert(p.is_equation()); return p.get_left_side().size() == 1 && p.get_right_side().size() == 1; };
+        bool is_simple_eq(const Predicate& p) const { return p.is_equation() && p.get_left_side().size() == 1 && p.get_right_side().size() == 1; };
     
         void remove_predicate(size_t index);
         void add_predicate(const Predicate& pred, int index = -1);
@@ -284,6 +292,8 @@ namespace smt::noodler {
         FormulaVar formula;
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
+        std::vector<LenNode*> len_formulae;
+        std::set<BasicTerm> len_variables;
 
     protected:
         void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd);
@@ -296,11 +306,14 @@ namespace smt::noodler {
         void get_concat_gather(const Concat& concat, SepEqsGather& res) const;
         void separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const;
 
+        void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
+
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass) : 
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::set<BasicTerm>& lv) : 
             formula(conj), 
             fresh_var_cnt(0),
-            aut_ass(ass) { };
+            aut_ass(ass),
+            len_variables(lv) { };
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
@@ -314,6 +327,7 @@ namespace smt::noodler {
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
         void separate_eqs();
+        void remove_extension();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
@@ -322,6 +336,16 @@ namespace smt::noodler {
          * @param replace Replace
          */
         void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
+        /**
+         * @brief Update predicate with the given index.
+         * 
+         * @param index Index of the predicate to be updated
+         * @param pred New predicate
+         */
+        void update_predicate(size_t index, const Predicate& pred) { 
+            this->formula.remove_predicate(index);
+            this->formula.add_predicate(pred, index);
+        }
         void clean_varmap() { this->formula.clean_varmap(); };
     };
 

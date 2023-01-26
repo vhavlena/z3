@@ -4,27 +4,51 @@
 
 #include <optional>
 #include <deque>
-#include "inclusion_graph_node.h"
+#include "formula.h"
 
 namespace smt::noodler {
 
-    using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
-    using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
+    //----------------------------------------------------------------------------------------------------------------------------------
 
-
-    class Formula {
+    class GraphNode {
     public:
-        Formula(): predicates() {}
+        GraphNode() = default;
+        explicit GraphNode(const Predicate& predicate) : node_predicate(predicate) {}
 
-        std::vector<Predicate>& get_predicates() { return predicates; }
-        const std::vector<Predicate>& get_predicates() const { return predicates; }
+        void set_predicate(const Predicate& predicate) { this->node_predicate = predicate; }
+        [[nodiscard]] Predicate& get_predicate() { return node_predicate; }
+        [[nodiscard]] const Predicate& get_predicate() const { return node_predicate; }
 
-        // TODO: Use std::move for both add functions?
-        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
+        struct HashFunction {
+            size_t operator()(const GraphNode& graph_node) const {
+                return Predicate::HashFunction()(graph_node.node_predicate);
+            }
+        };
+
+        [[nodiscard]] bool equals(const GraphNode& other) const {
+            return this->node_predicate == other.node_predicate;
+        }
 
     private:
-        std::vector<Predicate> predicates;
-    }; // Class Formula.
+        Predicate node_predicate;
+
+        // TODO: Add additional attributes such as cost, etc.
+    }; // Class GraphNode.
+
+    static bool operator==(const GraphNode& lhs, const GraphNode& rhs) { return lhs.equals(rhs); }
+    static bool operator!=(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs == rhs); }
+    static bool operator<(const GraphNode& lhs, const GraphNode& rhs) {
+        if (lhs.get_predicate() < rhs.get_predicate()) {
+            return true;
+        }
+        return false;
+    }
+    static bool operator>(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs < rhs); }
+
+    //----------------------------------------------------------------------------------------------------------------------------------
+
+    using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
+    using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
 
     class Graph {
     private:

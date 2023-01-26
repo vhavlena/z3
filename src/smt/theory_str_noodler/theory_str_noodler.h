@@ -30,7 +30,7 @@ Eternal glory to Yu-Fang.
 
 #include <mata/nfa.hh>
 
-#include "inclusion_graph_node.h"
+#include "formula.h"
 #include "inclusion_graph.h"
 #include "state_len.h"
 #include "expr_solver.h"
@@ -168,9 +168,7 @@ namespace smt::noodler {
         std::vector<app_ref> find_state_var(const obj_hashtable<expr>& conj);
 
         void remove_irrelevant_constr();
-        // static void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, vector<expr*>& res);
 
-        void collect_terms(const app* ex, std::vector<BasicTerm>& terms);
         Predicate conv_eq_pred(const app* expr);
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };

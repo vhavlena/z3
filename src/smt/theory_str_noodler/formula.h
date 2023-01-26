@@ -1,8 +1,6 @@
 /**
- * @brief Create basic representation of an inclusion graph node.
+ * @brief Create basic representation of firnzkae.
  *
- * The inclusion graph node is represented as a predicate, represention an equation, inequation or another predicate
- *  such as contains, etc.
  * Each equation or inequation consists of a left and right side of the equation which hold a vector of basic equation
  *  terms.
  * Each term is of one of the following types:
@@ -11,8 +9,8 @@
  *     - operation such as IndexOf, Length, etc.
  */
 
-#ifndef Z3_INCLUSION_GRAPH_NODE_H
-#define Z3_INCLUSION_GRAPH_NODE_H
+#ifndef Z3_NOODLER_FORMULA_H
+#define Z3_NOODLER_FORMULA_H
 
 #include <utility>
 #include <vector>
@@ -128,6 +126,42 @@ namespace smt::noodler {
     }
     static bool operator>(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs < rhs); }
 
+    //----------------------------------------------------------------------------------------------------------------------------------
+
+    enum struct LenFormulaType {
+        PLUS,
+        EQ,
+        LEQ,
+        LEAF,
+    };
+
+    struct LenNode {
+        LenFormulaType type;
+        BasicTerm atom_val;
+        std::vector<struct LenNode*> succ;
+
+        LenNode(LenFormulaType tp, const BasicTerm& val, const std::vector<struct LenNode*>& s) : type(tp), atom_val(val), succ(s) { };
+        LenNode(LenFormulaType tp, const std::vector<struct LenNode*>& s) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
+
+        ~LenNode() { // as a matter of fact do not clean the whole formula (root is not cleaned; but I don't care)
+            for(size_t i = 0; i < succ.size(); i++) {
+                delete succ[i];
+            }
+        }
+    };
+
+    class LenFormula {
+    private:
+        LenNode* root;
+
+    public:
+        LenFormula(LenNode* rt) : root(rt) { };
+        ~LenFormula() { delete this->root; };
+
+    };
+
+    //----------------------------------------------------------------------------------------------------------------------------------
+
     class Predicate {
     public:
         enum struct EquationSideType {
@@ -221,6 +255,34 @@ namespace smt::noodler {
             for(const BasicTerm& t : this->params[1])
                 ret.insert(t);
             return ret;
+        }
+
+        /**
+         * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
+         * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
+         * 
+         * @return LenNode* Root of the length formula
+         */
+        LenNode* get_formula_eq() const {
+            assert(is_equation());
+            LenNode* left, *right;
+
+            auto plus_chain = [&](const std::vector<BasicTerm>& side) {
+                std::vector<LenNode*> ops;
+                if(side.size() == 0) {
+                    return new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Literal, "0"), {});
+                }
+                for(const BasicTerm& t : side) {
+                    LenNode *n = new LenNode(LenFormulaType::LEAF, t, {});
+                    ops.push_back(n);
+                } 
+                return new LenNode(LenFormulaType::PLUS, ops);
+            };
+
+            left = plus_chain(this->params[0]);
+            right = plus_chain(this->params[1]);
+            LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+            return eq;         
         }
 
         std::vector<BasicTerm>& get_side(EquationSideType side);
@@ -365,40 +427,22 @@ namespace smt::noodler {
     }
     static bool operator>(const Predicate& lhs, const Predicate& rhs) { return !(lhs < rhs); }
 
-    class GraphNode {
+    //----------------------------------------------------------------------------------------------------------------------------------
+
+    class Formula {
     public:
-        GraphNode() = default;
-        explicit GraphNode(const Predicate& predicate) : node_predicate(predicate) {}
+        Formula(): predicates() {}
 
-        void set_predicate(const Predicate& predicate) { this->node_predicate = predicate; }
-        [[nodiscard]] Predicate& get_predicate() { return node_predicate; }
-        [[nodiscard]] const Predicate& get_predicate() const { return node_predicate; }
+        std::vector<Predicate>& get_predicates() { return predicates; }
+        const std::vector<Predicate>& get_predicates() const { return predicates; }
 
-        struct HashFunction {
-            size_t operator()(const GraphNode& graph_node) const {
-                return Predicate::HashFunction()(graph_node.node_predicate);
-            }
-        };
-
-        [[nodiscard]] bool equals(const GraphNode& other) const {
-            return this->node_predicate == other.node_predicate;
-        }
+        // TODO: Use std::move for both add functions?
+        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
 
     private:
-        Predicate node_predicate;
+        std::vector<Predicate> predicates;
+    }; // Class Formula.
 
-        // TODO: Add additional attributes such as cost, etc.
-    }; // Class GraphNode.
-
-    static bool operator==(const GraphNode& lhs, const GraphNode& rhs) { return lhs.equals(rhs); }
-    static bool operator!=(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs == rhs); }
-    static bool operator<(const GraphNode& lhs, const GraphNode& rhs) {
-        if (lhs.get_predicate() < rhs.get_predicate()) {
-            return true;
-        }
-        return false;
-    }
-    static bool operator>(const GraphNode& lhs, const GraphNode& rhs) { return !(lhs < rhs); }
 } // Namespace smt::noodler.
 
 namespace std {
@@ -419,4 +463,4 @@ namespace std {
     };
 }
 
-#endif //Z3_INCLUSION_GRAPH_NODE_H
+#endif //Z3_NOODLER_FORMULA_H

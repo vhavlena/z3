@@ -1,5 +1,5 @@
 
-#include "inclusion_graph_node.h"
+#include "formula.h"
 
 namespace smt::noodler {
     std::set<BasicTerm> Predicate::get_vars() const {
