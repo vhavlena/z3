@@ -183,7 +183,7 @@ namespace smt::noodler {
          * @param[in] expr Expression to be converted to regex.
          * @return The resulting regex.
          */
-        std::string conv_to_regex(const app* expr);
+        std::string conv_to_regex_hex(const app* expr);
 
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };

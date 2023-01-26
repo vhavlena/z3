@@ -695,9 +695,9 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
-            std::cout << "start conv_to_regex.\n";
-            conv_to_regex(to_app(std::get<1>(we)));
-            std::cout << "end conv_to_regex.\n";
+            std::cout << "start conv_to_regex_hex.\n";
+            conv_to_regex_hex(to_app(std::get<1>(we)));
+            std::cout << "end conv_to_regex_hex.\n";
         }
 
         Formula instance;
@@ -1763,7 +1763,7 @@ namespace smt::noodler {
         }
     }
 
-    std::string theory_str_noodler::conv_to_regex(const app *expr) {
+    std::string theory_str_noodler::conv_to_regex_hex(const app *expr) {
         for (int id{ 0 }; id < expr->get_num_parameters(); ++id) {
             mk_pp(const_cast<app*>(expr), m);
         }
@@ -1773,31 +1773,14 @@ namespace smt::noodler {
             SASSERT(expr->get_num_args() == 1);
             const auto arg{ expr->get_arg(0) };
             SASSERT(is_string_sort(arg));
-            auto string_literal{ conv_to_regex(to_app(arg)) };
-            size_t string_literal_size{ string_literal.size() };
-            for (size_t index{ 0 }; index < string_literal_size; ++index) {
-                if (index + 3 < string_literal_size) {
-                    if (string_literal[index] == '\\' && string_literal[index + 1] == 'x') {
-                        // Conversion of string of hexadecimal numbers can be further optimized.
-                        //  See https://stackoverflow.com/a/3790707.
-                        std::string hex_value{ string_literal.substr(index + 2, 2) };
-                        auto ascii_character{ static_cast<char>(std::stoul(hex_value, nullptr, 16)) };
-                        regex += ascii_character;
-                        index += 3;
-                    } else {
-                        regex += string_literal[index];
-                    }
-                } else {
-                    regex += string_literal[index];
-                }
-            }
+            regex = conv_to_regex_hex(to_app(arg));
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
             const auto left{expr->get_arg(0)};
             const auto right{expr->get_arg(1)};
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = conv_to_regex(to_app(left)) + conv_to_regex(to_app(right));
+            regex = conv_to_regex_hex(to_app(left)) + conv_to_regex_hex(to_app(right));
         } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union. // TODO: What is this?
             assert(false && "re.is_antimirov_union(expr)");
         } else if (m_util_s.re.is_complement(expr)) { // Handle complement. // TODO: What is this?
@@ -1826,7 +1809,7 @@ namespace smt::noodler {
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex(to_app(child)) + ")?";
+            regex = "(" + conv_to_regex_hex(to_app(child)) + ")?";
         } else if (m_util_s.re.is_range(expr)) { // Handle range. // TODO: What is this?
             assert(false && "re.is_range(expr)");
         } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse. // TODO: What is this?
@@ -1837,20 +1820,28 @@ namespace smt::noodler {
             const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = "(" + conv_to_regex(to_app(left)) + ")|(" + conv_to_regex(to_app(right)) + ")";
+            regex = "(" + conv_to_regex_hex(to_app(left)) + ")|(" + conv_to_regex_hex(to_app(right)) + ")";
         } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex(to_app(child)) + ")*";
+            regex = "(" + conv_to_regex_hex(to_app(child)) + ")*";
         } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex(to_app(child)) + ")+";
+            regex = "(" + conv_to_regex_hex(to_app(child)) + ")+";
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_args() == 1);
-            regex = expr->get_parameter(0).get_zstring().encode();
+            zstring tmp { expr->get_parameter(0).get_zstring() };
+            //zstring tmp3{ tmp.replace(zstring{ R"(\x)" }, zstring{ R"(\u)" })};
+            std::string tmp2{ tmp.encode() };
+            const zstring& string_literal{ zstring{ tmp2 } };
+            std::stringstream convert_stream;
+            for (size_t i{ 0 }; i < string_literal.length(); ++i) {
+                convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
+            }
+            regex = convert_stream.str();
         } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
             assert(false && "is_variable(expr)");
             // TODO: How to represent variables?
