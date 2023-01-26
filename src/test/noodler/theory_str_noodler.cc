@@ -62,7 +62,11 @@ TEST_CASE("theory_str_noodler", "[noodler]") {
         regex = noodler.conv_to_regex_hex(expr_concat);
         CHECK(regex == "(\\x{78})*(\\x{79})+");
 
-        auto expr_all_char{ m_util_s.re.mk_full_char(default_sort) };
+        //auto expr_all_char{ m_util_s.re.mk_full_char(default_sort) };
+        //regex = noodler.conv_to_regex_hex(expr_all_char);
+        //CHECK(regex == ".");
+
+        auto expr_all_char{ m_util_s.re.mk_full_seq(default_sort) };
         regex = noodler.conv_to_regex_hex(expr_all_char);
         CHECK(regex == ".");
 

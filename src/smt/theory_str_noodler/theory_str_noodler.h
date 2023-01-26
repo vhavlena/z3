@@ -181,9 +181,10 @@ namespace smt::noodler {
         /**
          * Convert expression @p expr to regex.
          * @param[in] expr Expression to be converted to regex.
+         * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
          * @return The resulting regex.
          */
-        std::string conv_to_regex_hex(const app* expr);
+        std::string conv_to_regex_hex(const app* expr, const std::set<uint32_t>& alphabet);
 
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };

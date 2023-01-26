@@ -666,7 +666,23 @@ namespace smt::noodler {
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 
-        for (const auto& we : this->m_word_eq_todo_rel) { // TODO: Equations
+        std::set<uint32_t> symbols_in_formula{};
+        for (const auto& word_equation : m_word_eq_todo_rel) {
+            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto& word_equation : m_word_diseq_todo_rel) {
+            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto& word_equation : m_membership_todo_rel) {
+            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto& we : this->m_word_eq_todo_rel) {
             // Function to read app and recursively look for symbols.
 
             app *const e = ctx.mk_eq_atom(we.first, we.second);
@@ -678,7 +694,7 @@ namespace smt::noodler {
             std::cout<<print_word_term(we.second) << std::endl;
         }
 
-        for (const auto& we : this->m_word_diseq_todo_rel) { // TODO: Disequations.
+        for (const auto& we : this->m_word_diseq_todo_rel) {
 
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             conj_instance.insert(e);
@@ -689,14 +705,14 @@ namespace smt::noodler {
         }
 
         ast_manager &m = get_manager();
-        for (const auto& we : this->m_membership_todo_rel) { // TODO: Regexes.
+        for (const auto& we : this->m_membership_todo_rel) {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
             std::cout << "start conv_to_regex_hex.\n";
-            conv_to_regex_hex(to_app(std::get<1>(we)));
+            conv_to_regex_hex(to_app(std::get<1>(we)), symbols_in_formula);
             std::cout << "end conv_to_regex_hex.\n";
         }
 
@@ -1763,7 +1779,7 @@ namespace smt::noodler {
         }
     }
 
-    std::string theory_str_noodler::conv_to_regex_hex(const app *expr) {
+    std::string theory_str_noodler::conv_to_regex_hex(const app *expr, const std::set<uint32_t>& alphabet) {
         for (int id{ 0 }; id < expr->get_num_parameters(); ++id) {
             mk_pp(const_cast<app*>(expr), m);
         }
@@ -1773,14 +1789,14 @@ namespace smt::noodler {
             SASSERT(expr->get_num_args() == 1);
             const auto arg{ expr->get_arg(0) };
             SASSERT(is_string_sort(arg));
-            regex = conv_to_regex_hex(to_app(arg));
+            regex = conv_to_regex_hex(to_app(arg), alphabet);
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
             const auto left{expr->get_arg(0)};
             const auto right{expr->get_arg(1)};
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = conv_to_regex_hex(to_app(left)) + conv_to_regex_hex(to_app(right));
+            regex = conv_to_regex_hex(to_app(left), alphabet) + conv_to_regex_hex(to_app(right), alphabet);
         } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union. // TODO: What is this?
             assert(false && "re.is_antimirov_union(expr)");
         } else if (m_util_s.re.is_complement(expr)) { // Handle complement. // TODO: What is this?
@@ -1798,7 +1814,13 @@ namespace smt::noodler {
         } else if (m_util_s.re.is_full_char(expr)) { // Handle full char. // TODO: What is this?
             assert(false && "re.is_full_char(expr)");
         } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
-            regex = "."; // Fixme: Enumerate symbols of alphabet.
+            regex += "[";
+            std::stringstream convert_stream;
+            for (const auto& symbol : alphabet) {
+                    convert_stream << std::dec << "\\x{" << std::hex << symbol << std::dec << "}";
+            }
+            regex += convert_stream.str();
+            regex += "]";
         } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection. // TODO: What is this?
             assert(false && "re.is_intersection(expr)");
         } else if (m_util_s.re.is_loop(expr)) { // Handle loop. // TODO: What is this?
@@ -1809,7 +1831,7 @@ namespace smt::noodler {
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child)) + ")?";
+            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")?";
         } else if (m_util_s.re.is_range(expr)) { // Handle range. // TODO: What is this?
             assert(false && "re.is_range(expr)");
         } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse. // TODO: What is this?
@@ -1820,23 +1842,20 @@ namespace smt::noodler {
             const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            regex = "(" + conv_to_regex_hex(to_app(left)) + ")|(" + conv_to_regex_hex(to_app(right)) + ")";
+            regex = "(" + conv_to_regex_hex(to_app(left), alphabet) + ")|(" + conv_to_regex_hex(to_app(right), alphabet) + ")";
         } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child)) + ")*";
+            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")*";
         } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child)) + ")+";
+            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")+";
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_args() == 1);
-            zstring tmp { expr->get_parameter(0).get_zstring() };
-            //zstring tmp3{ tmp.replace(zstring{ R"(\x)" }, zstring{ R"(\u)" })};
-            std::string tmp2{ tmp.encode() };
-            const zstring& string_literal{ zstring{ tmp2 } };
+            const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
             std::stringstream convert_stream;
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
                 convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
