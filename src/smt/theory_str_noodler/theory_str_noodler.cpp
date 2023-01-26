@@ -619,7 +619,7 @@ namespace smt::noodler {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
             if(!ctx.is_relevant(dis.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(dis.get(), m) << " relevant: " << 
+                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " << 
                     ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
                 continue;
             }
@@ -632,7 +632,7 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             if(ctx.is_relevant(in_app.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(in_app.get(), m) << " relevant: " << 
+                STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " << 
                     ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
                 this->m_membership_todo_rel.push_back(we);
                 continue;
@@ -701,6 +701,8 @@ namespace smt::noodler {
 
             expr_ref len_constr(m);
             while(this->adec_proc->get_another_solution(conj, len_constr)) {
+                if(len_constr == nullptr)
+                    continue;
                 int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
                 m_int_solver.initialize(get_context());
                 if(m_int_solver.check_sat(len_constr) == l_true) {
@@ -709,6 +711,9 @@ namespace smt::noodler {
                 TRACE("str", tout << "len unsat\n";);
             }
 
+            if(len_constr == nullptr) {
+                return FC_DONE;
+            }
             // all len solutions are unsat, we block the current assignment
             block_curr_assignment();
             return FC_CONTINUE;
@@ -1297,6 +1302,10 @@ namespace smt::noodler {
 
         STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
+        app_ref re_constr(to_app(s), m);
+
+
+
     //    expr_ref tmp{e, m};
     //    m_rewrite(tmp);
     //    if ((m.is_false(tmp) && is_true) || (m.is_true(tmp) && !is_true)) {
@@ -1306,7 +1315,7 @@ namespace smt::noodler {
     //        return;
     //    }
         expr_ref r{re, m};
-        this->m_membership_todo.push_back(std::make_tuple(expr_ref(s, m), r, is_true));
+        this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
     }
 
     void theory_str_noodler::set_conflict(const literal_vector& lv) {
