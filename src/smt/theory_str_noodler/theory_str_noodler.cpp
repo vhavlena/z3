@@ -612,7 +612,9 @@ namespace smt::noodler {
             //     continue;
             // }
 
-            this->m_word_eq_todo_rel.push_back(we);
+            if(!this->m_word_eq_todo_rel.contains(we)) {
+                this->m_word_eq_todo_rel.push_back(we);
+            }
         }
 
         for (const auto& we : m_word_diseq_todo) {
@@ -623,7 +625,9 @@ namespace smt::noodler {
                     ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
                 continue;
             }
-            this->m_word_diseq_todo_rel.push_back(we);
+            if(!this->m_word_diseq_todo_rel.contains(we)) {
+                this->m_word_diseq_todo_rel.push_back(we);
+            }
         }
 
         for (const auto& we : this->m_membership_todo) {
@@ -634,7 +638,10 @@ namespace smt::noodler {
             if(ctx.is_relevant(in_app.get())) {
                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " << 
                     ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-                this->m_membership_todo_rel.push_back(we);
+                
+                if(!this->m_membership_todo_rel.contains(we)) {
+                    this->m_membership_todo_rel.push_back(we);
+                }  
                 continue;
             }
         }
@@ -1297,23 +1304,20 @@ namespace smt::noodler {
         expr *s = nullptr, *re = nullptr;
         VERIFY(m_util_s.str.is_in_re(e, s, re));
         ast_manager& m = get_manager();
-
-
-
         STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
         app_ref re_constr(to_app(s), m);
+        /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms), 
+        /// this complex term T is replaced by a fresh variable X. The following axioms are hence added: X = T && X in RE.
+        if(re_constr->get_num_args() != 0) {
+            app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
+            expr_ref eq_fv(mk_eq_atom(fv.get(), s), m);
+            expr_ref n_re(this->m_util_s.re.mk_in_re(fv, re), m);
+            add_axiom(eq_fv);
+            add_axiom(n_re);
+            re_constr = fv;
+        }
 
-
-
-    //    expr_ref tmp{e, m};
-    //    m_rewrite(tmp);
-    //    if ((m.is_false(tmp) && is_true) || (m.is_true(tmp) && !is_true)) {
-    //        literal_vector lv;
-    //        lv.push_back(is_true ? mk_literal(e) : ~mk_literal(e));
-    //        set_conflict(lv);
-    //        return;
-    //    }
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
     }
