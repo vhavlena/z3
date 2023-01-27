@@ -34,6 +34,8 @@ namespace smt::noodler {
         }
 
     public:
+        using std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>>::unordered_map;
+
         AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val)
         { 
             for (const auto &key_value : val) {

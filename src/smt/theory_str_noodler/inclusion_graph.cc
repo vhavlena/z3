@@ -17,7 +17,7 @@ namespace {
     }
 } // Anonymous namespace.
 
-const Nodes smt::noodler::Graph::empty_nodes = Nodes();
+const smt::noodler::Graph::Nodes smt::noodler::Graph::empty_nodes = smt::noodler::Graph::Nodes();
 
 Graph smt::noodler::Graph::deep_copy() const {
     std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
@@ -44,7 +44,7 @@ Graph smt::noodler::Graph::deep_copy(std::unordered_map<std::shared_ptr<GraphNod
 void smt::noodler::Graph::add_inclusion_graph_edges() {
     for (auto& source_node: get_nodes() ) {
         for (auto& target_node: get_nodes()) {
-            if (source_node == target_node) {
+            if (source_node == target_node) { // we do not want self-loops (difference from FM'23)
                 continue;
             }
 
@@ -130,6 +130,7 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
 
     // Add all nodes which are not already present in direct and switched form.
     for (const auto& predicate: formula.get_predicates()) {
+        assert(predicate.get_left_side() != predicate.get_right_side());
         graph.add_node(predicate);
         graph.add_node(predicate.get_switched_sides_predicate());
     }
@@ -140,9 +141,6 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
 
     for (auto &source_node: graph.get_nodes() ) {
         for (auto &target_node: graph.get_nodes()) {
-            if (source_node == target_node) {
-                continue;
-            }
             auto& source_predicate{ source_node->get_predicate() };
             auto& target_predicate{ target_node->get_predicate() };
             auto& source_left_side{ source_predicate.get_left_side() };
@@ -181,6 +179,11 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
     }
 
     return graph;
+}
+
+Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula) {
+    std::deque<std::shared_ptr<GraphNode>> out_node_order;
+    return create_inclusion_graph(formula, out_node_order);
 }
 
 Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> &out_node_order) {

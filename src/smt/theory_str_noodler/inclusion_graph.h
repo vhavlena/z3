@@ -47,10 +47,11 @@ namespace smt::noodler {
 
     //----------------------------------------------------------------------------------------------------------------------------------
 
-    using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
-    using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
 
     class Graph {
+    public:
+        using Nodes = std::unordered_set<std::shared_ptr<GraphNode>>;
+        using Edges = std::unordered_map<std::shared_ptr<GraphNode>, Nodes>;
     private:
         Nodes nodes;
         Edges edges;
@@ -154,11 +155,16 @@ namespace smt::noodler {
         }
 
         std::shared_ptr<GraphNode> get_node(const Predicate& predicate) {
-            auto node = std::find_if(nodes.begin(), nodes.end(), [&predicate](std::shared_ptr<GraphNode> el){ return (el->get_predicate() == predicate);});
+            auto node = std::find_if(nodes.begin(), nodes.end(), [&predicate](const std::shared_ptr<GraphNode> &el){ return (el->get_predicate() == predicate);});
             if (node == nodes.end()) { return nullptr; }
             return *node;
         }
 
+        /**
+         * @brief adds node with predicate to graph (even if a node with such predicate exists in graph)
+         * 
+         * @return the newly added node
+         */
         std::shared_ptr<GraphNode> add_node(const Predicate& predicate) {
             // TODO check if added node already does not exists??? by calling get_node?
             std::shared_ptr<GraphNode> new_node = std::make_shared<GraphNode>(predicate);
@@ -167,6 +173,11 @@ namespace smt::noodler {
         }
 
 
+        /**
+         * @brief adds node with predicate to graph (even if a node with such predicate exists in graph)
+         * 
+         * @return the newly added node
+         */
         std::shared_ptr<GraphNode> add_node(const std::vector<BasicTerm> &left_side, const std::vector<BasicTerm> &right_side) {
             return add_node(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>> {left_side, right_side}));
         }
@@ -194,7 +205,8 @@ namespace smt::noodler {
         // in out_deleted_nodes there will be nodes that were deleted, because of merging
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map, std::unordered_set<std::shared_ptr<GraphNode>> &out_deleted_nodes);
 
-        // assumes that formula does not contain same equalities
+        // all these assume that formula does not contain same equalities
+        static Graph create_inclusion_graph(const Formula& formula);
         static Graph create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> &out_node_order);
         static Graph create_simplified_splitting_graph(const Formula& formula);
         static Graph create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> &out_node_order);

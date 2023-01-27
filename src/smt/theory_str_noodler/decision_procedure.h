@@ -5,6 +5,8 @@
 #include <deque>
 #include <algorithm>
 
+#include "formula.h"
+#include "inclusion_graph.h"
 #include "aut_assignment.h"
 #include "state_len.h"
 
