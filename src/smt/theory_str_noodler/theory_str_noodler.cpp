@@ -658,8 +658,7 @@ namespace smt::noodler {
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
                 std::cout << mk_pp(a, m) << std::endl;
-            }
-            // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
+            } // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
         }
         std::cout << std::endl;
 
@@ -1797,21 +1796,21 @@ namespace smt::noodler {
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             regex = conv_to_regex_hex(to_app(left), alphabet) + conv_to_regex_hex(to_app(right), alphabet);
-        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union. // TODO: What is this?
+        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
             assert(false && "re.is_antimirov_union(expr)");
-        } else if (m_util_s.re.is_complement(expr)) { // Handle complement. // TODO: What is this?
+        } else if (m_util_s.re.is_complement(expr)) { // Handle complement.
             assert(false && "re.is_complement(expr)");
-        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative. // TODO: What is this?
+        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative.
             assert(false && "re.is_derivative(expr)");
-        } else if (m_util_s.re.is_diff(expr)) { // Handle diff. // TODO: What is this?
+        } else if (m_util_s.re.is_diff(expr)) { // Handle diff.
             assert(false && "re.is_diff(expr)");
-        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus. // TODO: What is this?
+        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus.
             assert(false && "re.is_dot_plus(expr)");
-        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string. // TODO: What is this?
+        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
             assert(false && "re.is_empty(expr)");
         } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: Maybe ignore completely.
             assert(false && "re.is_epsilon(expr)");
-        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char. // TODO: What is this?
+        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char.
             assert(false && "re.is_full_char(expr)");
         } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
             regex += "[";
@@ -1821,20 +1820,20 @@ namespace smt::noodler {
             }
             regex += convert_stream.str();
             regex += "]";
-        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection. // TODO: What is this?
+        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
             assert(false && "re.is_intersection(expr)");
-        } else if (m_util_s.re.is_loop(expr)) { // Handle loop. // TODO: What is this?
+        } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
             assert(false && "re.is_loop(expr)");
-        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate. // TODO: What is this?
+        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
             assert(false && "re.is_of_pred(expr)");
         } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
             regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")?";
-        } else if (m_util_s.re.is_range(expr)) { // Handle range. // TODO: What is this?
+        } else if (m_util_s.re.is_range(expr)) { // Handle range.
             assert(false && "re.is_range(expr)");
-        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse. // TODO: What is this?
+        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
             assert(false && "re.is_reverse(expr)");
         } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
             SASSERT(expr->get_num_args() == 2);

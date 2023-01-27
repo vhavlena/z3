@@ -179,7 +179,7 @@ namespace smt::noodler {
         Predicate conv_eq_pred(const app* expr);
 
         /**
-         * Convert expression @p expr to regex.
+         * Convert expression @p expr to regex in hexadecimal format accepted by RE2.
          * @param[in] expr Expression to be converted to regex.
          * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
          * @return The resulting regex.
