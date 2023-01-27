@@ -710,9 +710,7 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
-            std::cout << "start conv_to_regex_hex.\n";
-            conv_to_regex_hex(to_app(std::get<1>(we)), symbols_in_formula);
-            std::cout << "end conv_to_regex_hex.\n";
+            util::conv_to_regex_hex(to_app(std::get<1>(we)), m_util_s, m, symbols_in_formula);
         }
 
         Formula instance;
@@ -1776,98 +1774,5 @@ namespace smt::noodler {
             STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
             res.add_predicate(inst);
         }
-    }
-
-    std::string theory_str_noodler::conv_to_regex_hex(const app *expr, const std::set<uint32_t>& alphabet) {
-        for (int id{ 0 }; id < expr->get_num_parameters(); ++id) {
-            mk_pp(const_cast<app*>(expr), m);
-        }
-        std::string regex{};
-        if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
-            // Assume that expression inside re.to_re() function is a string of characters.
-            SASSERT(expr->get_num_args() == 1);
-            const auto arg{ expr->get_arg(0) };
-            SASSERT(is_string_sort(arg));
-            regex = conv_to_regex_hex(to_app(arg), alphabet);
-        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{expr->get_arg(0)};
-            const auto right{expr->get_arg(1)};
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            regex = conv_to_regex_hex(to_app(left), alphabet) + conv_to_regex_hex(to_app(right), alphabet);
-        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
-            assert(false && "re.is_antimirov_union(expr)");
-        } else if (m_util_s.re.is_complement(expr)) { // Handle complement.
-            assert(false && "re.is_complement(expr)");
-        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative.
-            assert(false && "re.is_derivative(expr)");
-        } else if (m_util_s.re.is_diff(expr)) { // Handle diff.
-            assert(false && "re.is_diff(expr)");
-        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus.
-            assert(false && "re.is_dot_plus(expr)");
-        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
-            assert(false && "re.is_empty(expr)");
-        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: Maybe ignore completely.
-            assert(false && "re.is_epsilon(expr)");
-        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char.
-            assert(false && "re.is_full_char(expr)");
-        } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
-            regex += "[";
-            std::stringstream convert_stream;
-            for (const auto& symbol : alphabet) {
-                    convert_stream << std::dec << "\\x{" << std::hex << symbol << std::dec << "}";
-            }
-            regex += convert_stream.str();
-            regex += "]";
-        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
-            assert(false && "re.is_intersection(expr)");
-        } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
-            assert(false && "re.is_loop(expr)");
-        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
-            assert(false && "re.is_of_pred(expr)");
-        } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")?";
-        } else if (m_util_s.re.is_range(expr)) { // Handle range.
-            assert(false && "re.is_range(expr)");
-        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
-            assert(false && "re.is_reverse(expr)");
-        } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{ expr->get_arg(0) };
-            const auto right{ expr->get_arg(1) };
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            regex = "(" + conv_to_regex_hex(to_app(left), alphabet) + ")|(" + conv_to_regex_hex(to_app(right), alphabet) + ")";
-        } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")*";
-        } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), alphabet) + ")+";
-        } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
-            SASSERT(expr->get_num_args() == 1);
-            const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
-            std::stringstream convert_stream;
-            for (size_t i{ 0 }; i < string_literal.length(); ++i) {
-                convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
-            }
-            regex = convert_stream.str();
-        } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
-            assert(false && "is_variable(expr)");
-            // TODO: How to represent variables?
-            //SASSERT(expr->get_num_args() == 1);
-            // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
-            //regex = "(" + expr->get_decl()->get_parameter(0).get_symbol().str() + ")";
-        }
-        std::cout << regex << "\n";
-        return regex;
     }
 }
