@@ -24,7 +24,7 @@ Graph smt::noodler::Graph::deep_copy() const {
     return deep_copy(node_mapping);
 }
 
-Graph smt::noodler::Graph::deep_copy(std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping) const {
+Graph smt::noodler::Graph::deep_copy(std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> &node_mapping) const {
     Graph new_graph;
 
     for (const auto &this_node : get_nodes()) {
@@ -61,7 +61,7 @@ void smt::noodler::Graph::add_inclusion_graph_edges() {
     }
 }
 
-void smt::noodler::Graph::substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map, std::unordered_set<std::shared_ptr<GraphNode>> &out_deleted_nodes) {
+void smt::noodler::Graph::substitute_vars(const std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map, std::unordered_set<std::shared_ptr<GraphNode>> &out_deleted_nodes) {
     auto substitute_vector = [&substitution_map](std::vector<BasicTerm> &vector) {
         std::vector<BasicTerm> result;
         for (const BasicTerm &var : vector) {

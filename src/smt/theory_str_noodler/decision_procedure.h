@@ -8,7 +8,6 @@
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
-#include "state_len.h"
 
 namespace smt::noodler {
     struct WorklistElement {
@@ -61,8 +60,10 @@ namespace smt::noodler {
         // processed_node is the node that is being processed, the return value is this node in the deep copy
         // TODO this function is really ugly, I should do something about it
         std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
+            assert(inclusion_graph->get_nodes().count(processed_node) > 0);
             Graph graph_to_copy = *inclusion_graph;
             graph_to_copy.remove_all_edges();
+            assert(graph_to_copy.get_nodes().count(processed_node) > 0);
             std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
             inclusion_graph = std::make_shared<Graph>(graph_to_copy.deep_copy(node_mapping));
             std::deque<std::shared_ptr<GraphNode>> new_nodes_to_process;
