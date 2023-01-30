@@ -665,25 +665,14 @@ namespace smt::noodler {
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 
-        std::set<uint32_t> symbols_in_formula{};
-        for (const auto& word_equation : m_word_eq_todo_rel) {
-            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
+        // Get symbols in the whole formula.
+        std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
+        )};
+        // Add dummy symbols for all disequations.
+        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(m_word_diseq_todo_rel, symbols_in_formula) };
 
-        for (const auto& word_equation : m_word_diseq_todo_rel) {
-            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto& word_equation : m_membership_todo_rel) {
-            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
-            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto& we : this->m_word_eq_todo_rel) {
-            // Function to read app and recursively look for symbols.
-
+        for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
             conj_instance.insert(e);

@@ -110,6 +110,47 @@ namespace smt::noodler::util {
         }
     }
 
+    std::set<uint32_t> get_dummy_symbols(vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to) {
+        std::set<uint32_t> dummy_symbols{};
+        uint32_t dummy_symbol{ 0 };
+        const size_t disequations_number{ disequations.size() };
+        for (size_t diseq_index{ 0 }; diseq_index < disequations_number; ++diseq_index) {
+            while (symbols_to_append_to.find(dummy_symbol) != symbols_to_append_to.end()) { ++dummy_symbol; }
+            dummy_symbols.insert(dummy_symbol);
+            ++dummy_symbol;
+        }
+        const size_t dummy_symbols_number{ dummy_symbols.size() };
+        assert(dummy_symbols_number == disequations_number);
+        const size_t symbols_in_formula_number{ symbols_to_append_to.size() };
+        symbols_to_append_to.merge(dummy_symbols);
+        assert(dummy_symbols_number + symbols_in_formula_number == symbols_to_append_to.size());
+        return dummy_symbols;
+    }
+
+    std::set<uint32_t> get_symbols_for_formula(
+            const vector<expr_pair>& equations,
+            const vector<expr_pair>& disequations,
+            const vector<expr_pair_flag>& regexes,
+            const seq_util& m_util_s,
+            const ast_manager& m
+    ) {
+        std::set<uint32_t> symbols_in_formula{};
+        for (const auto &word_equation: equations) {
+            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto &word_equation: disequations) {
+            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto &word_equation: regexes) {
+            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+        }
+        return symbols_in_formula;
+    }
+
     std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,  const std::set<uint32_t>& alphabet) {
         std::string regex{};
         if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
@@ -136,7 +177,7 @@ namespace smt::noodler::util {
             assert(false && "re.is_dot_plus(expr)");
         } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
             assert(false && "re.is_empty(expr)");
-        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon. // TODO: Maybe ignore completely.
+        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon.
             assert(false && "re.is_epsilon(expr)");
         } else if (m_util_s.re.is_full_char(expr)) { // Handle full char.
             assert(false && "re.is_full_char(expr)");
