@@ -399,7 +399,6 @@ namespace smt::noodler {
             add_length_axiom(n);
         }
         if (m_util_s.str.is_extract(n)) {
-            std::cout << "substr" << std::endl;
             handle_substr(n);
         } else if (m_util_s.str.is_itos(n)) {
             //handle_itos(n);
@@ -699,8 +698,18 @@ namespace smt::noodler {
 
         }
 
+
+
+        
+
         Formula instance;
         this->conj_instance(conj_instance, instance);
+        for(const auto& f : instance.get_predicates()) {
+            std::cout << f.to_string() << std::endl;
+        }
+
+        block_curr_assignment();
+        return FC_CONTINUE;
 
         if(!this->state_len.contains(conj)){
             this->adec_proc->initialize(conj);
@@ -1007,6 +1016,9 @@ namespace smt::noodler {
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
         add_axiom({mk_eq(v, e, false)});
+
+        // add the replacement substr -> v
+        predicate_replace.insert(e, v.get());
     }
 
     void theory_str_noodler::handle_replace(expr *r) {
@@ -1540,8 +1552,8 @@ namespace smt::noodler {
         SASSERT(eq->get_arg(1));
 
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, left);
-        util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, right);
+        util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, this->predicate_replace, left);
+        util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, this->predicate_replace, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right}); 
     }

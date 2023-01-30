@@ -57,9 +57,12 @@ namespace smt::noodler::util {
     to the output parameter @p terms. 
     @param ex Expression to be checked for basic terms.
     @param m_util_s Seq util for AST
+    @param pred_replace Replacement of predicate and functions
     @param[out] terms Vector of found BasicTerm (in right order).
     */
-    static inline void collect_terms(const app* ex, const seq_util& m_util_s, std::vector<BasicTerm>& terms) {
+    static inline void collect_terms(app* const ex, const seq_util& m_util_s, 
+        obj_map<expr, expr*>& pred_replace, std::vector<BasicTerm>& terms) {
+
         if(m_util_s.str.is_string(ex)) {
             std::string lit = ex->get_parameter(0).get_zstring().encode();
             terms.push_back(BasicTerm(BasicTermType::Literal, lit));
@@ -72,12 +75,17 @@ namespace smt::noodler::util {
             return;
         }
 
-        SASSERT(m_util_s.str.is_concat(ex));
+        if(!m_util_s.str.is_concat(ex)) {
+            expr* rpl = pred_replace.find(ex); // dies if it is not found
+            collect_terms(to_app(rpl), m_util_s, pred_replace, terms);
+            return;
+        }
+
         SASSERT(ex->get_num_args() == 2);
         app *a_x = to_app(ex->get_arg(0));
         app *a_y = to_app(ex->get_arg(1));
-        collect_terms(a_x, m_util_s, terms);
-        collect_terms(a_y, m_util_s, terms);
+        collect_terms(a_x, m_util_s, pred_replace, terms);
+        collect_terms(a_y, m_util_s, pred_replace, terms);
     }
 
     static inline void get_len_exprs(app* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res) {

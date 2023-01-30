@@ -52,6 +52,9 @@ namespace smt::noodler {
         AbstractDecisionProcedure* adec_proc;
         obj_hashtable<expr> len_vars;
 
+        // mapping predicates and function to variables that they substitute to
+        obj_map<expr, expr*> predicate_replace;
+
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
