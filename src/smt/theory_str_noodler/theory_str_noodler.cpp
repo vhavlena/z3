@@ -16,6 +16,7 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_context.h"
 #include "ast/seq_decl_plugin.h"
 #include "ast/reg_decl_plugins.h"
+#include "decision_procedure.h"
 #include <mata/nfa.hh>
 
 
@@ -669,8 +670,14 @@ namespace smt::noodler {
         std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
                 m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
         )};
+
         // Add dummy symbols for all disequations.
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(m_word_diseq_todo_rel, symbols_in_formula) };
+
+        // Create automata assignment for the formula.
+        AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m, symbols_in_formula
+        ) };
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);

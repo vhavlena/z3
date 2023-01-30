@@ -23,11 +23,14 @@
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 #include "formula.h"
+#include "aut_assignment.h"
 
 namespace smt::noodler::util {
+    using expr_pair = std::pair<expr_ref, expr_ref>;
+    using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
 
     /**
-    Get variable from a given expression @p ex. Append to the output parameter @p res. 
+    Get variables from a given expression @p ex. Append to the output parameter @p res.
     @param ex Expression to be checked for variables.
     @param m_util_s Seq util for AST
     @param m AST manager
@@ -54,33 +57,57 @@ namespace smt::noodler::util {
     }
 
     /**
+     * Get variable names from a given expression @p ex. Append to the output parameter @p res.
+     * @param[in] ex Expression to be checked for variables.
+     * @param[in] m_util_s Seq util for AST
+     * @param[in] m AST manager
+     * @param[out] res Vector of found variables (may contain duplicities).
+     */
+    static void get_variable_names(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res) {
+        if(m_util_s.str.is_string(ex)) {
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            res.insert(std::to_string(to_app(ex)->get_name()));
+            return;
+        }
+
+        SASSERT(is_app(ex));
+        app* ex_app{ to_app(ex) };
+
+        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+            SASSERT(is_app(ex_app->get_arg(i)));
+            app *arg = to_app(ex_app->get_arg(i));
+            get_variable_names(arg, m_util_s, m, res);
+        }
+    }
+
+    /**
      * Get symbols from a given expression @p ex. Append to the output parameter @p alphabet.
      * @param ex Expression to be checked for symbols.
      * @param m_util_s Seq util for AST.
      * @param m AST manager.
      * @param[out] alphabet A set of symbols with where found symbols are appended to.
      */
-    void get_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet);
-
-    using expr_pair = std::pair<expr_ref, expr_ref>;
-    using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
+    void get_symbols(expr* ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet);
 
     /**
      * Get dummy symbols (one for each disequation in @p disequations).
      *
-     * @param disequations Vector of disequations.
-     * @param symbols_to_append_to Set of symbols where dummy symbols are appended to.
+     * @param[in] disequations Vector of disequations.
+     * @param[out] symbols_to_append_to Set of symbols where dummy symbols are appended to.
      * @return Set of dummy symbols.
      */
     std::set<uint32_t> get_dummy_symbols(vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to);
 
     /**
-     * Get symbolf for formula.
-     * @param equations Vector of equations in formula to get symbols from.
-     * @param disequations Vector of disequations in formula to get symbols from.
-     * @param regexes Vector of regexes in formula to get symbols from.
-     * @param m_util_s Seq util for AST.
-     * @param m AST manager.
+     * Get symbols for formula.
+     * @param[in] equations Vector of equations in formula to get symbols from.
+     * @param[in] disequations Vector of disequations in formula to get symbols from.
+     * @param[in] regexes Vector of regexes in formula to get symbols from.
+     * @param[in] m_util_s Seq util for AST.
+     * @param[in] m AST manager.
      * @return Set of symbols in the whole formula.
      */
     std::set<uint32_t> get_symbols_for_formula(
@@ -89,6 +116,24 @@ namespace smt::noodler::util {
             const vector<expr_pair_flag>& regexes,
             const seq_util& m_util_s,
             const ast_manager& m
+    );
+
+    /**
+     * Get automata assignment for formula.
+     * @param[in] equations Vector of equations in formula to get symbols from.
+     * @param[in] disequations Vector of disequations in formula to get symbols from.
+     * @param[in] regexes Vector of regexes in formula to get symbols from.
+     * @param[in] m_util_s Seq util for AST.
+     * @param[in] m AST manager.
+     * @return Automata assignment for the whole formula.
+     */
+    AutAssignment create_aut_assignment_for_formula(
+            const vector<expr_pair>& equations,
+            const vector<expr_pair>& disequations,
+            const vector<expr_pair_flag>& regexes,
+            const seq_util& m_util_s,
+            const ast_manager& m,
+            const std::set<uint32_t>& alphabet
     );
 
     /**

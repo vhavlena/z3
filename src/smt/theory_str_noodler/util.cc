@@ -1,8 +1,10 @@
 #include <cassert>
+#include <mata/re2parser.hh>
 
 #include "util.h"
 #include "theory_str_noodler.h"
 #include "inclusion_graph.h"
+#include "aut_assignment.h"
 
 namespace smt::noodler::util {
     void get_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
@@ -122,7 +124,7 @@ namespace smt::noodler::util {
         const size_t dummy_symbols_number{ dummy_symbols.size() };
         assert(dummy_symbols_number == disequations_number);
         const size_t symbols_in_formula_number{ symbols_to_append_to.size() };
-        symbols_to_append_to.merge(dummy_symbols);
+        symbols_to_append_to.insert(dummy_symbols.begin(), dummy_symbols.end());
         assert(dummy_symbols_number + symbols_in_formula_number == symbols_to_append_to.size());
         return dummy_symbols;
     }
@@ -151,7 +153,62 @@ namespace smt::noodler::util {
         return symbols_in_formula;
     }
 
-    std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,  const std::set<uint32_t>& alphabet) {
+    AutAssignment create_aut_assignment_for_formula(
+            const vector<expr_pair>& equations,
+            const vector<expr_pair>& disequations,
+            const vector<expr_pair_flag>& regexes,
+            const seq_util& m_util_s,
+            const ast_manager& m,
+            const std::set<uint32_t>& alphabet
+    ) {
+        // Find all variables in the whole formula.
+        std::unordered_set<std::string> variables_in_formula{};
+        for (const auto &word_equation: equations) {
+            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
+            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
+        }
+        for (const auto &word_equation: disequations) {
+            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
+            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
+        }
+
+        // DEBUG.
+        std::cout << "Variable names:\n";
+        for (const auto& name : variables_in_formula) {
+            std::cout << name << "\n";
+        }
+
+        AutAssignment aut_assignment{};
+        // Create automata from their corresponding regexes.
+        std::unordered_set<std::string> variables_with_regex{};
+        for (const auto &word_equation: regexes) {
+            const auto& variable{ std::get<0>(word_equation) };
+            assert(is_app(variable));
+            const auto& variable_app{ to_app(variable) };
+            assert(variable_app->get_num_args() == 0);
+            const auto& variable_name{ variable_app->get_decl()->get_parameter(0).get_symbol().str() };
+            variables_with_regex.insert(variable_name);
+            BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            assert(aut_assignment.find(variable_term) == aut_assignment.end());
+            Mata::Nfa::Nfa nfa{};
+            Mata::RE2Parser::create_nfa(&nfa, conv_to_regex_hex(to_app(std::get<1>(word_equation)), m_util_s, m, alphabet));
+            aut_assignment[variable_term] = std::make_shared<Mata::Nfa::Nfa>(nfa);
+        }
+
+        // Assign sigma start automata for all yet unassigned variables.
+        for (const auto& variable_name : variables_in_formula) {
+            if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
+                BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+                assert(aut_assignment.find(variable_term) == aut_assignment.end());
+                // FIXME: Use copy constructor for NFA.
+                aut_assignment[variable_term] = std::make_shared<Mata::Nfa::Nfa>(aut_assignment.sigma_star_automaton());
+            }
+        }
+
+        return aut_assignment;
+    }
+
+    std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m, const std::set<uint32_t>& alphabet) {
         std::string regex{};
         if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
             // Assume that expression inside re.to_re() function is a string of characters.
