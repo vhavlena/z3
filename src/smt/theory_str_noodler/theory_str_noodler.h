@@ -139,6 +139,7 @@ namespace smt::noodler {
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
+        expr_ref mk_str_var(const std::string& name);
         void add_axiom(std::initializer_list<literal> ls);
         void handle_char_at(expr *e);
         void handle_substr(expr *e);

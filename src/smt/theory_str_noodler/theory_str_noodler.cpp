@@ -884,7 +884,7 @@ namespace smt::noodler {
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         } else {
-            // std::cout << "already contains " << mk_pp(e, m) << std::endl;
+            STRACE("str", tout << __LINE__ << " " << __FUNCTION__ << "already contains " << mk_pp(e, m) << std::endl;);
         }
     }
 
@@ -941,70 +941,74 @@ namespace smt::noodler {
         add_axiom({~i_ge_len_s, mk_eq(e, emp, false)});
     }
 
-    /*
-      Note: this is copied and modified from theory_seq.cpp
-      TBD: check semantics of extract, a.k.a, substr(s, i ,l)
-
-      let e = extract(s, i, l)
-
-      i is start index, l is length of substring starting at index.
-
-      i < 0 => e = ""
-      i >= |s| => e = ""
-      l <= 0 => e = ""
-      0 <= i < |s| & l > 0 => s = xey, |x| = i, |e| = min(l, |s|-i)
-
-    this translates to:
-
-      0 <= i <= |s| -> s = xey
-      0 <= i <= |s| -> len(x) = i
-      0 <= i <= |s| & 0 <= l <= |s| - i -> |e| = l
-      0 <= i <= |s| & |s| < l + i  -> |e| = |s| - i
-      i >= |s| => |e| = 0
-      i < 0 => |e| = 0
-      l <= 0 => |e| = 0
-
-      It follows that:
-      |e| = min(l, |s| - i) for 0 <= i < |s| and 0 < |l|
-    */
+    /**
+     * @brief Handle str.substr
+     * 
+     * Translates to the following theory axioms:
+     * 0 <= i <= |s| -> xvy = s
+     * 0 <= i <= |s| -> |x| = i
+     * 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
+     * 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
+     * 0 <= i <= |s| && l < 0 -> v = eps
+     * i < 0 -> v = eps
+     * not(0 <= l <= |s| - i) -> v = eps
+     * i > |s| -> v = eps
+     * substr(s, i, n) = v
+     * 
+     * @param e Expression corresponding to str.substr
+     */
     void theory_str_noodler::handle_substr(expr *e) {
-        if (!axiomatized_terms.contains(e) || false) {
-            axiomatized_terms.insert(e);
+        if (axiomatized_terms.contains(e))
+            return;
 
-            ast_manager &m = get_manager();
-            expr *s = nullptr, *i = nullptr, *l = nullptr;
-            VERIFY(m_util_s.str.is_extract(e, s, i, l));
+        axiomatized_terms.insert(e);
 
-            expr_ref x(mk_skolem(symbol("m_substr_left"), s, i), m);
-            expr_ref ls(m_util_s.str.mk_length(s), m);
-            expr_ref lx(m_util_s.str.mk_length(x), m);
-            expr_ref le(m_util_s.str.mk_length(e), m);
-            expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
-            expr_ref y(mk_skolem(symbol("m_substr_right"), s, ls_minus_i_l), m);
-            expr_ref xe(m_util_s.str.mk_concat(x, e), m);
-            expr_ref xey(m_util_s.str.mk_concat(x, e, y), m);
+        ast_manager &m = get_manager();
+        expr *s = nullptr, *i = nullptr, *l = nullptr;
+        VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
-            string_theory_propagation(xe);
-            string_theory_propagation(xey);
+        expr_ref v = mk_str_var("substr");
+        expr_ref x = mk_str_var("pre_substr");
+        expr_ref ls(m_util_s.str.mk_length(s), m);
+        expr_ref lx(m_util_s.str.mk_length(x), m);
+        expr_ref le(m_util_s.str.mk_length(v), m);
+        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
+        expr_ref y = mk_str_var("post_substr");
+        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
+        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
-            expr_ref zero(m_util_a.mk_int(0), m);
+        string_theory_propagation(xe);
+        string_theory_propagation(xey);
 
-            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-            literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-            literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-            literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+        expr_ref zero(m_util_a.mk_int(0), m);
+        expr_ref eps(m_util_s.str.mk_string(""), m);
 
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(lx, i, false)});
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
-            add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(le, zero, false)});
-            add_axiom({i_ge_0, mk_eq(le, zero, false)});
-            add_axiom({ls_le_i, mk_eq(le, zero, false)});
-            add_axiom({~ls_le_0, mk_eq(le, zero, false)});
-        }
+        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
+        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
+        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
+        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
+        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+
+        // 0 <= i <= |s| -> xvy = s
+        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
+        // 0 <= i <= |s| -> |x| = i
+        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(lx, i, false)});
+        // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
+        add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
+        add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
+        // 0 <= i <= |s| && l < 0 -> v = eps
+        add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+        // i < 0 -> v = eps
+        add_axiom({i_ge_0, mk_eq(v, eps, false)});
+        // not(0 <= l <= |s| - i) -> v = eps
+        add_axiom({ls_le_i, mk_eq(v, eps, false)});
+        // i > |s| -> v = eps
+        add_axiom({~ls_le_0, mk_eq(v, eps, false)});
+        // substr(s, i, n) = v
+        add_axiom({mk_eq(v, e, false)});
     }
+
     void theory_str_noodler::handle_replace(expr *r) {
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
@@ -1156,18 +1160,21 @@ namespace smt::noodler {
 
     // e = prefix(x, y), check if x is a prefix of y
     void theory_str_noodler::handle_prefix(expr *e) {
-        if(!axiomatized_terms.contains(e)||false) {
+        if(!axiomatized_terms.contains(e)) {
             axiomatized_terms.insert(e);
 
             ast_manager &m = get_manager();
             expr *x = nullptr, *y = nullptr;
             VERIFY(m_util_s.str.is_prefix(e, x, y));
 
-            expr_ref s = mk_skolem(symbol("m_prefix_right"), x, y);
-            expr_ref xs(m_util_s.str.mk_concat(x, s), m);
+            expr_ref fresh(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name("prefix"), 
+                0, nullptr, this->m_util_s.mk_string_sort()), m); 
+            // expr_ref s = mk_skolem(symbol("m_prefix_right"), x, y);
+            expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
             string_theory_propagation(xs);
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_eq(y, xs, false)});
+            // add_axiom({mk_eq(y, xs, false)});
         }
     }
 
@@ -1499,6 +1506,19 @@ namespace smt::noodler {
                     std::cout <<"**"<< mk_pp(e, m) << (ctx.is_relevant(e) ? "\n" : " (not relevant)\n");
                 }
         );
+    }
+
+    /**
+     * @brief Create fresh string variable
+     * 
+     * @param name Static part of the name (will be concatenated with other parts 
+     *  distinguishing the name)
+     * @return expr_ref Fresh string variable
+     */
+    expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
+        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0, 
+            nullptr, this->m_util_s.mk_string_sort()), m); 
+        return var;
     }
 
     /**
