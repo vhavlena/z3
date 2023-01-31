@@ -458,6 +458,7 @@ namespace smt::noodler {
             if (is_true) {
                 handle_contains(e);
             } else {
+                std::cout << "not contains " << mk_pp(e, m) << std::endl << std::endl;
                 m_not_contains_todo.push_back({{e1, m},
                                                {e2, m}});
             }
@@ -954,7 +955,7 @@ namespace smt::noodler {
      * @brief Handle str.substr
      * 
      * Translates to the following theory axioms:
-     * 0 <= i <= |s| -> xvy = s
+     * 0 <= i <= |s| -> x.v.y = s
      * 0 <= i <= |s| -> |x| = i
      * 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
      * 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
@@ -964,7 +965,7 @@ namespace smt::noodler {
      * i > |s| -> v = eps
      * substr(s, i, n) = v
      * 
-     * @param e Expression corresponding to str.substr
+     * @param e str.substr(s, i, l)
      */
     void theory_str_noodler::handle_substr(expr *e) {
         if (axiomatized_terms.contains(e))
@@ -1041,101 +1042,128 @@ namespace smt::noodler {
         tightest_prefix(s, x);
 
     }
+
+    /**
+     * @brief Handling of str.indexof
+     * Translates to the following theory axioms:
+     * 
+     * @param i indexof term
+     */
     void theory_str_noodler::handle_index_of(expr *i) {
-        if(!axiomatized_terms.contains(i)||false) {
-            axiomatized_terms.insert(i);
-            ast_manager &m = get_manager();
-            expr *s = nullptr, *t = nullptr, *offset = nullptr;
-            rational r;
-            VERIFY(m_util_s.str.is_index(i, t, s) || m_util_s.str.is_index(i, t, s, offset));
+        if(axiomatized_terms.contains(i))
+            return;
 
-            expr_ref minus_one(m_util_a.mk_int(-1), m);
-            expr_ref zero(m_util_a.mk_int(0), m);
+        axiomatized_terms.insert(i);
+        ast_manager &m = get_manager();
+        expr *s = nullptr, *t = nullptr, *offset = nullptr;
+        rational r;
+        VERIFY(m_util_s.str.is_index(i, t, s) || m_util_s.str.is_index(i, t, s, offset));
 
-            expr_ref emp(m_util_s.str.mk_empty(t->get_sort()), m);
+        expr_ref minus_one(m_util_a.mk_int(-1), m);
+        expr_ref zero(m_util_a.mk_int(0), m);
+        expr_ref emp(m_util_s.str.mk_empty(t->get_sort()), m);
+        literal cnt = mk_literal(m_util_s.str.mk_contains(t, s));
 
-            literal cnt = mk_literal(m_util_s.str.mk_contains(t, s));
+        literal i_eq_m1 = mk_eq(i, minus_one, false);
+        literal i_eq_0 = mk_eq(i, zero, false);
+        literal s_eq_empty = mk_eq(s, emp, false);
+        literal t_eq_empty = mk_eq(t, emp, false);
 
+        add_axiom({cnt, i_eq_m1});
+        add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
 
-            literal i_eq_m1 = mk_eq(i, minus_one, false);
-            literal i_eq_0 = mk_eq(i, zero, false);
-            literal s_eq_empty = mk_eq(s, emp, false);
-            literal t_eq_empty = mk_eq(t, emp, false);
+        if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
+            expr_ref x = mk_str_var("index_left");
+            expr_ref y = mk_str_var("index_right");
+            expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);
+            expr_ref indexofVar = mk_int_var("index_res");
+            string_theory_propagation(xsy);
 
-            add_axiom({cnt, i_eq_m1});
-            add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
+            // |s| = 0 => indexof(t,s,0) = 0
+            // contains(t,s) & |s| != 0 => t = xsy & indexof(t,s,0) = |x|
+            expr_ref lenx(m_util_s.str.mk_length(x), m);
+            add_axiom({~s_eq_empty, i_eq_0});
+            add_axiom({~cnt, s_eq_empty, mk_eq(t, xsy, false)});
+            add_axiom({~cnt, s_eq_empty, mk_eq(i, lenx, false)});
+            add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
+            add_axiom({mk_eq(i, indexofVar, false)});
+            tightest_prefix(s, x);
+        } else {
+            expr_ref len_t(m_util_s.str.mk_length(t), m);
+            literal offset_ge_len = mk_literal(m_util_a.mk_ge(mk_sub(offset, len_t), zero));
+            literal offset_le_len = mk_literal(m_util_a.mk_le(mk_sub(offset, len_t), zero));
+            literal i_eq_offset = mk_eq(i, offset, false);
+            add_axiom({~offset_ge_len, s_eq_empty, i_eq_m1});
+            add_axiom({offset_le_len, i_eq_m1});
+            add_axiom({~offset_ge_len, ~offset_le_len, ~s_eq_empty, i_eq_offset});
 
-            if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
-                expr_ref x = mk_skolem(symbol("m_contains_left"), t, s);
-                expr_ref y = mk_skolem(symbol("m_contains_right"), t, s);
-                expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);
-                string_theory_propagation(xsy);
+            expr_ref x = mk_str_var("index_left");
+            expr_ref y = mk_str_var("index_right");
+            expr_ref xy(m_util_s.str.mk_concat(x, y), m);
+            string_theory_propagation(xy);
 
-                // |s| = 0 => indexof(t,s,0) = 0
-                // contains(t,s) & |s| != 0 => t = xsy & indexof(t,s,0) = |x|
-                expr_ref lenx(m_util_s.str.mk_length(x), m);
-                add_axiom({~s_eq_empty, i_eq_0});
-                add_axiom({~cnt, s_eq_empty, mk_eq(t, xsy, false)});
-                add_axiom({~cnt, s_eq_empty, mk_eq(i, lenx, false)});
-                add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
-
-                tightest_prefix(s, x);
-            } else {
-                expr_ref len_t(m_util_s.str.mk_length(t), m);
-                literal offset_ge_len = mk_literal(m_util_a.mk_ge(mk_sub(offset, len_t), zero));
-                literal offset_le_len = mk_literal(m_util_a.mk_le(mk_sub(offset, len_t), zero));
-                literal i_eq_offset = mk_eq(i, offset, false);
-                add_axiom({~offset_ge_len, s_eq_empty, i_eq_m1});
-                add_axiom({offset_le_len, i_eq_m1});
-                add_axiom({~offset_ge_len, ~offset_le_len, ~s_eq_empty, i_eq_offset});
-
-                expr_ref x = mk_skolem(symbol("m_contains_left"), t, s, offset);
-                expr_ref y = mk_skolem(symbol("m_contains_right"), t, s, offset);
-                expr_ref xy(m_util_s.str.mk_concat(x, y), m);
-                string_theory_propagation(xy);
-
-                expr_ref indexof0(m_util_s.str.mk_index(y, s, zero), m);
-                expr_ref offset_p_indexof0(m_util_a.mk_add(offset, indexof0), m);
-                literal offset_ge_0 = mk_literal(m_util_a.mk_ge(offset, zero));
-                add_axiom(
-                        {~offset_ge_0, offset_ge_len, mk_eq(t, xy, false)});
-                add_axiom(
-                        {~offset_ge_0, offset_ge_len, mk_eq(m_util_s.str.mk_length(x), offset, false)});
-                add_axiom({~offset_ge_0, offset_ge_len, ~mk_eq(indexof0, minus_one, false), i_eq_m1});
-                add_axiom({~offset_ge_0, offset_ge_len, ~mk_literal(m_util_a.mk_ge(indexof0, zero)),
+            expr_ref indexof0(m_util_s.str.mk_index(y, s, zero), m);
+            expr_ref offset_p_indexof0(m_util_a.mk_add(offset, indexof0), m);
+            literal offset_ge_0 = mk_literal(m_util_a.mk_ge(offset, zero));
+            add_axiom({~offset_ge_0, offset_ge_len, mk_eq(t, xy, false)});
+            add_axiom({~offset_ge_0, offset_ge_len, mk_eq(m_util_s.str.mk_length(x), offset, false)});
+            add_axiom({~offset_ge_0, offset_ge_len, ~mk_eq(indexof0, minus_one, false), i_eq_m1});
+            add_axiom({~offset_ge_0, offset_ge_len, ~mk_literal(m_util_a.mk_ge(indexof0, zero)),
                             mk_eq(offset_p_indexof0, i, false)});
 
-                // offset < 0 => -1 = i
-                add_axiom({offset_ge_0, i_eq_m1});
-            }
+            // offset < 0 => -1 = i
+            add_axiom({offset_ge_0, i_eq_m1});
         }
     }
 
+    /**
+     * @brief String term @p x does not contain @p s as a substring. 
+     * Translates to the following theory axioms:
+     * not(s = eps) -> s = s1.s2 where s1 = s[0,-2], s2 = s[-1] in the case of @p s being a string
+     * not(s = eps) -> not(contains(x.s1, s))
+     * not(s = eps) -> s2 in re.allchar (is a single character)
+     * 
+     * @param s Substring that should not be present
+     * @param x String term
+     */
     void theory_str_noodler::tightest_prefix(expr* s, expr* x) {
         expr_ref s1 = mk_first(s);
         expr_ref c  = mk_last(s);
-        expr_ref s1c = mk_concat(s1, m_util_s.str.mk_unit(c));
+        expr_ref s1c = mk_concat(s1, c);
         literal s_eq_emp = mk_eq_empty(s);
-        add_axiom({s_eq_emp, mk_eq(s, s1c,true)});
-        add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s))});
+        expr_ref re(m_util_s.re.mk_in_re(c, m_util_s.re.mk_full_seq(nullptr)), m);
+
+        add_axiom({s_eq_emp, mk_literal(re) });
+        add_axiom({s_eq_emp, mk_literal(m.mk_eq(s, s1c))});
+        add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, x), s))});
     }
 
+    /**
+     * @brief Get string term representing first |s| - 1 characters of @p s.
+     * 
+     * @param s String term
+     * @return expr_ref String term
+     */
     expr_ref theory_str_noodler::mk_first(expr* s) {
         zstring str;
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
             return expr_ref(m_util_s.str.mk_string(str.extract(0, str.length()-1)), m);
         }
-        return mk_skolem(symbol("seq_first"), s);
+        return mk_str_var("index_first");
     }
 
+    /**
+     * @brief Get string term representing last character of @p s.
+     * 
+     * @param s String term
+     * @return expr_ref String term
+     */
     expr_ref theory_str_noodler::mk_last(expr* s) {
         zstring str;
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
-            return expr_ref(m_util_s.str.mk_char(str, str.length()-1), m);
+            return expr_ref(m_util_s.str.mk_string(str.extract(str.length()-1, 1)), m);
         }
-        sort* char_sort = nullptr;
-        VERIFY(m_util_s.is_seq(s->get_sort(), char_sort));
-        return mk_skolem(symbol("seq_last"), s, nullptr, nullptr, nullptr, char_sort);
+        return mk_str_var("index_last");
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {
@@ -1300,23 +1328,29 @@ namespace smt::noodler {
     }
 
     // e = contains(x, y)
+
+    /**
+     * @brief Handle contains
+     * Translates to the following theory axioms:
+     * str.contains(x,y) -> x = pys
+     * 
+     * @param e str.contains(x,y)
+     */
     void theory_str_noodler::handle_contains(expr *e) {
-        if(!axiomatized_terms.contains(e)||false) {
-            axiomatized_terms.insert(e);
-            ast_manager &m = get_manager();
-            expr *x = nullptr, *y = nullptr;
-            VERIFY(m_util_s.str.is_contains(e, x, y));
-            expr_ref p = mk_skolem(symbol("m_contains_left"), x, y);
-            expr_ref s = mk_skolem(symbol("m_contains_right"), x, y);
-            expr_ref pys(m_util_s.str.mk_concat(m_util_s.str.mk_concat(p, y), s), m);
+        if(axiomatized_terms.contains(e))
+            return;
 
-            string_theory_propagation(pys);
-//            expr_ref not_e(m.mk_not(e),m);
-//            add_axiom(m.mk_or(not_e, m.mk_eq(y, pys)));
-            literal not_e = mk_literal(mk_not({e, m}));
-            add_axiom({not_e, mk_eq(x, pys, false)});
-        }
+        axiomatized_terms.insert(e);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y));
+        expr_ref p = mk_str_var("contains_left");
+        expr_ref s = mk_str_var("contains_right");
+        expr_ref pys(m_util_s.str.mk_concat(m_util_s.str.mk_concat(p, y), s), m);
 
+        string_theory_propagation(pys);
+        literal not_e = mk_literal(mk_not({e, m}));
+        add_axiom({not_e, mk_eq(x, pys, false)});
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
@@ -1530,6 +1564,20 @@ namespace smt::noodler {
     expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
         expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0, 
             nullptr, this->m_util_s.mk_string_sort()), m); 
+        return var;
+    }
+
+    /**
+     * @brief Create fresh int variable
+     * 
+     * @param name Static part of the name (will be concatenated with other parts 
+     *  distinguishing the name)
+     * @return expr_ref Fresh int variable
+     */
+    expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
+        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
+        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0, 
+            nullptr, int_sort), m); 
         return var;
     }
 
