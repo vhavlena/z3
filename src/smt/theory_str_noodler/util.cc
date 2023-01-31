@@ -6,8 +6,12 @@
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
 
+namespace {
+    using Mata::Nfa::Nfa;
+}
+
 namespace smt::noodler::util {
-    void get_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
+    void extract_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
         if (m_util_s.str.is_string(ex)) {
             auto ex_app{ to_app(ex) };
             SASSERT(ex_app->get_num_args() == 1);
@@ -30,7 +34,7 @@ namespace smt::noodler::util {
             SASSERT(ex_app->get_num_args() == 1);
             const auto arg{ ex_app->get_arg(0) };
             //SASSERT(is_string_sort(arg));
-            get_symbols(to_app(arg), m_util_s, m, alphabet);
+            extract_symbols(to_app(arg), m_util_s, m, alphabet);
             return;
         } else if (m_util_s.re.is_concat(ex_app)) { // Handle concatenation.
             SASSERT(ex_app->get_num_args() == 2);
@@ -38,42 +42,42 @@ namespace smt::noodler::util {
             const auto right{ex_app->get_arg(1)};
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            get_symbols(to_app(left), m_util_s, m, alphabet);
-            get_symbols(to_app(right), m_util_s, m, alphabet);
+            extract_symbols(to_app(left), m_util_s, m, alphabet);
+            extract_symbols(to_app(right), m_util_s, m, alphabet);
             return;
-        } else if (m_util_s.re.is_antimirov_union(ex_app)) { // Handle Antimirov union. // TODO: What is this?
+        } else if (m_util_s.re.is_antimirov_union(ex_app)) { // Handle Antimirov union.
             assert(false && "re.is_antimirov_union(ex_app)");
-        } else if (m_util_s.re.is_complement(ex_app)) { // Handle complement. // TODO: What is this?
+        } else if (m_util_s.re.is_complement(ex_app)) { // Handle complement.
             assert(false && "re.is_complement(ex_app)");
-        } else if (m_util_s.re.is_derivative(ex_app)) { // Handle derivative. // TODO: What is this?
+        } else if (m_util_s.re.is_derivative(ex_app)) { // Handle derivative.
             assert(false && "re.is_derivative(ex_app)");
-        } else if (m_util_s.re.is_diff(ex_app)) { // Handle diff. // TODO: What is this?
+        } else if (m_util_s.re.is_diff(ex_app)) { // Handle diff.
             assert(false && "re.is_diff(ex_app)");
-        } else if (m_util_s.re.is_dot_plus(ex_app)) { // Handle dot plus. // TODO: What is this?
+        } else if (m_util_s.re.is_dot_plus(ex_app)) { // Handle dot plus.
             assert(false && "re.is_dot_plus(ex_app)");
-        } else if (m_util_s.re.is_empty(ex_app)) { // Handle empty string. // TODO: What is this?
+        } else if (m_util_s.re.is_empty(ex_app)) { // Handle empty string.
             assert(false && "re.is_empty(ex_app)");
-        } else if (m_util_s.re.is_epsilon(ex_app)) { // Handle epsilon. // TODO: Maybe ignore completely.
+        } else if (m_util_s.re.is_epsilon(ex_app)) { // Handle epsilon.
             assert(false && "re.is_epsilon(ex_app)");
-        } else if (m_util_s.re.is_full_char(ex_app)) { // Handle full char. // TODO: What is this?
+        } else if (m_util_s.re.is_full_char(ex_app)) { // Handle full char.
             assert(false && "re.is_full_char(ex_app)");
         } else if (m_util_s.re.is_full_seq(ex_app)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
             return;
-        } else if (m_util_s.re.is_intersection(ex_app)) { // Handle intersection. // TODO: What is this?
+        } else if (m_util_s.re.is_intersection(ex_app)) { // Handle intersection.
             assert(false && "re.is_intersection(ex_app)");
-        } else if (m_util_s.re.is_loop(ex_app)) { // Handle loop. // TODO: What is this?
+        } else if (m_util_s.re.is_loop(ex_app)) { // Handle loop.
             assert(false && "re.is_loop(ex_app)");
-        } else if (m_util_s.re.is_of_pred(ex_app)) { // Handle of predicate. // TODO: What is this?
+        } else if (m_util_s.re.is_of_pred(ex_app)) { // Handle of predicate.
             assert(false && "re.is_of_pred(ex_app)");
         } else if (m_util_s.re.is_opt(ex_app)) { // Handle optional.
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
-            get_symbols(to_app(child), m_util_s, m, alphabet);
+            extract_symbols(to_app(child), m_util_s, m, alphabet);
             return;
-        } else if (m_util_s.re.is_range(ex_app)) { // Handle range. // TODO: What is this?
+        } else if (m_util_s.re.is_range(ex_app)) { // Handle range.
             assert(false && "re.is_range(ex_app)");
-        } else if (m_util_s.re.is_reverse(ex_app)) { // Handle reverse. // TODO: What is this?
+        } else if (m_util_s.re.is_reverse(ex_app)) { // Handle reverse.
             assert(false && "re.is_reverse(ex_app)");
         } else if (m_util_s.re.is_union(ex_app)) { // Handle union (= or; A|B).
             SASSERT(ex_app->get_num_args() == 2);
@@ -81,38 +85,74 @@ namespace smt::noodler::util {
             const auto right{ ex_app->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            get_symbols(to_app(left), m_util_s, m, alphabet);
-            get_symbols(to_app(right), m_util_s, m, alphabet);
+            extract_symbols(to_app(left), m_util_s, m, alphabet);
+            extract_symbols(to_app(right), m_util_s, m, alphabet);
             return;
         } else if (m_util_s.re.is_star(ex_app)) { // Handle star iteration.
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
-            get_symbols(to_app(child), m_util_s, m, alphabet);
+            extract_symbols(to_app(child), m_util_s, m, alphabet);
             return;
         } else if (m_util_s.re.is_plus(ex_app)) { // Handle positive iteration.
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
-            get_symbols(to_app(child), m_util_s, m, alphabet);
+            extract_symbols(to_app(child), m_util_s, m, alphabet);
             return;
         } else if(is_app(ex_app) && to_app(ex_app)->get_num_args() == 0) { // Handle variable.
             assert(false && "is_variable(ex_app)");
-            // TODO: How to represent variables?
-            //SASSERT(ex_app->get_num_args() == 1);
-            // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
-            //regex = "(" + ex_app->get_decl()->get_parameter(0).get_symbol().str() + ")";
         }
 
-        // WHen ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
+        // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
         for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
             SASSERT(is_app(ex_app->get_arg(i)));
             app *arg = to_app(ex_app->get_arg(i));
-            get_symbols(arg, m_util_s, m, alphabet);
+            extract_symbols(arg, m_util_s, m, alphabet);
         }
     }
 
-    std::set<uint32_t> get_dummy_symbols(vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to) {
+    void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {
+        if(m_util_s.str.is_string(ex)) {
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            res.insert(ex);
+            return;
+        }
+
+        SASSERT(is_app(ex));
+        app* ex_app{ to_app(ex) };
+
+        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+            SASSERT(is_app(ex_app->get_arg(i)));
+            app *arg = to_app(ex_app->get_arg(i));
+            get_variables(arg, m_util_s, m, res);
+        }
+    }
+
+    void get_variable_names(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res) {
+        if(m_util_s.str.is_string(ex)) {
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            res.insert(std::to_string(to_app(ex)->get_name()));
+            return;
+        }
+
+        SASSERT(is_app(ex));
+        app* ex_app{ to_app(ex) };
+
+        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+            SASSERT(is_app(ex_app->get_arg(i)));
+            app *arg = to_app(ex_app->get_arg(i));
+            get_variable_names(arg, m_util_s, m, res);
+        }
+    }
+
+    std::set<uint32_t> get_dummy_symbols(const vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to) {
         std::set<uint32_t> dummy_symbols{};
         uint32_t dummy_symbol{ 0 };
         const size_t disequations_number{ disequations.size() };
@@ -138,17 +178,17 @@ namespace smt::noodler::util {
     ) {
         std::set<uint32_t> symbols_in_formula{};
         for (const auto &word_equation: equations) {
-            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
         }
 
         for (const auto &word_equation: disequations) {
-            util::get_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::get_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
         }
 
         for (const auto &word_equation: regexes) {
-            util::get_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+            util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
         }
         return symbols_in_formula;
     }
@@ -190,18 +230,18 @@ namespace smt::noodler::util {
             variables_with_regex.insert(variable_name);
             BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             assert(aut_assignment.find(variable_term) == aut_assignment.end());
-            Mata::Nfa::Nfa nfa{};
+            Nfa nfa{};
             Mata::RE2Parser::create_nfa(&nfa, conv_to_regex_hex(to_app(std::get<1>(word_equation)), m_util_s, m, alphabet));
-            aut_assignment[variable_term] = std::make_shared<Mata::Nfa::Nfa>(nfa);
+            aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
         }
 
         // Assign sigma start automata for all yet unassigned variables.
+        const Nfa nfa_sigma_star{ aut_assignment.sigma_star_automaton() };
         for (const auto& variable_name : variables_in_formula) {
             if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
                 BasicTerm variable_term{ BasicTermType::Variable, variable_name };
                 assert(aut_assignment.find(variable_term) == aut_assignment.end());
-                // FIXME: Use copy constructor for NFA.
-                aut_assignment[variable_term] = std::make_shared<Mata::Nfa::Nfa>(aut_assignment.sigma_star_automaton());
+                aut_assignment[variable_term] = std::make_shared<Nfa>(nfa_sigma_star);
             }
         }
 
@@ -288,11 +328,41 @@ namespace smt::noodler::util {
             regex = convert_stream.str();
         } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
             assert(false && "is_variable(expr)");
-            // TODO: How to represent variables?
-            //SASSERT(expr->get_num_args() == 1);
-            // TODO: What if valid variable is only the first symbol, the rest is undefined from underlying variant?
-            //regex = expr->get_decl()->get_parameter(0).get_symbol().str();
         }
         return regex;
+    }
+
+    void collect_terms(const app* ex, const seq_util& m_util_s, std::vector<BasicTerm>& terms) {
+        if(m_util_s.str.is_string(ex)) {
+            std::string lit = ex->get_parameter(0).get_zstring().encode();
+            terms.emplace_back(BasicTermType::Literal, lit);
+            return;
+        }
+
+        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+            std::string var = ex->get_decl()->get_name().str();
+            terms.emplace_back(BasicTermType::Variable, var);
+            return;
+        }
+
+        SASSERT(m_util_s.str.is_concat(ex));
+        SASSERT(ex->get_num_args() == 2);
+        app *a_x = to_app(ex->get_arg(0));
+        app *a_y = to_app(ex->get_arg(1));
+        collect_terms(a_x, m_util_s, terms);
+        collect_terms(a_y, m_util_s, terms);
+    }
+
+    void get_len_exprs(app* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res) {
+        if(m_util_s.str.is_length(ex)) {
+            res.insert(ex);
+            return;
+        }
+
+        for(unsigned i = 0; i < ex->get_num_args(); i++) {
+            SASSERT(is_app(ex->get_arg(i)));
+            app *arg = to_app(ex->get_arg(i));
+            get_len_exprs(arg, m_util_s, m, res);
+        }
     }
 }

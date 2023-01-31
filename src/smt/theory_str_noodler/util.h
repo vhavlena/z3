@@ -36,61 +36,25 @@ namespace smt::noodler::util {
     @param m AST manager
     @param[out] res Vector of found variables (may contain duplicities).
     */
-    static void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {
-        if(m_util_s.str.is_string(ex)) {
-            return;
-        }
-
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            res.insert(ex);
-            return;
-        }
-
-        SASSERT(is_app(ex));
-        app* ex_app{ to_app(ex) };
-
-        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-            SASSERT(is_app(ex_app->get_arg(i)));
-            app *arg = to_app(ex_app->get_arg(i));
-            get_variables(arg, m_util_s, m, res);
-        }
-    }
+    void get_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res);
 
     /**
      * Get variable names from a given expression @p ex. Append to the output parameter @p res.
      * @param[in] ex Expression to be checked for variables.
-     * @param[in] m_util_s Seq util for AST
-     * @param[in] m AST manager
+     * @param[in] m_util_s Seq util for AST.
+     * @param[in] m AST manager.
      * @param[out] res Vector of found variables (may contain duplicities).
      */
-    static void get_variable_names(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res) {
-        if(m_util_s.str.is_string(ex)) {
-            return;
-        }
-
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            res.insert(std::to_string(to_app(ex)->get_name()));
-            return;
-        }
-
-        SASSERT(is_app(ex));
-        app* ex_app{ to_app(ex) };
-
-        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-            SASSERT(is_app(ex_app->get_arg(i)));
-            app *arg = to_app(ex_app->get_arg(i));
-            get_variable_names(arg, m_util_s, m, res);
-        }
-    }
+    void get_variable_names(expr* ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res);
 
     /**
-     * Get symbols from a given expression @p ex. Append to the output parameter @p alphabet.
-     * @param ex Expression to be checked for symbols.
-     * @param m_util_s Seq util for AST.
-     * @param m AST manager.
+     * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
+     * @param[in] ex Expression to be checked for symbols.
+     * @param[in] m_util_s Seq util for AST.
+     * @param[in] m AST manager.
      * @param[out] alphabet A set of symbols with where found symbols are appended to.
      */
-    void get_symbols(expr* ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet);
+    void extract_symbols(expr * ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet);
 
     /**
      * Get dummy symbols (one for each disequation in @p disequations).
@@ -99,7 +63,7 @@ namespace smt::noodler::util {
      * @param[out] symbols_to_append_to Set of symbols where dummy symbols are appended to.
      * @return Set of dummy symbols.
      */
-    std::set<uint32_t> get_dummy_symbols(vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to);
+    std::set<uint32_t> get_dummy_symbols(const vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to);
 
     /**
      * Get symbols for formula.
@@ -110,7 +74,7 @@ namespace smt::noodler::util {
      * @param[in] m AST manager.
      * @return Set of symbols in the whole formula.
      */
-    std::set<uint32_t> get_symbols_for_formula(
+    [[nodiscard]] std::set<uint32_t> get_symbols_for_formula(
             const vector<expr_pair>& equations,
             const vector<expr_pair>& disequations,
             const vector<expr_pair_flag>& regexes,
@@ -127,7 +91,7 @@ namespace smt::noodler::util {
      * @param[in] m AST manager.
      * @return Automata assignment for the whole formula.
      */
-    AutAssignment create_aut_assignment_for_formula(
+    [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
             const vector<expr_pair>& equations,
             const vector<expr_pair>& disequations,
             const vector<expr_pair_flag>& regexes,
@@ -144,7 +108,7 @@ namespace smt::noodler::util {
      * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
      * @return The resulting regex.
      */
-    std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,  const std::set<uint32_t>& alphabet);
+    [[nodiscard]] std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,  const std::set<uint32_t>& alphabet);
 
     /**
     Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 
@@ -154,8 +118,7 @@ namespace smt::noodler::util {
     @param pred_replace Replacement of predicate and functions
     @param[out] terms Vector of found BasicTerm (in right order).
     */
-    static inline void collect_terms(app* const ex, const seq_util& m_util_s, 
-        obj_map<expr, expr*>& pred_replace, std::vector<BasicTerm>& terms) {
+    void collect_terms(const app* ex, const seq_util& m_util_s, std::vector<BasicTerm>& terms);
 
         if(m_util_s.str.is_string(ex)) {
             std::string lit = ex->get_parameter(0).get_zstring().encode();
