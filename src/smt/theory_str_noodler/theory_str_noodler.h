@@ -155,6 +155,7 @@ namespace smt::noodler {
         void handle_not_prefix(expr *e);
         void handle_not_suffix(expr *e);
         void handle_contains(expr *e);
+        void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
         void set_conflict(const literal_vector& ls);
         void block_curr_assignment();

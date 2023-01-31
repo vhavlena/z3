@@ -459,6 +459,7 @@ namespace smt::noodler {
                 handle_contains(e);
             } else {
                 std::cout << "not contains " << mk_pp(e, m) << std::endl << std::endl;
+                handle_not_contains(e);
                 m_not_contains_todo.push_back({{e1, m},
                                                {e2, m}});
             }
@@ -1135,7 +1136,7 @@ namespace smt::noodler {
 
         add_axiom({s_eq_emp, mk_literal(re) });
         add_axiom({s_eq_emp, mk_literal(m.mk_eq(s, s1c))});
-        add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, x), s))});
+        add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s))});
     }
 
     /**
@@ -1351,6 +1352,24 @@ namespace smt::noodler {
         string_theory_propagation(pys);
         literal not_e = mk_literal(mk_not({e, m}));
         add_axiom({not_e, mk_eq(x, pys, false)});
+    }
+
+    void theory_str_noodler::handle_not_contains(expr *e) {
+        if(axiomatized_terms.contains(e))
+            return;
+
+        axiomatized_terms.insert(e);
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y)); 
+
+        std::cout << mk_pp(x, m) << std::endl;
+        std::cout << mk_pp(y, m) << std::endl;
+
+        zstring s;
+        if(m_util_s.str.is_string(y, s)) {
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_seq(nullptr)), m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)), m_util_s.re.mk_star(m_util_s.re.mk_full_seq(nullptr)))) ), m);
+            add_axiom({mk_literal(e), ~mk_literal(re)});
+        }
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
