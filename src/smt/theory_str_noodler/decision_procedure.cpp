@@ -26,7 +26,7 @@ namespace smt::noodler {
         worklist.push_back(initialWlEl);
     }
 
-    bool DecisionProcedure::get_another_solution() {
+    bool DecisionProcedure::is_sat() {
 
         while (!worklist.empty()) {
             WorklistElement element_to_process = std::move(worklist.front());
@@ -118,11 +118,10 @@ namespace smt::noodler {
                 // TODO probably we should try shortest words, it might work correctly
                 if (is_node_to_process_on_cycle // TODO should we not test inclusion if we have node that is not on cycle? because we will not go back to it, so it should make sense to just do noodlification
                     && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *(right_side_automata[0]))) { // there should be exactly one element in right_side_automata as we do not have length variables
-                    if (element_to_process.nodes_to_process.empty()) {
-                        // TODO do some other shit?
-                        sat_element = std::move(element_to_process);
-                        return true;
-                    }
+                    // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.nodes_to_process is empty), or just to get to sat faster
+                    worklist.push_front(element_to_process);
+                    // we continue as there is no need for noodlification, inclusion already holds
+                    continue;
                 }
             }
 
@@ -183,17 +182,11 @@ namespace smt::noodler {
                                                 element_to_process.length_sensitive_vars,
                                                 element_to_process.substitution_map);
 
-                    if (new_element.nodes_to_process.empty()) {
-                        // TODO do something more??
-                        sat_element = std::move(new_element);
-                        return true;
+                    // TODO should we really push to front when not on cycle?
+                    if (!is_node_to_process_on_cycle) {
+                        worklist.push_front(new_element);
                     } else {
-                        // TODO should we really push to front when not on cycle?
-                        if (!is_node_to_process_on_cycle) {
-                            worklist.push_front(new_element);
-                        } else {
-                            worklist.push_back(new_element);
-                        }
+                        worklist.push_back(new_element);
                     }
                 }
             } else {

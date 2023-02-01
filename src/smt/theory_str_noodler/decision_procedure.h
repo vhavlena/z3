@@ -85,6 +85,37 @@ namespace smt::noodler {
             auto is_deleted = [&deleted_nodes](std::shared_ptr<GraphNode> node) { return (deleted_nodes.count(node) > 0) ; };
             nodes_to_process.erase(std::remove_if(nodes_to_process.begin(), nodes_to_process.end(), is_deleted), nodes_to_process.end());
         }
+
+        /**
+         * @brief Combines aut_ass and substitution_map into one AutAssigment
+         * 
+         * For example, if we have aut_ass[x] = aut1, aut_ass[y] = aut2, and substitution_map[z] = xy, then this will return
+         * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
+         * 
+         */
+        AutAssignment flatten_substition_map() {
+            AutAssignment result = aut_ass;
+            std::function<std::shared_ptr<Mata::Nfa::Nfa>(const BasicTerm&)> squash_var;
+            flatten_var = [&result, &squash_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
+                if (result.count(var) == 0) {
+                    std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>();
+                    auto state = var_aut->add_state();
+                    var_aut->initial.add(state);
+                    var_aut->final.add(state);
+                    for (const auto &subst_var : this->substitution_map.at(var)) {
+                        var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *squash_var(subst_var)));
+                    }
+                    result[var] = var_aut;
+                    return var_aut;
+                } else {
+                    return result[var];
+                }
+            };
+            for (const auto &subst_map_pair : substitution_map) {
+                squash_var(subst_map_pair.first);
+            }
+            return result;
+        }
     };
 
     class DecisionProcedure  {
@@ -103,11 +134,9 @@ namespace smt::noodler {
 
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm> init_length_sensitive_vars);
 
-        bool get_another_solution();
+        // returns true if there is something in worklist that is satisfiable and saves the satisfying element in sat_element
+        bool is_sat();
         WorklistElement sat_element;
-
-        // void initialize(const Instance& inst) override;
-        // bool get_another_solution(const Instance& inst, LengthConstr& out) override;
     };
 }
 
