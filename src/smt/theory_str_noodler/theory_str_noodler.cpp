@@ -710,6 +710,10 @@ namespace smt::noodler {
             std::cout << f.to_string() << std::endl;
         }
 
+        if(instance.get_predicates().size() == 0) {
+            return FC_DONE;
+        }
+
         block_curr_assignment();
         return FC_CONTINUE;
 
@@ -953,7 +957,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Handle str.substr
+     * @brief Handle str.substr(s,i,l)
      * 
      * Translates to the following theory axioms:
      * 0 <= i <= |s| -> x.v.y = s
@@ -1160,7 +1164,7 @@ namespace smt::noodler {
         expr_ref c  = mk_last(s);
         expr_ref s1c = mk_concat(s1, c);
         literal s_eq_emp = mk_eq_empty(s);
-        expr_ref re(m_util_s.re.mk_in_re(c, m_util_s.re.mk_full_seq(nullptr)), m);
+        expr_ref re(m_util_s.re.mk_in_re(c, m_util_s.re.mk_full_char(nullptr)), m);
 
         add_axiom({s_eq_emp, mk_literal(re) });
         add_axiom({s_eq_emp, mk_literal(m.mk_eq(s, s1c))});
@@ -1250,49 +1254,61 @@ namespace smt::noodler {
         add_axiom({not_e, mk_eq(y, xs, false)});
     }
 
-// e = prefix(x, y), check if x is not a prefix of y
+    /**
+     * @brief Handle not(prefix(x,y)); prefix(x,y) = @p e
+     * Translates to the following theory axioms:
+     * not(e) && |x| <= |y| -> x = p.mx.qx
+     * not(e) && |x| <= |y| -> y = p.my.qy
+     * not(e) && |x| <= |y| -> mx in re.allchar
+     * not(e) && |x| <= |y| -> my in re.allchar
+     * not(e) && |x| <= |y| -> mx != my
+     * 
+     * @param e prefix term
+     */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        if(!axiomatized_terms.contains(e)||false) {
-            axiomatized_terms.insert(e);
+        if(axiomatized_terms.contains(e))
+            return; 
+            
+        axiomatized_terms.insert(e);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_prefix(e, x, y));
 
-            ast_manager &m = get_manager();
-            expr *x = nullptr, *y = nullptr;
-            VERIFY(m_util_s.str.is_prefix(e, x, y));
+        expr_ref p = mk_str_var("nprefix_left");
+        expr_ref mx = mk_str_var("nprefix_midx");
+        expr_ref my = mk_str_var("nprefix_midy");
+        expr_ref qx = mk_str_var("nprefix_rightx");
+        expr_ref qy = mk_str_var("nprefix_righty");
 
-            expr_ref p= mk_skolem(symbol("m_not_prefix_left"), x, y);
-            expr_ref mx= mk_skolem(symbol("m_not_prefix_midx"), x, y);
-            expr_ref my= mk_skolem(symbol("m_not_prefix_midy"), x, y);
-            expr_ref qx= mk_skolem(symbol("m_not_prefix_rightx"), x, y);
-            expr_ref qy= mk_skolem(symbol("m_not_prefix_righty"), x, y);
+        expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
+        literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
+        expr_ref pmx(m_util_s.str.mk_concat(p, mx), m);
+        string_theory_propagation(pmx);
+        expr_ref pmxqx(m_util_s.str.mk_concat(pmx, qx), m);
+        string_theory_propagation(pmxqx);
+        expr_ref pmy(m_util_s.str.mk_concat(p, my), m);
+        string_theory_propagation(pmy);
+        expr_ref pmyqy(m_util_s.str.mk_concat(pmy, qy), m);
+        string_theory_propagation(pmyqy);
 
-            expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
+        literal x_eq_pmq = mk_eq(x,pmxqx,false);
+        literal y_eq_pmq = mk_eq(y,pmyqy,false);
+        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
 
-            literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
+        expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
 
-            expr_ref pmx(m_util_s.str.mk_concat(p, mx), m);
-            string_theory_propagation(pmx);
-            expr_ref pmxqx(m_util_s.str.mk_concat(pmx, qx), m);
-            string_theory_propagation(pmxqx);
-
-            expr_ref pmy(m_util_s.str.mk_concat(p, my), m);
-            string_theory_propagation(pmy);
-            expr_ref pmyqy(m_util_s.str.mk_concat(pmy, qy), m);
-            string_theory_propagation(pmyqy);
-
-            literal x_eq_pmq = mk_eq(x,pmxqx,false);
-            literal y_eq_pmq = mk_eq(y,pmyqy,false);
-
-            literal len_mx_is_one = mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(mx),false);
-            literal len_my_is_one = mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(my),false);
-            literal eq_mx_my = mk_eq(mx, my,false);
-
-            literal lit_e = mk_literal(e);
-            add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
-            add_axiom({lit_e, len_y_gt_len_x, y_eq_pmq});
-            add_axiom({lit_e, len_y_gt_len_x, len_mx_is_one});
-            add_axiom({lit_e, len_y_gt_len_x, len_my_is_one});
-            add_axiom({lit_e, len_y_gt_len_x, ~eq_mx_my});
-        }
+        literal lit_e = mk_literal(e);
+        // not(e) && |x| <= |y| -> x = p.mx.qx
+        add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
+        // not(e) && |x| <= |y| -> y = p.my.qy
+        add_axiom({lit_e, len_y_gt_len_x, y_eq_pmq});
+        // not(e) && |x| <= |y| -> mx in re.allchar
+        add_axiom({lit_e, len_y_gt_len_x, mk_literal(rex)});
+        // not(e) && |x| <= |y| -> my in re.allchar
+        add_axiom({lit_e, len_y_gt_len_x, mk_literal(rey)});
+        // not(e) && |x| <= |y| -> mx != my
+        add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
     }
 
     /**
@@ -1319,50 +1335,62 @@ namespace smt::noodler {
     }
 
     // e = suffix(x, y), check if x is not a suffix of y
+
+    /**
+     * @brief Handle not(suffix(x,y)); suffix(x,y) = @p e
+     * Translates to the following theory axioms:
+     * not(e) && |x| <= |y| -> x = px.mx.q
+     * not(e) && |x| <= |y| -> y = py.my.q
+     * not(e) && |x| <= |y| -> mx in re.allchar
+     * not(e) && |x| <= |y| -> my in re.allchar
+     * not(e) && |x| <= |y| -> mx != my
+     * 
+     * @param e prefix term
+     */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        if(!axiomatized_terms.contains(e)||false) {
-            axiomatized_terms.insert(e);
+        if(axiomatized_terms.contains(e))
+            return;
 
-            ast_manager &m = get_manager();
-            expr *x = nullptr, *y = nullptr;
-            VERIFY(m_util_s.str.is_prefix(e, x, y));
+        axiomatized_terms.insert(e);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_suffix(e, x, y));
 
-            expr_ref q= mk_skolem(symbol("m_not_suffix_right"), x, y);
-            expr_ref mx= mk_skolem(symbol("m_not_suffix_midx"), x, y);
-            expr_ref my= mk_skolem(symbol("m_not_suffix_midy"), x, y);
-            expr_ref px= mk_skolem(symbol("m_not_suffix_leftx"), x, y);
-            expr_ref py= mk_skolem(symbol("m_not_suffix_lefty"), x, y);
+        expr_ref q = mk_str_var("nsuffix_right");
+        expr_ref mx = mk_str_var("nsuffix_midx");
+        expr_ref my = mk_str_var("nsuffix_midy");
+        expr_ref px = mk_str_var("nsuffix_leftx");
+        expr_ref py = mk_str_var("nsuffix_lefty");
 
+        expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
+        literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
+        expr_ref pxmx(m_util_s.str.mk_concat(px, mx), m);
+        string_theory_propagation(pxmx);
+        expr_ref pxmxq(m_util_s.str.mk_concat(pxmx, q), m);
+        string_theory_propagation(pxmxq);
+        expr_ref pymy(m_util_s.str.mk_concat(py, my), m);
+        string_theory_propagation(pymy);
+        expr_ref pymyq(m_util_s.str.mk_concat(pymy, q), m);
+        string_theory_propagation(pymyq);
 
+        literal x_eq_pmq = mk_eq(x,pxmxq,false);
+        literal y_eq_pmq = mk_eq(y,pymyq,false);
+        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
+        literal lit_e = mk_literal(e);
 
-            expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
+        expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
 
-            literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
-
-            expr_ref pxmx(m_util_s.str.mk_concat(px, mx), m);
-            string_theory_propagation(pxmx);
-            expr_ref pxmxq(m_util_s.str.mk_concat(pxmx, q), m);
-            string_theory_propagation(pxmxq);
-
-            expr_ref pymy(m_util_s.str.mk_concat(py, my), m);
-            string_theory_propagation(pymy);
-            expr_ref pymyq(m_util_s.str.mk_concat(pymy, q), m);
-            string_theory_propagation(pymyq);
-
-            literal x_eq_pmq = mk_eq(x,pxmxq,false);
-            literal y_eq_pmq = mk_eq(y,pymyq,false);
-
-            literal len_mx_is_one = mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(mx),false);
-            literal len_my_is_one = mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(my),false);
-            literal eq_mx_my = mk_eq(mx, my,false);
-
-            literal lit_e = mk_literal(e);
-            add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
-            add_axiom({lit_e, len_y_gt_len_x, y_eq_pmq});
-            add_axiom({lit_e, len_y_gt_len_x, len_mx_is_one});
-            add_axiom({lit_e, len_y_gt_len_x, len_my_is_one});
-            add_axiom({lit_e, len_y_gt_len_x, ~eq_mx_my});
-        }
+        // not(e) && |x| <= |y| -> x = px.mx.q
+        add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
+        // not(e) && |x| <= |y| -> y = py.my.q
+        add_axiom({lit_e, len_y_gt_len_x, y_eq_pmq});
+        // not(e) && |x| <= |y| -> mx in re.allchar
+        add_axiom({lit_e, len_y_gt_len_x, mk_literal(rex)});
+        // not(e) && |x| <= |y| -> my in re.allchar
+        add_axiom({lit_e, len_y_gt_len_x, mk_literal(rey)});
+        // not(e) && |x| <= |y| -> mx != my
+        add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
     }
 
     // e = contains(x, y)
@@ -1404,7 +1432,9 @@ namespace smt::noodler {
 
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_seq(nullptr)), m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)), m_util_s.re.mk_star(m_util_s.re.mk_full_seq(nullptr)))) ), m);
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)), 
+                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)), 
+                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
         }
     }
@@ -1651,7 +1681,7 @@ namespace smt::noodler {
             eq = to_app(ex->get_arg(0));
             ptype = PredicateType::Inequation;
         }
-        SASSERT(ex->get_num_args() == 2);
+        SASSERT(eq->get_num_args() == 2);
         SASSERT(eq->get_arg(0));
         SASSERT(eq->get_arg(1));
 
