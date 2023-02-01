@@ -33,7 +33,6 @@ namespace smt::noodler::util {
             // Assume that expression inside re.to_re() function is a string of characters.
             SASSERT(ex_app->get_num_args() == 1);
             const auto arg{ ex_app->get_arg(0) };
-            //SASSERT(is_string_sort(arg));
             extract_symbols(to_app(arg), m_util_s, m, alphabet);
             return;
         } else if (m_util_s.re.is_concat(ex_app)) { // Handle concatenation.
@@ -59,9 +58,11 @@ namespace smt::noodler::util {
             assert(false && "re.is_empty(ex_app)");
         } else if (m_util_s.re.is_epsilon(ex_app)) { // Handle epsilon.
             assert(false && "re.is_epsilon(ex_app)");
-        } else if (m_util_s.re.is_full_char(ex_app)) { // Handle full char.
-            assert(false && "re.is_full_char(ex_app)");
-        } else if (m_util_s.re.is_full_seq(ex_app)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
+        } else if (m_util_s.re.is_full_char(ex_app)) {
+            // Handle full char (single occurrence of any string symbol, '.') (SMT2: re.allchar).
+            return;
+        } else if (m_util_s.re.is_full_seq(ex_app)) {
+            // Handle full sequence of characters (any sequence of characters, '.*') (SMT2: re.all).
             return;
         } else if (m_util_s.re.is_intersection(ex_app)) { // Handle intersection.
             assert(false && "re.is_intersection(ex_app)");
@@ -230,13 +231,14 @@ namespace smt::noodler::util {
             variables_with_regex.insert(variable_name);
             BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             assert(aut_assignment.find(variable_term) == aut_assignment.end());
-            Nfa nfa{};
-            Mata::RE2Parser::create_nfa(&nfa, conv_to_regex_hex(to_app(std::get<1>(word_equation)), m_util_s, m, alphabet));
+
+            const bool make_complement{ std::get<2>(word_equation) };
+            Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, alphabet, make_complement) };
             aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
         }
 
         // Assign sigma start automata for all yet unassigned variables.
-        const Nfa nfa_sigma_star{ aut_assignment.sigma_star_automaton() };
+        const Nfa nfa_sigma_star{ aut_assignment.sigma_star_automaton() };  // FIXME: Unknown alphabet so far.
         for (const auto& variable_name : variables_in_formula) {
             if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
                 BasicTerm variable_term{ BasicTermType::Variable, variable_name };
@@ -245,6 +247,11 @@ namespace smt::noodler::util {
             }
         }
 
+        // DEBUG.
+        for (const auto& single_aut_assignment: aut_assignment) {
+            std::cout << single_aut_assignment.first.get_name() << ":\n";
+            single_aut_assignment.second->print_to_DOT(std::cout);
+        }
         return aut_assignment;
     }
 
@@ -257,8 +264,8 @@ namespace smt::noodler::util {
             regex = conv_to_regex_hex(to_app(arg), m_util_s, m, alphabet);
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
-            const auto left{expr->get_arg(0)};
-            const auto right{expr->get_arg(1)};
+            const auto left{ expr->get_arg(0) };
+            const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             regex = conv_to_regex_hex(to_app(left), m_util_s, m, alphabet) + conv_to_regex_hex(to_app(right), m_util_s, m, alphabet);
@@ -276,9 +283,7 @@ namespace smt::noodler::util {
             assert(false && "re.is_empty(expr)");
         } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon.
             assert(false && "re.is_epsilon(expr)");
-        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char.
-            assert(false && "re.is_full_char(expr)");
-        } else if (m_util_s.re.is_full_seq(expr)) { // Handle full sequence (any character, '.') (SMT2: re.allchar).
+        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char (single occurrence of any string symbol, '.').
             regex += "[";
             std::stringstream convert_stream;
             for (const auto& symbol : alphabet) {
@@ -286,6 +291,16 @@ namespace smt::noodler::util {
             }
             regex += convert_stream.str();
             regex += "]";
+        } else if (m_util_s.re.is_full_seq(expr)) {
+            // Handle full sequence of characters (any sequence of characters, '.*') (SMT2: re.all).
+
+            regex += "[";
+            std::stringstream convert_stream;
+            for (const auto& symbol : alphabet) {
+                convert_stream << std::dec << "\\x{" << std::hex << symbol << std::dec << "}";
+            }
+            regex += convert_stream.str();
+            regex += "]*";
         } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
             assert(false && "re.is_intersection(expr)");
         } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
@@ -329,7 +344,21 @@ namespace smt::noodler::util {
         } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
             assert(false && "is_variable(expr)");
         }
+
+        std::cout << regex << "\n";
         return regex;
+    }
+
+    [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+                                              const std::set<uint32_t>& alphabet, bool make_complement) {
+        const std:string regex{ conv_to_regex_hex(expr, m_util_s, m, alphabet) };
+        Nfa nfa{};
+        Mata::RE2Parser::create_nfa(&nfa, regex);
+        if (make_complement) {
+            Mata::OnTheFlyAlphabet mata_alphabet{ Mata::Nfa::create_alphabet(nfa) };
+            nfa = Mata::Nfa::complement(nfa, mata_alphabet);
+        }
+        return nfa;
     }
 
     void collect_terms(const app* ex, const seq_util& m_util_s, std::vector<BasicTerm>& terms) {

@@ -108,7 +108,20 @@ namespace smt::noodler::util {
      * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
      * @return The resulting regex.
      */
-    [[nodiscard]] std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,  const std::set<uint32_t>& alphabet);
+    [[nodiscard]] std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+                                                const std::set<uint32_t>& alphabet);
+
+    /**
+     * Convert expression @p expr to NFA using hexadecimal values as symbols.
+     * @param[in] expr Expression to be converted to regex.
+     * @param[in] m_util_s Seq util for AST.
+     * @param[in] m AST manager.
+     * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
+     * @param[in] make_complement Whether to make complement of the passed @p expr instead.
+     * @return The resulting regex.
+     */
+    [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+                                              const std::set<uint32_t>& alphabet, bool make_complement = false);
 
     /**
     Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 

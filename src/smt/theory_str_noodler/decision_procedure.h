@@ -11,7 +11,6 @@
 #include "state_len.h"
 #include "formula_preprocess.h"
 
-
 namespace smt::noodler {
     /**
      * @brief Abstract decision procedure. Defines interface for decision
