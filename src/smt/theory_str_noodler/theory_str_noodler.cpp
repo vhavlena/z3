@@ -1045,8 +1045,28 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Handling of str.indexof
+     * @brief Handling of str.indexof(t, s, offset) = indexof
      * Translates to the following theory axioms:
+     * The case of offset = 0
+     * not(contains(t,s)) -> indexof = -1
+     * t = eps && s != eps -> indexof = -1
+     * s = eps -> indexof = 0
+     * contains(t, s) && s != eps -> t = xsy
+     * contains(t, s) && s != eps -> indexof = |x|
+     * contains(t, s) -> indexof >= 0
+     * tightestprefix(s,x)
+     * 
+     * The case of offset > 0
+     * not(contains(t,s)) -> indexof = -1
+     * t = eps && s != eps -> indexof = -1
+     * offset >= |t| && s != eps -> indexof = -1
+     * offset > |t| -> indexof = -1
+     * offset >= |t| && offset <= |t| && s = eps -> indexof = offset
+     * offset >= 0 && offset < |t| -> t = xy
+     * offset >= 0 && offset < |t| -> |x| = offset
+     * offset >= 0 && offset < |t| && indexof(y,s,0) = -1 -> indexof = -1
+     * offset >= 0 && offset < |t| && indexof(y,s,0) >= 0 -> offset + indexof(y,s,0) = indexof
+     * offset < 0 -> indexof = -1
      * 
      * @param i indexof term
      */
@@ -1070,32 +1090,37 @@ namespace smt::noodler {
         literal s_eq_empty = mk_eq(s, emp, false);
         literal t_eq_empty = mk_eq(t, emp, false);
 
+        // not(contains(t,s)) -> indexof = -1
         add_axiom({cnt, i_eq_m1});
+        // t = eps && s != eps -> indexof = -1
         add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
 
         if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
             expr_ref x = mk_str_var("index_left");
             expr_ref y = mk_str_var("index_right");
             expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);
-            expr_ref indexofVar = mk_int_var("index_res");
             string_theory_propagation(xsy);
 
-            // |s| = 0 => indexof(t,s,0) = 0
-            // contains(t,s) & |s| != 0 => t = xsy & indexof(t,s,0) = |x|
             expr_ref lenx(m_util_s.str.mk_length(x), m);
+            // s = eps -> indexof = 0
             add_axiom({~s_eq_empty, i_eq_0});
+            // contains(t, s) && s != eps -> t = xsy
             add_axiom({~cnt, s_eq_empty, mk_eq(t, xsy, false)});
+            // contains(t, s) && s != eps -> indexof = |x|
             add_axiom({~cnt, s_eq_empty, mk_eq(i, lenx, false)});
+            // contains(t, s) -> indexof >= 0
             add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
-            add_axiom({mk_eq(i, indexofVar, false)});
             tightest_prefix(s, x);
         } else {
             expr_ref len_t(m_util_s.str.mk_length(t), m);
             literal offset_ge_len = mk_literal(m_util_a.mk_ge(mk_sub(offset, len_t), zero));
             literal offset_le_len = mk_literal(m_util_a.mk_le(mk_sub(offset, len_t), zero));
             literal i_eq_offset = mk_eq(i, offset, false);
+            // offset >= |t| && s != eps -> indexof = -1
             add_axiom({~offset_ge_len, s_eq_empty, i_eq_m1});
+            // offset > |t| -> indexof = -1
             add_axiom({offset_le_len, i_eq_m1});
+            // offset >= |t| && offset <= |t| && s = eps -> indexof = offset
             add_axiom({~offset_ge_len, ~offset_le_len, ~s_eq_empty, i_eq_offset});
 
             expr_ref x = mk_str_var("index_left");
@@ -1106,13 +1131,16 @@ namespace smt::noodler {
             expr_ref indexof0(m_util_s.str.mk_index(y, s, zero), m);
             expr_ref offset_p_indexof0(m_util_a.mk_add(offset, indexof0), m);
             literal offset_ge_0 = mk_literal(m_util_a.mk_ge(offset, zero));
+            // offset >= 0 && offset < |t| -> t = xy
             add_axiom({~offset_ge_0, offset_ge_len, mk_eq(t, xy, false)});
+            // offset >= 0 && offset < |t| -> |x| = offset
             add_axiom({~offset_ge_0, offset_ge_len, mk_eq(m_util_s.str.mk_length(x), offset, false)});
+            // offset >= 0 && offset < |t| && indexof(y,s,0) = -1 -> indexof = -1
             add_axiom({~offset_ge_0, offset_ge_len, ~mk_eq(indexof0, minus_one, false), i_eq_m1});
+            // offset >= 0 && offset < |t| && indexof(y,s,0) >= 0 -> offset + indexof(y,s,0) = indexof
             add_axiom({~offset_ge_0, offset_ge_len, ~mk_literal(m_util_a.mk_ge(indexof0, zero)),
                             mk_eq(offset_p_indexof0, i, false)});
-
-            // offset < 0 => -1 = i
+            // offset < 0 -> indexof = -1
             add_axiom({offset_ge_0, i_eq_m1});
         }
     }
