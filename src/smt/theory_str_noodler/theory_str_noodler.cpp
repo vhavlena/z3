@@ -1051,7 +1051,7 @@ namespace smt::noodler {
      * not(contains(t,s)) -> indexof = -1
      * t = eps && s != eps -> indexof = -1
      * s = eps -> indexof = 0
-     * contains(t, s) && s != eps -> t = xsy
+     * contains(t, s) && s != eps -> t = x.s.y
      * contains(t, s) && s != eps -> indexof = |x|
      * contains(t, s) -> indexof >= 0
      * tightestprefix(s,x)
@@ -1104,7 +1104,7 @@ namespace smt::noodler {
             expr_ref lenx(m_util_s.str.mk_length(x), m);
             // s = eps -> indexof = 0
             add_axiom({~s_eq_empty, i_eq_0});
-            // contains(t, s) && s != eps -> t = xsy
+            // contains(t, s) && s != eps -> t = x.s.y
             add_axiom({~cnt, s_eq_empty, mk_eq(t, xsy, false)});
             // contains(t, s) && s != eps -> indexof = |x|
             add_axiom({~cnt, s_eq_empty, mk_eq(i, lenx, false)});
@@ -1227,24 +1227,27 @@ namespace smt::noodler {
     }
 
 
-    // e = prefix(x, y), check if x is a prefix of y
+    /**
+     * @brief Handling of str.prefix(x, y) = e (x is a prefix of y)
+     * Translates to the following theory axioms:
+     * e -> y = x.v
+     * 
+     * @param e prefix term
+     */
     void theory_str_noodler::handle_prefix(expr *e) {
-        if(!axiomatized_terms.contains(e)) {
-            axiomatized_terms.insert(e);
+        if(axiomatized_terms.contains(e))
+            return;
 
-            ast_manager &m = get_manager();
-            expr *x = nullptr, *y = nullptr;
-            VERIFY(m_util_s.str.is_prefix(e, x, y));
+        axiomatized_terms.insert(e);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_prefix(e, x, y));
 
-            expr_ref fresh(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name("prefix"), 
-                0, nullptr, this->m_util_s.mk_string_sort()), m); 
-            // expr_ref s = mk_skolem(symbol("m_prefix_right"), x, y);
-            expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
-            string_theory_propagation(xs);
-            literal not_e = mk_literal(mk_not({e, m}));
-            add_axiom({not_e, mk_eq(y, xs, false)});
-            // add_axiom({mk_eq(y, xs, false)});
-        }
+        expr_ref fresh = mk_str_var("prefix");
+        expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
+        string_theory_propagation(xs);
+        literal not_e = mk_literal(mk_not({e, m}));
+        add_axiom({not_e, mk_eq(y, xs, false)});
     }
 
 // e = prefix(x, y), check if x is not a prefix of y
@@ -1292,21 +1295,27 @@ namespace smt::noodler {
         }
     }
 
-
-    // e = suffix(x, y), check if x is a suffix of y
+    /**
+     * @brief Handling of str.suffix(x, y) = e (x is a suffix of y)
+     * Translates to the following theory axioms:
+     * e -> y = v.x
+     * 
+     * @param e suffix term
+     */
     void theory_str_noodler::handle_suffix(expr *e) {
-        if(!axiomatized_terms.contains(e)||false) {
-            axiomatized_terms.insert(e);
-            ast_manager &m = get_manager();
-            expr *x = nullptr, *y = nullptr;
-            VERIFY(m_util_s.str.is_suffix(e, x, y));
+        if(axiomatized_terms.contains(e))
+            return;
+        
+        axiomatized_terms.insert(e);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_suffix(e, x, y));
 
-            expr_ref p = mk_skolem(symbol("m_suffix_left"), x, y);
-            expr_ref px(m_util_s.str.mk_concat(p, x), m);
-            string_theory_propagation(px);
-            literal not_e = mk_literal(mk_not({e, m}));
-            add_axiom({not_e, mk_eq(y, px, false)});
-        }
+        expr_ref fresh = mk_str_var("suffix");
+        expr_ref px(m_util_s.str.mk_concat(fresh, x), m);
+        string_theory_propagation(px);
+        literal not_e = mk_literal(mk_not({e, m}));
+        add_axiom({not_e, mk_eq(y, px, false)});
     }
 
     // e = suffix(x, y), check if x is not a suffix of y
