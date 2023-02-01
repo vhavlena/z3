@@ -458,10 +458,7 @@ namespace smt::noodler {
             if (is_true) {
                 handle_contains(e);
             } else {
-                std::cout << "not contains " << mk_pp(e, m) << std::endl << std::endl;
                 handle_not_contains(e);
-                m_not_contains_todo.push_back({{e1, m},
-                                               {e2, m}});
             }
         } else if (m_util_s.str.is_in_re(e)) {
             handle_in_re(e, is_true);
@@ -1436,6 +1433,13 @@ namespace smt::noodler {
         add_axiom({not_e, mk_eq(x, pys, false)});
     }
 
+
+    /**
+     * @brief Heuristics for handling not contains: not(contains(s, t)). 
+     * So far only the case when t is a string literal is implemented.
+     * 
+     * @param e contains term.
+     */
     void theory_str_noodler::handle_not_contains(expr *e) {
         if(axiomatized_terms.contains(e))
             return;
@@ -1444,15 +1448,14 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y)); 
 
-        std::cout << mk_pp(x, m) << std::endl;
-        std::cout << mk_pp(y, m) << std::endl;
-
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)), 
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)), 
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
+        } else {
+            m_not_contains_todo.push_back({{x, m},{y, m}});
         }
     }
 
