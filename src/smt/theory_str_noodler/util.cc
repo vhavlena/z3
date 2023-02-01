@@ -220,6 +220,7 @@ namespace smt::noodler::util {
         }
 
         AutAssignment aut_assignment{};
+        aut_assignment.set_alphabet(alphabet);
         // Create automata from their corresponding regexes.
         std::unordered_set<std::string> variables_with_regex{};
         for (const auto &word_equation: regexes) {

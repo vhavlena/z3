@@ -83,6 +83,13 @@ namespace smt::noodler {
             return this->alphabet;
         }
 
+        void set_alphabet(const std::set<uint32_t>& alphabet) {
+            this->alphabet.clear();
+            for (const auto& symbol : alphabet) {
+                this->alphabet.insert(symbol);
+            }
+        }
+
     };
         
 } // Namespace smt::noodler.
