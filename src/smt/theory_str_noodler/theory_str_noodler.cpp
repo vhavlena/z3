@@ -1041,23 +1041,45 @@ namespace smt::noodler {
         predicate_replace.insert(e, v.get());
     }
 
+    /**
+     * @brief Handling of str.replace(a,s,t) = v ... a where to replace, s what to find, t replacement.
+     * Translates to the following theory axioms:
+     * replace(a,s,t) = v
+     * a = eps && s != eps -> v = a
+     * (not(contains(a,s))) -> v = a
+     * s = eps -> v = t.a
+     * contains(a,s) && a != eps && s != eps -> a = x.s.y
+     * contains(a,s) && a != eps && s != eps -> v = x.t.y
+     * tighttestprefix(s,t)
+     * 
+     * @param r replace term
+     */
     void theory_str_noodler::handle_replace(expr *r) {
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
-        expr_ref x  = mk_skolem(symbol("m_contains_left"), a, s);
-        expr_ref y  = mk_skolem(symbol("m_contains_right"), a, s);
+        expr_ref v = mk_str_var("replace");
+        expr_ref x = mk_str_var("replace_left");
+        expr_ref y = mk_str_var("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
         literal a_emp = mk_eq_empty(a, true);
         literal s_emp = mk_eq_empty(s, true);
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
-        add_axiom({~a_emp, s_emp, mk_eq(r, a,false)});
-        add_axiom({cnt,  mk_eq(r, a,false)});
-        add_axiom({~s_emp, mk_eq(r, mk_concat(t, a),false)});
+
+        // replace(a,s,t) = v
+        // a = eps && s != eps -> v = a
+        add_axiom({~a_emp, s_emp, mk_eq(v, a,false)});
+        // (not(contains(a,s))) -> v = a
+        add_axiom({cnt,  mk_eq(v, a, false)});
+        // s = eps -> v = t.a
+        add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+        // contains(a,s) && a != eps && s != eps -> a = x.s.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(a, xsy,false)});
-        add_axiom({~cnt, a_emp, s_emp, mk_eq(r, xty,false)});
+        // contains(a,s) && a != eps && s != eps -> v = x.t.y
+        add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
         ctx.force_phase(cnt);
+        // tighttestprefix(s,t)
         tightest_prefix(s, x);
 
     }
@@ -1406,8 +1428,6 @@ namespace smt::noodler {
         // not(e) && |x| <= |y| -> mx != my
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
     }
-
-    // e = contains(x, y)
 
     /**
      * @brief Handle contains
