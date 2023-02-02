@@ -95,15 +95,16 @@ namespace smt::noodler {
          */
         AutAssignment flatten_substition_map() {
             AutAssignment result = aut_ass;
-            std::function<std::shared_ptr<Mata::Nfa::Nfa>(const BasicTerm&)> squash_var;
-            flatten_var = [&result, &squash_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
+            std::function<std::shared_ptr<Mata::Nfa::Nfa>(const BasicTerm&)> flatten_var;
+
+            flatten_var = [&result, &flatten_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
                 if (result.count(var) == 0) {
                     std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>();
                     auto state = var_aut->add_state();
                     var_aut->initial.add(state);
                     var_aut->final.add(state);
                     for (const auto &subst_var : this->substitution_map.at(var)) {
-                        var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *squash_var(subst_var)));
+                        var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *flatten_var(subst_var)));
                     }
                     result[var] = var_aut;
                     return var_aut;
@@ -112,7 +113,7 @@ namespace smt::noodler {
                 }
             };
             for (const auto &subst_map_pair : substitution_map) {
-                squash_var(subst_map_pair.first);
+                flatten_var(subst_map_pair.first);
             }
             return result;
         }
