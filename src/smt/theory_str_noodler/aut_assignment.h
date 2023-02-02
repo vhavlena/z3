@@ -23,12 +23,12 @@ namespace smt::noodler {
 
     private:
         /// Union of all alphabets of automata in the aut assignment
-        std::set<Mata::Nfa::Symbol> alphabet;
+        std::set<Mata::Symbol> alphabet;
 
         void update_alphabet() {
             this->alphabet.clear();
             for (const auto& pr : *this) {
-                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::OnTheFlyAlphabet::from_nfas(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
+                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::Nfa::from_nfas(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
                 this->alphabet.insert(alph_symbols.begin(), alph_symbols.end());
             }
         }
@@ -56,7 +56,7 @@ namespace smt::noodler {
             Mata::Nfa::Nfa nfa(1);
             nfa.initial = {0};
             nfa.final = {0};
-            for (const Mata::Nfa::Symbol& symb : this->alphabet) {
+            for (const Mata::Symbol& symb : this->alphabet) {
                 nfa.delta.add(0, symb, 0);
             }
             return nfa;
@@ -87,7 +87,7 @@ namespace smt::noodler {
             }
         }
 
-        const std::set<Mata::Nfa::Symbol> get_alphabet(bool recompute=false) {
+        const std::set<Mata::Symbol> get_alphabet(bool recompute=false) {
             if(recompute) update_alphabet();
             return this->alphabet;
         }
