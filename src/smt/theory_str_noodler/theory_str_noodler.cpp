@@ -966,6 +966,9 @@ namespace smt::noodler {
 
         // add the replacement charat -> v
         predicate_replace.insert(e, fresh.get());
+        // update length variables
+        util::get_variables(s, this->m_util_s, m, this->len_vars);
+        this->len_vars.insert(x);
     }
 
     /**
@@ -1038,7 +1041,11 @@ namespace smt::noodler {
         // add_axiom({mk_eq(v, e, false)});
 
         // add the replacement substr -> v
-        predicate_replace.insert(e, v.get());
+        this->predicate_replace.insert(e, v.get());
+        // update length variables
+        util::get_variables(s, this->m_util_s, m, this->len_vars);
+        this->len_vars.insert(x);
+        this->len_vars.insert(v);
     }
 
     /**
@@ -1082,6 +1089,7 @@ namespace smt::noodler {
         // tighttestprefix(s,t)
         tightest_prefix(s, x);
 
+        predicate_replace.insert(r, v.get());
     }
 
     /**
@@ -1151,6 +1159,10 @@ namespace smt::noodler {
             // contains(t, s) -> indexof >= 0
             add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
             tightest_prefix(s, x);
+
+            // update length variables
+            this->len_vars.insert(x);
+
         } else {
             expr_ref len_t(m_util_s.str.mk_length(t), m);
             literal offset_ge_len = mk_literal(m_util_a.mk_ge(mk_sub(offset, len_t), zero));
@@ -1182,6 +1194,10 @@ namespace smt::noodler {
                             mk_eq(offset_p_indexof0, i, false)});
             // offset < 0 -> indexof = -1
             add_axiom({offset_ge_0, i_eq_m1});
+
+            // update length variables
+            util::get_variables(t, this->m_util_s, m, this->len_vars);
+            this->len_vars.insert(x);
         }
     }
 
@@ -1345,6 +1361,10 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, mk_literal(rey)});
         // not(e) && |x| <= |y| -> mx != my
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
+
+        // update length variables
+        util::get_variables(x, this->m_util_s, m, this->len_vars);
+        util::get_variables(y, this->m_util_s, m, this->len_vars);
     }
 
     /**
@@ -1427,6 +1447,10 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, mk_literal(rey)});
         // not(e) && |x| <= |y| -> mx != my
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
+
+        // update length variables
+        util::get_variables(x, this->m_util_s, m, this->len_vars);
+        util::get_variables(y, this->m_util_s, m, this->len_vars);
     }
 
     /**
