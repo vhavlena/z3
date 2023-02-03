@@ -130,7 +130,7 @@ namespace smt::noodler {
 
         std::deque<SolvingState> worklist;
 
-        std::shared_ptr<Mata::Nfa::Nfa> automaton_with_empty_word;
+        // std::shared_ptr<Mata::Nfa::Nfa> automaton_with_empty_word;
     public:
 
 

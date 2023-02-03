@@ -28,7 +28,7 @@ namespace smt::noodler {
         void update_alphabet() {
             this->alphabet.clear();
             for (const auto& pr : *this) {
-                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::Nfa::from_nfas(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
+                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::create_alphabet(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
                 this->alphabet.insert(alph_symbols.begin(), alph_symbols.end());
             }
         }
@@ -44,14 +44,6 @@ namespace smt::noodler {
             update_alphabet();
         };
 
-        // TODO this should probably be function of mata library
-        Mata::Nfa::Nfa eps_automaton() const {
-            Mata::Nfa::Nfa nfa(1);
-            nfa.initial = {0};
-            nfa.final = {0};
-            return nfa;
-        }
-
         Mata::Nfa::Nfa sigma_star_automaton() const {
             Mata::Nfa::Nfa nfa(1);
             nfa.initial = {0};
@@ -63,7 +55,7 @@ namespace smt::noodler {
         }
 
         Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
-            Mata::Nfa::Nfa ret = eps_automaton();
+            Mata::Nfa::Nfa ret = Mata::Nfa::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
                 ret = Mata::Nfa::concatenate(ret, *(this->at(t)));  // fails when not found
             }

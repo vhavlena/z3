@@ -8,15 +8,6 @@
 
 namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars) {
-        Mata::Nfa::Nfa aut_empty_word;
-        auto state = aut_empty_word.add_state();
-        aut_empty_word.initial.add(state);
-        aut_empty_word.final.add(state);
-        // TODO probably something with alphabet too
-        automaton_with_empty_word = std::make_shared<Mata::Nfa::Nfa>(aut_empty_word);
-
-
-
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = std::move(init_length_sensitive_vars);
         initialWlEl.aut_ass = std::move(init_aut_ass);
@@ -54,7 +45,7 @@ namespace smt::noodler {
                 // left side is empty => left side accepts only empty word, we need to add the automaton accepting only empty word
                 // it should not be problematic, there will be just one empty noodle (or none, if right side does not accept empty word)
                 // so we will substitute each lenght-aware right var with empty concatenation while we process that noodle
-                left_side_automata.push_back(automaton_with_empty_word);
+                left_side_automata.push_back(std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::create_empty_string_nfa()));
             }
             /** end of left side processing **/
 
@@ -70,7 +61,7 @@ namespace smt::noodler {
                 // right side is empty, i.e. there is only empty word
                 // because there is no length variable, it can be easily processed by FM noodlification
                 // TODO do we want to do FM noodlification tho? we will end up with aut_assignment where some vars are mapped to aut accepting empty word
-                right_side_automata.push_back(automaton_with_empty_word);
+                right_side_automata.push_back(std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::create_empty_string_nfa()));
             } else {
                 auto right_var_it = right_side_vars.begin();
                 auto right_side_end = right_side_vars.end();
