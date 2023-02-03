@@ -17,7 +17,7 @@ namespace smt::noodler {
 
 
 
-        WorklistElement initialWlEl;
+        SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = std::move(init_length_sensitive_vars);
         initialWlEl.aut_ass = std::move(init_aut_ass);
         // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
@@ -26,15 +26,15 @@ namespace smt::noodler {
         worklist.push_back(initialWlEl);
     }
 
-    bool DecisionProcedure::is_sat() {
+    bool DecisionProcedure::compute_next_solution() {
 
         while (!worklist.empty()) {
-            WorklistElement element_to_process = std::move(worklist.front());
+            SolvingState element_to_process = std::move(worklist.front());
             worklist.pop_front();
 
             if (element_to_process.nodes_to_process.empty()) {
                 // TODO do some arithmetic shit?
-                sat_element = std::move(element_to_process);
+                solution = std::move(element_to_process);
                 return true;
             }
 
@@ -176,7 +176,7 @@ namespace smt::noodler {
                     }
                     // insert rest of vars which were not updated into new_assignment
                     new_assignment.insert(element_to_process.aut_ass.begin(), element_to_process.aut_ass.end());
-                    WorklistElement new_element(std::move(new_assignment), 
+                    SolvingState new_element(std::move(new_assignment), 
                                                 element_to_process.nodes_to_process,
                                                 element_to_process.inclusion_graph,
                                                 element_to_process.length_sensitive_vars,
@@ -203,7 +203,7 @@ namespace smt::noodler {
                 std::vector<std::vector<std::pair<std::shared_ptr<Mata::Nfa::Nfa>, std::vector<unsigned>>>> noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
 
                 for (const auto &noodle : noodles) {
-                    WorklistElement new_element = element_to_process;
+                    SolvingState new_element = element_to_process;
                     // we need to make a deep copy, because we will be updating this graph
                     auto new_node_to_process = new_element.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
 

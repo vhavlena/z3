@@ -41,7 +41,7 @@ TEST_CASE("unsat-simple", "[nooodler]") {
     init_ass[get_var('z')] = regex_to_nfa("b");
     init_ass[get_var('u')] = regex_to_nfa("b*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-simple", "[nooodler]") {
@@ -54,7 +54,7 @@ TEST_CASE("sat-simple", "[nooodler]") {
     init_ass[get_var('z')] = regex_to_nfa("a*");
     init_ass[get_var('u')] = regex_to_nfa("a*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(proc.is_sat());
+    CHECK(proc.compute_next_solution());
 }
 
 TEST_CASE("unsat-FM-example", "[noodler]") {
@@ -66,7 +66,7 @@ TEST_CASE("unsat-FM-example", "[noodler]") {
     init_ass[get_var('y')] = regex_to_nfa("a+b+");
     init_ass[get_var('z')] = regex_to_nfa("b*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("unsat-simple-length", "[nooodler]") {
@@ -79,7 +79,7 @@ TEST_CASE("unsat-simple-length", "[nooodler]") {
     init_ass[get_var('z')] = regex_to_nfa("b");
     init_ass[get_var('u')] = regex_to_nfa("b*");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-simple-length", "[nooodler]") {
@@ -92,9 +92,9 @@ TEST_CASE("sat-simple-length", "[nooodler]") {
     init_ass[get_var('z')] = regex_to_nfa("a*");
     init_ass[get_var('u')] = regex_to_nfa("a*");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") });
-    CHECK(proc.is_sat());
-    CHECK(proc.is_sat());
-    CHECK(!proc.is_sat());
+    CHECK(proc.compute_next_solution());
+    CHECK(proc.compute_next_solution());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-simple-length-substitution", "[nooodler]") {
@@ -108,22 +108,22 @@ TEST_CASE("sat-simple-length-substitution", "[nooodler]") {
     init_ass[get_var('u')] = regex_to_nfa("a*");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") });
 
-    REQUIRE(proc.is_sat());
+    REQUIRE(proc.compute_next_solution());
 
-    REQUIRE(proc.sat_element.substitution_map.count(get_var('z')) > 0);
-    const auto &z_subst = proc.sat_element.substitution_map.at(get_var('z'));
+    REQUIRE(proc.solution.substitution_map.count(get_var('z')) > 0);
+    const auto &z_subst = proc.solution.substitution_map.at(get_var('z'));
     CHECK(z_subst.size() == 1);
     const auto &z_tmp_var = z_subst[0];
-    REQUIRE(proc.sat_element.substitution_map.count(get_var('x')) > 0);
-    REQUIRE(proc.sat_element.substitution_map.at(get_var('x')).size() == 1);
-    CHECK(z_tmp_var == proc.sat_element.substitution_map.at(get_var('x'))[0]);
-    REQUIRE(proc.sat_element.aut_ass.count(z_tmp_var) > 0);
-    CHECK(Mata::Nfa::are_equivalent(*(proc.sat_element.aut_ass.at(z_subst[0])), *regex_to_nfa("a")));
+    REQUIRE(proc.solution.substitution_map.count(get_var('x')) > 0);
+    REQUIRE(proc.solution.substitution_map.at(get_var('x')).size() == 1);
+    CHECK(z_tmp_var == proc.solution.substitution_map.at(get_var('x'))[0]);
+    REQUIRE(proc.solution.aut_ass.count(z_tmp_var) > 0);
+    CHECK(Mata::Nfa::are_equivalent(*(proc.solution.aut_ass.at(z_subst[0])), *regex_to_nfa("a")));
 
-    CHECK(proc.sat_element.substitution_map.count(get_var('u')) + proc.sat_element.substitution_map.count(get_var('y')) == 1);
-    CHECK(proc.sat_element.aut_ass.count(get_var('u')) + proc.sat_element.aut_ass.count(get_var('y')) == 1);
+    CHECK(proc.solution.substitution_map.count(get_var('u')) + proc.solution.substitution_map.count(get_var('y')) == 1);
+    CHECK(proc.solution.aut_ass.count(get_var('u')) + proc.solution.aut_ass.count(get_var('y')) == 1);
 
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("unsat-two-equations", "[nooodler]") {
@@ -137,7 +137,7 @@ TEST_CASE("unsat-two-equations", "[nooodler]") {
     init_ass[get_var('u')] = regex_to_nfa("b*");
     init_ass[get_var('r')] = regex_to_nfa("a*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-two-equations", "[nooodler]") {
@@ -151,7 +151,7 @@ TEST_CASE("sat-two-equations", "[nooodler]") {
     init_ass[get_var('u')] = regex_to_nfa("(a|b)*");
     init_ass[get_var('r')] = regex_to_nfa("aaa");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(proc.is_sat());
+    CHECK(proc.compute_next_solution());
 }
 
 TEST_CASE("unsat-two-equations-length", "[nooodler]") {
@@ -165,7 +165,7 @@ TEST_CASE("unsat-two-equations-length", "[nooodler]") {
     init_ass[get_var('u')] = regex_to_nfa("b*");
     init_ass[get_var('r')] = regex_to_nfa("a*");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-two-equations-length", "[nooodler]") {
@@ -180,13 +180,13 @@ TEST_CASE("sat-two-equations-length", "[nooodler]") {
     init_ass[get_var('r')] = regex_to_nfa("ab*a");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") });
 
-    REQUIRE(proc.is_sat());
+    REQUIRE(proc.compute_next_solution());
 
-    AutAssignment squashed_aut_ass = proc.sat_element.flatten_substition_map();
+    AutAssignment squashed_aut_ass = proc.solution.flatten_substition_map();
     CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('x')), *regex_to_nfa("a")));
     CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('z')), *regex_to_nfa("a")));
     
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-two-equations-length2", "[nooodler]") {
@@ -201,14 +201,14 @@ TEST_CASE("sat-two-equations-length2", "[nooodler]") {
     init_ass[get_var('r')] = regex_to_nfa("ab*a");
     DecisionProcedure proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") , BasicTerm(BasicTermType::Variable, "r") });
 
-    REQUIRE(proc.is_sat());
+    REQUIRE(proc.compute_next_solution());
 
-    AutAssignment squashed_aut_ass = proc.sat_element.flatten_substition_map();
+    AutAssignment squashed_aut_ass = proc.solution.flatten_substition_map();
     CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('x')), *regex_to_nfa("a")));
     CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('z')), *regex_to_nfa("a")));
     CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('r')), *regex_to_nfa("aa")));
 
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("unsat-simple-non-chain-free", "[nooodler]") {
@@ -218,7 +218,7 @@ TEST_CASE("unsat-simple-non-chain-free", "[nooodler]") {
     AutAssignment init_ass;
     init_ass[get_var('x')] = regex_to_nfa("aa?b*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(!proc.is_sat());
+    CHECK(!proc.compute_next_solution());
 }
 
 TEST_CASE("sat-simple-non-chain-free", "[nooodler]") {
@@ -228,5 +228,5 @@ TEST_CASE("sat-simple-non-chain-free", "[nooodler]") {
     AutAssignment init_ass;
     init_ass[get_var('x')] = regex_to_nfa("a*b*");
     DecisionProcedure proc(equalities, init_ass, { });
-    CHECK(proc.is_sat());
+    CHECK(proc.compute_next_solution());
 }

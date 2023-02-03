@@ -8,9 +8,10 @@
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
+#include "state_len.h"
 
 namespace smt::noodler {
-    struct WorklistElement {
+    struct SolvingState {
         AutAssignment aut_ass;
         std::deque<std::shared_ptr<GraphNode>> nodes_to_process;
         std::shared_ptr<Graph> inclusion_graph;
@@ -20,8 +21,8 @@ namespace smt::noodler {
         // each variable should be either assigned in aut_ass or substituted in this map
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
-        WorklistElement() = default;
-        WorklistElement(AutAssignment aut_ass,
+        SolvingState() = default;
+        SolvingState(AutAssignment aut_ass,
                         std::deque<std::shared_ptr<GraphNode>> nodes_to_process,
                         std::shared_ptr<Graph> inclusion_graph,
                         std::unordered_set<BasicTerm> length_sensitive_vars,
@@ -119,7 +120,7 @@ namespace smt::noodler {
         }
     };
 
-    class DecisionProcedure  {
+    class DecisionProcedure : public AbstractDecisionProcedure {
     private:
         // prefix of newly created vars during the procedure
         const std::string VAR_PREFIX = "tmp";
@@ -127,7 +128,7 @@ namespace smt::noodler {
         // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
         unsigned noodlification_no = 0;
 
-        std::deque<WorklistElement> worklist;
+        std::deque<SolvingState> worklist;
 
         std::shared_ptr<Mata::Nfa::Nfa> automaton_with_empty_word;
     public:
@@ -135,9 +136,16 @@ namespace smt::noodler {
 
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm> init_length_sensitive_vars);
 
-        // returns true if there is something in worklist that is satisfiable and saves the satisfying element in sat_element
-        bool is_sat();
-        WorklistElement sat_element;
+        // returns true if there is something in worklist that is satisfiable and saves the satisfying element in solution
+        bool compute_next_solution();
+        SolvingState solution;
+
+        void initialize(const Instance& inst) override {
+            // TODO implement me
+        }
+        bool get_another_solution(const Instance& inst, LengthConstr& out) override {
+            // TODO implement me
+        }
     };
 }
 
