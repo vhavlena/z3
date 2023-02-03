@@ -129,8 +129,6 @@ namespace smt::noodler {
         unsigned noodlification_no = 0;
 
         std::deque<SolvingState> worklist;
-
-        // std::shared_ptr<Mata::Nfa::Nfa> automaton_with_empty_word;
     public:
 
 
@@ -141,10 +139,10 @@ namespace smt::noodler {
         SolvingState solution;
 
         void initialize(const Instance& inst) override {
-            // TODO implement me
+            assert(false); // TODO implement me
         }
         bool get_another_solution(const Instance& inst, LengthConstr& out) override {
-            // TODO implement me
+            assert(false); // TODO implement me
         }
     };
 }
