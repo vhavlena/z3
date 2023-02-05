@@ -196,9 +196,10 @@ namespace smt::noodler {
      * @param pred New predicate
      * @param index Index of the new predicate (if set to -1, first higher index than top is chosen)
      */
-    void FormulaVar::add_predicate(const Predicate& pred, int index) {
-        if(this->allpreds.find(pred) != this->allpreds.end()) 
-            return;
+    int FormulaVar::add_predicate(const Predicate& pred, int index) {
+        auto it = this->allpreds.find(pred);
+        if(it != this->allpreds.end()) 
+            return -1;
         if(index == -1) {
             assert(this->predicates.find(index) == this->predicates.end()); // check if the position is free
             this->max_index++;
@@ -211,6 +212,7 @@ namespace smt::noodler {
         this->predicates[index] = pred;
         this->allpreds.insert(pred);
         update_varmap(pred, size_t(index));
+        return index;
     }
 
     /**
@@ -309,6 +311,8 @@ namespace smt::noodler {
                     Predicate reg_pred;
                     if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
                         worklist.push_back({occurrs.begin()->eq_index, reg_pred});
+                        // update dependency
+                        map_set_insert(this->dependency, occurrs.begin()->eq_index, pr.first);
                     }
                 }
             }
@@ -343,6 +347,11 @@ namespace smt::noodler {
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             this->formula.remove_predicate(index);
+
+            // update dependencies (overapproximation). Each remaining predicat depends on the removed one.
+            for(const auto& pr : this->formula.get_predicates()) {
+                map_set_insert(this->dependency, pr.first, index);
+            }
 
             STRACE("str", tout << "propagate_variables\n";);
         }
@@ -422,12 +431,11 @@ namespace smt::noodler {
 
                 Predicate new_pred;
                 if(generate_identities_suit(diff, new_pred)) {
-                    this->formula.add_predicate(new_pred);
-                    new_preds.insert(new_pred);
+                    int index = this->formula.add_predicate(new_pred);
+                    this->dependency[index] = std::set<size_t>({pr1.first, pr2.first});
                 }
             }
         }
-        this->formula.add_predicates(new_preds);
     }
 
     /**
@@ -543,6 +551,7 @@ namespace smt::noodler {
         }
         for(const Predicate& eq : new_eqs) {
             this->formula.add_predicate(eq);
+            // We do not add dependency
         }
     }
 
@@ -620,6 +629,11 @@ namespace smt::noodler {
             this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
             assert(t.is_variable() || t.get_name() == "");
         }
+        // update dependencies (overapproximation). Each remaining predicate depends on all epsilon equations.
+        for(const auto& pr : this->formula.get_predicates()) {
+            /// TODO: modif
+            this->dependency[pr.first].insert(eps_eq_id.begin(), eps_eq_id.end());
+        }
 
         this->formula.clean_predicates();
     }
@@ -695,6 +709,7 @@ namespace smt::noodler {
     void FormulaPreprocess::separate_eqs() {
         std::set<Predicate> add_eqs;
         std::set<size_t> rem_ids;
+        std::map<Predicate, std::set<size_t>> deps; // local dependencies
 
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
@@ -706,13 +721,19 @@ namespace smt::noodler {
             separate_eq(pr.second, gather_left, gather_right, res);
             
             if(res.size() > 1) {
+                // update dependencies of added predicates
+                for(const Predicate& p : res) {
+                    map_set_insert(deps, p, pr.first);
+                }
                 add_eqs.insert(res.begin(), res.end());
                 rem_ids.insert(pr.first);
             }
         }
 
         for(const Predicate& p : add_eqs) {
-            this->formula.add_predicate(p);
+            int index = this->formula.add_predicate(p);
+            // update dependencies
+            this->dependency[index] = deps[p];
         }
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
@@ -830,6 +851,7 @@ namespace smt::noodler {
             if(modif) updates.insert({pr.first, pred});
         }
 
+        // We do not need to update dependencies
         for(const auto& pr : updates) {
             this->update_predicate(pr.first, pr.second);
         }
