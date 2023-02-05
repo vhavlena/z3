@@ -49,7 +49,7 @@ namespace smt::noodler {
         //ast_manager& m;
 
         StateLen<bool> state_len;
-        AbstractDecisionProcedure* adec_proc;
+        DecisionProcedureDebug* adec_proc;
         obj_hashtable<expr> len_vars;
 
         obj_hashtable<expr> axiomatized_terms;

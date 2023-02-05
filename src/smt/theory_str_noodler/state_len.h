@@ -91,22 +91,10 @@ namespace smt::noodler {
     };
 
     /**
-     * @brief Abstract decision procedure. Defines interface for decision 
-     * procedures to be used within z3.
-     */
-    class AbstractDecisionProcedure {
-    public:
-        virtual void initialize(const Instance& inst) =0;
-        virtual bool get_another_solution(const Instance& inst, LengthConstr& out) =0;
-
-        virtual ~AbstractDecisionProcedure() {}
-    };
-
-    /**
      * @brief Debug instance of the Decision procedure. Always says SAT and return some length 
      * constraints. Simulates the situation when each instance has exactly 10 noodles.
      */
-    class DecisionProcedureDebug : public AbstractDecisionProcedure {
+    class DecisionProcedureDebug {
     private:
         StateLen<int> state;
         ast_manager& m;
@@ -121,11 +109,11 @@ namespace smt::noodler {
             m_util_a(util_a) 
             { }
 
-        void initialize(const Instance& inst) override {
+        void initialize(const Instance& inst) {
             this->state.add(inst, 0);
         }
 
-        bool get_another_solution(const Instance& inst, LengthConstr& out) override {
+        bool get_another_solution(const Instance& inst, LengthConstr& out) {
             int cnt = this->state.get_val(inst);
             if(cnt >= 10) {
                 return false;

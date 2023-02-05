@@ -8,7 +8,17 @@
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
-#include "state_len.h"
+
+/**
+ * @brief Abstract decision procedure. Defines interface for decision 
+ * procedures to be used within z3.
+ */
+class AbstractDecisionProcedure {
+public:
+
+    virtual bool compute_next_solution()=0;
+    virtual ~AbstractDecisionProcedure()=default;
+};
 
 namespace smt::noodler {
     struct SolvingState {
@@ -135,15 +145,8 @@ namespace smt::noodler {
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm> init_length_sensitive_vars);
 
         // returns true if there is something in worklist that is satisfiable and saves the satisfying element in solution
-        bool compute_next_solution();
+        bool compute_next_solution() override;
         SolvingState solution;
-
-        void initialize(const Instance& inst) override {
-            assert(false); // TODO implement me
-        }
-        bool get_another_solution(const Instance& inst, LengthConstr& out) override {
-            assert(false); // TODO implement me
-        }
     };
 }
 
