@@ -70,32 +70,10 @@ namespace smt::noodler {
         // nodes_to_process are updated so that the pointers point to the nodes of this deep copy
         // processed_node is the node that is being processed, the return value is this node in the deep copy
         // TODO this function is really ugly, I should do something about it
-        std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
-            assert(inclusion_graph->get_nodes().count(processed_node) > 0);
-            Graph graph_to_copy = *inclusion_graph;
-            graph_to_copy.remove_all_edges();
-            assert(graph_to_copy.get_nodes().count(processed_node) > 0);
-            std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
-            inclusion_graph = std::make_shared<Graph>(graph_to_copy.deep_copy(node_mapping));
-            std::deque<std::shared_ptr<GraphNode>> new_nodes_to_process;
-            while (!nodes_to_process.empty()) {
-                new_nodes_to_process.push_back(node_mapping.at(nodes_to_process.front()));
-                nodes_to_process.pop_front();
-            }
-            nodes_to_process = new_nodes_to_process;
-            return node_mapping.at(processed_node);
-        }
+        std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
 
         // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process (and also nodes that have same sides are deleted)
-        void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map) {
-            std::unordered_set<std::shared_ptr<GraphNode>> deleted_nodes;
-            inclusion_graph->substitute_vars(substitution_map, deleted_nodes);
-
-            // remove all deleted_nodes from the nodes_to_process (using remove/erase)
-            // TODO: is this correct?? I assume that if we delete copy of a merged node from nodes_to_process, it either does not need to be processed or the merged node will be in nodes_to_process
-            auto is_deleted = [&deleted_nodes](std::shared_ptr<GraphNode> node) { return (deleted_nodes.count(node) > 0) ; };
-            nodes_to_process.erase(std::remove_if(nodes_to_process.begin(), nodes_to_process.end(), is_deleted), nodes_to_process.end());
-        }
+        void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map);
 
         /**
          * @brief Combines aut_ass and substitution_map into one AutAssigment
@@ -104,30 +82,7 @@ namespace smt::noodler {
          * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
          * 
          */
-        AutAssignment flatten_substition_map() {
-            AutAssignment result = aut_ass;
-            std::function<std::shared_ptr<Mata::Nfa::Nfa>(const BasicTerm&)> flatten_var;
-
-            flatten_var = [&result, &flatten_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
-                if (result.count(var) == 0) {
-                    std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>();
-                    auto state = var_aut->add_state();
-                    var_aut->initial.add(state);
-                    var_aut->final.add(state);
-                    for (const auto &subst_var : this->substitution_map.at(var)) {
-                        var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *flatten_var(subst_var)));
-                    }
-                    result[var] = var_aut;
-                    return var_aut;
-                } else {
-                    return result[var];
-                }
-            };
-            for (const auto &subst_map_pair : substitution_map) {
-                flatten_var(subst_map_pair.first);
-            }
-            return result;
-        }
+        AutAssignment flatten_substition_map();
     };
 
     class DecisionProcedure : public AbstractDecisionProcedure {
