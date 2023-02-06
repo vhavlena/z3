@@ -32,7 +32,7 @@ Eternal glory to Yu-Fang.
 
 #include "formula.h"
 #include "inclusion_graph.h"
-#include "state_len.h"
+#include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
 
@@ -49,7 +49,7 @@ namespace smt::noodler {
         //ast_manager& m;
 
         StateLen<bool> state_len;
-        DecisionProcedureDebug* adec_proc;
+        AbstractDecisionProcedure* adec_proc;
         obj_hashtable<expr> len_vars;
 
         obj_hashtable<expr> axiomatized_terms;
