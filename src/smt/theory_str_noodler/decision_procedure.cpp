@@ -57,14 +57,14 @@ namespace smt::noodler {
         }
         return result;
     }
-    
-    DecisionProcedure::DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars) {
+
+    DecisionProcedure::DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         SolvingState initialWlEl;
-        initialWlEl.length_sensitive_vars = std::move(init_length_sensitive_vars);
+        initialWlEl.length_sensitive_vars = init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(init_aut_ass);
         // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process)); 
-        
+        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process));
+
         worklist.push_back(initialWlEl);
     }
 
@@ -173,7 +173,7 @@ namespace smt::noodler {
                 // we push only those nodes which are not already in nodes_to_process
                 // if the node_to_process is on cycle, we need to do BFS
                 // if it is not on cycle, we can do DFS
-                // TODO: can we really do DFS?? 
+                // TODO: can we really do DFS??
                 element_to_process.push_unique(node, is_node_to_process_on_cycle);
             }
 
@@ -182,7 +182,7 @@ namespace smt::noodler {
              * empty elements_to_process, however, we need to remmeber the state of the algorithm, we would need to return back to noodles
              * and process them if z3 realizes that the result is actually not sat (because of lengths)
              */
-            
+
 
             if (!is_there_length_on_right) {
                 // we have no length-aware variables on the right hand side
@@ -218,7 +218,7 @@ namespace smt::noodler {
                     }
                     // insert rest of vars which were not updated into new_assignment
                     new_assignment.insert(element_to_process.aut_ass.begin(), element_to_process.aut_ass.end());
-                    SolvingState new_element(std::move(new_assignment), 
+                    SolvingState new_element(std::move(new_assignment),
                                                 element_to_process.nodes_to_process,
                                                 element_to_process.inclusion_graph,
                                                 element_to_process.length_sensitive_vars,
@@ -341,7 +341,7 @@ namespace smt::noodler {
                     // TODO: should we do something more here??
 
                 }
-                
+
                 ++noodlification_no; // TODO: when to do this increment??
             }
         }

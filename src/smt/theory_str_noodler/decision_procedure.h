@@ -13,7 +13,7 @@
 
 namespace smt::noodler {
     /**
-     * @brief Abstract decision procedure. Defines interface for decision 
+     * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
      */
     class AbstractDecisionProcedure {
@@ -35,7 +35,7 @@ namespace smt::noodler {
     };
 
     /**
-     * @brief Debug instance of the Decision procedure. Always says SAT and return some length 
+     * @brief Debug instance of the Decision procedure. Always says SAT and return some length
      * constraints. Simulates the situation when each instance has exactly 10 noodles.
      */
     class DecisionProcedureDebug : public AbstractDecisionProcedure {
@@ -46,11 +46,11 @@ namespace smt::noodler {
         arith_util& m_util_a;
 
     public:
-        DecisionProcedureDebug(ast_manager& mn, seq_util& util_s, arith_util& util_a) : 
-            state(), 
-            m(mn), 
-            m_util_s(util_s), 
-            m_util_a(util_a) 
+        DecisionProcedureDebug(ast_manager& mn, seq_util& util_s, arith_util& util_a) :
+            state(),
+            m(mn),
+            m_util_s(util_s),
+            m_util_a(util_a)
             { }
 
         void initialize(const Instance& inst) override {
@@ -85,7 +85,7 @@ namespace smt::noodler {
         }
 
         ~DecisionProcedureDebug() { }
-    
+
     };
 
 
@@ -107,9 +107,9 @@ namespace smt::noodler {
                         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
                         : aut_ass(aut_ass),
                           nodes_to_process(nodes_to_process),
-                          inclusion_graph(inclusion_graph), 
+                          inclusion_graph(inclusion_graph),
                           length_sensitive_vars(length_sensitive_vars),
-                          substitution_map(substitution_map) {} 
+                          substitution_map(substitution_map) {}
 
         // pushes node to the beginning of nodes_to_process but only if it is not in it yet
         void push_front_unique(const std::shared_ptr<GraphNode> &node) {
@@ -145,10 +145,10 @@ namespace smt::noodler {
 
         /**
          * @brief Combines aut_ass and substitution_map into one AutAssigment
-         * 
+         *
          * For example, if we have aut_ass[x] = aut1, aut_ass[y] = aut2, and substitution_map[z] = xy, then this will return
          * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
-         * 
+         *
          */
         AutAssignment flatten_substition_map();
     };
@@ -163,9 +163,7 @@ namespace smt::noodler {
 
         std::deque<SolvingState> worklist;
     public:
-
-
-        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm> init_length_sensitive_vars);
+        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
         // returns true if there is something in worklist that is satisfiable and saves the satisfying element in solution
         bool compute_next_solution() override;
