@@ -23,17 +23,19 @@ namespace smt::noodler {
 
     private:
         /// Union of all alphabets of automata in the aut assignment
-        std::set<Mata::Nfa::Symbol> alphabet;
+        std::set<Mata::Symbol> alphabet;
 
         void update_alphabet() {
             this->alphabet.clear();
             for (const auto& pr : *this) {
-                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::OnTheFlyAlphabet::from_nfas(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
+                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::create_alphabet(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
                 this->alphabet.insert(alph_symbols.begin(), alph_symbols.end());
             }
         }
 
     public:
+        using std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>>::unordered_map;
+
         AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val)
         { 
             for (const auto &key_value : val) {
@@ -42,25 +44,18 @@ namespace smt::noodler {
             update_alphabet();
         };
 
-        Mata::Nfa::Nfa eps_automaton() const {
-            Mata::Nfa::Nfa nfa(1);
-            nfa.initial = {0};
-            nfa.final = {0};
-            return nfa;
-        }
-
         Mata::Nfa::Nfa sigma_star_automaton() const {
             Mata::Nfa::Nfa nfa(1);
             nfa.initial = {0};
             nfa.final = {0};
-            for (const Mata::Nfa::Symbol& symb : this->alphabet) {
+            for (const Mata::Symbol& symb : this->alphabet) {
                 nfa.delta.add(0, symb, 0);
             }
             return nfa;
         }
 
         Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
-            Mata::Nfa::Nfa ret = eps_automaton();
+            Mata::Nfa::Nfa ret = Mata::Nfa::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
                 ret = Mata::Nfa::concatenate(ret, *(this->at(t)));  // fails when not found
             }
@@ -72,7 +67,19 @@ namespace smt::noodler {
             return v.get_num_of_trans() == 0 && v.initial.size() == 1 && v.final.size();
         }
 
-        const std::set<Mata::Nfa::Symbol> get_alphabet(bool recompute=false) {
+        // adds all mappings of variables from other to this assigment except those which already exists in this assignment
+        // i.e. if this[var] exists, then nothing happens for var, if it does not, then this[var] = other[var]
+        // TODO: probably this is the same as just doing this->insert(other.begin(), other.end())
+        // TODO: or even better, if we do not care what happens with other, we can use this->merge(other)
+        void add_to_assignment(const AutAssignment &other) {
+            for (const auto &it : other) {
+                if (this->count(it.first) == 0) {
+                    (*this)[it.first] = it.second;
+                }
+            }
+        }
+
+        const std::set<Mata::Symbol> get_alphabet(bool recompute=false) {
             if(recompute) update_alphabet();
             return this->alphabet;
         }

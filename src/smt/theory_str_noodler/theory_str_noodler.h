@@ -32,7 +32,7 @@ Eternal glory to Yu-Fang.
 
 #include "formula.h"
 #include "inclusion_graph.h"
-#include "state_len.h"
+#include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
 

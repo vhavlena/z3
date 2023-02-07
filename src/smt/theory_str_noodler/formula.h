@@ -212,6 +212,26 @@ namespace smt::noodler {
             return params[1];
         }
 
+        void set_left_side(const std::vector<BasicTerm> &new_left_side) {
+            assert(is_eq_or_ineq());
+            params[0] = new_left_side;
+        }
+
+        void set_left_side(std::vector<BasicTerm> &&new_left_side) {
+            assert(is_eq_or_ineq());
+            params[0] = std::move(new_left_side);
+        }
+
+        void set_right_side(const std::vector<BasicTerm> &new_right_side) {
+            assert(is_eq_or_ineq());
+            params[1] = new_right_side;
+        }
+
+        void set_right_side(std::vector<BasicTerm> &&new_right_side) {
+            assert(is_eq_or_ineq());
+            params[1] = std::move(new_right_side);
+        }
+
         std::set<BasicTerm> get_set() const {
             std::set<BasicTerm> ret;
             for(const auto& side : this->params) {

@@ -15,6 +15,7 @@ add_executable(test-noodler
         main.cc
         inclusion-graph-node.cc
         formula-preprocess.cpp
+        decision-procedure.cpp
 )
 
 find_library(LIBMATA mata)
