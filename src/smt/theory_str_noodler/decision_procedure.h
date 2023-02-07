@@ -18,15 +18,30 @@ namespace smt::noodler {
      */
     class AbstractDecisionProcedure {
     public:
+        /**
+         * Get lengths for problem instance.
+         * @return Conjunction of lengths of the current solution for variables in constructor
+         *  (variable renames, init length variables).
+         *
+         *  FIXME: What does the note "from handlers to rewrite predicates" mean?
+         */
+        virtual expr_ref get_lengths() {
+            throw std::runtime_error("Unimplemented");
+        }
 
-        virtual void initialize(const Instance& inst) {
-            throw std::runtime_error("Not implemented");
+        virtual void preprocess() {
+            throw std::runtime_error("Unimplemented");
         }
 
         virtual bool get_another_solution(const Instance& inst, LengthConstr& out) {
             throw std::runtime_error("Not implemented");
         }
 
+        /**
+         * Compute next solution.
+         * @return True if there is an satisfiable element in the worklist and saves the satisfying element in @c
+         *  solution.
+         */
         virtual bool compute_next_solution() {
             throw std::runtime_error("Not implemented");
         }
@@ -53,7 +68,7 @@ namespace smt::noodler {
             m_util_a(util_a)
             { }
 
-        void initialize(const Instance& inst) override {
+        void initialize(const Instance& inst) {
             this->state.add(inst, 0);
         }
 
@@ -162,12 +177,26 @@ namespace smt::noodler {
         unsigned noodlification_no = 0;
 
         std::deque<SolvingState> worklist;
-    public:
-        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
-        // returns true if there is something in worklist that is satisfiable and saves the satisfying element in solution
+        ast_manager& m;
+        seq_util& m_util_s;
+
+        /**
+         * Convert all string literals in formula to fresh variables with automata in automata assignment.
+         *
+         * All string literals are converted to fresh variables with assigned automata equal to the string literal
+         *  expression.
+         */
+        void conv_str_lits_to_fresh_vars();
+
+    public:
+        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars, ast_manager& m, seq_util& m_util_s);
+
         bool compute_next_solution() override;
-        SolvingState solution;
+        expr_ref get_lengths() override;
+        void preprocess() override;
+
+
     };
 }
 
