@@ -88,7 +88,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('z')] = regex_to_nfa("a*");
         init_ass[get_var('u')] = regex_to_nfa("a*");
         DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s);
-        CHECK(proc.compute_next_solution());
+        CHECK(proc.compute_next_solution()); 
     }
 
     SECTION("unsat-FM-example", "[noodler]") {
@@ -264,5 +264,4 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s);
         CHECK(proc.compute_next_solution());
     }
-    memory::finalize();
 }
