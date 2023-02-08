@@ -198,8 +198,13 @@ namespace smt::noodler {
      */
     int FormulaVar::add_predicate(const Predicate& pred, int index) {
         auto it = this->allpreds.find(pred);
-        if(it != this->allpreds.end()) 
-            return -1;
+        if(it != this->allpreds.end()) {
+            for(const auto& pr : this->predicates) { // WARNING: ineffective; needs to iterate over all predicates
+                if(pr.second == pred)
+                    return pr.first;
+            }
+            assert(false);
+        }
         if(index == -1) {
             assert(this->predicates.find(index) == this->predicates.end()); // check if the position is free
             this->max_index++;
@@ -402,7 +407,9 @@ namespace smt::noodler {
      * (b) X1 X X2 = Z and Z = X1 Y X2 => X = Y. Where each term can be both literal and variable.
      */
     void FormulaPreprocess::generate_identities() {
-        std::set<Predicate> new_preds;
+        std::set<std::pair<size_t, Predicate>> new_preds;
+        size_t index = this->formula.get_max_index() + 1;
+
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation())
                 continue;
@@ -431,10 +438,14 @@ namespace smt::noodler {
 
                 Predicate new_pred;
                 if(generate_identities_suit(diff, new_pred)) {
-                    int index = this->formula.add_predicate(new_pred);
+                    new_preds.insert({index, new_pred});
                     this->dependency[index] = std::set<size_t>({pr1.first, pr2.first});
+                    index++;
                 }
             }
+        }
+        for(const auto &pr : new_preds) {
+            this->formula.add_predicate(pr.second, pr.first);
         }
     }
 
@@ -629,13 +640,15 @@ namespace smt::noodler {
             this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
             assert(t.is_variable() || t.get_name() == "");
         }
+        this->formula.clean_predicates();
+
         // update dependencies (overapproximation). Each remaining predicate depends on all epsilon equations.
         for(const auto& pr : this->formula.get_predicates()) {
-            /// TODO: modif
+            // might result to the case {0: {0,1,...}}
             this->dependency[pr.first].insert(eps_eq_id.begin(), eps_eq_id.end());
         }
 
-        this->formula.clean_predicates();
+        
     }
 
     /**
@@ -855,6 +868,36 @@ namespace smt::noodler {
         for(const auto& pr : updates) {
             this->update_predicate(pr.first, pr.second);
         }
+    }
+
+    /**
+     * @brief Flatten dependencies. Compute transition closure of dependencies.
+     * 
+     * @return Transitive closure of the Dependency 
+     */
+    Dependency FormulaPreprocess::get_flat_dependency() const {
+        Dependency flat = get_dependency();
+        std::set<size_t> keys;
+        for(const auto& pr : flat) {
+            keys.insert(pr.first);
+        }
+
+        bool changed = true;
+        while(changed) {
+            changed = false;
+            for(const size_t& k : keys) {
+                auto it = flat.find(k);
+                size_t sb = it->second.size();
+                for(const size_t& val : flat[k]) {
+                    it->second.insert(flat[val].begin(), flat[val].end());
+                }
+                if(sb != it->second.size()) {
+                    changed = true;
+                }
+            }
+        }
+
+        return flat;
     }
 
 

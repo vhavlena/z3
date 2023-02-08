@@ -85,6 +85,8 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
     prep.remove_regular();
 
     AutAssignment ret = prep.get_aut_assignment();
+    CHECK(prep.get_dependency() == Dependency({{2, {3}}}));
+    CHECK(prep.get_flat_dependency() == Dependency({{2, {3}}, {3, {}}}));
     CHECK(Mata::Nfa::are_equivalent(*ret.at(x4), regex_to_nfa("a*")));
     CHECK(Mata::Nfa::are_equivalent(*ret.at(x5), regex_to_nfa("a*")));
     CHECK(Mata::Nfa::are_equivalent(*ret.at(x2), regex_to_nfa("(a|b)*b(a*)b")));
@@ -96,6 +98,8 @@ TEST_CASE( "Remove regular", "[noodler]" ) {
         conj.add_predicate(eq2);
         FormulaPreprocess prep(conj, aut_ass, {x2});
         prep.remove_regular();
+        CHECK(prep.get_dependency() == Dependency({}));
+        CHECK(prep.get_flat_dependency() == Dependency({}));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq1, eq2
         }));
@@ -134,6 +138,7 @@ TEST_CASE( "Generate identities", "[noodler]" ) {
     conj.add_predicate(ieq1);
     FormulaPreprocess prep(conj, aut_ass, {});
     prep.generate_identities();
+    CHECK(prep.get_dependency() == Dependency({{3, {0}}, {4, {1}}}));
     std::set<Predicate> res;
     res.insert(eq1);
     res.insert(eq2);
@@ -296,6 +301,7 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
     CHECK(Mata::Nfa::are_equivalent(*ret.at(x3), regex_to_nfa("(b|c)*")));
     CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
     CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
+    CHECK(prep.get_dependency() == Dependency({{0, {2,3}}, {1, {2,3}}, {3, {2}}}));
 }
 
 TEST_CASE( "Remove duplicates", "[noodler]" ) {
@@ -444,6 +450,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x2, x1, x2}), std::vector<BasicTerm>({b, tmp0}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x3, x4, b}) })  ) 
         }));
+        CHECK(prep.get_dependency().empty());
+        CHECK(prep.get_flat_dependency().empty());
     }
 
     SECTION("two fresh") {
@@ -459,6 +467,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1}), std::vector<BasicTerm>({tmp0}) })  ) 
         }));
+        CHECK(prep.get_dependency().empty());
+        CHECK(prep.get_flat_dependency().empty());
     }
 
     SECTION("length vars") {
@@ -474,6 +484,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp0}), std::vector<BasicTerm>({x4, a, b}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({tmp1, x2, x3}), std::vector<BasicTerm>({tmp0}) })  ) 
         }));
+        CHECK(prep.get_dependency().empty());
+        CHECK(prep.get_flat_dependency().empty());
     }
 }
 
@@ -521,6 +533,7 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>({x5}) })  ),
             Predicate(PredicateType::Inequation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({}), std::vector<BasicTerm>({}) })  ),
         }));
+        CHECK(prep.get_dependency() == Dependency({{2, {0, 1}}, {3, {0, 1}}}));
     }
 
     SECTION("empty side") {
@@ -533,6 +546,7 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({b}), std::vector<BasicTerm>() })  )
         }));
+        CHECK(prep.get_dependency() == Dependency({{0, {0}}}));
     }
 }
 
@@ -574,6 +588,7 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, a, b, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  ) 
         }));
+        CHECK(prep.get_dependency() == Dependency({{1, {0}}, {2, {0}}, {3, {0}}}));
     }
 
     SECTION("longer literals") {
@@ -586,6 +601,7 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, ab, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  ) 
         }));
+        CHECK(prep.get_dependency() == Dependency({{1, {0}}, {2, {0}}, {3, {0}}}));
     }
 
     SECTION("no match 1") {
@@ -596,6 +612,7 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq3
         }));
+        CHECK(prep.get_dependency().empty());
     }
 
     SECTION("no match 2") {
@@ -606,6 +623,7 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq4
         }));
+        CHECK(prep.get_dependency().empty());
     }
 }
 
@@ -652,6 +670,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x2, a, x4}) })), 
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x3}) })), 
         }));
+        CHECK(prep.get_dependency().empty());
     }
 
     SECTION("ineq") {
@@ -666,6 +685,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x1, x3}) })), 
             Predicate(PredicateType::Inequation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({y1}), std::vector<BasicTerm>({x1, x2}) })  ),
         }));
+        CHECK(prep.get_dependency().empty());
     }
 
     SECTION("unchanged") {
@@ -678,6 +698,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq1, eq2, eq3
         }));
+        CHECK(prep.get_dependency().empty());
     }
 
     SECTION("from end") {
@@ -712,6 +733,7 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq1, eq2
         }));
+        CHECK(prep.get_dependency().empty());
     }
 
     SECTION("length vars") {
@@ -723,5 +745,6 @@ TEST_CASE( "Remove extension", "[noodler]" ) {
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({ 
             eq1, eq2,
         }));
+        CHECK(prep.get_dependency().empty());
     }
 }

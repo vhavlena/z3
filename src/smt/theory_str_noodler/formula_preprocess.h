@@ -218,6 +218,7 @@ namespace smt::noodler {
     using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
     using Concat = std::vector<BasicTerm>;
     using SepEqsGather = std::vector<std::pair<std::set<BasicTerm>, unsigned>>;
+    using Dependency = std::map<size_t, std::set<size_t>>;
 
     /**
      * @brief Class representing a formula with efficient handling of variable occurrences.
@@ -247,6 +248,7 @@ namespace smt::noodler {
         const VarMap& get_varmap() const { return this->varmap; };
         void get_side_regulars(std::vector<std::pair<size_t, Predicate>>& out) const;
         void get_simple_eqs(std::vector<std::pair<size_t, Predicate>>& out) const;
+        size_t get_max_index() const { return this->max_index; }
         bool contains_simple_eqs() const { std::vector<std::pair<size_t, Predicate>> out; get_simple_eqs(out); return out.size() > 0;  }
 
         std::set<VarNode> get_var_positions(const Predicate& pred, size_t index, bool incl_lit=false) const;
@@ -295,7 +297,7 @@ namespace smt::noodler {
         std::vector<LenNode*> len_formulae;
         std::set<BasicTerm> len_variables;
 
-        std::map<size_t, std::set<size_t>> dependency;
+        Dependency dependency;
 
     protected:
         void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd);
@@ -323,6 +325,8 @@ namespace smt::noodler {
         void get_regular_sublists(std::map<Concat, unsigned>& res) const; 
         void get_eps_terms(std::set<BasicTerm>& res) const;
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
+        const Dependency& get_dependency() const { return this->dependency; }
+        Dependency get_flat_dependency() const;
 
         void remove_regular();
         void propagate_variables();
