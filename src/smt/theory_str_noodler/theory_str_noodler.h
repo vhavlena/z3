@@ -50,7 +50,6 @@ namespace smt::noodler {
         //ast_manager& m;
 
         StateLen<bool> state_len;
-        DecisionProcedureDebug* adec_proc; // TODO: Replace with 'AbstractDecisionProcedure*'.
         obj_hashtable<expr> len_vars;
 
         // mapping predicates and function to variables that they substitute to
@@ -128,9 +127,7 @@ namespace smt::noodler {
         void add_length(expr* e);
         void enforce_length(expr* n);
 
-        ~theory_str_noodler() {
-            delete this->adec_proc;
-        }
+        ~theory_str_noodler() {}
 
     protected:
         bool is_of_this_theory(expr *e) const;

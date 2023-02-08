@@ -34,7 +34,6 @@ namespace smt::noodler {
         m_util_s(m),
         state_len(),
         m_length(m) {
-        this->adec_proc = new DecisionProcedureDebug(m, m_util_s, m_util_a);
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -697,10 +696,6 @@ namespace smt::noodler {
 
         }
 
-
-
-
-
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
@@ -714,42 +709,28 @@ namespace smt::noodler {
         block_curr_assignment();
         return FC_CONTINUE;
 
-        if(!this->state_len.contains(conj)){
-            expr_ref len_constr(m);
-            this->adec_proc->initialize(conj, len_constr);
-            this->state_len.add(conj, true);
+        expr_ref* lengths;
+        AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
 
-            while(this->adec_proc->compute_next_solution()) {
-                if(len_constr == nullptr)
-                    continue;
-                int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-                m_int_solver.initialize(get_context());
-                if(m_int_solver.check_sat(len_constr) == l_true) {
-                    return FC_DONE;
-                }
-                TRACE("str", tout << "len unsat\n";);
-            }
-
-            if(len_constr == nullptr) {
+        while(dec_proc.compute_next_solution()) {
+            *lengths = dec_proc.get_lengths();
+            if(lengths == nullptr)
+                continue;
+            int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
+            m_int_solver.initialize(get_context());
+            if(m_int_solver.check_sat(*lengths) == l_true) {
                 return FC_DONE;
             }
-            // all len solutions are unsat, we block the current assignment
-            block_curr_assignment();
-            return FC_CONTINUE;
-
-        } else {
-            TRACE("str", tout << "already visited\n";);
-            UNREACHABLE();
-            return FC_CONTINUE;
+            TRACE("str", tout << "len unsat\n";);
         }
 
-        return FC_DONE;
-
-
+        if(lengths == nullptr) {
+            return FC_DONE;
+        }
+        // all len solutions are unsat, we block the current assignment
         block_curr_assignment();
-        TRACE("str", tout << "final_check ends\n";);
         IN_CHECK_FINAL = false;
-
+        TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
     }
 
