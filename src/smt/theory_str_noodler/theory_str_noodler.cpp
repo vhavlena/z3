@@ -712,8 +712,10 @@ namespace smt::noodler {
         expr_ref* lengths;
         AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
 
+        std::map<BasicTerm, expr_ref> variable_map; /// TODO: fill
+
         while(dec_proc.compute_next_solution()) {
-            *lengths = dec_proc.get_lengths();
+            *lengths = dec_proc.get_lengths(variable_map);
             if(lengths == nullptr)
                 continue;
             int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());

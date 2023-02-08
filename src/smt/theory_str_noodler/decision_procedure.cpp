@@ -61,8 +61,8 @@ namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(
             const Formula &equalities, AutAssignment init_aut_ass,
             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-            ast_manager& m, seq_util& m_util_s
-    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensistive_vars{ init_length_sensitive_vars } {
+            ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensistive_vars{ init_length_sensitive_vars }, m_util_a{ m_util_a } {
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(init_aut_ass);
@@ -353,14 +353,77 @@ namespace smt::noodler {
         return false;
     }
 
-    expr_ref DecisionProcedure::get_lengths() {
-        return AbstractDecisionProcedure::get_lengths(); // TODO: Remove when implemented.
+    /**
+     * @brief Get length constraints of the solution
+     * 
+     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
+     * @return expr_ref Length formula describing all solutions
+     */
+    expr_ref DecisionProcedure::get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+        AutAssignment ass = this->solution.flatten_substition_map();
+        expr_ref lengths(this->m.mk_true(), this->m);
+
+        for(const BasicTerm& var : this->init_length_sensistive_vars) {
+            std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
+            lengths = this->m.mk_and(lengths, mk_len_aut(variable_map.at(var), aut_constr));   
+        }
+
+        return lengths;
     }
 
     void DecisionProcedure::preprocess() {
         /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
 
         AbstractDecisionProcedure::preprocess(); // TODO: Remove when implemented.
+    }
+
+    /**
+     * @brief Create a fresh int variable.
+     * 
+     * @param name Infix of the name (rest is added to get a unique name)
+     * @return expr_ref Fresh variable
+     */
+    expr_ref DecisionProcedure::mk_int_var(const std::string& name) {
+        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
+        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
+            nullptr, int_sort), m);
+        return var;
+    }
+
+    /**
+     * @brief Make a length constraint for a single NFA loop, handle
+     * 
+     * @param var variable
+     * @param v1 handle
+     * @param v2 loop
+     * @return expr_ref Length formula
+     */
+    expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
+        expr_ref len_x(this->m_util_s.str.mk_length(var), this->m);
+        expr_ref k = mk_int_var("k");
+        expr_ref c1(this->m_util_a.mk_int(v1), this->m);
+        expr_ref c2(this->m_util_a.mk_int(v2), this->m);
+
+        if(v2 != 0) {
+            expr_ref right(this->m_util_a.mk_add(c1, this->m_util_a.mk_mul(k, c2)), this->m);
+            return expr_ref(this->m.mk_eq(len_x, right), this->m);
+        }
+        return expr_ref(this->m.mk_eq(len_x, c1), this->m);
+    }
+
+    /**
+     * @brief Make a length formula corresponding to a set of pairs <loop, handle>
+     * 
+     * @param var Variable
+     * @param aut_constr Set of pairs <loop, handle>
+     * @return expr_ref Length constaint of the automaton
+     */
+    expr_ref DecisionProcedure::mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr) {
+        expr_ref res(this->m.mk_false(), this->m);
+        for(const auto& cns : aut_constr) {
+            res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
+        }
+        return res;
     }
 
 } // namespace smt::nodler

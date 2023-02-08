@@ -32,10 +32,11 @@ namespace smt::noodler {
 
         /**
          * Get lengths for problem instance.
+         * @param variable_map: map of the BasicTerm variables to Z3 variables
          * @return Conjunction of lengths of the current solution for variables in constructor
          *  (variable renames, init length variables).
          */
-        virtual expr_ref get_lengths() {
+        virtual expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -177,7 +178,8 @@ namespace smt::noodler {
 
         ast_manager& m;
         seq_util& m_util_s;
-        const std::unordered_set<BasicTerm>& init_length_sensistive_vars;
+        arith_util& m_util_a;
+        std::unordered_set<BasicTerm> init_length_sensistive_vars;
 
         /**
          * Convert all string literals in formula to fresh variables with automata in automata assignment.
@@ -187,14 +189,19 @@ namespace smt::noodler {
          */
         void conv_str_lits_to_fresh_vars();
 
+        expr_ref mk_int_var(const std::string& name); /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+
+        expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
+        expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
+
     public:
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                          ast_manager& m, seq_util& m_util_s
+                          ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
         );
 
         bool compute_next_solution() override;
-        expr_ref get_lengths() override;
+        expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) override;
 
         void preprocess() override;
     };
