@@ -715,11 +715,11 @@ namespace smt::noodler {
         return FC_CONTINUE;
 
         if(!this->state_len.contains(conj)){
-            this->adec_proc->initialize(conj);
+            expr_ref len_constr(m);
+            this->adec_proc->initialize(conj, len_constr);
             this->state_len.add(conj, true);
 
-            expr_ref len_constr(m);
-            while(this->adec_proc->get_another_solution(conj, len_constr)) {
+            while(this->adec_proc->compute_next_solution()) {
                 if(len_constr == nullptr)
                     continue;
                 int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
