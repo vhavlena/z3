@@ -1,5 +1,5 @@
 /*
-The skeleton of this code was obtained by Yu-Fang Chen from https://github.com/guluchen/z3. 
+The skeleton of this code was obtained by Yu-Fang Chen from https://github.com/guluchen/z3.
 Eternal glory to Yu-Fang.
 */
 
@@ -26,15 +26,14 @@ namespace smt::noodler {
         bool IN_CHECK_FINAL = false;
     }
 
-    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params): 
-        theory(ctx, ctx.get_manager().mk_family_id("seq")), 
+    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params):
+        theory(ctx, ctx.get_manager().mk_family_id("seq")),
         m_params(params),
-        m_rewrite(m), 
+        m_rewrite(m),
         m_util_a(m),
         m_util_s(m),
         state_len(),
         m_length(m) {
-        this->adec_proc = new DecisionProcedureDebug(m, m_util_s, m_util_a);
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -106,7 +105,7 @@ namespace smt::noodler {
         if (m.is_bool(term)) {
             bool_var bv = ctx.mk_bool_var(term);
             ctx.set_var_theory(bv, get_id());
-            //We do not want to mark as relevant because it involves 
+            //We do not want to mark as relevant because it involves
             // irrelevant RE solutions comming from the underlying SAT solver.
             //ctx.mark_as_relevant(bv);
         }
@@ -149,7 +148,7 @@ namespace smt::noodler {
         }
 
         return;
-        
+
         std::cout << ctx.get_unsat_core_size() << std::endl;
         std::cout << "~~~~~ print ctx start ~~~~~~~\n";
 //        context& ctx = get_context();
@@ -221,8 +220,8 @@ namespace smt::noodler {
         if (!ctx.e_internalized(expr)) {
             ctx.internalize(expr, false);
         }
-        //We do not mark the expression as relevant since we do not want bias a 
-        //fresh SAT solution by the newly added theory axioms. 
+        //We do not mark the expression as relevant since we do not want bias a
+        //fresh SAT solution by the newly added theory axioms.
         //enode *n = ctx.get_enode(expr);
         //ctx.mark_as_relevant(n);
 
@@ -297,7 +296,7 @@ namespace smt::noodler {
     void theory_str_noodler::propagate_basic_string_axioms(enode *str) {
         bool on_screen = false;
 
-        return; 
+        return;
 
         context &ctx = get_context();
         ast_manager &m = get_manager();
@@ -506,8 +505,8 @@ namespace smt::noodler {
         const expr_ref r{get_enode(y)->get_expr(), m};
 
         m_word_diseq_var_todo.push_back({x, y});
-        m_word_diseq_todo.push_back({l, r});    
-        
+        m_word_diseq_todo.push_back({l, r});
+
         app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
         app_ref neg(m.mk_not(l_eq_r), m);
         ctx.internalize(neg, false);
@@ -548,7 +547,7 @@ namespace smt::noodler {
         m_not_contains_todo.pop_scope(num_scopes);
         m_rewrite.reset();
         STRACE("str", if (!IN_CHECK_FINAL)
-            tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);       
+            tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
     }
 
     void theory_str_noodler::reset_eh() {
@@ -585,11 +584,11 @@ namespace smt::noodler {
     }
 
     /**
-    Remove irrelevant string constraints. In particular remove equations, disequations, and 
+    Remove irrelevant string constraints. In particular remove equations, disequations, and
     regular constraints that are not relevant for SAT checking.
     */
     void theory_str_noodler::remove_irrelevant_constr() {
-        
+
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
         this->m_membership_todo_rel.clear();
@@ -597,15 +596,15 @@ namespace smt::noodler {
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             if(!ctx.is_relevant(eq.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " << 
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
                     ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << '\n';);
                 continue;
-            }   
+            }
 
             // app_ref double_not(m.mk_not(m.mk_not(eq)), m);
             // ctx.internalize(double_not, false);
             // if(ctx.find_assignment(double_not.get()) != l_undef && !ctx.is_relevant(double_not.get())) {
-            //     STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " << 
+            //     STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " <<
             //         ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
             //     continue;
             // }
@@ -619,7 +618,7 @@ namespace smt::noodler {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
             if(!ctx.is_relevant(dis.get())) {
-                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " << 
+                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
                     ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
                 continue;
             }
@@ -634,12 +633,12 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             if(ctx.is_relevant(in_app.get())) {
-                STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " << 
+                STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
                     ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-                
+
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
-                }  
+                }
                 continue;
             }
         }
@@ -697,10 +696,6 @@ namespace smt::noodler {
 
         }
 
-
-
-        
-
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
@@ -714,42 +709,28 @@ namespace smt::noodler {
         block_curr_assignment();
         return FC_CONTINUE;
 
-        if(!this->state_len.contains(conj)){
-            this->adec_proc->initialize(conj);
-            this->state_len.add(conj, true);
+        expr_ref* lengths;
+        AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
 
-            expr_ref len_constr(m);
-            while(this->adec_proc->get_another_solution(conj, len_constr)) {
-                if(len_constr == nullptr)
-                    continue;
-                int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-                m_int_solver.initialize(get_context());
-                if(m_int_solver.check_sat(len_constr) == l_true) {
-                    return FC_DONE;
-                }
-                TRACE("str", tout << "len unsat\n";);
-            }
-
-            if(len_constr == nullptr) {
+        while(dec_proc.compute_next_solution()) {
+            *lengths = dec_proc.get_lengths();
+            if(lengths == nullptr)
+                continue;
+            int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
+            m_int_solver.initialize(get_context());
+            if(m_int_solver.check_sat(*lengths) == l_true) {
                 return FC_DONE;
             }
-            // all len solutions are unsat, we block the current assignment
-            block_curr_assignment();
-            return FC_CONTINUE;
+            TRACE("str", tout << "len unsat\n";);
+        }
 
-        } else {
-            TRACE("str", tout << "already visited\n";);
-            UNREACHABLE();
-            return FC_CONTINUE;
-        }        
-
-        return FC_DONE;
-
-
+        if(lengths == nullptr) {
+            return FC_DONE;
+        }
+        // all len solutions are unsat, we block the current assignment
         block_curr_assignment();
-        TRACE("str", tout << "final_check ends\n";);
         IN_CHECK_FINAL = false;
-        
+        TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
     }
 
@@ -921,17 +902,17 @@ namespace smt::noodler {
 
     /**
      * @brief Handle str.at(s,i)
-     * 
+     *
      * Translates to the following theory axioms:
      * 0 <= i < |s| -> s = xvy
      * 0 <= i < |s| -> v in re.allchar
      * 0 <= i < |s| -> |x| = i
      * i < 0 -> v = eps
      * i >= |s| -> v = eps
-     * 
+     *
      * We store
      * str.at(s,i) = v
-     * 
+     *
      * @param e str.at(s, i)
      */
     void theory_str_noodler::handle_char_at(expr *e) {
@@ -973,7 +954,7 @@ namespace smt::noodler {
 
     /**
      * @brief Handle str.substr(s,i,l)
-     * 
+     *
      * Translates to the following theory axioms:
      * 0 <= i <= |s| -> x.v.y = s
      * 0 <= i <= |s| -> |x| = i
@@ -983,10 +964,10 @@ namespace smt::noodler {
      * i < 0 -> v = eps
      * not(0 <= l <= |s| - i) -> v = eps
      * i > |s| -> v = eps
-     * 
+     *
      * We store
      * substr(s, i, n) = v
-     * 
+     *
      * @param e str.substr(s, i, l)
      */
     void theory_str_noodler::handle_substr(expr *e) {
@@ -1058,7 +1039,7 @@ namespace smt::noodler {
      * contains(a,s) && a != eps && s != eps -> a = x.s.y
      * contains(a,s) && a != eps && s != eps -> v = x.t.y
      * tighttestprefix(s,t)
-     * 
+     *
      * @param r replace term
      */
     void theory_str_noodler::handle_replace(expr *r) {
@@ -1103,7 +1084,7 @@ namespace smt::noodler {
      * contains(t, s) && s != eps -> indexof = |x|
      * contains(t, s) -> indexof >= 0
      * tightestprefix(s,x)
-     * 
+     *
      * The case of offset > 0
      * not(contains(t,s)) -> indexof = -1
      * t = eps && s != eps -> indexof = -1
@@ -1115,7 +1096,7 @@ namespace smt::noodler {
      * offset >= 0 && offset < |t| && indexof(y,s,0) = -1 -> indexof = -1
      * offset >= 0 && offset < |t| && indexof(y,s,0) >= 0 -> offset + indexof(y,s,0) = indexof
      * offset < 0 -> indexof = -1
-     * 
+     *
      * @param i indexof term
      */
     void theory_str_noodler::handle_index_of(expr *i) {
@@ -1202,12 +1183,12 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief String term @p x does not contain @p s as a substring. 
+     * @brief String term @p x does not contain @p s as a substring.
      * Translates to the following theory axioms:
      * not(s = eps) -> s = s1.s2 where s1 = s[0,-2], s2 = s[-1] in the case of @p s being a string
      * not(s = eps) -> not(contains(x.s1, s))
      * not(s = eps) -> s2 in re.allchar (is a single character)
-     * 
+     *
      * @param s Substring that should not be present
      * @param x String term
      */
@@ -1225,7 +1206,7 @@ namespace smt::noodler {
 
     /**
      * @brief Get string term representing first |s| - 1 characters of @p s.
-     * 
+     *
      * @param s String term
      * @return expr_ref String term
      */
@@ -1239,7 +1220,7 @@ namespace smt::noodler {
 
     /**
      * @brief Get string term representing last character of @p s.
-     * 
+     *
      * @param s String term
      * @return expr_ref String term
      */
@@ -1287,7 +1268,7 @@ namespace smt::noodler {
      * @brief Handling of str.prefix(x, y) = e (x is a prefix of y)
      * Translates to the following theory axioms:
      * e -> y = x.v
-     * 
+     *
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
@@ -1314,13 +1295,13 @@ namespace smt::noodler {
      * not(e) && |x| <= |y| -> mx in re.allchar
      * not(e) && |x| <= |y| -> my in re.allchar
      * not(e) && |x| <= |y| -> mx != my
-     * 
+     *
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
         if(axiomatized_terms.contains(e))
-            return; 
-            
+            return;
+
         axiomatized_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
@@ -1371,13 +1352,13 @@ namespace smt::noodler {
      * @brief Handling of str.suffix(x, y) = e (x is a suffix of y)
      * Translates to the following theory axioms:
      * e -> y = v.x
-     * 
+     *
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
         if(axiomatized_terms.contains(e))
             return;
-        
+
         axiomatized_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
@@ -1400,7 +1381,7 @@ namespace smt::noodler {
      * not(e) && |x| <= |y| -> mx in re.allchar
      * not(e) && |x| <= |y| -> my in re.allchar
      * not(e) && |x| <= |y| -> mx != my
-     * 
+     *
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
@@ -1457,7 +1438,7 @@ namespace smt::noodler {
      * @brief Handle contains
      * Translates to the following theory axioms:
      * str.contains(x,y) -> x = pys
-     * 
+     *
      * @param e str.contains(x,y)
      */
     void theory_str_noodler::handle_contains(expr *e) {
@@ -1479,9 +1460,9 @@ namespace smt::noodler {
 
 
     /**
-     * @brief Heuristics for handling not contains: not(contains(s, t)). 
+     * @brief Heuristics for handling not contains: not(contains(s, t)).
      * So far only the case when t is a string literal is implemented.
-     * 
+     *
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
@@ -1490,12 +1471,12 @@ namespace smt::noodler {
 
         axiomatized_terms.insert(e);
         expr *x = nullptr, *y = nullptr;
-        VERIFY(m_util_s.str.is_contains(e, x, y)); 
+        VERIFY(m_util_s.str.is_contains(e, x, y));
 
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)), 
-                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)), 
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
+                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
@@ -1510,7 +1491,7 @@ namespace smt::noodler {
         STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
         app_ref re_constr(to_app(s), m);
-        /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms), 
+        /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms),
         /// this complex term T is replaced by a fresh variable X. The following axioms are hence added: X = T && X in RE.
         if(re_constr->get_num_args() != 0) {
             app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
@@ -1573,7 +1554,7 @@ namespace smt::noodler {
             refinement = refinement == nullptr ? in_app : m.mk_or(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
-        
+
         if (refinement != nullptr) {
             add_block_axiom(refinement);
         }
@@ -1671,7 +1652,7 @@ namespace smt::noodler {
             expr *const e = ctx.mk_eq_atom(we.first, we.second);
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
         }
-        
+
         if(bool_var == nullptr) {
             UNREACHABLE();
         }
@@ -1706,28 +1687,28 @@ namespace smt::noodler {
 
     /**
      * @brief Create fresh string variable
-     * 
-     * @param name Static part of the name (will be concatenated with other parts 
+     *
+     * @param name Static part of the name (will be concatenated with other parts
      *  distinguishing the name)
      * @return expr_ref Fresh string variable
      */
     expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
-        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0, 
-            nullptr, this->m_util_s.mk_string_sort()), m); 
+        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
+            nullptr, this->m_util_s.mk_string_sort()), m);
         return var;
     }
 
     /**
      * @brief Create fresh int variable
-     * 
-     * @param name Static part of the name (will be concatenated with other parts 
+     *
+     * @param name Static part of the name (will be concatenated with other parts
      *  distinguishing the name)
      * @return expr_ref Fresh int variable
      */
     expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
         sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0, 
-            nullptr, int_sort), m); 
+        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
+            nullptr, int_sort), m);
         return var;
     }
 
@@ -1736,7 +1717,7 @@ namespace smt::noodler {
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
     */
-    Predicate theory_str_noodler::conv_eq_pred(const app* ex) { 
+    Predicate theory_str_noodler::conv_eq_pred(const app* ex) {
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
         if(m.is_not(ex)) {
@@ -1753,7 +1734,7 @@ namespace smt::noodler {
         util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, this->predicate_replace, left);
         util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, this->predicate_replace, right);
 
-        return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right}); 
+        return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }
 
     /**
@@ -1766,6 +1747,6 @@ namespace smt::noodler {
             Predicate inst = this->conv_eq_pred(pred);
             STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
             res.add_predicate(inst);
-        } 
+        }
     }
 }

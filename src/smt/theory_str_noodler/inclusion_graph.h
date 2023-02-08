@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <deque>
+#include <algorithm>
 #include "formula.h"
 
 namespace smt::noodler {
@@ -162,7 +163,7 @@ namespace smt::noodler {
 
         /**
          * @brief adds node with predicate to graph (even if a node with such predicate exists in graph)
-         * 
+         *
          * @return the newly added node
          */
         std::shared_ptr<GraphNode> add_node(const Predicate& predicate) {
@@ -175,7 +176,7 @@ namespace smt::noodler {
 
         /**
          * @brief adds node with predicate to graph (even if a node with such predicate exists in graph)
-         * 
+         *
          * @return the newly added node
          */
         std::shared_ptr<GraphNode> add_node(const std::vector<BasicTerm> &left_side, const std::vector<BasicTerm> &right_side) {
@@ -192,7 +193,7 @@ namespace smt::noodler {
             return (nodes_not_on_cycle.count(node) == 0);
         }
 
-        // adds edges so that inclusions x and y where left side of x shares variable with right side of y have edge from x to y  
+        // adds edges so that inclusions x and y where left side of x shares variable with right side of y have edge from x to y
         void add_inclusion_graph_edges();
 
         // makes a deep copy of the garph, i.e. returned graph is semantically same as this graph, but the pointers to nodes are different

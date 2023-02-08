@@ -1,5 +1,5 @@
 /*
-The skeleton of this code was obtained by Yu-Fang Chen from https://github.com/guluchen/z3. 
+The skeleton of this code was obtained by Yu-Fang Chen from https://github.com/guluchen/z3.
 Eternal glory to Yu-Fang.
 */
 
@@ -39,6 +39,7 @@ Eternal glory to Yu-Fang.
 namespace smt::noodler {
 
     class theory_str_noodler : public theory {
+    protected:
 
         int m_scope_level = 0;
         static bool is_over_approximation;
@@ -49,7 +50,6 @@ namespace smt::noodler {
         //ast_manager& m;
 
         StateLen<bool> state_len;
-        AbstractDecisionProcedure* adec_proc;
         obj_hashtable<expr> len_vars;
 
         // mapping predicates and function to variables that they substitute to
@@ -127,11 +127,9 @@ namespace smt::noodler {
         void add_length(expr* e);
         void enforce_length(expr* n);
 
-        ~theory_str_noodler() {
-            delete this->adec_proc;
-        }
+        ~theory_str_noodler() {}
 
-    private:
+    protected:
         bool is_of_this_theory(expr *e) const;
         bool is_string_sort(expr *e) const;
         bool is_regex_sort(expr *e) const;
@@ -144,7 +142,7 @@ namespace smt::noodler {
         bool_var mk_bool_var(expr *e);
         expr_ref mk_str_var(const std::string& name);
         expr_ref mk_int_var(const std::string& name);
-        
+
         void add_axiom(std::initializer_list<literal> ls);
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
