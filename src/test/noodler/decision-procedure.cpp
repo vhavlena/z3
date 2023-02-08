@@ -20,12 +20,13 @@ public:
 
 class DecisionProcedureCUT : public DecisionProcedure {
 public:
-    DecisionProcedureCUT(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars, ast_manager& m, seq_util& m_util_s)
-            : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s) {}
+    DecisionProcedureCUT(const Formula &equalities, AutAssignment init_aut_ass,
+                         const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                         ast_manager& m, seq_util& m_util_s
+    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s) {}
 
     using DecisionProcedure::compute_next_solution;
     using DecisionProcedure::get_lengths;
-    using DecisionProcedure::get_another_solution;
     using DecisionProcedure::preprocess;
     using DecisionProcedure::solution;
 };

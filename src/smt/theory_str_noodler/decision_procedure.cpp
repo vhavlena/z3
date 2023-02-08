@@ -61,7 +61,8 @@ namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(
             const Formula &equalities, AutAssignment init_aut_ass,
             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-            ast_manager& m, seq_util& m_util_s) : m{ m }, m_util_s{ m_util_s } {
+            ast_manager& m, seq_util& m_util_s
+    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensistive_vars{ init_length_sensitive_vars } {
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(init_aut_ass);
@@ -353,11 +354,13 @@ namespace smt::noodler {
     }
 
     expr_ref DecisionProcedure::get_lengths() {
-        return AbstractDecisionProcedure::get_lengths();
+        return AbstractDecisionProcedure::get_lengths(); // TODO: Remove when implemented.
     }
 
     void DecisionProcedure::preprocess() {
-        AbstractDecisionProcedure::preprocess();
+        /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
+
+        AbstractDecisionProcedure::preprocess(); // TODO: Remove when implemented.
     }
 
 } // namespace smt::nodler

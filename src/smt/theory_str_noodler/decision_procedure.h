@@ -18,8 +18,6 @@ namespace smt::noodler {
      */
     class AbstractDecisionProcedure {
     public:
-
-        /// TODO: What to do?
         virtual void preprocess() {
             throw std::runtime_error("Unimplemented");
         }
@@ -36,8 +34,6 @@ namespace smt::noodler {
          * Get lengths for problem instance.
          * @return Conjunction of lengths of the current solution for variables in constructor
          *  (variable renames, init length variables).
-         *
-         *  FIXME: What does the note "from handlers to rewrite predicates" mean?
          */
         virtual expr_ref get_lengths() {
             throw std::runtime_error("Unimplemented");
@@ -57,19 +53,14 @@ namespace smt::noodler {
         seq_util& m_util_s;
         arith_util& m_util_a;
         Instance inst{};
-        LengthConstr* out_length_constr{ nullptr };
+        LengthConstr* solution{ nullptr };
 
     public:
-        DecisionProcedureDebug(ast_manager& mn, seq_util& util_s, arith_util& util_a) :
-            state(),
-            m(mn),
-            m_util_s(util_s),
-            m_util_a(util_a)
-            { }
-
-        void initialize(const Instance& inst, LengthConstr& len) {
+        DecisionProcedureDebug(const Instance& inst, LengthConstr& len,
+                               ast_manager& mn, seq_util& util_s, arith_util& util_a
+        ) : state{}, m{ mn }, m_util_s{ util_s }, m_util_a{ util_a } {
             this->inst = inst;
-            this->out_length_constr = &len;
+            this->solution = &len;
             this->state.add(inst, 0);
         }
 
@@ -96,7 +87,7 @@ namespace smt::noodler {
             }
 
             this->state.update_val(inst, cnt+1);
-            *out_length_constr = refinement_len;
+            *solution = refinement_len;
             return true;
         }
 
@@ -177,6 +168,7 @@ namespace smt::noodler {
         // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
         unsigned noodlification_no = 0;
 
+
         std::deque<SolvingState> worklist;
 
         /// State of a found satisfiable solution set when one is computed using
@@ -185,6 +177,7 @@ namespace smt::noodler {
 
         ast_manager& m;
         seq_util& m_util_s;
+        const std::unordered_set<BasicTerm>& init_length_sensistive_vars;
 
         /**
          * Convert all string literals in formula to fresh variables with automata in automata assignment.
@@ -195,10 +188,14 @@ namespace smt::noodler {
         void conv_str_lits_to_fresh_vars();
 
     public:
-        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars, ast_manager& m, seq_util& m_util_s);
+        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
+                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                          ast_manager& m, seq_util& m_util_s
+        );
 
         bool compute_next_solution() override;
         expr_ref get_lengths() override;
+
         void preprocess() override;
     };
 }
