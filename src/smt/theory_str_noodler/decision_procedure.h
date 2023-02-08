@@ -18,6 +18,20 @@ namespace smt::noodler {
      */
     class AbstractDecisionProcedure {
     public:
+
+        /// TODO: What to do?
+        virtual void preprocess() {
+            throw std::runtime_error("Unimplemented");
+        }
+
+        /**
+         * Compute next solution and save the satisfiable solution.
+         * @return True if there is an satisfiable element in the worklist.
+         */
+        virtual bool compute_next_solution() {
+            throw std::runtime_error("Not implemented");
+        }
+
         /**
          * Get lengths for problem instance.
          * @return Conjunction of lengths of the current solution for variables in constructor
@@ -27,23 +41,6 @@ namespace smt::noodler {
          */
         virtual expr_ref get_lengths() {
             throw std::runtime_error("Unimplemented");
-        }
-
-        virtual void preprocess() {
-            throw std::runtime_error("Unimplemented");
-        }
-
-        virtual bool get_another_solution(const Instance& inst, LengthConstr& out) {
-            throw std::runtime_error("Not implemented");
-        }
-
-        /**
-         * Compute next solution.
-         * @return True if there is an satisfiable element in the worklist and saves the satisfying element in @c
-         *  solution.
-         */
-        virtual bool compute_next_solution() {
-            throw std::runtime_error("Not implemented");
         }
 
         virtual ~AbstractDecisionProcedure()=default;
@@ -59,6 +56,8 @@ namespace smt::noodler {
         ast_manager& m;
         seq_util& m_util_s;
         arith_util& m_util_a;
+        Instance inst{};
+        LengthConstr* out_length_constr{ nullptr };
 
     public:
         DecisionProcedureDebug(ast_manager& mn, seq_util& util_s, arith_util& util_a) :
@@ -68,11 +67,13 @@ namespace smt::noodler {
             m_util_a(util_a)
             { }
 
-        void initialize(const Instance& inst) {
+        void initialize(const Instance& inst, LengthConstr& len) {
+            this->inst = inst;
+            this->out_length_constr = &len;
             this->state.add(inst, 0);
         }
 
-        bool get_another_solution(const Instance& inst, LengthConstr& out) override {
+        bool compute_next_solution() override {
             int cnt = this->state.get_val(inst);
             if(cnt >= 10) {
                 return false;
@@ -95,7 +96,7 @@ namespace smt::noodler {
             }
 
             this->state.update_val(inst, cnt+1);
-            out = refinement_len;
+            *out_length_constr = refinement_len;
             return true;
         }
 
@@ -169,7 +170,7 @@ namespace smt::noodler {
     };
 
     class DecisionProcedure : public AbstractDecisionProcedure {
-    private:
+    protected:
         // prefix of newly created vars during the procedure
         const std::string VAR_PREFIX = "tmp";
         // counter of noodlifications, so that newly created variables will have unique names per noodlification
@@ -177,6 +178,10 @@ namespace smt::noodler {
         unsigned noodlification_no = 0;
 
         std::deque<SolvingState> worklist;
+
+        /// State of a found satisfiable solution set when one is computed using
+        ///  'DecisionProcedure::compute_next_solution()'.
+        SolvingState solution;
 
         ast_manager& m;
         seq_util& m_util_s;
@@ -195,8 +200,6 @@ namespace smt::noodler {
         bool compute_next_solution() override;
         expr_ref get_lengths() override;
         void preprocess() override;
-
-
     };
 }
 

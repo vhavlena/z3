@@ -39,6 +39,7 @@ Eternal glory to Yu-Fang.
 namespace smt::noodler {
 
     class theory_str_noodler : public theory {
+    protected:
 
         int m_scope_level = 0;
         static bool is_over_approximation;
@@ -49,7 +50,7 @@ namespace smt::noodler {
         //ast_manager& m;
 
         StateLen<bool> state_len;
-        AbstractDecisionProcedure* adec_proc;
+        DecisionProcedureDebug* adec_proc; // TODO: Replace with 'AbstractDecisionProcedure*'.
         obj_hashtable<expr> len_vars;
 
         // mapping predicates and function to variables that they substitute to
@@ -131,7 +132,7 @@ namespace smt::noodler {
             delete this->adec_proc;
         }
 
-    private:
+    protected:
         bool is_of_this_theory(expr *e) const;
         bool is_string_sort(expr *e) const;
         bool is_regex_sort(expr *e) const;
