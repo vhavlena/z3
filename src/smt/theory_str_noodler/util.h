@@ -123,15 +123,18 @@ namespace smt::noodler::util {
     [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
                                               const std::set<uint32_t>& alphabet, bool make_complement = false);
 
+
     /**
-    Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms 
-    to the output parameter @p terms. 
-    @param ex Expression to be checked for basic terms.
-    @param m_util_s Seq util for AST
-    @param pred_replace Replacement of predicate and functions
-    @param[out] terms Vector of found BasicTerm (in right order).
-    */
-    void collect_terms(const app* ex, const seq_util& m_util_s, std::vector<BasicTerm>& terms);
+     * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms
+     * to the output parameter @p terms.
+     * @param ex Expression to be checked for basic terms.
+     * @param m_util_s Seq util for AST
+     * @param pred_replace Replacement of predicate and functions
+     * @param[out] terms Vector of found BasicTerm (in right order).
+     */
+    void collect_terms(app* const ex, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
+                       std::vector<BasicTerm>& terms
+    );
 
         if(m_util_s.str.is_string(ex)) {
             std::string lit = ex->get_parameter(0).get_zstring().encode();
