@@ -200,7 +200,7 @@ namespace smt::noodler::util {
             const vector<expr_pair_flag>& regexes,
             const seq_util& m_util_s,
             const ast_manager& m,
-            const std::set<uint32_t>& alphabet
+            const std::set<uint32_t>& noodler_alphabet
     ) {
         // Find all variables in the whole formula.
         std::unordered_set<std::string> variables_in_formula{};
@@ -220,7 +220,7 @@ namespace smt::noodler::util {
         }
 
         AutAssignment aut_assignment{};
-        aut_assignment.set_alphabet(alphabet);
+        aut_assignment.set_alphabet(noodler_alphabet);
         // Create automata from their corresponding regexes.
         std::unordered_set<std::string> variables_with_regex{};
         for (const auto &word_equation: regexes) {
@@ -234,12 +234,26 @@ namespace smt::noodler::util {
             assert(aut_assignment.find(variable_term) == aut_assignment.end());
 
             const bool make_complement{ std::get<2>(word_equation) };
-            Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, alphabet, make_complement) };
+            Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
             aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
         }
 
         // Assign sigma start automata for all yet unassigned variables.
-        const Nfa nfa_sigma_star{ aut_assignment.sigma_star_automaton() };  // FIXME: Unknown alphabet so far.
+        Mata::OnTheFlyAlphabet mata_alphabet{};
+        std::stringstream string_stream;
+        string_stream << std::hex;
+        std::string hex_symbol_string;
+        for (const uint32_t symbol : noodler_alphabet) {
+            string_stream << symbol;
+            string_stream >> hex_symbol_string;
+            hex_symbol_string = "\\x{" + hex_symbol_string + "}";
+            mata_alphabet.add_new_symbol(hex_symbol_string, symbol);
+            string_stream.clear();
+        }
+
+        const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(&mata_alphabet) };
+        std::cout << "Star automaton:\n";
+        nfa_sigma_star.print_to_DOT(std::cout);
         for (const auto& variable_name : variables_in_formula) {
             if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
                 BasicTerm variable_term{ BasicTermType::Variable, variable_name };
@@ -352,7 +366,7 @@ namespace smt::noodler::util {
 
     [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
                                               const std::set<uint32_t>& alphabet, bool make_complement) {
-        const std:string regex{ conv_to_regex_hex(expr, m_util_s, m, alphabet) };
+        const std::string regex{ conv_to_regex_hex(expr, m_util_s, m, alphabet) };
         Nfa nfa{};
         Mata::RE2Parser::create_nfa(&nfa, regex);
         if (make_complement) {

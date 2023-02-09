@@ -13,7 +13,7 @@
 #include <mata/nfa.hh>
 
 namespace smt::noodler {
-    
+
     /**
      * hints for using AutAssignment:
      *   - use at() instead of [] operator for getting the value, use [] only for assigning
@@ -42,16 +42,6 @@ namespace smt::noodler {
             }
             update_alphabet();
         };
-
-        Mata::Nfa::Nfa sigma_star_automaton() const {
-            Mata::Nfa::Nfa nfa(1);
-            nfa.initial = {0};
-            nfa.final = {0};
-            for (const Mata::Symbol& symb : this->alphabet) {
-                nfa.delta.add(0, symb, 0);
-            }
-            return nfa;
-        }
 
         Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             Mata::Nfa::Nfa ret = Mata::Nfa::create_empty_string_nfa();
@@ -91,7 +81,7 @@ namespace smt::noodler {
         }
 
     };
-        
+
 } // Namespace smt::noodler.
 
 #endif //Z3_STR_AUT_ASSIGNMENT_H_
