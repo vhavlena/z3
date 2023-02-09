@@ -404,6 +404,7 @@ namespace smt::noodler {
      */
     void DecisionProcedure::preprocess() {
         /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
+        conv_str_lits_to_fresh_vars();
 
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
@@ -452,6 +453,10 @@ namespace smt::noodler {
             res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
         }
         return res;
+    }
+
+    void DecisionProcedure::conv_str_lits_to_fresh_vars() {
+        // TODO: Implement.
     }
 
 } // namespace smt::nodler
