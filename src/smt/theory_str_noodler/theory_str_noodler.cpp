@@ -723,7 +723,9 @@ namespace smt::noodler {
         return FC_CONTINUE;
 
         expr_ref* lengths;
-        AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{};
+        AbstractDecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s };
+        dec_proc.preprocess();
 
         while(dec_proc.compute_next_solution()) {
             *lengths = dec_proc.get_lengths(this->var_name);
