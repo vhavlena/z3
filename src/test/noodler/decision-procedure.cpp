@@ -234,18 +234,19 @@ TEST_CASE("Decision Procedure", "[noodler]") {
 
         auto l_vars = { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") };
         auto var_map = create_var_map(l_vars, m, m_util_s);
-
-        // Not sure now, how to test it
-        //std::cout << mk_pp(proc.get_lengths(var_map), m) << std::endl;
-        expr_ref res(m.mk_and(m.mk_true(), m.mk_and(
-            m.mk_or(
-                m.mk_false(), 
-                m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "x"))), m_util_a.mk_int(1))),  
+        expr_ref len = proc.get_lengths(var_map);
+        expr_ref res(m.mk_and(  
+            m.mk_and(
+                m.mk_true(),
+                m.mk_or(
+                    m.mk_false(), 
+                    m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "x"))), m_util_a.mk_int(1)))
+            ),  
             m.mk_or(m.mk_false(), 
-            m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "z"))), m_util_a.mk_int(1))) )), 
+            m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "z"))), m_util_a.mk_int(1))) ), 
         m);
-        CHECK(proc.get_lengths(var_map) == res); // this is false, but syntactically it is the same
 
+        CHECK(len->hash() == res->hash());
         CHECK(!proc.compute_next_solution());
     }
 
