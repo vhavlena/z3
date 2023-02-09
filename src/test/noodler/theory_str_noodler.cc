@@ -69,14 +69,14 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
 
         auto expr_all_char{ m_util_s.re.mk_full_seq(default_sort) };
         regex = util::conv_to_regex_hex(expr_all_char, m_util_s, m, alphabet);
-        CHECK(regex == "[\\x{78}\\x{79}\\x{7a}]");
+        CHECK(regex == "[\\x{78}\\x{79}\\x{7a}]*");
 
         // FIXME.
         //auto expr_all_char_star{ m_util_s.re.mk_star(expr_all_char) };
         //regex = util::conv_to_regex_hex(expr_all_char_star, m_util_s, m, alphabet);
         //CHECK(regex == "(((.))*)");
     }
-    
+
     memory::finalize();
 }
 
