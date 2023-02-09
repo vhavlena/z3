@@ -52,6 +52,8 @@ namespace smt::noodler {
         StateLen<bool> state_len;
         obj_hashtable<expr> len_vars;
 
+        std::map<BasicTerm, expr_ref> var_name;
+
         // mapping predicates and function to variables that they substitute to
         obj_map<expr, expr*> predicate_replace;
 
@@ -174,7 +176,7 @@ namespace smt::noodler {
 
         void remove_irrelevant_constr();
 
-        Predicate conv_eq_pred(const app* expr);
+        Predicate conv_eq_pred(app* const expr);
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
     };
 }

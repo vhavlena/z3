@@ -9,6 +9,7 @@
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
 #include "state_len.h"
+#include "formula_preprocess.h"
 
 
 namespace smt::noodler {
@@ -169,6 +170,8 @@ namespace smt::noodler {
         // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
         unsigned noodlification_no = 0;
 
+        FormulaPreprocess prep_handler;
+
 
         std::deque<SolvingState> worklist;
 
@@ -189,8 +192,8 @@ namespace smt::noodler {
          */
         void conv_str_lits_to_fresh_vars();
 
-        expr_ref mk_int_var(const std::string& name); /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
-
+        expr_ref mk_int_var_fresh(const std::string& name); /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+        expr_ref mk_str_var(const std::string& name); 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 
