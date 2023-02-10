@@ -365,9 +365,9 @@ namespace smt::noodler {
 
             auto it = variable_map.find(var);
             expr_ref var_expr(this->m);
-            if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+            if(it != variable_map.end()) { // take the existing variable from the map
                 var_expr = it->second;
-            } else {
+            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                 var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
             }
             lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));   
