@@ -180,6 +180,9 @@ namespace smt::noodler {
 
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
 
+        /**
+         * Get initial length variables as a set of @c BasicTerm from their expressions.
+         */
         std::unordered_set<BasicTerm> get_init_length_vars();
     };
 }
