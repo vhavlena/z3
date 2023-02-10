@@ -718,26 +718,22 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
-        expr_ref* lengths { nullptr };
+        expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars() };
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
+        dec_proc.init_computation();
 
         while(dec_proc.compute_next_solution()) {
-            *lengths = dec_proc.get_lengths(this->var_name);
-            if(lengths == nullptr)
-                continue;
+            lengths = dec_proc.get_lengths(this->var_name);
             int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
             m_int_solver.initialize(get_context());
-            if(m_int_solver.check_sat(*lengths) == l_true) {
+            if(m_int_solver.check_sat(lengths) == l_true) {
                 return FC_DONE;
             }
             TRACE("str", tout << "len unsat\n";);
         }
 
-        if(lengths == nullptr) {
-            return FC_DONE;
-        }
         // all len solutions are unsat, we block the current assignment
         block_curr_assignment();
         IN_CHECK_FINAL = false;

@@ -76,6 +76,12 @@ namespace smt::noodler {
             SolvingState element_to_process = std::move(worklist.front());
             worklist.pop_front();
 
+            // if the inclusion graph is empty, we are done
+            if(element_to_process.inclusion_graph->get_edges().empty()) {
+                solution = std::move(element_to_process);
+                return this->solution.aut_ass.is_sat();
+            }
+
             if (element_to_process.nodes_to_process.empty()) {
                 // TODO do some arithmetic shit?
                 solution = std::move(element_to_process);

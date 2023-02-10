@@ -90,6 +90,20 @@ namespace smt::noodler {
             }
         }
 
+        /**
+         * @brief Check if all automata in the map have non-empty language.
+         * 
+         * @return true All have non-empty language
+         * @return false There is at least one NFA with the empty language
+         */
+        bool is_sat() const {
+            for (const auto& pr : *this) {
+                if(Mata::Nfa::is_lang_empty(*pr.second))
+                    return false;
+            }
+            return true;
+        }
+
     };
 
 } // Namespace smt::noodler.
