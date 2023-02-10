@@ -17,9 +17,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Update the structure collecting information about variable occurrence. The structure contains variables as 
+     * @brief Update the structure collecting information about variable occurrence. The structure contains variables as
      * [var] = { (var;eq_index;position) } s.t. position is negative if it is on the left side (numbering from 1).
-     * 
+     *
      * @param pred Equation whose variables should be stored
      * @param index Index of the given equation @p pred.
      */
@@ -35,9 +35,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get VarNode (structure representing variable position in the equation) for each 
+     * @brief Get VarNode (structure representing variable position in the equation) for each
      * variable in the equation @p pred.
-     * 
+     *
      * @param pred Equation
      * @param index Index of the equation @p pred
      * @param incl_lit Include positions of literals
@@ -56,7 +56,7 @@ namespace smt::noodler {
 
     /**
      * @brief Update BasicTerm positions in the concatenation
-     * 
+     *
      * @param side Concatenation of BasicTerms
      * @param[out] res Set of positions (VarNodes)
      * @param index Index of the equation the @p side belongs to
@@ -74,7 +74,7 @@ namespace smt::noodler {
 
     /**
      * @brief String representation of FormulaVar.
-     * 
+     *
      * @return String representation
      */
     std::string FormulaVar::to_string() const {
@@ -97,7 +97,7 @@ namespace smt::noodler {
 
     /**
      * @brief Do all given variables occur at most once in the formula?
-     * 
+     *
      * @param items Set of variables to be checked.
      * @return true All variables have unique occurrence.
      */
@@ -112,9 +112,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Is the given predicate @p p regular? If so, set @p out to the form that 
+     * @brief Is the given predicate @p p regular? If so, set @p out to the form that
      * a single variable is on the left side.
-     * 
+     *
      * @param p predicate to be checked (works for equalities only).
      * @param[out] out Adjusted form of the predicate s.t. |L| = 1
      * @return Is regular?
@@ -135,13 +135,13 @@ namespace smt::noodler {
         }
 
         return false;
-    } 
+    }
 
     /**
-     * @brief Get all regular predicates from the formula (regular predicates are defined in remove_regular) with 
-     * an additional condition that all predicates are switched to the form X = X_1...X_n (the single variable is 
+     * @brief Get all regular predicates from the formula (regular predicates are defined in remove_regular) with
+     * an additional condition that all predicates are switched to the form X = X_1...X_n (the single variable is
      * on the left).
-     * 
+     *
      * @param[out] out Vector of predicates with the corresponding index in the map predicates.
      */
     void FormulaVar::get_side_regulars(std::vector<std::pair<size_t, Predicate>>& out) const {
@@ -154,7 +154,7 @@ namespace smt::noodler {
 
     /**
      * @brief Get simple equations. Simple equation is of the form X = Y where |X| = |Y| = 1.
-     * 
+     *
      * @param[out] out Vector of simple equations with the corresponding index in the map predicates
      */
     void FormulaVar::get_simple_eqs(std::vector<std::pair<size_t, Predicate>>& out) const {
@@ -165,7 +165,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Clean occurrences of variables that have empty set of occurrences from varmap. 
+     * @brief Clean occurrences of variables that have empty set of occurrences from varmap.
      * In other words remove items from varmap s.t. (x, {}).
      */
     void FormulaVar::clean_varmap() {
@@ -173,9 +173,9 @@ namespace smt::noodler {
     };
 
     /**
-     * @brief Remove predicate from the formula. Updates the variable map (if the variable is no further present in 
+     * @brief Remove predicate from the formula. Updates the variable map (if the variable is no further present in
      * the system, it is not removed, only the set of occurrences is set to {}).
-     * 
+     *
      * @param index Index of the predicate to be removed.
      */
     void FormulaVar::remove_predicate(size_t index) {
@@ -183,7 +183,7 @@ namespace smt::noodler {
 
         const auto& filter = [&index](const VarNode& n) { return n.eq_index == index; };
         for(const BasicTerm& v : items) {
-            std::set<VarNode>& occurr = this->varmap[v]; 
+            std::set<VarNode>& occurr = this->varmap[v];
             remove_if(occurr, filter);
         }
         this->allpreds.erase(this->predicates[index]);
@@ -192,7 +192,7 @@ namespace smt::noodler {
 
     /**
      * @brief Add predicate to the formula (with updating the variable map).
-     * 
+     *
      * @param pred New predicate
      * @param index Index of the new predicate (if set to -1, first higher index than top is chosen)
      */
@@ -222,19 +222,19 @@ namespace smt::noodler {
 
     /**
      * @brief Add a set of new predicates.
-     * 
+     *
      * @param preds Set of new predicates to be added
      */
     void FormulaVar::add_predicates(const std::set<Predicate>& preds) {
         for(const Predicate& p : preds) {
             add_predicate(p);
         }
-    } 
+    }
 
     /**
      * @brief Replace @p find in the formula (in all predicates).
-     * 
-     * @param find Find 
+     *
+     * @param find Find
      * @param replace Replace
      */
     void FormulaVar::replace(const Concat& find, const Concat& replace) {
@@ -249,11 +249,11 @@ namespace smt::noodler {
         for(const auto& pr : replace_map) {
             remove_predicate(pr.first);
             add_predicate(pr.second, pr.first);
-        } 
+        }
     }
 
     /**
-     * @brief Remove equations with both sides empty. 
+     * @brief Remove equations with both sides empty.
      */
     void FormulaVar::clean_predicates() {
         std::vector<size_t> rem_ids;
@@ -269,9 +269,9 @@ namespace smt::noodler {
     };
 
     /**
-     * @brief Update automata assignment of @p var. If var exists in the aut assignment, we set 
-     * L(var) = L(var) \cap L(upd). Otherwise we set L(var) = L(upd). 
-     * 
+     * @brief Update automata assignment of @p var. If var exists in the aut assignment, we set
+     * L(var) = L(var) \cap L(upd). Otherwise we set L(var) = L(upd).
+     *
      * @param var Basic term to be updated
      * @param upd Concatenation of terms for updating @p var.
      */
@@ -286,9 +286,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where 
-     * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable 
-     * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system 
+     * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where
+     * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable
+     * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system
      * provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X) is the automaton assigned to variable X.
      */
     void FormulaPreprocess::remove_regular() {
@@ -299,7 +299,7 @@ namespace smt::noodler {
         while(!worklist.empty()) {
             std::pair<size_t, Predicate> pr = worklist.front();
             worklist.pop_front();
-    
+
             assert(pr.second.get_left_side().size() == 1);
 
             // right side containts len variables; skip
@@ -315,7 +315,7 @@ namespace smt::noodler {
                 if(occurrs.size() == 1) {
                     Predicate reg_pred;
                     if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
-                        worklist.push_back({occurrs.begin()->eq_index, reg_pred});
+                        worklist.emplace_back(occurrs.begin()->eq_index, reg_pred);
                         // update dependency
                         map_set_insert(this->dependency, occurrs.begin()->eq_index, pr.first);
                     }
@@ -325,7 +325,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Propagate variables. Propagate all equations of the form X=Y 
+     * @brief Propagate variables. Propagate all equations of the form X=Y
      * (find all Y in the formula and replace with X).
      */
     void FormulaPreprocess::propagate_variables() {
@@ -340,7 +340,7 @@ namespace smt::noodler {
             size_t index = worklist.front();
             worklist.pop_front();
             Predicate eq = this->formula.get_predicate(index);
-    
+
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
@@ -362,15 +362,15 @@ namespace smt::noodler {
         }
 
         assert(!this->formula.contains_simple_eqs());
-    } 
+    }
 
     /**
-     * @brief Get symmetrical difference of occurrences of BasicTerms within two concatenations. For instance for X.Y.X and X.Y.W.Z 
+     * @brief Get symmetrical difference of occurrences of BasicTerms within two concatenations. For instance for X.Y.X and X.Y.W.Z
      * it returns ({{X,3}}, {{W,3}, {Z,4}}). It includes both variables and literals.
-     * 
+     *
      * @param cat1 First concatenation
      * @param cat2 Second concatenation
-     * @return Symmetrical difference 
+     * @return Symmetrical difference
      */
     VarNodeSymDiff FormulaPreprocess::get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const {
         std::set<VarNode> p1, p2;
@@ -380,11 +380,11 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Check whether symmetric difference of term occurrences is suitable for generating identities. The 
-     * symmetric difference contains different BasicTerms that are on the different positions in the contatenations. If so, 
+     * @brief Check whether symmetric difference of term occurrences is suitable for generating identities. The
+     * symmetric difference contains different BasicTerms that are on the different positions in the contatenations. If so,
      * set @p new_pred with the new predicate that was generated from the difference.
-     * 
-     * @param diff Symmetric difference of two equivalent terms (concatenation) 
+     *
+     * @param diff Symmetric difference of two equivalent terms (concatenation)
      * @param[out] new_pred Newly created identity
      * @return Is it suitable for gen identity (was some identity created?)
      */
@@ -393,8 +393,8 @@ namespace smt::noodler {
             VarNode val1 = *diff.first.begin();
             VarNode val2 = *diff.second.begin();
             if(val1.position == val2.position) {
-                new_pred = Predicate(PredicateType::Equation, 
-                    std::vector<Concat>({Concat({val1.term}), 
+                new_pred = Predicate(PredicateType::Equation,
+                    std::vector<Concat>({Concat({val1.term}),
                     std::vector<BasicTerm>({val2.term})}));
                 return true;
             }
@@ -403,7 +403,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Generate indentities. It covers two cases (a) X1 X X2 = X1 Y X2 => X = Y 
+     * @brief Generate indentities. It covers two cases (a) X1 X X2 = X1 Y X2 => X = Y
      * (b) X1 X X2 = Z and Z = X1 Y X2 => X = Y. Where each term can be both literal and variable.
      */
     void FormulaPreprocess::generate_identities() {
@@ -416,23 +416,23 @@ namespace smt::noodler {
             for(const auto& pr2 : this->formula.get_predicates()) {
                 if(!pr2.second.is_equation())
                     continue;
-                if(pr1.first > pr2.first) 
+                if(pr1.first > pr2.first)
                     continue;
 
                 VarNodeSymDiff diff;
                 if(pr1.first == pr2.first) { // two equations are the same
                     diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
                 // L1 = R1 and L2 = R2 and L1 = L2 => R1 = R2
-                } else if(pr1.second.get_left_side() == pr2.second.get_left_side()) { 
+                } else if(pr1.second.get_left_side() == pr2.second.get_left_side()) {
                     diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_right_side());
                 // L1 = R1 and L2 = R2 and L1 = R2 => R1 = L2
-                } else if(pr1.second.get_left_side() == pr2.second.get_right_side()) { 
+                } else if(pr1.second.get_left_side() == pr2.second.get_right_side()) {
                     diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_left_side());
                 // L1 = R1 and L2 = R2 and R1 = L2 => L2 = R1
-                } else if(pr1.second.get_right_side() == pr2.second.get_left_side()) { 
+                } else if(pr1.second.get_right_side() == pr2.second.get_left_side()) {
                     diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
                 // L1 = R1 and L2 = R2 and R1 = R2 => L1 = L2
-                } else if(pr1.second.get_right_side() == pr2.second.get_right_side()) { 
+                } else if(pr1.second.get_right_side() == pr2.second.get_right_side()) {
                     diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_left_side());
                 }
 
@@ -450,10 +450,10 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Create concatenation graph. Oriented graph where each term is node and two terms 
-     * (variable/litaral) t1 and t2 are connected (t1 -> t2) if t1.t2 occurs in some equation. 
+     * @brief Create concatenation graph. Oriented graph where each term is node and two terms
+     * (variable/litaral) t1 and t2 are connected (t1 -> t2) if t1.t2 occurs in some equation.
      * Moreover each edge is labelled by number of occurrences of such concatenation in the formula.
-     * 
+     *
      * @return ConcatGraph of the formula.
      */
     ConcatGraph FormulaPreprocess::get_concat_graph() const {
@@ -479,10 +479,10 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get regular sublists, i.e., concatenations X1...Xk such that each Xi occurrs (if it is a variable) in the 
-     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then 
-     * X+ ... Xk do not occurr in the formula anymore (except in V). 
-     * 
+     * @brief Get regular sublists, i.e., concatenations X1...Xk such that each Xi occurrs (if it is a variable) in the
+     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then
+     * X+ ... Xk do not occurr in the formula anymore (except in V).
+     *
      * @param res Regular sublists with the number of their occurrences.
      */
     void FormulaPreprocess::get_regular_sublists(std::map<Concat, unsigned>& res) const {
@@ -502,8 +502,8 @@ namespace smt::noodler {
                 // Construct the set of supposed occurences of the symbol side[i]
                 for(const VarNode& vn : occurrs) {
                     vns.insert({
-                        .term = side[i], 
-                        .eq_index = vn.eq_index, 
+                        .term = side[i],
+                        .eq_index = vn.eq_index,
                         .position = FormulaVar::increment_side_index(vn.position, i-start)
                     });
                 }
@@ -517,7 +517,7 @@ namespace smt::noodler {
                 if(side[i].is_variable() && vns != occurs_act) {
                     break;
                 }
-                if(side[i].is_literal() && !std::includes(occurs_act.begin(), 
+                if(side[i].is_literal() && !std::includes(occurs_act.begin(),
                     occurs_act.end(), vns.begin(), vns.end())) {
                     break;
                 }
@@ -532,7 +532,7 @@ namespace smt::noodler {
 
     /**
      * @brief Create a fresh variable.
-     * 
+     *
      * @return BasicTerm Corresponding to a fresh variable.
      */
     BasicTerm FormulaPreprocess::create_fresh_var() {
@@ -540,11 +540,11 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Replace regular sequences with a fresh variables. The regular sequence is a concatenations X1...Xk 
-     * such that each Xi occurrs (if it is a variable) in the 
-     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then 
-     * variables from X1 ... Xk do not occurr in the formula anymore (except in V). 
-     * 
+     * @brief Replace regular sequences with a fresh variables. The regular sequence is a concatenations X1...Xk
+     * such that each Xi occurrs (if it is a variable) in the
+     * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then
+     * variables from X1 ... Xk do not occurr in the formula anymore (except in V).
+     *
      * @param mn Minimum number of occurrences of a regular sequence to be replaced with a fresh variable.
      */
     void FormulaPreprocess::reduce_regular_sequence(unsigned mn) {
@@ -567,9 +567,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get all epsilon terms (variables with the language containing eps only and 
+     * @brief Get all epsilon terms (variables with the language containing eps only and
      * epsilon literals).
-     * 
+     *
      * @param res All terms with epsilon semantics.
      */
     void FormulaPreprocess::get_eps_terms(std::set<BasicTerm>& res) const {
@@ -580,12 +580,12 @@ namespace smt::noodler {
             if(pr.first.is_literal() && pr.first.get_name() == "") {
                 res.insert(pr.first);
             }
-                
+
         }
     }
 
     /**
-     * @brief Transitively ropagate epsilon variables. The epsilon variables and the epsilon 
+     * @brief Transitively ropagate epsilon variables. The epsilon variables and the epsilon
      * literal remove from the formula and set the corresponding languages appropriately.
      */
     void FormulaPreprocess::propagate_eps() {
@@ -602,7 +602,7 @@ namespace smt::noodler {
         }
 
         while(!worklist.empty()) {
-            size_t index = worklist.front();            
+            size_t index = worklist.front();
             worklist.pop_front();
             // eps_eq_id contains indices of equations that were reduced to eps = eps (one side is eps)
             if(eps_eq_id.find(index) != eps_eq_id.end())
@@ -635,7 +635,7 @@ namespace smt::noodler {
             if(t.is_variable()) {
                 update_reg_constr(t, Concat()); // L(t) = L(t) \cap {\eps}
             }
-            this->formula.replace(Concat({t}), Concat()); 
+            this->formula.replace(Concat({t}), Concat());
             // add len constraint |X| = 0
             this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
             assert(t.is_variable() || t.get_name() == "");
@@ -648,14 +648,14 @@ namespace smt::noodler {
             this->dependency[pr.first].insert(eps_eq_id.begin(), eps_eq_id.end());
         }
 
-        
+
     }
 
     /**
      * @brief Gather information about a concatenation for equation separation.
-     * 
+     *
      * @param concat Concatenation
-     * @param res vector where i-th position contains a pair (S,n) where S is a set of variables 
+     * @param res vector where i-th position contains a pair (S,n) where S is a set of variables
      *  preceeding position i in @p concat and n is a length of all literals preceeding @p concat.
      */
     void FormulaPreprocess::get_concat_gather(const Concat& concat, SepEqsGather& res) const {
@@ -676,9 +676,9 @@ namespace smt::noodler {
 
     /**
      * @brief Separate equations into a set of new equations.
-     * 
+     *
      * @param eq Equation
-     * @param gather_left Gathered informaiton about left side 
+     * @param gather_left Gathered informaiton about left side
      * @param gather_right Gathered informaiton about right side
      * @param res Set of new equations
      */
@@ -693,7 +693,7 @@ namespace smt::noodler {
             for(size_t j = 0; j < gather_right.size(); j++) {
                 if(gather_left[i] == gather_right[j]) {
                     res.insert(Predicate(PredicateType::Equation, std::vector<Concat>({
-                        Concat(it_left, left.begin()+i+1), 
+                        Concat(it_left, left.begin()+i+1),
                         Concat(it_right, right.begin()+j+1)
                     })));
                     it_left = left.begin()+i+1;
@@ -732,7 +732,7 @@ namespace smt::noodler {
             get_concat_gather(pr.second.get_left_side(), gather_left);
             get_concat_gather(pr.second.get_right_side(), gather_right);
             separate_eq(pr.second, gather_left, gather_right, res);
-            
+
             if(res.size() > 1) {
                 // update dependencies of added predicates
                 for(const Predicate& p : res) {
@@ -755,10 +755,10 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Gather variables allowing left/right extension. A variable X is left extensible if 
-     * L(X) = \Sigma^*.L(X) (right extensibility analogously). \Sigma is collected among all 
+     * @brief Gather variables allowing left/right extension. A variable X is left extensible if
+     * L(X) = \Sigma^*.L(X) (right extensibility analogously). \Sigma is collected among all
      * automata in the assignment.
-     * 
+     *
      * @param side Left/right extension
      * @param res Extensible variables
      */
@@ -769,7 +769,7 @@ namespace smt::noodler {
                 Mata::Nfa::Nfa concat;
                 if(side == Predicate::EquationSideType::Left)
                     concat = Mata::Nfa::concatenate(sigma_star, *(this->aut_ass.at(pr.first)));
-                else 
+                else
                     concat = Mata::Nfa::concatenate(*(this->aut_ass.at(pr.first)), sigma_star);
 
                 if(Mata::Nfa::are_equivalent(*(this->aut_ass.at(pr.first)), concat)) {
@@ -780,9 +780,9 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Remove extensible variables from beginning/end of an equation: 
-     * X = Y1 Y2 Y3 if Y1 occurrs always first (and X is the left side) and 
-     * Y2 is left extensible. We can remove Y1 (similarly the right extensibility and removing from 
+     * @brief Remove extensible variables from beginning/end of an equation:
+     * X = Y1 Y2 Y3 if Y1 occurrs always first (and X is the left side) and
+     * Y2 is left extensible. We can remove Y1 (similarly the right extensibility and removing from
      * the end of the equation).
      */
     void FormulaPreprocess::remove_extension() {
@@ -814,18 +814,18 @@ namespace smt::noodler {
              * TODO: Extend to both sides (so far just the left side is considered)
              */
             if(left.size() == 1 && right.size() > 1) {
-                if(right[0].is_variable() && left[0].is_variable() 
-                    && right[1].is_variable() && begin_star.find(right[1]) != begin_star.end() 
+                if(right[0].is_variable() && left[0].is_variable()
+                    && right[1].is_variable() && begin_star.find(right[1]) != begin_star.end()
                     && varmap[right[1]].size() == 1
-                    && this->len_variables.find(right[0]) == this->len_variables.end() 
+                    && this->len_variables.find(right[0]) == this->len_variables.end()
                     && this->len_variables.find(right[1]) == this->len_variables.end() ) {
                     b_map.insert({right[0], {}});
                     b_map[right[0]].push_back(left[0]);
                 }
-                if(right[right.size()-1].is_variable() && left[0].is_variable() 
-                    && right[right.size()-2].is_variable() && end_star.find(right[right.size()-2]) != end_star.end() 
+                if(right[right.size()-1].is_variable() && left[0].is_variable()
+                    && right[right.size()-2].is_variable() && end_star.find(right[right.size()-2]) != end_star.end()
                     && varmap[right[right.size()-2]].size() == 1
-                    && this->len_variables.find(right[right.size()-1]) == this->len_variables.end() 
+                    && this->len_variables.find(right[right.size()-1]) == this->len_variables.end()
                     && this->len_variables.find(right[right.size()-2]) == this->len_variables.end() ) {
                     e_map.insert({right[right.size()-1], {}});
                     e_map[right[right.size()-1]].push_back(left[0]);
@@ -846,7 +846,7 @@ namespace smt::noodler {
             bool modif = false;
             for(const auto& beg : b_rem) {
                 if(pred.get_left_side()[0] == beg.second && right_side[0] == beg.first) {
-                    // X = Y1 Y2 ... 
+                    // X = Y1 Y2 ...
                     Concat modif_side(right_side.begin()+1, right_side.end());
                     pred = Predicate(PredicateType::Equation, std::vector<Concat>{pred.get_left_side(), modif_side} );
                     modif = true;
@@ -872,8 +872,8 @@ namespace smt::noodler {
 
     /**
      * @brief Flatten dependencies. Compute transition closure of dependencies.
-     * 
-     * @return Transitive closure of the Dependency 
+     *
+     * @return Transitive closure of the Dependency
      */
     Dependency FormulaPreprocess::get_flat_dependency() const {
         Dependency flat = get_dependency();
@@ -903,8 +903,8 @@ namespace smt::noodler {
 
     /**
      * @brief Return a modified formula by the preprocessing.
-     * 
-     * @return Result of the preprocessing. 
+     *
+     * @return Result of the preprocessing.
      */
     Formula FormulaPreprocess::get_modified_formula() const {
         Formula ret;
