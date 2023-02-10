@@ -61,15 +61,12 @@ namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(
             const Formula &equalities, AutAssignment init_aut_ass,
             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-            ast_manager& m, seq_util& m_util_s
-    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensistive_vars{ init_length_sensitive_vars } {
-        SolvingState initialWlEl;
-        initialWlEl.length_sensitive_vars = init_length_sensitive_vars;
-        initialWlEl.aut_ass = std::move(init_aut_ass);
-        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process));
-
-        worklist.push_back(initialWlEl);
+            ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensitive_vars{ init_length_sensitive_vars }, 
+        m_util_a{ m_util_a }, 
+        prep_handler(equalities, init_aut_ass, init_length_sensitive_vars),
+        init_aut_ass{ init_aut_ass },
+        formula { equalities } {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -353,14 +350,108 @@ namespace smt::noodler {
         return false;
     }
 
-    expr_ref DecisionProcedure::get_lengths() {
-        return AbstractDecisionProcedure::get_lengths(); // TODO: Remove when implemented.
+    /**
+     * @brief Get length constraints of the solution
+     * 
+     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
+     * @return expr_ref Length formula describing all solutions
+     */
+    expr_ref DecisionProcedure::get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+        AutAssignment ass = this->solution.flatten_substition_map();
+        expr_ref lengths(this->m.mk_true(), this->m);
+
+        for(const BasicTerm& var : this->init_length_sensitive_vars) {
+            std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
+
+            auto it = variable_map.find(var);
+            expr_ref var_expr(this->m);
+            if(it != variable_map.end()) { // take the existing variable from the map
+                var_expr = it->second;
+            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+                var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
+            }
+            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));   
+        }
+
+        // collect lengths introduced by the preprocessing
+        expr_ref prep_formula = util::len_to_expr(
+                this->prep_handler.get_len_formula(), 
+                variable_map, 
+                this->m, this->m_util_s, this->m_util_a );
+        
+        if(!this->m.is_true(prep_formula)) {
+            lengths = this->m.mk_and(lengths, prep_formula);
+        }
+
+        return lengths;
     }
 
+    /**
+     * @brief Creates initial inclusion graph according to the preprocessed instance.
+     */
+    void DecisionProcedure::init_computation() {
+        SolvingState initialWlEl;
+        initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
+        initialWlEl.aut_ass = std::move(this->init_aut_ass);
+        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
+        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+
+        worklist.push_back(initialWlEl);
+    }
+
+    /**
+     * @brief Preprocessing.
+     */
     void DecisionProcedure::preprocess() {
         /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
 
-        AbstractDecisionProcedure::preprocess(); // TODO: Remove when implemented.
+        // So-far just lightweight preprocessing
+        this->prep_handler.propagate_variables();
+        this->prep_handler.propagate_eps();
+        this->prep_handler.remove_regular();
+        this->prep_handler.generate_identities();
+        this->prep_handler.propagate_variables();
+
+        // Refresh the instance
+        this->init_aut_ass = std::move(this->prep_handler.get_aut_assignment());
+        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
+        this->formula = this->prep_handler.get_modified_formula();
+    }
+
+    /**
+     * @brief Make a length constraint for a single NFA loop, handle
+     * 
+     * @param var variable
+     * @param v1 handle
+     * @param v2 loop
+     * @return expr_ref Length formula
+     */
+    expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
+        expr_ref len_x(this->m_util_s.str.mk_length(var), this->m);
+        expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_s, this->m_util_a);
+        expr_ref c1(this->m_util_a.mk_int(v1), this->m);
+        expr_ref c2(this->m_util_a.mk_int(v2), this->m);
+
+        if(v2 != 0) {
+            expr_ref right(this->m_util_a.mk_add(c1, this->m_util_a.mk_mul(k, c2)), this->m);
+            return expr_ref(this->m.mk_eq(len_x, right), this->m);
+        }
+        return expr_ref(this->m.mk_eq(len_x, c1), this->m);
+    }
+
+    /**
+     * @brief Make a length formula corresponding to a set of pairs <loop, handle>
+     * 
+     * @param var Variable
+     * @param aut_constr Set of pairs <loop, handle>
+     * @return expr_ref Length constaint of the automaton
+     */
+    expr_ref DecisionProcedure::mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr) {
+        expr_ref res(this->m.mk_false(), this->m);
+        for(const auto& cns : aut_constr) {
+            res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
+        }
+        return res;
     }
 
 } // namespace smt::nodler

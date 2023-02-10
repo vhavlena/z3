@@ -902,5 +902,19 @@ namespace smt::noodler {
     }
 
 
+    /**
+     * @brief Return a modified formula by the preprocessing.
+     * 
+     * @return Result of the preprocessing. 
+     */
+    Formula FormulaPreprocess::get_modified_formula() const {
+        Formula ret;
+        for(const Predicate& p: this->formula.get_predicates_set()) {
+            ret.add_predicate(p);
+        }
+        return ret;
+    }
+
+
 
 } // Namespace smt::noodler.

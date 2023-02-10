@@ -713,7 +713,7 @@ namespace smt::noodler {
         AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
 
         while(dec_proc.compute_next_solution()) {
-            *lengths = dec_proc.get_lengths();
+            *lengths = dec_proc.get_lengths(this->var_name);
             if(lengths == nullptr)
                 continue;
             int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
@@ -1713,11 +1713,12 @@ namespace smt::noodler {
     }
 
     /**
-    Convert equation/disaequation @p ex to the instance of Predicate.
+    Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of 
+    variables (BasicTerm) to the corresponding z2 expr.
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
     */
-    Predicate theory_str_noodler::conv_eq_pred(const app* ex) {
+    Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
         if(m.is_not(ex)) {
@@ -1729,6 +1730,13 @@ namespace smt::noodler {
         SASSERT(eq->get_num_args() == 2);
         SASSERT(eq->get_arg(0));
         SASSERT(eq->get_arg(1));
+
+        obj_hashtable<expr> vars;
+        util::get_variables(ex, this->m_util_s, this->m, vars);
+        for(expr * const v : vars) {
+            BasicTerm vterm(BasicTermType::Variable, to_app(ex)->get_decl()->get_name().str());
+            this->var_name.insert({vterm, expr_ref(v, this->m)});
+        }
 
         std::vector<BasicTerm> left, right;
         util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, this->predicate_replace, left);
