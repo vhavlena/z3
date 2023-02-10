@@ -404,12 +404,14 @@ namespace smt::noodler {
      * @brief Preprocessing.
      */
     void DecisionProcedure::preprocess() {
-        std::cout << "Preprocessing\n";
+        // As a first preprocessing operation, convert string literals to fresh variables with automata assignment
+        //  representing their string literal.
+        conv_str_lits_to_fresh_vars();
+        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars);
 
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
         this->prep_handler.propagate_eps();
-        // FIXME: slog_4003 seg faults inside remove_regular.
         this->prep_handler.remove_regular();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
@@ -419,10 +421,7 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
         this->formula = this->prep_handler.get_modified_formula();
 
-        // As a last preprocessing operation, convert string literals to fresh variables with automata assignment
-        //  representing their string literal.
-        std::cout << "Converting string literals to fresh variables.\n";
-        conv_str_lits_to_fresh_vars();
+        STRACE("str", tout << "preprocess-output: " << this->formula.to_string() << "\n" );
     }
 
     /**
