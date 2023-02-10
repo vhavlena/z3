@@ -352,7 +352,7 @@ namespace smt::noodler {
 
     /**
      * @brief Get length constraints of the solution
-     * 
+     *
      * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
      * @return expr_ref Length formula describing all solutions
      */
@@ -370,15 +370,15 @@ namespace smt::noodler {
             } else {
                 var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
             }
-            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));   
+            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
         }
 
         // collect lengths introduced by the preprocessing
         expr_ref prep_formula = util::len_to_expr(
-                this->prep_handler.get_len_formula(), 
-                variable_map, 
+                this->prep_handler.get_len_formula(),
+                variable_map,
                 this->m, this->m_util_s, this->m_util_a );
-        
+
         if(!this->m.is_true(prep_formula)) {
             lengths = this->m.mk_and(lengths, prep_formula);
         }
@@ -404,7 +404,6 @@ namespace smt::noodler {
      */
     void DecisionProcedure::preprocess() {
         std::cout << "Preprocessing\n";
-        /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
         conv_str_lits_to_fresh_vars();
 
         // So-far just lightweight preprocessing
@@ -415,14 +414,14 @@ namespace smt::noodler {
         this->prep_handler.propagate_variables();
 
         // Refresh the instance
-        this->init_aut_ass = std::move(this->prep_handler.get_aut_assignment());
+        this->init_aut_ass = this->prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
         this->formula = this->prep_handler.get_modified_formula();
     }
 
     /**
      * @brief Make a length constraint for a single NFA loop, handle
-     * 
+     *
      * @param var variable
      * @param v1 handle
      * @param v2 loop
@@ -443,7 +442,7 @@ namespace smt::noodler {
 
     /**
      * @brief Make a length formula corresponding to a set of pairs <loop, handle>
-     * 
+     *
      * @param var Variable
      * @param aut_constr Set of pairs <loop, handle>
      * @return expr_ref Length constaint of the automaton
@@ -457,8 +456,7 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::conv_str_lits_to_fresh_vars() {
-        // TODO: Implement.
-        // Fresh variable for each separate string (even if there are same strings).
+
         std::cout << "Converting string literals to fresh variables.\n";
     }
 

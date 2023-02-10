@@ -21,7 +21,7 @@ namespace smt::noodler {
 
     /**
      * @brief Remove from the container @p st all items satisfying the predicate @p pred.
-     * 
+     *
      * @tparam T Container type
      * @tparam P Predicate type
      * @param st Set
@@ -39,7 +39,7 @@ namespace smt::noodler {
 
     /**
      * @brief Set difference
-     * 
+     *
      * @tparam T type of sets
      * @param t1 First set
      * @param t2 Second set
@@ -110,8 +110,8 @@ namespace smt::noodler {
     using ConcatGraphEdges = std::map<std::pair<BasicTerm,BasicTerm>, unsigned>;
 
     /**
-     * @brief Concatenation graph. Oriented graph where each term (literal/variable) is node and two terms 
-     * t1 and t2 are connected by a labelled oriented edge (t1 -> t2) if t1.t2 occurs in some equation. 
+     * @brief Concatenation graph. Oriented graph where each term (literal/variable) is node and two terms
+     * t1 and t2 are connected by a labelled oriented edge (t1 -> t2) if t1.t2 occurs in some equation.
      * Moreover each edge is labelled by the number of occurrences of such concatenation in the formula.
      */
     class ConcatGraph {
@@ -132,29 +132,29 @@ namespace smt::noodler {
 
         unsigned get_edge_cost(const BasicTerm& from, const BasicTerm& to) const {
             return this->edges.at({from, to});
-        }; 
+        };
 
-        std::set<BasicTerm> get_succ(const BasicTerm& t) const { 
-            return this->succ.at(t); 
+        std::set<BasicTerm> get_succ(const BasicTerm& t) const {
+            return this->succ.at(t);
         };
 
 
         bool is_init(const BasicTerm& t) const { return t.get_name() == ""; };
 
         /**
-         * @brief Special node s (variable with empty name) denoting beginning and end of a concatenation. If there is 
-         * an edge between this special node s->t, t is at the beginning of some equation. If there is an edge t->s, 
+         * @brief Special node s (variable with empty name) denoting beginning and end of a concatenation. If there is
+         * an edge between this special node s->t, t is at the beginning of some equation. If there is an edge t->s,
          * t is at the end of an equation.
-         * 
+         *
          * @return Special node (called init).
          */
         BasicTerm init() const { return BasicTerm(BasicTermType::Variable, "");  };
 
         /**
-         * @brief Returns nodes (variables) having only one sucessor and moreover having more than one 
+         * @brief Returns nodes (variables) having only one sucessor and moreover having more than one
          * predecessors (or a predecessor is init node) .
-         * 
-         * @return Set of BasicTerms (variable terms). 
+         *
+         * @return Set of BasicTerms (variable terms).
          */
         std::set<BasicTerm> get_init_vars() const {
             std::set<BasicTerm> ret;
@@ -164,7 +164,7 @@ namespace smt::noodler {
                 if(!pr.first.is_variable())    continue;
 
                 std::set<BasicTerm> pred_set = this->pred.at(pr.first);
-                if(pred_set.size() > 1) 
+                if(pred_set.size() > 1)
                     ret.insert(pr.first);
                 if(pred_set.size() == 1 && is_init(*pred_set.begin()))
                     ret.insert(pr.first);
@@ -176,9 +176,9 @@ namespace smt::noodler {
     //----------------------------------------------------------------------------------------------------------------------------------
 
     /**
-     * @brief Representation of a variable in an equation. Var is the variable name, eq_index 
-     * is the equation index, and position represents the position of the variable in the equation. 
-     * Negative value means left side, positive right side. 
+     * @brief Representation of a variable in an equation. Var is the variable name, eq_index
+     * is the equation index, and position represents the position of the variable in the equation.
+     * Negative value means left side, positive right side.
      */
     struct VarNode {
         BasicTerm term;
@@ -224,13 +224,13 @@ namespace smt::noodler {
      * @brief Class representing a formula with efficient handling of variable occurrences.
      */
     class FormulaVar {
-    
+
     private:
         std::map<size_t, Predicate> predicates; // formula
         std::set<Predicate> allpreds; // all predicates in a set
         VarMap varmap; // mapping of a variable name to a set of its occurrences in the formula
         size_t input_size; // number of equations in the input formula
-        size_t max_index; // maximum occupied index 
+        size_t max_index; // maximum occupied index
 
     protected:
         void update_varmap(const Predicate& pred, size_t index);
@@ -238,7 +238,7 @@ namespace smt::noodler {
     public:
 
         FormulaVar(const Formula& conj);
-        
+
         std::string to_string() const;
 
         const std::set<VarNode>& get_var_occurr(const BasicTerm& var) const { return this->varmap.at(var); };
@@ -258,12 +258,12 @@ namespace smt::noodler {
         bool is_side_regular(const Predicate& p, Predicate& out) const;
         /**
          * @brief Is equation simple (equation of the form X=Y)
-         * 
+         *
          * @param p Equation
          * @return Is simple?
          */
         bool is_simple_eq(const Predicate& p) const { return p.is_equation() && p.get_left_side().size() == 1 && p.get_right_side().size() == 1; };
-    
+
         void remove_predicate(size_t index);
         int add_predicate(const Predicate& pred, int index = -1);
         void add_predicates(const std::set<Predicate>& preds);
@@ -273,10 +273,10 @@ namespace smt::noodler {
         void clean_predicates();
 
         /**
-         * @brief Increment index pointing to a side (taking into account that left side has negative numbers 
+         * @brief Increment index pointing to a side (taking into account that left side has negative numbers
          * from 1 and right side positive numbers from 1).
-         * 
-         * @param val Index 
+         *
+         * @param val Index
          * @param incr Increment
          * @return @p incr th successor of @p val
          */
@@ -313,8 +313,8 @@ namespace smt::noodler {
         void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
 
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv) : 
-            formula(conj), 
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv) :
+            formula(conj),
             fresh_var_cnt(0),
             aut_ass(ass),
             len_variables(lv),
@@ -322,13 +322,13 @@ namespace smt::noodler {
 
         const FormulaVar& get_formula() const { return this->formula; };
         std::string to_string() const { return this->formula.to_string(); };
-        void get_regular_sublists(std::map<Concat, unsigned>& res) const; 
+        void get_regular_sublists(std::map<Concat, unsigned>& res) const;
         void get_eps_terms(std::set<BasicTerm>& res) const;
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
         const LenNode* get_len_formula() const { return new LenNode(LenFormulaType::AND, this->len_formulae); }
-        const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; } 
+        const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
 
         Formula get_modified_formula() const;
 
@@ -342,18 +342,18 @@ namespace smt::noodler {
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
-         * 
+         *
          * @param find Find
          * @param replace Replace
          */
         void replace(const Concat& find, const Concat& replace) { this->formula.replace(find, replace); };
         /**
          * @brief Update predicate with the given index.
-         * 
+         *
          * @param index Index of the predicate to be updated
          * @param pred New predicate
          */
-        void update_predicate(size_t index, const Predicate& pred) { 
+        void update_predicate(size_t index, const Predicate& pred) {
             this->formula.remove_predicate(index);
             this->formula.add_predicate(pred, index);
         }
@@ -377,7 +377,7 @@ namespace smt::noodler {
         return ret;
     }
 
-        
+
 } // Namespace smt::noodler.
 
 #endif //Z3_STR_FORMULA_PREPROCESS_H_
