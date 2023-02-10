@@ -54,7 +54,7 @@ namespace smt::noodler {
     }
 
     template<typename T>
-    bool set_disjoint(const std::set<T>& t1, const std::set<T>& t2) {
+    bool set_disjoint(const std::unordered_set<T>& t1, const std::set<T>& t2) {
         std::set<T> inter;
         std::set_intersection(t1.begin(), t1.end(), t2.begin(), t2.end(),
             std::inserter(inter, inter.begin()));
@@ -295,7 +295,7 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
         std::vector<LenNode*> len_formulae;
-        std::set<BasicTerm> len_variables;
+        std::unordered_set<BasicTerm> len_variables;
 
         Dependency dependency;
 
@@ -313,7 +313,7 @@ namespace smt::noodler {
         void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
 
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::set<BasicTerm>& lv) : 
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv) : 
             formula(conj), 
             fresh_var_cnt(0),
             aut_ass(ass),
@@ -328,6 +328,9 @@ namespace smt::noodler {
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
         const LenNode* get_len_formula() const { return new LenNode(LenFormulaType::AND, this->len_formulae); }
+        const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; } 
+
+        Formula get_modified_formula() const;
 
         void remove_regular();
         void propagate_variables();

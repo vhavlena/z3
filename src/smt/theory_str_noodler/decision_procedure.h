@@ -19,6 +19,14 @@ namespace smt::noodler {
      */
     class AbstractDecisionProcedure {
     public:
+
+        /**
+         * @brief Initialize the computation (supposed to be called after preprocess)
+         */
+        virtual void init_computation() {
+            throw std::runtime_error("Unimplemented");
+        }
+
         virtual void preprocess() {
             throw std::runtime_error("Unimplemented");
         }
@@ -182,7 +190,9 @@ namespace smt::noodler {
         ast_manager& m;
         seq_util& m_util_s;
         arith_util& m_util_a;
-        std::unordered_set<BasicTerm> init_length_sensistive_vars;
+        std::unordered_set<BasicTerm> init_length_sensitive_vars;
+        Formula formula;
+        AutAssignment init_aut_ass;
 
         /**
          * Convert all string literals in formula to fresh variables with automata in automata assignment.
@@ -203,6 +213,7 @@ namespace smt::noodler {
 
         bool compute_next_solution() override;
         expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) override;
+        void init_computation() override;
 
         void preprocess() override;
     };

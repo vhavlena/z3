@@ -62,14 +62,11 @@ namespace smt::noodler {
             const Formula &equalities, AutAssignment init_aut_ass,
             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensistive_vars{ init_length_sensitive_vars }, m_util_a{ m_util_a }, prep_handler(equalities, init_aut_ass, std::set<BasicTerm>()) { // TODO: type mismatch, needs to be fixed
-        SolvingState initialWlEl;
-        initialWlEl.length_sensitive_vars = init_length_sensitive_vars;
-        initialWlEl.aut_ass = std::move(init_aut_ass);
-        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(equalities, initialWlEl.nodes_to_process));
-
-        worklist.push_back(initialWlEl);
+    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensitive_vars{ init_length_sensitive_vars }, 
+        m_util_a{ m_util_a }, 
+        prep_handler(equalities, init_aut_ass, init_length_sensitive_vars),
+        init_aut_ass{ init_aut_ass },
+        formula { equalities } {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -363,7 +360,7 @@ namespace smt::noodler {
         AutAssignment ass = this->solution.flatten_substition_map();
         expr_ref lengths(this->m.mk_true(), this->m);
 
-        for(const BasicTerm& var : this->init_length_sensistive_vars) {
+        for(const BasicTerm& var : this->init_length_sensitive_vars) {
             std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
 
             auto it = variable_map.find(var);
@@ -389,10 +386,36 @@ namespace smt::noodler {
         return lengths;
     }
 
+    /**
+     * @brief Creates initial inclusion graph according to the preprocessed instance.
+     */
+    void DecisionProcedure::init_computation() {
+        SolvingState initialWlEl;
+        initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
+        initialWlEl.aut_ass = std::move(this->init_aut_ass);
+        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
+        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+
+        worklist.push_back(initialWlEl);
+    }
+
+    /**
+     * @brief Preprocessing.
+     */
     void DecisionProcedure::preprocess() {
         /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
 
-        AbstractDecisionProcedure::preprocess(); // TODO: Remove when implemented.
+        // So-far just lightweight preprocessing
+        this->prep_handler.propagate_variables();
+        this->prep_handler.propagate_eps();
+        this->prep_handler.remove_regular();
+        this->prep_handler.generate_identities();
+        this->prep_handler.propagate_variables();
+
+        // Refresh the instance
+        this->init_aut_ass = std::move(this->prep_handler.get_aut_assignment());
+        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
+        this->formula = this->prep_handler.get_modified_formula();
     }
 
     /**
