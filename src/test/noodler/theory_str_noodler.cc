@@ -77,7 +77,7 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
         //CHECK(regex == "(((.))*)");
     }
 
-    memory::finalize();
+    // memory::finalize();
 }
 
 TEST_CASE("theory_str_noodler::util") {

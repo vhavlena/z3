@@ -14,7 +14,7 @@ namespace smt::noodler::util {
     void extract_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
         if (m_util_s.str.is_string(ex)) {
             auto ex_app{ to_app(ex) };
-            SASSERT(ex_app->get_num_args() == 1);
+            SASSERT(ex_app->get_num_parameters() == 1);
             const zstring string_literal{ zstring{ ex_app->get_parameter(0).get_zstring() } };
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
                 alphabet.insert(string_literal[i]);
@@ -349,7 +349,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(child));
             regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")+";
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
-            SASSERT(expr->get_num_args() == 1);
+            SASSERT(expr->get_num_parameters() == 1);
             const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
             std::stringstream convert_stream;
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
