@@ -162,9 +162,9 @@ namespace smt::noodler::util {
             dummy_symbols.insert(dummy_symbol);
             ++dummy_symbol;
         }
-        const size_t dummy_symbols_number{ dummy_symbols.size() };
+        [[maybe_unused]] const size_t dummy_symbols_number{ dummy_symbols.size() };
         assert(dummy_symbols_number == disequations_number);
-        const size_t symbols_in_formula_number{ symbols_to_append_to.size() };
+        [[maybe_unused]] const size_t symbols_in_formula_number{ symbols_to_append_to.size() };
         symbols_to_append_to.insert(dummy_symbols.begin(), dummy_symbols.end());
         assert(dummy_symbols_number + symbols_in_formula_number == symbols_to_append_to.size());
         return dummy_symbols;
