@@ -404,7 +404,6 @@ namespace smt::noodler {
      */
     void DecisionProcedure::preprocess() {
         std::cout << "Preprocessing\n";
-        conv_str_lits_to_fresh_vars();
 
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
@@ -417,6 +416,10 @@ namespace smt::noodler {
         this->init_aut_ass = this->prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
         this->formula = this->prep_handler.get_modified_formula();
+
+        // As a last preprocessing operation, convert string literals to fresh variables with automata assignment
+        //  representing their string literal.
+        conv_str_lits_to_fresh_vars();
     }
 
     /**

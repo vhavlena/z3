@@ -198,6 +198,7 @@ namespace smt::noodler {
          *
          * All string literals are converted to fresh variables with assigned automata equal to the string literal
          *  expression.
+         * We get a new fresh variable for each separate string literal, even if there are multiple same string literals.
          */
         void conv_str_lits_to_fresh_vars();
 
