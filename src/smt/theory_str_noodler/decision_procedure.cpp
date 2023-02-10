@@ -76,18 +76,12 @@ namespace smt::noodler {
             SolvingState element_to_process = std::move(worklist.front());
             worklist.pop_front();
 
-            // if the inclusion graph is empty, we are done
-            if(element_to_process.inclusion_graph->get_edges().empty()) {
-                solution = std::move(element_to_process);
-                return this->solution.aut_ass.is_sat();
-            }
-
             if (element_to_process.nodes_to_process.empty()) {
                 // TODO do some arithmetic shit?
                 solution = std::move(element_to_process);
                 return true;
             }
-
+            
             std::shared_ptr<GraphNode> node_to_process = element_to_process.nodes_to_process.front();
             element_to_process.nodes_to_process.pop_front();
 
@@ -400,8 +394,15 @@ namespace smt::noodler {
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(this->init_aut_ass);
-        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+
+        if(!initialWlEl.aut_ass.is_sat()) { // TODO: return unsat core
+            return;
+        }
+
+        if (!this->formula.get_predicates().empty()) {
+            // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
+            initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+        }
 
         worklist.push_back(initialWlEl);
     }
