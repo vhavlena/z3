@@ -194,7 +194,7 @@ namespace smt::noodler {
         AutAssignment init_aut_ass;
 
         /**
-         * Convert all string literals in formula to fresh variables with automata in automata assignment.
+         * Convert all string literals in @c formula to fresh variables with automata in automata assignment.
          *
          * All string literals are converted to fresh variables with assigned automata equal to the string literal
          *  expression.

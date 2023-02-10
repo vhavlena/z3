@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <mata/nfa-strings.hh>
+#include <mata/re2parser.hh>
 #include "aut_assignment.h"
 #include "decision_procedure.h"
 
@@ -419,6 +420,7 @@ namespace smt::noodler {
 
         // As a last preprocessing operation, convert string literals to fresh variables with automata assignment
         //  representing their string literal.
+        std::cout << "Converting string literals to fresh variables.\n";
         conv_str_lits_to_fresh_vars();
     }
 
@@ -459,8 +461,34 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::conv_str_lits_to_fresh_vars() {
+        constexpr char name_prefix[] = "str_lit_to_var_";
+        size_t counter{ 0 };
+        for (auto& predicate : formula.get_predicates()) {
+            if (predicate.is_eq_or_ineq()) {
+                for (auto& term : predicate.get_left_side()) {
+                    if (term.is_literal()) { // Handle string literal.
+                        std::string string_literal_content{ term.get_name() };
+                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
+                        ++counter;
+                        Mata::Nfa::Nfa nfa{};
+                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        term = fresh_variable;
+                    }
+                }
 
-        std::cout << "Converting string literals to fresh variables.\n";
+                for (auto& term : predicate.get_right_side()) {
+                    if (term.is_literal()) { // Handle string literal.
+                        std::string string_literal_content{ term.get_name() };
+                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
+                        ++counter;
+                        Mata::Nfa::Nfa nfa{};
+                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        term = fresh_variable;
+                    }
+                }
+            }
+        }
     }
-
 } // namespace smt::nodler
