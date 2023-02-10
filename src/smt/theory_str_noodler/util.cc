@@ -228,7 +228,7 @@ namespace smt::noodler::util {
             assert(is_app(variable));
             const auto& variable_app{ to_app(variable) };
             assert(variable_app->get_num_args() == 0);
-            const auto& variable_name{ variable_app->get_decl()->get_parameter(0).get_symbol().str() };
+            const auto& variable_name{ variable_app->get_decl()->get_name().str() };
             variables_with_regex.insert(variable_name);
             BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             assert(aut_assignment.find(variable_term) == aut_assignment.end());
