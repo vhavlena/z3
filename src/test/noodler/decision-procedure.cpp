@@ -246,18 +246,22 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         auto l_vars = { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") };
         auto var_map = create_var_map(l_vars, m, m_util_s);
         expr_ref len = proc.get_lengths(var_map);
-        expr_ref res(m.mk_and(  
+
+        // result as a lambda (different ordering of variables due to std::unordered_set)
+        auto resf = [&](std::vector<std::string> vc) {
+            return expr_ref(m.mk_and(  
             m.mk_and(
                 m.mk_true(),
                 m.mk_or(
                     m.mk_false(), 
-                    m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "x"))), m_util_a.mk_int(1)))
+                    m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[0]))), m_util_a.mk_int(1)))
             ),  
             m.mk_or(m.mk_false(), 
-            m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, "z"))), m_util_a.mk_int(1))) ), 
+            m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[1]))), m_util_a.mk_int(1))) ), 
         m);
+        };
 
-        CHECK(len->hash() == res->hash());
+        CHECK(((resf({"x", "z"})->hash() == len->hash()) || (resf({"z", "x"})->hash() == len->hash())));
         CHECK(!proc.compute_next_solution());
     }
 
