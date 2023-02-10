@@ -179,6 +179,8 @@ namespace smt::noodler {
         Predicate conv_eq_pred(const app* expr);
 
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
+
+        std::unordered_set<BasicTerm> get_init_length_vars();
     };
 }
 

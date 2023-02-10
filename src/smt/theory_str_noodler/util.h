@@ -136,43 +136,14 @@ namespace smt::noodler::util {
                        std::vector<BasicTerm>& terms
     );
 
-        if(m_util_s.str.is_string(ex)) {
-            std::string lit = ex->get_parameter(0).get_zstring().encode();
-            terms.emplace_back(BasicTermType::Literal, lit);
-            return;
-        }
+    /**
+     * Convert variable in @c expr form to @c BasicTerm.
+     * @param variable Variable to be converted to @c BasicTerm.
+     * @return Passed @p variable as a @c BasicTerm
+     */
+    BasicTerm get_variable_basic_term(expr* const variable);
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
-            std::string var = ex->get_decl()->get_name().str();
-            terms.emplace_back(BasicTermType::Variable, var);
-            return;
-        }
-
-        if(!m_util_s.str.is_concat(ex)) {
-            expr* rpl = pred_replace.find(ex); // dies if it is not found
-            collect_terms(to_app(rpl), m_util_s, pred_replace, terms);
-            return;
-        }
-
-        SASSERT(ex->get_num_args() == 2);
-        app *a_x = to_app(ex->get_arg(0));
-        app *a_y = to_app(ex->get_arg(1));
-        collect_terms(a_x, m_util_s, pred_replace, terms);
-        collect_terms(a_y, m_util_s, pred_replace, terms);
-    }
-
-    static inline void get_len_exprs(app* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res) {
-        if(m_util_s.str.is_length(ex)) {
-            res.insert(ex);
-            return;
-        }
-
-        for(unsigned i = 0; i < ex->get_num_args(); i++) {
-            SASSERT(is_app(ex->get_arg(i)));
-            app *arg = to_app(ex->get_arg(i));
-            get_len_exprs(arg, m_util_s, m, res);
-        }
-    }
+    void get_len_exprs(app* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res);
 
     /**
      * @brief Create a fresh int variable.
@@ -269,7 +240,6 @@ namespace smt::noodler::util {
             assert(false);
         }
     }
-    
 }
 
 #endif

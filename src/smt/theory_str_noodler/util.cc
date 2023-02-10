@@ -404,6 +404,13 @@ namespace smt::noodler::util {
         collect_terms(a_y, m_util_s, pred_replace, terms);
     }
 
+    BasicTerm get_variable_basic_term(expr *const variable) {
+        SASSERT(is_app(variable));
+        const app* variable_app{ to_app(variable) };
+        SASSERT(variable_app->get_num_args() == 0);
+        return BasicTerm{ BasicTermType::Variable, variable_app->get_decl()->get_name().str() };
+    }
+
     void get_len_exprs(app* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res) {
         if(m_util_s.str.is_length(ex)) {
             res.insert(ex);

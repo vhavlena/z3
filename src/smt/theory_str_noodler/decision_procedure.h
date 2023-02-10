@@ -27,7 +27,7 @@ namespace smt::noodler {
         }
 
         virtual void preprocess() {
-            throw std::runtime_error("Unimplemented");
+            throw std::runtime_error("preprocess unimplemented");
         }
 
         /**
