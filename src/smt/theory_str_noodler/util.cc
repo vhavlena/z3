@@ -213,12 +213,6 @@ namespace smt::noodler::util {
             util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
         }
 
-        // DEBUG.
-        std::cout << "Variable names:\n";
-        for (const auto& name : variables_in_formula) {
-            std::cout << name << "\n";
-        }
-
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
         // Create automata from their corresponding regexes.
@@ -252,8 +246,6 @@ namespace smt::noodler::util {
         }
 
         const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(&mata_alphabet) };
-        std::cout << "Star automaton:\n";
-        nfa_sigma_star.print_to_DOT(std::cout);
         for (const auto& variable_name : variables_in_formula) {
             if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
                 BasicTerm variable_term{ BasicTermType::Variable, variable_name };
@@ -263,10 +255,11 @@ namespace smt::noodler::util {
         }
 
         // DEBUG.
-        for (const auto& single_aut_assignment: aut_assignment) {
-            std::cout << single_aut_assignment.first.get_name() << ":\n";
-            single_aut_assignment.second->print_to_DOT(std::cout);
-        }
+        //for (const auto& single_aut_assignment: aut_assignment) {
+        //    std::cout << single_aut_assignment.first.get_name() << ":\n";
+        //    single_aut_assignment.second->print_to_DOT(std::cout);
+        //}
+
         return aut_assignment;
     }
 
@@ -360,7 +353,7 @@ namespace smt::noodler::util {
             assert(false && "is_variable(expr)");
         }
 
-        std::cout << regex << "\n";
+        //std::cout << regex << "\n";
         return regex;
     }
 
