@@ -706,7 +706,6 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
-            util::conv_to_regex_hex(to_app(std::get<1>(we)), m_util_s, m, symbols_in_formula);
         }
 
         Formula instance;
@@ -721,7 +720,7 @@ namespace smt::noodler {
 
         expr_ref* lengths { nullptr };
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars() };
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s };
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
 
         while(dec_proc.compute_next_solution()) {
