@@ -371,9 +371,19 @@ namespace smt::noodler {
             if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                 var_expr = it->second;
             } else {
-                var_expr = mk_str_var(var.get_name());
+                var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
             }
             lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));   
+        }
+
+        // collect lengths introduced by the preprocessing
+        expr_ref prep_formula = util::len_to_expr(
+                this->prep_handler.get_len_formula(), 
+                variable_map, 
+                this->m, this->m_util_s, this->m_util_a );
+        
+        if(!this->m.is_true(prep_formula)) {
+            lengths = this->m.mk_and(lengths, prep_formula);
         }
 
         return lengths;
@@ -386,31 +396,6 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Create a fresh int variable.
-     * 
-     * @param name Infix of the name (rest is added to get a unique name)
-     * @return expr_ref Fresh variable
-     */
-    expr_ref DecisionProcedure::mk_int_var_fresh(const std::string& name) {
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, int_sort), m);
-        return var;
-    }
-
-    /**
-     * @brief Create a fresh int variable.
-     * 
-     * @param name Infix of the name (rest is added to get a unique name)
-     * @return expr_ref Fresh variable
-     */
-    expr_ref DecisionProcedure::mk_str_var(const std::string& name) {
-        expr_ref var(this->m_util_s.mk_skolem(symbol(name), 0,
-            nullptr, this->m_util_s.mk_string_sort()), m);
-        return var;
-    }
-
-    /**
      * @brief Make a length constraint for a single NFA loop, handle
      * 
      * @param var variable
@@ -420,7 +405,7 @@ namespace smt::noodler {
      */
     expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
         expr_ref len_x(this->m_util_s.str.mk_length(var), this->m);
-        expr_ref k = mk_int_var_fresh("k");
+        expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_s, this->m_util_a);
         expr_ref c1(this->m_util_a.mk_int(v1), this->m);
         expr_ref c2(this->m_util_a.mk_int(v2), this->m);
 

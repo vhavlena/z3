@@ -327,6 +327,7 @@ namespace smt::noodler {
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
+        const LenNode* get_len_formula() const { return new LenNode(LenFormulaType::AND, this->len_formulae); }
 
         void remove_regular();
         void propagate_variables();

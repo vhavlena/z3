@@ -192,8 +192,6 @@ namespace smt::noodler {
          */
         void conv_str_lits_to_fresh_vars();
 
-        expr_ref mk_int_var_fresh(const std::string& name); /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
-        expr_ref mk_str_var(const std::string& name); 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 

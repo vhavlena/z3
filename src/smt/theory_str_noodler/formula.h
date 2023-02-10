@@ -133,6 +133,7 @@ namespace smt::noodler {
         EQ,
         LEQ,
         LEAF,
+        AND,
     };
 
     struct LenNode {
