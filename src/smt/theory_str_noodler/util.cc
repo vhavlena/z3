@@ -347,6 +347,7 @@ namespace smt::noodler::util {
             std::stringstream convert_stream;
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
                 convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
+                // std::setfill('0') << std::setw(2) <<
             }
             regex = convert_stream.str();
         } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
@@ -369,12 +370,13 @@ namespace smt::noodler::util {
         return nfa;
     }
 
-    void collect_terms(app* const ex, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
+    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms) {
 
         if(m_util_s.str.is_string(ex)) {
             std::string lit = ex->get_parameter(0).get_zstring().encode();
             terms.emplace_back(BasicTermType::Literal, lit);
+            terms.emplace_back(BasicTermType::Literal, util::conv_to_regex_hex(ex, m_util_s, m, {}));
             return;
         }
 
@@ -386,15 +388,15 @@ namespace smt::noodler::util {
 
         if(!m_util_s.str.is_concat(ex)) {
             expr* rpl = pred_replace.find(ex); // dies if it is not found
-            collect_terms(to_app(rpl), m_util_s, pred_replace, terms);
+            collect_terms(to_app(rpl), m, m_util_s, pred_replace, terms);
             return;
         }
 
         SASSERT(ex->get_num_args() == 2);
         app *a_x = to_app(ex->get_arg(0));
         app *a_y = to_app(ex->get_arg(1));
-        collect_terms(a_x, m_util_s, pred_replace, terms);
-        collect_terms(a_y, m_util_s, pred_replace, terms);
+        collect_terms(a_x, m, m_util_s, pred_replace, terms);
+        collect_terms(a_y, m, m_util_s, pred_replace, terms);
     }
 
     BasicTerm get_variable_basic_term(expr *const variable) {

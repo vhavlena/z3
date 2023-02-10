@@ -132,7 +132,7 @@ namespace smt::noodler::util {
      * @param pred_replace Replacement of predicate and functions
      * @param[out] terms Vector of found BasicTerm (in right order).
      */
-    void collect_terms(app* const ex, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
+    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms
     );
 
@@ -147,7 +147,7 @@ namespace smt::noodler::util {
 
     /**
      * @brief Create a fresh int variable.
-     * 
+     *
      * @param name Infix of the name (rest is added to get a unique name)
      * @param m ast manager
      * @param m_util_s string ast util
@@ -160,10 +160,10 @@ namespace smt::noodler::util {
             nullptr, int_sort), m);
         return var;
     }
-        
+
     /**
      * @brief Create a fresh int variable.
-     * 
+     *
      * @param name Infix of the name (rest is added to get a unique name)
      * @param m ast manager
      * @param m_util_s string ast util
@@ -177,13 +177,13 @@ namespace smt::noodler::util {
 
     /**
      * @brief Convert Length node to z3 length formula
-     * 
+     *
      * @param node Length node
      * @param variable_map mapping of variables(BasicTerms) to the corresponding z3 variables(expr_ref)
      * @param m ast manager
      * @param m_util_s string ast util
      * @param m_util_a arith ast util
-     * @return expr_ref 
+     * @return expr_ref
      */
     static expr_ref len_to_expr(const LenNode * node, std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
         assert(node->succ.size() <= 2);
@@ -192,7 +192,7 @@ namespace smt::noodler::util {
         case LenFormulaType::LEAF:
             if(node->atom_val.is_literal())
                 return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name())), m);
-            else { 
+            else {
                 auto it = variable_map.find(node->atom_val);
                 expr_ref var_expr(m);
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
@@ -202,7 +202,7 @@ namespace smt::noodler::util {
                 }
                 return var_expr;
             }
-        
+
         case LenFormulaType::PLUS: {
             assert(node->succ.size() >= 2);
             expr_ref plus = len_to_expr(node->succ[0], variable_map, m, m_util_s, m_util_a);

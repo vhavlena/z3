@@ -1745,8 +1745,8 @@ namespace smt::noodler {
         }
 
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, this->predicate_replace, left);
-        util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, this->predicate_replace, right);
+        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, left);
+        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }
