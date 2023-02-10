@@ -145,6 +145,3 @@ target_link_libraries(test-z3 PRIVATE ${Z3_DEPENDENT_LIBS})
 target_include_directories(test-z3 PRIVATE ${Z3_COMPONENT_EXTRA_INCLUDE_DIRS})
 z3_append_linker_flag_list_to_target(test-z3 ${Z3_DEPENDENT_EXTRA_CXX_LINK_FLAGS})
 z3_add_component_dependencies_to_target(test-z3 ${z3_test_expanded_deps})
-
-
-

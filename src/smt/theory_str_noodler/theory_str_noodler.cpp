@@ -183,7 +183,7 @@ namespace smt::noodler {
         sort *str_sort = m_util_s.str.mk_string_sort();
         std::cout << "#e.id = " << id << std::endl;
         std::cout << "#e.kind = " << get_ast_kind_name(ast) << std::endl;
-        std::cout << std::boolalpha << "#is bool sort? " << (e_sort == bool_sort) << std::endl;
+        std::cout << std::boolalpha << " sort? " << (e_sort == bool_sort) << std::endl;
         std::cout << std::boolalpha << "#is string sort? " << (e_sort == str_sort) << std::endl;
         std::cout << std::boolalpha << "#is string term? " << m_util_s.str.is_string(e) << std::endl;
         std::cout << std::boolalpha << "#is_numeral? " << m_util_a.is_numeral(e) << std::endl;
@@ -649,7 +649,7 @@ namespace smt::noodler {
     Final check for an assignment of the underlying boolean skeleton.
     */
     final_check_status theory_str_noodler::final_check_eh() {
-        std::cout << "final_check starts\n"<<std::endl;
+        TRACE("str", tout << "final_check starts\n";);
 
         remove_irrelevant_constr();
 
@@ -684,9 +684,9 @@ namespace smt::noodler {
             conj.insert(e);
             conj_instance.insert(e);
 
-            std::cout<<print_word_term(we.first) << std::flush;
-            std::cout<<"="<<std::flush;
-            std::cout<<print_word_term(we.second) << std::endl;
+            TRACE("str", tout << print_word_term(we.first) << std::flush);
+            TRACE("str", tout << "="<<std::flush);
+            TRACE("str", tout << print_word_term(we.second) << std::endl);
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
@@ -694,9 +694,9 @@ namespace smt::noodler {
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             conj_instance.insert(e);
 
-            std::cout<<print_word_term(we.first) <<std::flush;
-            std::cout<<"!="<<std::flush;
-            std::cout<<print_word_term(we.second)<< std::endl;
+            TRACE("str", tout << print_word_term(we.first) <<std::flush);
+            TRACE("str", tout << "!="<<std::flush);
+            TRACE("str", tout << print_word_term(we.second)<< std::endl);
         }
 
         ast_manager &m = get_manager();
@@ -705,13 +705,13 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
+            TRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
 
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
-            std::cout << f.to_string() << std::endl;
+            TRACE("str", tout << f.to_string() << std::endl);
         }
 
         if(instance.get_predicates().empty()) {
@@ -1759,7 +1759,7 @@ namespace smt::noodler {
     */
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
         for(app *const pred : conj) {
-            print_ast(pred);
+            //print_ast(pred);
             Predicate inst = this->conv_eq_pred(pred);
             STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
             res.add_predicate(inst);

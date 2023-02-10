@@ -98,3 +98,5 @@ z3_add_component(smt
     simplex
     substitution
 )
+
+target_compile_options(smt PRIVATE ${Z3_COMPONENT_CXX_FLAGS} -Wno-unused -Wno-unused-function)
