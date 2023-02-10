@@ -661,7 +661,6 @@ namespace smt::noodler {
                 std::cout << mk_pp(a, m) << std::endl;
             } // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
         }
-        std::cout << std::endl;
 
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
