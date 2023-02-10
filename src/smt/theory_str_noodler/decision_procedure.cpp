@@ -409,6 +409,7 @@ namespace smt::noodler {
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
         this->prep_handler.propagate_eps();
+        // FIXME: slog_4003 seg faults inside remove_regular.
         this->prep_handler.remove_regular();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
