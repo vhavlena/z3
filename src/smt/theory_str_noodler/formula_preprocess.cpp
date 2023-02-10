@@ -316,7 +316,7 @@ namespace smt::noodler {
                 if(occurrs.size() == 1) {
                     Predicate reg_pred;
                     if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
-                        worklist.push_back({occurrs.begin()->eq_index, reg_pred});
+                        worklist.emplace_back(occurrs.begin()->eq_index, reg_pred);
                         // update dependency
                         map_set_insert(this->dependency, occurrs.begin()->eq_index, pr.first);
                     }
@@ -904,8 +904,8 @@ namespace smt::noodler {
 
     /**
      * @brief Return a modified formula by the preprocessing.
-     * 
-     * @return Result of the preprocessing. 
+     *
+     * @return Result of the preprocessing.
      */
     Formula FormulaPreprocess::get_modified_formula() const {
         Formula ret;

@@ -440,6 +440,14 @@ namespace smt::noodler {
         // TODO: Use std::move for both add functions?
         void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
 
+        std::string to_string() const {
+            std::string ret;
+            for(const Predicate& p : this->predicates) {
+                ret += p.to_string() + "\n";
+            }
+            return ret;
+        }
+
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.

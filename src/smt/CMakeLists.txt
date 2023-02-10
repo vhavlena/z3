@@ -73,6 +73,7 @@ z3_add_component(smt
     theory_str_noodler/inclusion_graph.cc
     theory_str_noodler/decision_procedure.cpp
     theory_str_noodler/formula.cpp
+    theory_str_noodler/util.cc
     theory_str_mc.cpp
     theory_str_regex.cpp
     theory_user_propagator.cpp
@@ -97,3 +98,5 @@ z3_add_component(smt
     simplex
     substitution
 )
+
+target_compile_options(smt PRIVATE ${Z3_COMPONENT_CXX_FLAGS} -Wno-unused -Wno-unused-function)

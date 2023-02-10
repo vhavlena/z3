@@ -13,7 +13,7 @@
 #include <mata/nfa.hh>
 
 namespace smt::noodler {
-    
+
     /**
      * hints for using AutAssignment:
      *   - use at() instead of [] operator for getting the value, use [] only for assigning
@@ -36,8 +36,7 @@ namespace smt::noodler {
     public:
         using std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>>::unordered_map;
 
-        AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val)
-        { 
+        AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val) {
             for (const auto &key_value : val) {
                 this->operator[](key_value.first) = std::make_shared<Mata::Nfa::Nfa>(key_value.second);
             }
@@ -67,7 +66,7 @@ namespace smt::noodler {
             return v.get_num_of_trans() == 0 && v.initial.size() == 1 && v.final.size();
         }
 
-        // adds all mappings of variables from other to this assigment except those which already exists in this assignment
+        // adds all mappings of variables from other to this assignment except those which already exists in this assignment
         // i.e. if this[var] exists, then nothing happens for var, if it does not, then this[var] = other[var]
         // TODO: probably this is the same as just doing this->insert(other.begin(), other.end())
         // TODO: or even better, if we do not care what happens with other, we can use this->merge(other)
@@ -84,8 +83,29 @@ namespace smt::noodler {
             return this->alphabet;
         }
 
+        void set_alphabet(const std::set<uint32_t>& alphabet) {
+            this->alphabet.clear();
+            for (const auto& symbol : alphabet) {
+                this->alphabet.insert(symbol);
+            }
+        }
+
+        /**
+         * @brief Check if all automata in the map have non-empty language.
+         * 
+         * @return true All have non-empty language
+         * @return false There is at least one NFA with the empty language
+         */
+        bool is_sat() const {
+            for (const auto& pr : *this) {
+                if(Mata::Nfa::is_lang_empty(*pr.second))
+                    return false;
+            }
+            return true;
+        }
+
     };
-        
+
 } // Namespace smt::noodler.
 
 #endif //Z3_STR_AUT_ASSIGNMENT_H_

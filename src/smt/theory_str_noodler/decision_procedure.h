@@ -11,7 +11,6 @@
 #include "state_len.h"
 #include "formula_preprocess.h"
 
-
 namespace smt::noodler {
     /**
      * @brief Abstract decision procedure. Defines interface for decision
@@ -28,7 +27,7 @@ namespace smt::noodler {
         }
 
         virtual void preprocess() {
-            throw std::runtime_error("Unimplemented");
+            throw std::runtime_error("preprocess unimplemented");
         }
 
         /**
@@ -195,10 +194,11 @@ namespace smt::noodler {
         AutAssignment init_aut_ass;
 
         /**
-         * Convert all string literals in formula to fresh variables with automata in automata assignment.
+         * Convert all string literals in @c formula to fresh variables with automata in automata assignment.
          *
          * All string literals are converted to fresh variables with assigned automata equal to the string literal
          *  expression.
+         * We get a new fresh variable for each separate string literal, even if there are multiple same string literals.
          */
         void conv_str_lits_to_fresh_vars();
 

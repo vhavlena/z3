@@ -16,6 +16,7 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_context.h"
 #include "ast/seq_decl_plugin.h"
 #include "ast/reg_decl_plugins.h"
+#include "decision_procedure.h"
 #include <mata/nfa.hh>
 
 
@@ -182,7 +183,7 @@ namespace smt::noodler {
         sort *str_sort = m_util_s.str.mk_string_sort();
         std::cout << "#e.id = " << id << std::endl;
         std::cout << "#e.kind = " << get_ast_kind_name(ast) << std::endl;
-        std::cout << std::boolalpha << "#is bool sort? " << (e_sort == bool_sort) << std::endl;
+        std::cout << std::boolalpha << " sort? " << (e_sort == bool_sort) << std::endl;
         std::cout << std::boolalpha << "#is string sort? " << (e_sort == str_sort) << std::endl;
         std::cout << std::boolalpha << "#is string term? " << m_util_s.str.is_string(e) << std::endl;
         std::cout << std::boolalpha << "#is_numeral? " << m_util_a.is_numeral(e) << std::endl;
@@ -648,7 +649,7 @@ namespace smt::noodler {
     Final check for an assignment of the underlying boolean skeleton.
     */
     final_check_status theory_str_noodler::final_check_eh() {
-        std::cout << "final_check starts\n"<<std::endl;
+        TRACE("str", tout << "final_check starts\n";);
 
         remove_irrelevant_constr();
 
@@ -658,32 +659,43 @@ namespace smt::noodler {
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
                 std::cout << mk_pp(a, m) << std::endl;
-            }
-            // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
+            } // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
         }
-        std::cout << std::endl;
 
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 
-        for (const auto& we : this->m_word_eq_todo_rel) {
+        // Get symbols in the whole formula.
+        std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
+        )};
 
+        // Add dummy symbols for all disequations.
+        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(m_word_diseq_todo_rel, symbols_in_formula) };
+
+        // Create automata assignment for the formula.
+        AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m, symbols_in_formula
+        ) };
+
+        for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
             conj_instance.insert(e);
 
-            std::cout<<print_word_term(we.first) <<std::flush;
-            std::cout<<"="<<std::flush;
-            std::cout<<print_word_term(we.second) << std::endl;
+            TRACE("str", tout << print_word_term(we.first) << std::flush);
+            TRACE("str", tout << "="<<std::flush);
+            TRACE("str", tout << print_word_term(we.second) << std::endl);
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
+
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             conj_instance.insert(e);
 
-            std::cout<<print_word_term(we.first) <<std::flush;
-            std::cout<<"!="<<std::flush;
-            std::cout<<print_word_term(we.second)<< std::endl;
+            TRACE("str", tout << print_word_term(we.first) <<std::flush);
+            TRACE("str", tout << "!="<<std::flush);
+            TRACE("str", tout << print_word_term(we.second)<< std::endl);
         }
 
         ast_manager &m = get_manager();
@@ -692,41 +704,35 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            std::cout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl;
-
+            TRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
 
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
-            std::cout << f.to_string() << std::endl;
+            TRACE("str", tout << f.to_string() << std::endl);
         }
 
-        if(instance.get_predicates().size() == 0) {
+        if(instance.get_predicates().empty()) {
             return FC_DONE;
         }
 
-        block_curr_assignment();
-        return FC_CONTINUE;
-
-        expr_ref* lengths;
-        AbstractDecisionProcedure dec_proc = DecisionProcedureDebug{ conj, *lengths, m, m_util_s, m_util_a };
+        expr_ref lengths(m);
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars() };
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
+        dec_proc.preprocess();
+        dec_proc.init_computation();
 
         while(dec_proc.compute_next_solution()) {
-            *lengths = dec_proc.get_lengths(this->var_name);
-            if(lengths == nullptr)
-                continue;
+            lengths = dec_proc.get_lengths(this->var_name);
             int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
             m_int_solver.initialize(get_context());
-            if(m_int_solver.check_sat(*lengths) == l_true) {
+            if(m_int_solver.check_sat(lengths) == l_true) {
                 return FC_DONE;
             }
             TRACE("str", tout << "len unsat\n";);
         }
 
-        if(lengths == nullptr) {
-            return FC_DONE;
-        }
         // all len solutions are unsat, we block the current assignment
         block_curr_assignment();
         IN_CHECK_FINAL = false;
@@ -1713,7 +1719,7 @@ namespace smt::noodler {
     }
 
     /**
-    Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of 
+    Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
     variables (BasicTerm) to the corresponding z2 expr.
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
@@ -1739,22 +1745,31 @@ namespace smt::noodler {
         }
 
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), this->m_util_s, this->predicate_replace, left);
-        util::collect_terms(to_app(eq->get_arg(1)), this->m_util_s, this->predicate_replace, right);
+        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, left);
+        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }
 
     /**
-    Convert conjunction of equations/disequations to the instance of Formula.
+    Convert conjunction of equations/disequations to the instance of @c Formula.
     @param conj Conjunction in the form of a set of (dis)equations
     @param[out] res Resulting formula
     */
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
         for(app *const pred : conj) {
+            //print_ast(pred);
             Predicate inst = this->conv_eq_pred(pred);
             STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
             res.add_predicate(inst);
         }
+    }
+
+    std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars() {
+        std::unordered_set<BasicTerm> init_lengths{};
+        for (const auto& len : len_vars) {
+            init_lengths.emplace(util::get_variable_basic_term(len));
+        }
+        return init_lengths;
     }
 }

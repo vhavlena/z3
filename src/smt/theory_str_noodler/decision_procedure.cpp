@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <mata/nfa-strings.hh>
+#include <mata/re2parser.hh>
 #include "aut_assignment.h"
 #include "decision_procedure.h"
 
@@ -62,11 +63,11 @@ namespace smt::noodler {
             const Formula &equalities, AutAssignment init_aut_ass,
             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-    ) : m{ m }, m_util_s{ m_util_s }, init_length_sensitive_vars{ init_length_sensitive_vars }, 
-        m_util_a{ m_util_a }, 
-        prep_handler(equalities, init_aut_ass, init_length_sensitive_vars),
-        init_aut_ass{ init_aut_ass },
-        formula { equalities } {
+    ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars), m{ m }, m_util_s{ m_util_s },
+        m_util_a{ m_util_a },
+        init_length_sensitive_vars{ init_length_sensitive_vars },
+        formula { equalities },
+        init_aut_ass{ init_aut_ass } {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -80,7 +81,7 @@ namespace smt::noodler {
                 solution = std::move(element_to_process);
                 return true;
             }
-
+            
             std::shared_ptr<GraphNode> node_to_process = element_to_process.nodes_to_process.front();
             element_to_process.nodes_to_process.pop_front();
 
@@ -352,7 +353,7 @@ namespace smt::noodler {
 
     /**
      * @brief Get length constraints of the solution
-     * 
+     *
      * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
      * @return expr_ref Length formula describing all solutions
      */
@@ -370,15 +371,15 @@ namespace smt::noodler {
             } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                 var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
             }
-            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));   
+            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
         }
 
         // collect lengths introduced by the preprocessing
         expr_ref prep_formula = util::len_to_expr(
-                this->prep_handler.get_len_formula(), 
-                variable_map, 
+                this->prep_handler.get_len_formula(),
+                variable_map,
                 this->m, this->m_util_s, this->m_util_a );
-        
+
         if(!this->m.is_true(prep_formula)) {
             lengths = this->m.mk_and(lengths, prep_formula);
         }
@@ -393,8 +394,15 @@ namespace smt::noodler {
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(this->init_aut_ass);
-        // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-        initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+
+        if(!initialWlEl.aut_ass.is_sat()) { // TODO: return unsat core
+            return;
+        }
+
+        if (!this->formula.get_predicates().empty()) {
+            // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
+            initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+        }
 
         worklist.push_back(initialWlEl);
     }
@@ -403,7 +411,10 @@ namespace smt::noodler {
      * @brief Preprocessing.
      */
     void DecisionProcedure::preprocess() {
-        /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
+        // As a first preprocessing operation, convert string literals to fresh variables with automata assignment
+        //  representing their string literal.
+        conv_str_lits_to_fresh_vars();
+        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars);
 
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
@@ -413,14 +424,16 @@ namespace smt::noodler {
         this->prep_handler.propagate_variables();
 
         // Refresh the instance
-        this->init_aut_ass = std::move(this->prep_handler.get_aut_assignment());
+        this->init_aut_ass = this->prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
         this->formula = this->prep_handler.get_modified_formula();
+
+        STRACE("str", tout << "preprocess-output: " << this->formula.to_string() << "\n" );
     }
 
     /**
      * @brief Make a length constraint for a single NFA loop, handle
-     * 
+     *
      * @param var variable
      * @param v1 handle
      * @param v2 loop
@@ -441,7 +454,7 @@ namespace smt::noodler {
 
     /**
      * @brief Make a length formula corresponding to a set of pairs <loop, handle>
-     * 
+     *
      * @param var Variable
      * @param aut_constr Set of pairs <loop, handle>
      * @return expr_ref Length constaint of the automaton
@@ -454,4 +467,35 @@ namespace smt::noodler {
         return res;
     }
 
+    void DecisionProcedure::conv_str_lits_to_fresh_vars() {
+        constexpr char name_prefix[] = "str_lit_to_var_";
+        size_t counter{ 0 };
+        for (auto& predicate : formula.get_predicates()) {
+            if (predicate.is_eq_or_ineq()) {
+                for (auto& term : predicate.get_left_side()) {
+                    if (term.is_literal()) { // Handle string literal.
+                        std::string string_literal_content{ term.get_name() };
+                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
+                        ++counter;
+                        Mata::Nfa::Nfa nfa{};
+                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        term = fresh_variable;
+                    }
+                }
+
+                for (auto& term : predicate.get_right_side()) {
+                    if (term.is_literal()) { // Handle string literal.
+                        std::string string_literal_content{ term.get_name() };
+                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
+                        ++counter;
+                        Mata::Nfa::Nfa nfa{};
+                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        term = fresh_variable;
+                    }
+                }
+            }
+        }
+    }
 } // namespace smt::nodler
