@@ -403,6 +403,7 @@ namespace smt::noodler {
      * @brief Preprocessing.
      */
     void DecisionProcedure::preprocess() {
+        std::cout << "Preprocessing\n";
         /// TODO: Run str_lit convert and connect with Vojta's preprocessing.
         conv_str_lits_to_fresh_vars();
 
@@ -457,6 +458,8 @@ namespace smt::noodler {
 
     void DecisionProcedure::conv_str_lits_to_fresh_vars() {
         // TODO: Implement.
+        // Fresh variable for each separate string (even if there are same strings).
+        std::cout << "Converting string literals to fresh variables.\n";
     }
 
 } // namespace smt::nodler
