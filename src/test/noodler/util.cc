@@ -126,4 +126,40 @@ TEST_CASE("theory_str_noodler::util") {
         expr_ref int_literal{ m_util_a.mk_int(1), m };
         CHECK(!util::is_str_variable(int_literal, m_util_s));
     }
+
+    SECTION("get_variables()") {
+        SECTION("String variables") {
+            auto var1{ noodler.mk_str_var("var1") };
+            auto var2{ noodler.mk_str_var("var2") };
+            auto var3{ noodler.mk_str_var("var3") };
+            auto concat1{ m_util_s.str.mk_concat(var1, var2) };
+            auto concat2{ m_util_s.str.mk_concat(concat1, var3) };
+
+            obj_hashtable<expr> res;
+            util::get_variables(concat2, m_util_s, m, res);
+            CHECK(res.size() == 3);
+            CHECK(res.contains(var1));
+            CHECK(res.contains(var2));
+            CHECK(res.contains(var3));
+        }
+
+        SECTION("Bool tree") {
+            auto var1{ noodler.mk_int_var("var1") };
+            auto var2{ noodler.mk_int_var("var2") };
+            auto var3{ noodler.mk_int_var("var3") };
+
+            auto expression{ expr_ref(m.mk_and(m.mk_and(m.mk_true(), m.mk_or(m.mk_false(), m.mk_eq(var1, var2))),
+                              m.mk_or(m.mk_false(), m.mk_eq(var3, noodler.m_util_a.mk_int(1))) ), m) };
+
+            obj_hashtable<expr> res;
+            util::get_variables(expression, m_util_s, m, res);
+            for (auto tmp : res) {
+                std::cout << mk_pp(tmp, m) << "\n";
+            }
+            CHECK(res.size() == 3);
+            CHECK(res.contains(var1));
+            CHECK(res.contains(var2));
+            CHECK(res.contains(var3));
+        }
+    }
 }
