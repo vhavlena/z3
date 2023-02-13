@@ -374,8 +374,6 @@ namespace smt::noodler::util {
                        std::vector<BasicTerm>& terms) {
 
         if(m_util_s.str.is_string(ex)) {
-            std::string lit = ex->get_parameter(0).get_zstring().encode();
-            terms.emplace_back(BasicTermType::Literal, lit);
             terms.emplace_back(BasicTermType::Literal, util::conv_to_regex_hex(ex, m_util_s, m, {}));
             return;
         }
