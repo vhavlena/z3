@@ -117,11 +117,8 @@ namespace smt::noodler::util {
         if(m_util_s.str.is_string(ex)) {
             return;
         }
-        if(!m_util_s.is_string(ex->get_sort())) {
-            return;
-        }
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+        if(m_util_s.is_string(ex->get_sort()) && is_app(ex) && to_app(ex)->get_num_args() == 0) {
             res.insert(ex);
             return;
         }
