@@ -183,7 +183,7 @@ namespace smt::noodler {
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
-        std::unordered_set<BasicTerm> get_init_length_vars();
+        std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
     };
 }
 

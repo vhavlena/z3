@@ -713,12 +713,13 @@ namespace smt::noodler {
             STRACE("str", tout << f.to_string() << std::endl);
         }
 
+        // TODO: this is not correct
         if(instance.get_predicates().empty()) {
             return FC_DONE;
         }
 
         expr_ref lengths(m);
-        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars() };
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         dec_proc.init_computation();
@@ -1765,10 +1766,12 @@ namespace smt::noodler {
         }
     }
 
-    std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars() {
+    std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars(AutAssignment& ass) {
         std::unordered_set<BasicTerm> init_lengths{};
         for (const auto& len : len_vars) {
-            init_lengths.emplace(util::get_variable_basic_term(len));
+            BasicTerm v = util::get_variable_basic_term(len);
+            if(ass.find(v) != ass.end())
+                init_lengths.emplace(v);
         }
         return init_lengths;
     }
