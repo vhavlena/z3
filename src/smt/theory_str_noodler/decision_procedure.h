@@ -83,7 +83,7 @@ namespace smt::noodler {
             app* atom;
             for (const auto& eq : inst) {
                 obj_hashtable<expr> vars;
-                util::get_variables(to_app(eq), this->m_util_s, this->m, vars);
+                util::get_str_variables(to_app(eq), this->m_util_s, this->m, vars);
 
                 for(expr * const var : vars) {
                     expr_ref len_str_l(m_util_s.str.mk_length(var), m);

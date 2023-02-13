@@ -36,7 +36,7 @@ namespace smt::noodler::util {
     @param m AST manager
     @param[out] res Vector of found variables (may contain duplicities).
     */
-    void get_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res);
+    void get_str_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res);
 
     /**
      * Get variable names from a given expression @p ex. Append to the output parameter @p res.

@@ -113,8 +113,11 @@ namespace smt::noodler::util {
         }
     }
 
-    void get_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {
+    void get_str_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {        
         if(m_util_s.str.is_string(ex)) {
+            return;
+        }
+        if(!m_util_s.is_string(ex->get_sort())) {
             return;
         }
 
@@ -129,7 +132,7 @@ namespace smt::noodler::util {
         for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
             SASSERT(is_app(ex_app->get_arg(i)));
             app *arg = to_app(ex_app->get_arg(i));
-            get_variables(arg, m_util_s, m, res);
+            get_str_variables(arg, m_util_s, m, res);
         }
     }
 
