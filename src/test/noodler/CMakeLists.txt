@@ -17,6 +17,7 @@ add_executable(test-noodler
         theory_str_noodler.cc
         formula-preprocess.cpp
         decision-procedure.cpp
+        util.cc
 )
 
 find_library(LIBMATA mata)
