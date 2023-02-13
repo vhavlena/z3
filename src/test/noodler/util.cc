@@ -12,7 +12,6 @@
 using namespace smt::noodler;
 
 TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
-    memory::initialize(0);
     smt_params params;
     ast_manager ast_m;
     reg_decl_plugins(ast_m);
@@ -70,12 +69,9 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
         //regex = util::conv_to_regex_hex(expr_all_char_star, m_util_s, m, alphabet);
         //CHECK(regex == "(((.))*)");
     }
-
-    // memory::finalize();
 }
 
 TEST_CASE("theory_str_noodler::util") {
-    memory::initialize(0);
     smt_params params;
     ast_manager ast_m;
     reg_decl_plugins(ast_m);

@@ -11,7 +11,6 @@
 #include "test_utils.h"
 
 TEST_CASE("Decision Procedure", "[noodler]") {
-    memory::initialize(0);
     smt_params params;
     ast_manager ast_m;
     reg_decl_plugins(ast_m);
