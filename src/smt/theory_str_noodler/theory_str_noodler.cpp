@@ -202,7 +202,7 @@ namespace smt::noodler {
             obj_hashtable<app> lens;
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
-                util::get_variables(a, this->m_util_s, m, this->len_vars);
+                util::get_str_variables(a, this->m_util_s, m, this->len_vars);
             }
 
             expr *ex = ctx.get_asserted_formula(i);
@@ -683,9 +683,9 @@ namespace smt::noodler {
             conj.insert(e);
             conj_instance.insert(e);
 
-            TRACE("str", tout << print_word_term(we.first) << std::flush);
-            TRACE("str", tout << "="<<std::flush);
-            TRACE("str", tout << print_word_term(we.second) << std::endl);
+            STRACE("str", tout << print_word_term(we.first) << std::flush);
+            STRACE("str", tout << "="<<std::flush);
+            STRACE("str", tout << print_word_term(we.second) << std::endl);
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
@@ -693,9 +693,9 @@ namespace smt::noodler {
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             conj_instance.insert(e);
 
-            TRACE("str", tout << print_word_term(we.first) <<std::flush);
-            TRACE("str", tout << "!="<<std::flush);
-            TRACE("str", tout << print_word_term(we.second)<< std::endl);
+            STRACE("str", tout << print_word_term(we.first) <<std::flush);
+            STRACE("str", tout << "!="<<std::flush);
+            STRACE("str", tout << print_word_term(we.second)<< std::endl);
         }
 
         ast_manager &m = get_manager();
@@ -704,21 +704,22 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            TRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
+            STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
 
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
-            TRACE("str", tout << f.to_string() << std::endl);
+            STRACE("str", tout << f.to_string() << std::endl);
         }
 
+        // TODO: this is not correct
         if(instance.get_predicates().empty()) {
             return FC_DONE;
         }
 
         expr_ref lengths(m);
-        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars() };
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         dec_proc.init_computation();
@@ -730,7 +731,7 @@ namespace smt::noodler {
             if(m_int_solver.check_sat(lengths) == l_true) {
                 return FC_DONE;
             }
-            TRACE("str", tout << "len unsat\n";);
+            STRACE("str", tout << "len unsat\n";);
         }
 
         // all len solutions are unsat, we block the current assignment
@@ -954,7 +955,7 @@ namespace smt::noodler {
         // add the replacement charat -> v
         predicate_replace.insert(e, fresh.get());
         // update length variables
-        util::get_variables(s, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(s, this->m_util_s, m, this->len_vars);
         this->len_vars.insert(x);
     }
 
@@ -1030,7 +1031,7 @@ namespace smt::noodler {
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());
         // update length variables
-        util::get_variables(s, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(s, this->m_util_s, m, this->len_vars);
         this->len_vars.insert(x);
         this->len_vars.insert(v);
     }
@@ -1183,7 +1184,7 @@ namespace smt::noodler {
             add_axiom({offset_ge_0, i_eq_m1});
 
             // update length variables
-            util::get_variables(t, this->m_util_s, m, this->len_vars);
+            util::get_str_variables(t, this->m_util_s, m, this->len_vars);
             this->len_vars.insert(x);
         }
     }
@@ -1350,8 +1351,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
     }
 
     /**
@@ -1436,8 +1437,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
     }
 
     /**
@@ -1583,8 +1584,8 @@ namespace smt::noodler {
         for (const auto& we : this->m_word_eq_todo_rel) {
 
             obj_hashtable<expr> vars;
-            util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
-            util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
+            util::get_str_variables(to_app(we.first.get()), m_util_s, m, vars);
+            util::get_str_variables(to_app(we.second.get()), m_util_s, m, vars);
 
             for(expr * const var : vars) {
                 std::cout << mk_pp(var, m) << std::endl;
@@ -1638,8 +1639,8 @@ namespace smt::noodler {
         for (const auto& we : this->m_word_eq_todo_rel) {
 
             obj_hashtable<expr> vars;
-            util::get_variables(to_app(we.first.get()), m_util_s, m, vars);
-            util::get_variables(to_app(we.second.get()), m_util_s, m, vars);
+            util::get_str_variables(to_app(we.first.get()), m_util_s, m, vars);
+            util::get_str_variables(to_app(we.second.get()), m_util_s, m, vars);
 
             for(expr * const var : vars) {
                 // std::cout << mk_pp(var, m) << std::endl;
@@ -1738,7 +1739,7 @@ namespace smt::noodler {
         SASSERT(eq->get_arg(1));
 
         obj_hashtable<expr> vars;
-        util::get_variables(ex, this->m_util_s, this->m, vars);
+        util::get_str_variables(ex, this->m_util_s, this->m, vars);
         for(expr * const v : vars) {
             BasicTerm vterm(BasicTermType::Variable, to_app(ex)->get_decl()->get_name().str());
             this->var_name.insert({vterm, expr_ref(v, this->m)});
@@ -1765,10 +1766,12 @@ namespace smt::noodler {
         }
     }
 
-    std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars() {
+    std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars(AutAssignment& ass) {
         std::unordered_set<BasicTerm> init_lengths{};
         for (const auto& len : len_vars) {
-            init_lengths.emplace(util::get_variable_basic_term(len));
+            BasicTerm v = util::get_variable_basic_term(len);
+            if(ass.find(v) != ass.end())
+                init_lengths.emplace(v);
         }
         return init_lengths;
     }

@@ -448,6 +448,20 @@ namespace smt::noodler {
             return ret;
         }
 
+        /**
+         * @brief Get union of variables from all predicates
+         * 
+         * @return std::set<BasicTerm> Variables
+         */
+        std::set<BasicTerm> get_vars() const {
+            std::set<BasicTerm> ret;
+            for(const auto& p : this->predicates) {
+                auto vars = p.get_vars();
+                ret.insert(vars.begin(), vars.end());
+            }
+            return ret;
+        }
+
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
