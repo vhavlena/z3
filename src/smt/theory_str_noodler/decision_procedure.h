@@ -172,6 +172,7 @@ namespace smt::noodler {
     class DecisionProcedure : public AbstractDecisionProcedure {
     protected:
         // prefix of newly created vars during the procedure
+        // TODO there is a small possibility that such a variable already exists, we should either check how to call tmp variables or better, add to normal variables some prefix?
         const std::string VAR_PREFIX = "tmp";
         // counter of noodlifications, so that newly created variables will have unique names per noodlification
         // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
