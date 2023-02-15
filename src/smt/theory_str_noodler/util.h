@@ -39,6 +39,25 @@ namespace smt::noodler::util {
     void get_str_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res);
 
     /**
+     * Check whether an @p expression is a string variable.
+     *
+     * Function checks only the top-level expression and is not recursive.
+     * Regex variables do not count as string variables.
+     * @param expression Expression to check.
+     * @return True if @p expression is a variable, false otherwise.
+     */
+    bool is_str_variable(const expr* expression, const seq_util& m_util_s);
+
+    /**
+     * Check whether an @p expression is any kind of variable (string, regex, integer).
+     *
+     * Function checks only the top-level expression and is not recursive.
+     * @param expression Expression to check.
+     * @return True if @p expression is a variable, false otherwise.
+     */
+    bool is_variable(const expr* expression, const seq_util& m_util_s);
+
+    /**
      * Get variable names from a given expression @p ex. Append to the output parameter @p res.
      * @param[in] ex Expression to be checked for variables.
      * @param[in] m_util_s Seq util for AST.

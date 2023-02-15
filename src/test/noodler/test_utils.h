@@ -20,6 +20,7 @@ public:
             : theory_str_noodler(ctx, m, params) {}
 
     using theory_str_noodler::m_util_s, theory_str_noodler::m, theory_str_noodler::m_util_a;
+    using theory_str_noodler::mk_str_var, theory_str_noodler::mk_int_var, theory_str_noodler::mk_literal;
 };
 
 class DecisionProcedureCUT : public DecisionProcedure {

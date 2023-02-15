@@ -22,7 +22,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) { // Skip variables.
+        if(util::is_variable(ex, m_util_s)) { // Skip variables.
             return;
         }
 
@@ -101,7 +101,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(child));
             extract_symbols(to_app(child), m_util_s, m, alphabet);
             return;
-        } else if(is_app(ex_app) && to_app(ex_app)->get_num_args() == 0) { // Handle variable.
+        } else if(is_variable(ex_app, m_util_s)) { // Handle variable.
             assert(false && "is_variable(ex_app)");
         }
 
@@ -118,7 +118,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(m_util_s.is_string(ex->get_sort()) && is_app(ex) && to_app(ex)->get_num_args() == 0) {
+        if(is_str_variable(ex, m_util_s)) {
             res.insert(ex);
             return;
         }
@@ -138,7 +138,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+        if(is_variable(ex, m_util_s)) {
             res.insert(std::to_string(to_app(ex)->get_name()));
             return;
         }
@@ -151,6 +151,24 @@ namespace smt::noodler::util {
             app *arg = to_app(ex_app->get_arg(i));
             get_variable_names(arg, m_util_s, m, res);
         }
+    }
+
+    bool is_variable(const expr* expression, const seq_util& m_util_s) {
+        // TODO: When we are able to detect other kinds of variables, add their checks here.
+        return is_str_variable(expression, m_util_s);
+    }
+
+    bool is_str_variable(const expr* expression, const seq_util& m_util_s) {
+        if(m_util_s.str.is_string(expression)) { // Filter away string literals first.
+            return false;
+        }
+
+        if (m_util_s.is_string(expression->get_sort()) &&
+            is_app(expression) && to_app(expression)->get_num_args() == 0) {
+            return true;
+        }
+
+        return false;
     }
 
     std::set<uint32_t> get_dummy_symbols(const vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to) {
@@ -350,7 +368,7 @@ namespace smt::noodler::util {
                 // std::setfill('0') << std::setw(2) <<
             }
             regex = convert_stream.str();
-        } else if(is_app(expr) && to_app(expr)->get_num_args() == 0) { // Handle variable.
+        } else if(is_variable(expr, m_util_s)) { // Handle variable.
             assert(false && "is_variable(expr)");
         }
 
@@ -378,7 +396,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(is_app(ex) && to_app(ex)->get_num_args() == 0) {
+        if(is_variable(ex, m_util_s)) {
             std::string var = ex->get_decl()->get_name().str();
             terms.emplace_back(BasicTermType::Variable, var);
             return;
