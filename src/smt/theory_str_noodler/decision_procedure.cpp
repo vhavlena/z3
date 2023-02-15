@@ -428,6 +428,10 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
         this->formula = this->prep_handler.get_modified_formula();
 
+        if(this->formula.get_predicates().size() > 0) {
+            this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
+        }
+
         STRACE("str", tout << "preprocess-output: " << this->formula.to_string() << "\n" );
     }
 
