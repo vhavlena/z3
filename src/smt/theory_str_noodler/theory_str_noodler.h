@@ -136,6 +136,26 @@ namespace smt::noodler {
         bool is_string_sort(expr *e) const;
         bool is_regex_sort(expr *e) const;
         bool is_const_fun(expr *e) const;
+
+        /**
+         * Check whether an @p expression is a string variable.
+         *
+         * Function checks only the top-level expression and is not recursive.
+         * Regex variables do not count as string variables.
+         * @param expression Expression to check.
+         * @return True if @p expression is a variable, false otherwise.
+         */
+        bool is_str_variable(const expr* expression) const;
+
+        /**
+         * Check whether an @p expression is any kind of variable (string, regex, integer).
+         *
+         * Function checks only the top-level expression and is not recursive.
+         * @param expression Expression to check.
+         * @return True if @p expression is a variable, false otherwise.
+         */
+        bool is_variable(const expr* expression) const;
+
         expr_ref mk_sub(expr *a, expr *b);
         zstring print_word_term(expr * a) const;
 
