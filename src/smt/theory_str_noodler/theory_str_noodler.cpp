@@ -1741,7 +1741,7 @@ namespace smt::noodler {
         obj_hashtable<expr> vars;
         util::get_str_variables(ex, this->m_util_s, this->m, vars);
         for(expr * const v : vars) {
-            BasicTerm vterm(BasicTermType::Variable, to_app(ex)->get_decl()->get_name().str());
+            BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
             this->var_name.insert({vterm, expr_ref(v, this->m)});
         }
 
