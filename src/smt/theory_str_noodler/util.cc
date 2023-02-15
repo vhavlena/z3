@@ -113,7 +113,7 @@ namespace smt::noodler::util {
         }
     }
 
-    void get_str_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {        
+    void get_str_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res) {
         if(m_util_s.str.is_string(ex)) {
             return;
         }
@@ -227,7 +227,7 @@ namespace smt::noodler::util {
             BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             assert(aut_assignment.find(variable_term) == aut_assignment.end());
 
-            const bool make_complement{ std::get<2>(word_equation) };
+            const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
             aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
         }
@@ -361,7 +361,7 @@ namespace smt::noodler::util {
     [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
                                               const std::set<uint32_t>& alphabet, bool make_complement) {
         const std::string regex{ conv_to_regex_hex(expr, m_util_s, m, alphabet) };
-        Nfa nfa{};
+        Nfa nfa;
         Mata::RE2Parser::create_nfa(&nfa, regex);
         if (make_complement) {
             Mata::OnTheFlyAlphabet mata_alphabet{ Mata::Nfa::create_alphabet(nfa) };
