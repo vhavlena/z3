@@ -280,9 +280,9 @@ namespace smt::noodler {
         Mata::Nfa::Nfa concat = this->aut_ass.get_automaton_concat(upd);
         auto iter = this->aut_ass.find(var);
         if(iter != this->aut_ass.end()) {
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(Mata::Nfa::intersection(*(iter->second), concat)));
+            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(*(iter->second), concat));
         } else {
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(concat));
+            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(concat);
         }
     }
 

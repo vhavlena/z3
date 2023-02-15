@@ -104,6 +104,15 @@ namespace smt::noodler {
             return true;
         }
 
+        /**
+         * @brief Reduce all automata occurring in the map.
+         */
+        void reduce() {
+             for (auto& pr : *this) {
+                pr.second = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(*pr.second));
+            }
+        }
+
     };
 
 } // Namespace smt::noodler.
