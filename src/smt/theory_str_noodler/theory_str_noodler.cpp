@@ -653,15 +653,6 @@ namespace smt::noodler {
 
         remove_irrelevant_constr();
 
-        unsigned num = ctx.get_num_asserted_formulas();
-        for(unsigned i = 0; i < num; i++) {
-            obj_hashtable<app> lens;
-            util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
-            for (app* const a : lens) {
-                std::cout << mk_pp(a, m) << std::endl;
-            } // std::cout << mk_pp(ctx.get_asserted_formula(i), m) << std::endl;
-        }
-
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 
