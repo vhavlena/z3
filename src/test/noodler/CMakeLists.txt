@@ -17,6 +17,7 @@ add_executable(test-noodler
         theory_str_noodler.cc
         formula-preprocess.cpp
         decision-procedure.cpp
+        util.cc
 )
 
 find_library(LIBMATA mata)
@@ -26,7 +27,7 @@ z3_add_install_tactic_rule(${z3_test_deps})
 z3_add_memory_initializer_rule(${z3_test_deps})
 z3_add_gparams_register_modules_rule(${z3_test_deps})
 target_compile_definitions(test-noodler PRIVATE ${Z3_COMPONENT_CXX_DEFINES})
-target_compile_options(test-noodler PRIVATE ${Z3_COMPONENT_CXX_FLAGS})
+target_compile_options(test-noodler PRIVATE ${Z3_COMPONENT_CXX_FLAGS} -Wno-unused -Wno-unused-function)
 target_link_libraries(test-noodler PRIVATE ${Z3_DEPENDENT_LIBS})
 target_include_directories(test-noodler PRIVATE ${Z3_COMPONENT_EXTRA_INCLUDE_DIRS})
 z3_append_linker_flag_list_to_target(test-noodler ${Z3_DEPENDENT_EXTRA_CXX_LINK_FLAGS})
