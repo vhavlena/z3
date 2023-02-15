@@ -62,7 +62,7 @@ namespace smt::noodler {
         }
 
         bool is_epsilon(const BasicTerm &t) const {
-            Mata::Nfa::Nfa v = Mata::Nfa::minimize(Mata::Nfa::remove_epsilon(*(this->at(t)))); // TODO if we are sure that we have epsilon-free automata, we can skip remove_epsilon
+            Mata::Nfa::Nfa v = Mata::Nfa::minimize(*(this->at(t))); // TODO if we are sure that we have epsilon-free automata, we can skip remove_epsilon
             return v.get_num_of_trans() == 0 && v.initial.size() == 1 && v.final.size();
         }
 

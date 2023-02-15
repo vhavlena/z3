@@ -277,7 +277,7 @@ namespace smt::noodler {
      * @param upd Concatenation of terms for updating @p var.
      */
     void FormulaPreprocess::update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {
-        Mata::Nfa::Nfa concat = Mata::Nfa::remove_epsilon(this->aut_ass.get_automaton_concat(upd));
+        Mata::Nfa::Nfa concat = this->aut_ass.get_automaton_concat(upd);
         auto iter = this->aut_ass.find(var);
         if(iter != this->aut_ass.end()) {
             this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(Mata::Nfa::intersection(*(iter->second), concat)));
