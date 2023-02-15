@@ -273,6 +273,9 @@ namespace smt::noodler {
                 if(side.size() == 0) {
                     return new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Literal, "0"), {});
                 }
+                if(side.size() == 1) {
+                    return new LenNode(LenFormulaType::LEAF, side[0], {});
+                }
                 for(const BasicTerm& t : side) {
                     LenNode *n = new LenNode(LenFormulaType::LEAF, t, {});
                     ops.push_back(n);
