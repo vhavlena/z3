@@ -92,6 +92,8 @@ namespace smt::noodler::util {
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @return Set of symbols in the whole formula.
+     *
+     * TODO: Test.
      */
     [[nodiscard]] std::set<uint32_t> get_symbols_for_formula(
             const vector<expr_pair>& equations,
@@ -109,6 +111,8 @@ namespace smt::noodler::util {
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @return Automata assignment for the whole formula.
+     *
+     * TODO: Test.
      */
     [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
             const vector<expr_pair>& equations,
@@ -144,12 +148,14 @@ namespace smt::noodler::util {
 
 
     /**
-     * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms
-     * to the output parameter @p terms.
+     * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter
+     *  @p terms.
      * @param ex Expression to be checked for basic terms.
      * @param m_util_s Seq util for AST
      * @param pred_replace Replacement of predicate and functions
      * @param[out] terms Vector of found BasicTerm (in right order).
+     *
+     * TODO: Test.
      */
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms
@@ -159,6 +165,8 @@ namespace smt::noodler::util {
      * Convert variable in @c expr form to @c BasicTerm.
      * @param variable Variable to be converted to @c BasicTerm.
      * @return Passed @p variable as a @c BasicTerm
+     *
+     * TODO: Test.
      */
     BasicTerm get_variable_basic_term(expr* const variable);
 

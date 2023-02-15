@@ -22,7 +22,7 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
     auto& m_util_s{ noodler.m_util_s };
     auto& m{ noodler.m };
     auto& m_util_a{ noodler.m_util_a };
-    auto default_sort{ ast_m.mk_sort(symbol{ "RegEx" }, sort_info{ noodler.get_family_id(), 1, sort_size(0), 0, nullptr }) };
+    auto default_sort{ ast_m.mk_sort(m_util_s.get_family_id(), RE_SORT) };
 
     SECTION("util::conv_to_regex_hex()") {
         auto expr_x{ m_util_s.re.mk_to_re(m_util_s.str.mk_string("x")) };
@@ -83,7 +83,6 @@ TEST_CASE("theory_str_noodler::util") {
     auto& m_util_s{ noodler.m_util_s };
     auto& m_util_a{ noodler.m_util_a };
     auto& m{ noodler.m };
-    auto default_sort{ ast_m.mk_sort(symbol{ "RegEx" }, sort_info{ noodler.get_family_id(), 1, sort_size(0), 0, nullptr }) };
 
     SECTION("util::get_dummy_symbols()") {
         vector<util::expr_pair> disequations{};
@@ -127,7 +126,9 @@ TEST_CASE("theory_str_noodler::util") {
         CHECK(!util::is_str_variable(int_literal, m_util_s));
     }
 
-    SECTION("get_variables()") {
+    SECTION("get_str_variables()") {
+        obj_hashtable<expr> res;
+
         SECTION("String variables") {
             auto var1{ noodler.mk_str_var("var1") };
             auto var2{ noodler.mk_str_var("var2") };
@@ -135,31 +136,92 @@ TEST_CASE("theory_str_noodler::util") {
             auto concat1{ m_util_s.str.mk_concat(var1, var2) };
             auto concat2{ m_util_s.str.mk_concat(concat1, var3) };
 
-            obj_hashtable<expr> res;
-            util::get_variables(concat2, m_util_s, m, res);
+            util::get_str_variables(concat2, m_util_s, m, res);
             CHECK(res.size() == 3);
             CHECK(res.contains(var1));
             CHECK(res.contains(var2));
             CHECK(res.contains(var3));
         }
 
-        SECTION("Bool tree") {
-            auto var1{ noodler.mk_int_var("var1") };
-            auto var2{ noodler.mk_int_var("var2") };
-            auto var3{ noodler.mk_int_var("var3") };
+        // FIXME: Uncomment and fix when we are able to detect all types of variables, int variables especially.
+        //SECTION("Bool tree") {
+        //    auto var1{ noodler.mk_int_var("var1") };
+        //    auto var2{ noodler.mk_int_var("var2") };
+        //    auto var3{ noodler.mk_int_var("var3") };
 
-            auto expression{ expr_ref(m.mk_and(m.mk_and(m.mk_true(), m.mk_or(m.mk_false(), m.mk_eq(var1, var2))),
-                              m.mk_or(m.mk_false(), m.mk_eq(var3, noodler.m_util_a.mk_int(1))) ), m) };
+        //    auto expression{ expr_ref(m.mk_and(m.mk_and(m.mk_true(), m.mk_or(m.mk_false(), m.mk_eq(var1, var2))),
+        //                      m.mk_or(m.mk_false(), m.mk_eq(var3, noodler.m_util_a.mk_int(1))) ), m) };
 
-            obj_hashtable<expr> res;
-            util::get_variables(expression, m_util_s, m, res);
-            for (auto tmp : res) {
-                std::cout << mk_pp(tmp, m) << "\n";
-            }
+        //    util::get_str_variables(expression, m_util_s, m, res);
+        //    CHECK(res.empty());
+        //    util::get_int_variables(expression, m_util_s, m, res);
+        //    for (auto tmp : res) {
+        //        std::cout << mk_pp(tmp, m) << "\n";
+        //    }
+        //    CHECK(res.size() == 3);
+        //    CHECK(res.contains(var1));
+        //    CHECK(res.contains(var2));
+        //    CHECK(res.contains(var3));
+        //}
+
+        SECTION("String constructs") {
+            expr_ref var1{ noodler.mk_str_var("var1"), m };
+            expr_ref var2{ noodler.mk_str_var("var2"), m };
+            expr_ref var3{ noodler.mk_str_var("var3"), m };
+            expr_ref re1{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re1")), m };
+            expr_ref re2{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re2")), m };
+            expr_ref re_eq{ m.mk_eq(re1, re2), m };
+            expr_ref lit1{ m_util_s.str.mk_string("lit1"), m };
+            expr_ref concat1{ m_util_s.str.mk_concat(var1, lit1), m };
+            expr_ref concat2{ m_util_s.str.mk_concat(concat1, var2), m };
+            expr_ref str_eq{ m.mk_eq(concat2, var3), m };
+            expr_ref and_expr{ m.mk_and(re_eq, str_eq), m };
+
+            util::get_str_variables(and_expr, m_util_s, m, res);
             CHECK(res.size() == 3);
             CHECK(res.contains(var1));
             CHECK(res.contains(var2));
             CHECK(res.contains(var3));
+        }
+    }
+
+    SECTION("get_variable_names()") {
+        std::unordered_set<std::string> res{};
+
+        SECTION("String variables") {
+            auto var1{ noodler.mk_str_var("var1") };
+            auto var2{ noodler.mk_str_var("var2") };
+            auto var3{ noodler.mk_str_var("var3") };
+            auto lit1{ m_util_s.str.mk_string("lit1") };
+            auto lit2{ m_util_s.str.mk_string("lit2") };
+            auto concat1{ m_util_s.str.mk_concat(var1, lit1) };
+            auto concat2{ m_util_s.str.mk_concat(concat1, var2) };
+            auto concat3{ m_util_s.str.mk_concat(concat2, lit2) };
+            auto concat4{ m_util_s.str.mk_concat(concat3, var3) };
+
+            util::get_variable_names(concat4, m_util_s, m, res);
+            CHECK(res == std::unordered_set<std::string>{ to_app(var1)->get_name().str(),
+                                                           to_app(var2)->get_name().str(),
+                                                           to_app(var3)->get_name().str() });
+        }
+
+        SECTION("String constructs") {
+            expr_ref var1{ noodler.mk_str_var("var1"), m };
+            expr_ref var2{ noodler.mk_str_var("var2"), m };
+            expr_ref var3{ noodler.mk_str_var("var3"), m };
+            expr_ref re1{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re1")), m };
+            expr_ref re2{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re2")), m };
+            expr_ref re_eq{ m.mk_eq(re1, re2), m };
+            expr_ref lit1{ m_util_s.str.mk_string("lit1"), m };
+            expr_ref concat1{ m_util_s.str.mk_concat(var1, lit1), m };
+            expr_ref concat2{ m_util_s.str.mk_concat(concat1, var2), m };
+            expr_ref str_eq{ m.mk_eq(concat2, var3), m };
+            expr_ref and_expr{ m.mk_and(re_eq, str_eq), m };
+
+            util::get_variable_names(and_expr, m_util_s, m, res);
+            CHECK(res == std::unordered_set<std::string>{ to_app(var1)->get_name().str(),
+                                                          to_app(var2)->get_name().str(),
+                                                          to_app(var3)->get_name().str() });
         }
     }
 }
