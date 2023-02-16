@@ -40,10 +40,7 @@ namespace smt::noodler {
 
         flatten_var = [&result, &flatten_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
             if (result.count(var) == 0) {
-                std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>();
-                auto state = var_aut->add_state();
-                var_aut->initial.add(state);
-                var_aut->final.add(state);
+                std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::create_empty_string_nfa());
                 for (const auto &subst_var : this->substitution_map.at(var)) {
                     var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *flatten_var(subst_var)));
                 }
@@ -93,8 +90,10 @@ namespace smt::noodler {
             /** process left side **/
             std::vector<std::shared_ptr<Mata::Nfa::Nfa>> left_side_automata;
             const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
+            STRACE("str", tout << "Left automata:" << std::endl);
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
+                STRACE("str", left_side_automata.back()->print_to_DOT(tout););
             }
             /** end of left side processing **/
 
@@ -142,6 +141,8 @@ namespace smt::noodler {
                     }
                 }
                 right_side_automata.push_back(next_aut);
+                STRACE("str", tout << "Right automata:" << std::endl);
+                STRACE("str", right_side_automata.back()->print_to_DOT(tout););
                 right_side_division.push_back(next_division);
             }
             /** end of right side combining **/
@@ -197,7 +198,7 @@ namespace smt::noodler {
                 // as noodlification probably cannot handle situation where we have no automata on one side (representing empty word), we handle it here, by adding one empty noodle
                 noodles.push_back({});
             } else {
-                noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata);
+                noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata, false, {{"reduce", "true"}});
             }
 
             for (const auto &noodle : noodles) {
