@@ -194,9 +194,9 @@ namespace smt::noodler::util {
                 auto it = variable_map.find(node->atom_val);
                 expr_ref var_expr(m);
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = it->second;
+                    var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = mk_str_var(node->atom_val.get_name(), m, m_util_s);
+                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name(), m, m_util_s)), m);
                 }
                 return var_expr;
             }
@@ -214,7 +214,7 @@ namespace smt::noodler::util {
             assert(node->succ.size() == 2);
             expr_ref left = len_to_expr(node->succ[0], variable_map, m, m_util_s, m_util_a);
             expr_ref right = len_to_expr(node->succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m.mk_eq(left, right), m);
+            return expr_ref(m_util_a.mk_eq(left, right), m);
         }
 
         case LenFormulaType::LEQ: {
