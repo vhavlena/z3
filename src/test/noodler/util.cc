@@ -21,6 +21,7 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
     std::set<uint32_t> alphabet{ '\x78', '\x79', '\x7A' };
     auto& m_util_s{ noodler.m_util_s };
     auto& m{ noodler.m };
+    auto& m_util_a{ noodler.m_util_a };
     auto default_sort{ ast_m.mk_sort(symbol{ "RegEx" }, sort_info{ noodler.get_family_id(), 1, sort_size(0), 0, nullptr }) };
 
     SECTION("util::conv_to_regex_hex()") {
@@ -80,6 +81,7 @@ TEST_CASE("theory_str_noodler::util") {
     TheoryStrNoodlerCUT noodler{ctx, ast_m, str_params };
     std::set<uint32_t> alphabet{ '\x78', '\x79', '\x7A' };
     auto& m_util_s{ noodler.m_util_s };
+    auto& m_util_a{ noodler.m_util_a };
     auto& m{ noodler.m };
     auto default_sort{ ast_m.mk_sort(symbol{ "RegEx" }, sort_info{ noodler.get_family_id(), 1, sort_size(0), 0, nullptr }) };
 
@@ -112,5 +114,16 @@ TEST_CASE("theory_str_noodler::util") {
 
         util::extract_symbols(expr_concat, m_util_s, m, alphabet);
         CHECK(alphabet == std::set<uint32_t>{ '\x02', '\x45', '\x77', '\x78', '\x79', '\x7a' });
+    }
+
+    SECTION("util::is_str_variable()") {
+        expr_ref str_variable{ noodler.mk_str_var(symbol("var1")), m };
+        CHECK(util::is_str_variable(str_variable, m_util_s));
+        expr_ref str_literal{m_util_s.str.mk_string("var1"), m };
+        CHECK(!util::is_str_variable(str_literal, m_util_s));
+        expr_ref regex{ m_util_s.re.mk_to_re(m_util_s.str.mk_string(".*regex.*")), m };
+        CHECK(!util::is_str_variable(regex, m_util_s));
+        expr_ref int_literal{ m_util_a.mk_int(1), m };
+        CHECK(!util::is_str_variable(int_literal, m_util_s));
     }
 }

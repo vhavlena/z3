@@ -768,6 +768,14 @@ namespace smt::noodler {
         return is_app(e) && to_app(e)->get_decl()->get_arity() == 0;
     }
 
+    bool theory_str_noodler::is_str_variable(const expr* expression) const {
+        return util::is_str_variable(expression, m_util_s);
+    }
+
+    bool theory_str_noodler::is_variable(const expr* expression) const {
+        return util::is_variable(expression, m_util_s);
+    }
+
     expr_ref theory_str_noodler::mk_sub(expr *a, expr *b) {
         ast_manager &m = get_manager();
 
