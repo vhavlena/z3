@@ -343,6 +343,10 @@ namespace smt::noodler {
             size_t index = worklist.front();
             worklist.pop_front();
             Predicate eq = this->formula.get_predicate(index);
+            if(eq.get_left_side() == eq.get_right_side()) {
+                this->formula.remove_predicate(index);
+                continue;
+            }
 
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X

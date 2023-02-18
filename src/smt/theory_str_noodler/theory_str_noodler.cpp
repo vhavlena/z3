@@ -1565,7 +1565,8 @@ namespace smt::noodler {
         STRACE("str", tout << "[Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
             // we create the equation according to we
-            expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            expr *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
             STRACE("str", tout << we.first << " = " << we.second << '\n';);
         }
