@@ -710,6 +710,9 @@ namespace smt::noodler {
             STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
 
+        // so-far we are not able to do inequalities
+        assert(this->m_word_diseq_todo_rel.empty());
+
         Formula instance;
         this->conj_instance(conj_instance, instance);
         for(const auto& f : instance.get_predicates()) {
