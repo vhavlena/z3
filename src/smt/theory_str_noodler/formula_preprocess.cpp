@@ -7,6 +7,10 @@ namespace smt::noodler {
     FormulaVar::FormulaVar(const Formula& conj) : allpreds(), input_size(0) {
         const std::vector<Predicate>& preds = conj.get_predicates();
         for(size_t i = 0; i < preds.size(); i++) {
+            // we skip equations of the form X = X
+            if(preds[i].is_equation() && preds[i].get_left_side() == preds[i].get_right_side()) {
+                continue;
+            }
             if(this->allpreds.find(preds[i]) == this->allpreds.end()) {
                 this->predicates[i] = preds[i];
                 this->allpreds.insert(preds[i]);
