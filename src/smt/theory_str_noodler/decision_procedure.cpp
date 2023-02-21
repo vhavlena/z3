@@ -422,6 +422,7 @@ namespace smt::noodler {
         this->prep_handler.remove_regular();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
+        this->prep_handler.remove_trivial();
 
         // Refresh the instance
         this->init_aut_ass = this->prep_handler.get_aut_assignment();

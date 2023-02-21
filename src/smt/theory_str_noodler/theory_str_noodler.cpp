@@ -930,10 +930,10 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_char_at(expr *e) {
         STRACE("str", tout << "handle-charat: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_terms.contains(e))
+        if (axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *s = nullptr, *i = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
@@ -986,10 +986,10 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_substr(expr *e) {
         STRACE("str", tout << "handle-substr: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_terms.contains(e))
+        if (axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
 
         ast_manager &m = get_manager();
         expr *s = nullptr, *i = nullptr, *l = nullptr;
@@ -1118,10 +1118,10 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_index_of(expr *i) {
         STRACE("str", tout << "handle-indexof: " << mk_pp(i, m) << '\n';);
-        if(axiomatized_terms.contains(i))
+        if(axiomatized_persist_terms.contains(i))
             return;
 
-        axiomatized_terms.insert(i);
+        axiomatized_persist_terms.insert(i);
         ast_manager &m = get_manager();
         expr *s = nullptr, *t = nullptr, *offset = nullptr;
         rational r;
@@ -1290,10 +1290,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1317,10 +1317,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1374,10 +1374,10 @@ namespace smt::noodler {
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1388,8 +1388,6 @@ namespace smt::noodler {
         literal not_e = mk_literal(mk_not({e, m}));
         add_axiom({not_e, mk_eq(y, px, false)});
     }
-
-    // e = suffix(x, y), check if x is not a suffix of y
 
     /**
      * @brief Handle not(suffix(x,y)); suffix(x,y) = @p e
@@ -1403,10 +1401,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1460,10 +1458,10 @@ namespace smt::noodler {
      * @param e str.contains(x,y)
      */
     void theory_str_noodler::handle_contains(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
@@ -1484,10 +1482,10 @@ namespace smt::noodler {
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 

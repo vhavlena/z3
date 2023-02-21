@@ -58,6 +58,7 @@ namespace smt::noodler {
         obj_map<expr, expr*> predicate_replace;
 
         obj_hashtable<expr> axiomatized_terms;
+        obj_hashtable<expr> axiomatized_persist_terms;
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves

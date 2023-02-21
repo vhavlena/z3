@@ -882,6 +882,25 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Remove trivial equations of the form X = X
+     */
+    void FormulaPreprocess::remove_trivial() {
+        std::set<size_t> rem_ids;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_equation())
+                continue;
+
+            if(pr.second.get_left_side() == pr.second.get_right_side()) {
+                rem_ids.insert(pr.first);
+            }
+        }
+
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+    }
+
+    /**
      * @brief Flatten dependencies. Compute transition closure of dependencies.
      *
      * @return Transitive closure of the Dependency
