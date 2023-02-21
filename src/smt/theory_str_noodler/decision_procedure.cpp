@@ -78,7 +78,7 @@ namespace smt::noodler {
                 solution = std::move(element_to_process);
                 return true;
             }
-            
+
             std::shared_ptr<GraphNode> node_to_process = element_to_process.nodes_to_process.front();
             assert(node_to_process != nullptr);
             element_to_process.nodes_to_process.pop_front();
@@ -460,4 +460,4 @@ namespace smt::noodler {
             }
         }
     }
-} // namespace smt::nodler
+} // Namespace smt::noodler.
