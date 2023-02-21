@@ -1753,7 +1753,7 @@ namespace smt::noodler {
 
     /**
     Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
-    variables (BasicTerm) to the corresponding z2 expr.
+    variables (BasicTerm) to the corresponding z3 expr.
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
     */
