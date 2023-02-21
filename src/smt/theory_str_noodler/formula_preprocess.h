@@ -339,6 +339,7 @@ namespace smt::noodler {
         void reduce_regular_sequence(unsigned mn);
         void separate_eqs();
         void remove_extension();
+        void remove_trivial();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
