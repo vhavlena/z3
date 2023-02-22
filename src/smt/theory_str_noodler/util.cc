@@ -475,14 +475,7 @@ namespace smt::noodler::util {
             nfa.remove_epsilon();
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_parameters() == 1);
-            const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
-            std::stringstream convert_stream;
-            nfa.initial.add(0);
-            size_t state{ 0 };
-            for (; state < string_literal.length(); ++state) {
-                nfa.delta.add(state, string_literal[state], state + 1);
-            }
-            nfa.final.add(state);
+            nfa = create_word_nfa(expr->get_parameter(0).get_zstring());
         } else if(is_variable(expr, m_util_s)) { // Handle variable.
             assert(false && "is_variable(expr)");
         }
@@ -492,6 +485,17 @@ namespace smt::noodler::util {
             Mata::OnTheFlyAlphabet mata_alphabet{ Mata::Nfa::create_alphabet(nfa) };
             nfa = Mata::Nfa::complement(nfa, mata_alphabet);
         }
+        return nfa;
+    }
+
+    Nfa create_word_nfa(const zstring& word) {
+        Nfa nfa{};
+        nfa.initial.add(0);
+        size_t state{ 0 };
+        for (; state < word.length(); ++state) {
+            nfa.delta.add(state, word[state], state + 1);
+        }
+        nfa.final.add(state);
         return nfa;
     }
 

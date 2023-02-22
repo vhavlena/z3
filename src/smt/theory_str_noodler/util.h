@@ -146,6 +146,12 @@ namespace smt::noodler::util {
     [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
                                               const std::set<uint32_t>& alphabet, bool make_complement = false);
 
+    /**
+     * Create NFA accepting a word in Z3 zstring representation.
+     * @param word Word to accept.
+     * @return NFA.
+     */
+    Mata::Nfa::Nfa create_word_nfa(const zstring& word);
 
     /**
      * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter

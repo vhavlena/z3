@@ -436,24 +436,20 @@ namespace smt::noodler {
             if (predicate.is_eq_or_ineq()) {
                 for (auto& term : predicate.get_left_side()) {
                     if (term.is_literal()) { // Handle string literal.
-                        std::string string_literal_content{ term.get_name() };
                         BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
                         ++counter;
-                        Mata::Nfa::Nfa nfa{};
-                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
-                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        Mata::Nfa::Nfa nfa{ util::create_word_nfa(term.get_name()) };
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(std::move(nfa)));
                         term = fresh_variable;
                     }
                 }
 
                 for (auto& term : predicate.get_right_side()) {
                     if (term.is_literal()) { // Handle string literal.
-                        std::string string_literal_content{ term.get_name() };
                         BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
                         ++counter;
-                        Mata::Nfa::Nfa nfa{};
-                        Mata::RE2Parser::create_nfa(&nfa, string_literal_content);
-                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(nfa));
+                        Mata::Nfa::Nfa nfa{ util::create_word_nfa(term.get_name()) };
+                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(std::move(nfa)));
                         term = fresh_variable;
                     }
                 }
