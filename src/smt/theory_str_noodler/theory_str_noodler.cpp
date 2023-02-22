@@ -340,7 +340,6 @@ namespace smt::noodler {
         } else {
             // build axiom 1: Length(a_str) >= 0
             {
-                return;
                 if (on_screen) std::cout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS
@@ -357,7 +356,7 @@ namespace smt::noodler {
                 STRACE("str", tout << "string axiom 1: " << mk_ismt2_pp(lhs_ge_rhs, m) << std::endl;);
                 add_axiom(lhs_ge_rhs);
             }
-
+            return;
             // build axiom 2: Length(a_str) == 0 <=> a_str == ""
             {
                 if (on_screen) std::cout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl;
