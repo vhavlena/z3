@@ -23,6 +23,7 @@ Revision History:
 
 #include <type_traits>
 #include "util/memory_manager.h"
+#include "debug.h"
 
 template<typename T, bool CallDestructors=true, unsigned INITIAL_SIZE=16>
 class buffer {
