@@ -340,7 +340,13 @@ namespace smt::noodler {
         } else {
             // build axiom 1: Length(a_str) >= 0
             { 
-                return; // TODO: fix some day
+                /**
+                 * TODO: fix some day. Based on some expriments it is better to introduce this axiom when returning 
+                 * length formula from the decision procedure. If the axiom was introduced here, it leads to solving 
+                 * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
+                 * properly relevancy propagated...)
+                 */
+                return; // 
                 if (on_screen) std::cout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS
