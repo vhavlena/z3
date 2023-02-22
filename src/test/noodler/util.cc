@@ -117,7 +117,7 @@ TEST_CASE("theory_str_noodler::util") {
     }
 
     SECTION("util::is_str_variable()") {
-        expr_ref str_variable{ noodler.mk_str_var(symbol("var1")), m };
+        expr_ref str_variable{ noodler.mk_str_var("var1"), m };
         CHECK(util::is_str_variable(str_variable, m_util_s));
         expr_ref str_literal{m_util_s.str.mk_string("var1"), m };
         CHECK(!util::is_str_variable(str_literal, m_util_s));

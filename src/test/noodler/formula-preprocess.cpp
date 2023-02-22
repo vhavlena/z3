@@ -237,6 +237,7 @@ TEST_CASE( "Replace 2", "[noodler]" ) {
     conj2.add_predicate(ieq1);
     FormulaPreprocess prep2(conj2, aut_ass, {});
     prep2.replace(Concat({x2}), std::vector<BasicTerm>({x1}));
+    prep2.remove_trivial();
     prep2.clean_varmap();
     Formula res_conj2;
     res_conj2.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x1}) })));
