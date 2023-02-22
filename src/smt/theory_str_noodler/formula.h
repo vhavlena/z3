@@ -271,7 +271,7 @@ namespace smt::noodler {
             auto plus_chain = [&](const std::vector<BasicTerm>& side) {
                 std::vector<LenNode*> ops;
                 if(side.size() == 0) {
-                    return new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Literal, "0"), {});
+                    return new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, "0"), {});
                 }
                 if(side.size() == 1) {
                     return new LenNode(LenFormulaType::LEAF, side[0], {});
