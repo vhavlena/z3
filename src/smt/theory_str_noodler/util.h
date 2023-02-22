@@ -221,7 +221,7 @@ namespace smt::noodler::util {
     static expr_ref len_to_expr(const LenNode * node, std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
         switch(node->type) {
         case LenFormulaType::LEAF:
-            if(node->atom_val.is_literal())
+            if(node->atom_val.get_type() == BasicTermType::Length)
                 return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name().encode())), m);
             else {
                 auto it = variable_map.find(node->atom_val);
