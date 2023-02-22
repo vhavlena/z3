@@ -4527,16 +4527,16 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
         return BR_REWRITE_FULL;
     }
 
-    // if (get_re_head_tail(b, hd, tl)) {
-    //     SASSERT(re().min_length(hd) == re().max_length(hd));
-    //     expr_ref len_hd(m_autil.mk_int(re().min_length(hd)), m()); 
-    //     expr_ref len_a(str().mk_length(a), m());
-    //     expr_ref len_tl(m_autil.mk_sub(len_a, len_hd), m());
-    //     result = m().mk_and(m_autil.mk_ge(len_a, len_hd),
-    //                         re().mk_in_re(str().mk_substr(a, zero(), len_hd), hd),
-    //                         re().mk_in_re(str().mk_substr(a, len_hd, len_tl), tl));
-    //     return BR_REWRITE_FULL;
-    // }
+    if (false && get_re_head_tail(b, hd, tl)) { // FIXME: NOODLER replacing regexes to substr is not beneficial for noodler
+        SASSERT(re().min_length(hd) == re().max_length(hd));
+        expr_ref len_hd(m_autil.mk_int(re().min_length(hd)), m()); 
+        expr_ref len_a(str().mk_length(a), m());
+        expr_ref len_tl(m_autil.mk_sub(len_a, len_hd), m());
+        result = m().mk_and(m_autil.mk_ge(len_a, len_hd),
+                            re().mk_in_re(str().mk_substr(a, zero(), len_hd), hd),
+                            re().mk_in_re(str().mk_substr(a, len_hd, len_tl), tl));
+        return BR_REWRITE_FULL;
+    }
     if (get_re_head_tail_reversed(b, hd, tl)) {
         SASSERT(re().min_length(tl) == re().max_length(tl));
         expr_ref len_tl(m_autil.mk_int(re().min_length(tl)), m());
