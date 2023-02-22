@@ -155,16 +155,16 @@ namespace smt::noodler {
             case BasicTermType::Literal: {
                 std::string result{};
                 if (!name.empty()) {
-                    result += "\"" + name + "\"";
+                    result += "\"" + name.encode() + "\"";
                 }
                 return result;
             }
             case BasicTermType::Variable:
-                return name;
+                return name.encode();
             case BasicTermType::Length:
             case BasicTermType::Substring:
             case BasicTermType::IndexOf:
-                return name + " (" + noodler::to_string(type) + ")";
+                return name.encode() + " (" + noodler::to_string(type) + ")";
                 // TODO: Decide what will have names and when to use them.
         }
 

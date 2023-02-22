@@ -3,7 +3,6 @@
 #include <utility>
 
 #include <catch2/catch_test_macros.hpp>
-#include <mata/re2parser.hh>
 
 #include "smt/theory_str_noodler/decision_procedure.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"

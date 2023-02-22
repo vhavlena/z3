@@ -361,7 +361,7 @@ namespace smt::noodler::util {
             regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")+";
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_parameters() == 1);
-            const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
+            const zstring string_literal{ expr->get_parameter(0).get_zstring() };
             std::stringstream convert_stream;
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
                 convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
@@ -377,7 +377,7 @@ namespace smt::noodler::util {
     }
 
     [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
-                                              const std::set<uint32_t>& alphabet, bool make_complement) {
+                                      const std::set<uint32_t>& alphabet, bool make_complement) {
         Nfa nfa{};
 
         if (m_util_s.re.is_to_re(expr)) { // Handle conversion of to regex function call.
@@ -432,6 +432,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(child));
             nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
             for (const auto& initial : nfa.initial) {
+                // FIXME: Cannot that introduce errors if there are transitions leading to the initial states?
                 nfa.final.add(initial);
             }
         } else if (m_util_s.re.is_range(expr)) { // Handle range.
@@ -497,8 +498,8 @@ namespace smt::noodler::util {
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms) {
 
-        if(m_util_s.str.is_string(ex)) {
-            terms.emplace_back(BasicTermType::Literal, util::conv_to_regex_hex(ex, m_util_s, m, {}));
+        if(m_util_s.str.is_string(ex)) { // Handle string literals.
+            terms.emplace_back(BasicTermType::Literal, ex->get_parameter(0).get_zstring());
             return;
         }
 

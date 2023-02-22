@@ -676,7 +676,7 @@ namespace smt::noodler {
             if(t.is_variable()) {
                 new_val.first.insert(t);
             } else if(t.is_literal()) {
-                new_val.second += t.get_name().size();
+                new_val.second += t.get_name().length();
             } else {
                 assert(false);
             }
