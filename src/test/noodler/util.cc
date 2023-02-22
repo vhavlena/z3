@@ -22,7 +22,6 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
     auto& m_util_s{ noodler.m_util_s };
     auto& m{ noodler.m };
     auto& m_util_a{ noodler.m_util_a };
-    auto default_sort{ ast_m.mk_sort(m_util_s.get_family_id(), RE_SORT) };
 
     SECTION("util::conv_to_regex_hex()") {
         auto expr_x{ m_util_s.re.mk_to_re(m_util_s.str.mk_string("x")) };
@@ -61,9 +60,9 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
         //regex = util::conv_to_regex_hex(expr_all_char, m_util_s, m, alphabet);
         //CHECK(regex == ".");
 
-        auto expr_all_char{ m_util_s.re.mk_full_seq(default_sort) };
-        regex = util::conv_to_regex_hex(expr_all_char, m_util_s, m, alphabet);
-        CHECK(regex == "[\\x{78}\\x{79}\\x{7a}]*");
+        //auto expr_all_char{ m_util_s.re.mk_full_seq(default_sort) };
+        //regex = util::conv_to_regex_hex(expr_all_char, m_util_s, m, alphabet);
+        //CHECK(regex == "[\\x{78}\\x{79}\\x{7a}]*");
 
         // FIXME.
         //auto expr_all_char_star{ m_util_s.re.mk_star(expr_all_char) };

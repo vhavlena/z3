@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include <mata/nfa-strings.hh>
-#include <mata/re2parser.hh>
+#include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
 
@@ -325,7 +325,7 @@ namespace smt::noodler {
             if(it != variable_map.end()) { // take the existing variable from the map
                 var_expr = it->second;
             } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_str_var(var.get_name(), this->m, this->m_util_s);
+                var_expr = util::mk_str_var(var.get_name().encode(), this->m, this->m_util_s);
             }
             lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
         }

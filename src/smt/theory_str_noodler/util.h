@@ -157,7 +157,7 @@ namespace smt::noodler::util {
      *
      * TODO: Test.
      */
-    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
+    void collect_terms(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms
     );
 
@@ -216,14 +216,14 @@ namespace smt::noodler::util {
         switch(node->type) {
         case LenFormulaType::LEAF:
             if(node->atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name())), m);
+                return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name().encode())), m);
             else {
                 auto it = variable_map.find(node->atom_val);
                 expr_ref var_expr(m);
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name(), m, m_util_s)), m);
+                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name().encode(), m, m_util_s)), m);
                 }
                 return var_expr;
             }
@@ -261,9 +261,10 @@ namespace smt::noodler::util {
             return andref;
         }
 
-        default:
-            assert(false);
         }
+
+        assert(false);
+        return {{}, m};
     }
 }
 
