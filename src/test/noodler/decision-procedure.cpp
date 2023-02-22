@@ -195,12 +195,22 @@ TEST_CASE("Decision Procedure", "[noodler]") {
             return expr_ref(m.mk_and(
             m.mk_and(
                 m.mk_true(),
+                m.mk_and(
+                    m.mk_or(
+                        m.mk_false(),
+                        m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[0]))), m_util_a.mk_int(1))
+                    ),
+                    m_util_a.mk_ge(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[0]))), m_util_a.mk_int(0))
+                )
+            ),
+            m.mk_and(
                 m.mk_or(
                     m.mk_false(),
-                    m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[0]))), m_util_a.mk_int(1)))
+                    m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[1]))), m_util_a.mk_int(1))
+                ),
+                m_util_a.mk_ge(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[1]))), m_util_a.mk_int(0)) 
+            )
             ),
-            m.mk_or(m.mk_false(),
-            m.mk_eq(m_util_s.str.mk_length(var_map.at(BasicTerm(BasicTermType::Variable, vc[1]))), m_util_a.mk_int(1))) ),
         m);
         };
 
