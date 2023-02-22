@@ -341,7 +341,7 @@ namespace smt::noodler {
             // build axiom 1: Length(a_str) >= 0
             { 
                 /**
-                 * TODO: fix some day. Based on some expriments it is better to introduce this axiom when returning 
+                 * FIXME: fix some day. Based on some expriments it is better to introduce this axiom when returning 
                  * length formula from the decision procedure. If the axiom was introduced here, it leads to solving 
                  * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
                  * properly relevancy propagated...)
