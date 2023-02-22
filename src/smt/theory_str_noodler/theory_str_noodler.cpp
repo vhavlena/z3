@@ -297,7 +297,7 @@ namespace smt::noodler {
     void theory_str_noodler::propagate_basic_string_axioms(enode *str) {
         bool on_screen = false;
 
-        return;
+        // return;
 
         context &ctx = get_context();
         ast_manager &m = get_manager();
@@ -335,11 +335,18 @@ namespace smt::noodler {
             expr_ref len(m_util_a.mk_numeral(rational(l), true), m);
 
             literal lit(mk_eq(len_str, len, false));
-            ctx.mark_as_relevant(lit);
+            // ctx.mark_as_relevant(lit);
             ctx.mk_th_axiom(get_id(), 1, &lit);
         } else {
             // build axiom 1: Length(a_str) >= 0
-            {
+            { 
+                /**
+                 * FIXME: fix some day. Based on some expriments it is better to introduce this axiom when returning 
+                 * length formula from the decision procedure. If the axiom was introduced here, it leads to solving 
+                 * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
+                 * properly relevancy propagated...)
+                 */
+                return; // 
                 if (on_screen) std::cout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS
@@ -396,6 +403,7 @@ namespace smt::noodler {
         STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << '\n';);
 
         if (m_util_s.str.is_length(n)) {
+            STRACE("str", tout << "relevant-int: " << mk_pp(n, get_manager()) << '\n';);
             add_length_axiom(n);
         }
         if (m_util_s.str.is_extract(n)) {
@@ -475,19 +483,18 @@ namespace smt::noodler {
     void theory_str_noodler::new_eq_eh(theory_var x, theory_var y) {
         m_word_eq_var_todo.push_back({x, y});
 
-        const expr_ref l{get_enode(x)->get_expr(), m};
-        const expr_ref r{get_enode(y)->get_expr(), m};
+        expr_ref l{get_enode(x)->get_expr(), m};
+        expr_ref r{get_enode(y)->get_expr(), m};
 
         if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
             axiomatized_eq_vars.insert(std::make_pair(x, y));
-
 
             literal l_eq_r = mk_eq(l, r, false);
             literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
             add_axiom({~l_eq_r, len_l_eq_len_r});
         }
         m_word_eq_todo.push_back({l, r});
-        STRACE("str", tout << "new_eq: " << l << " = " << r << '\n';);
+        STRACE("str", tout << "new_eq: " << l <<  " = " << r << '\n';);
     }
 
     template<class T>
@@ -521,7 +528,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::propagate() {
-        STRACE("str", if (!IN_CHECK_FINAL) tout << "o propagate" << '\n';);
+        // STRACE("str", if (!IN_CHECK_FINAL) tout << "o propagate" << '\n';);
 
         // for(const expr_ref& ex : this->len_state_axioms)
         //     add_axiom(ex);
@@ -539,6 +546,8 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::pop_scope_eh(const unsigned num_scopes) {
+        // remove all axiomatized terms
+        axiomatized_terms.reset();
         m_scope_level -= num_scopes;
         m_word_eq_todo.pop_scope(num_scopes);
         m_word_diseq_todo.pop_scope(num_scopes);
@@ -596,11 +605,23 @@ namespace smt::noodler {
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
-            if(!ctx.is_relevant(eq.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
-                    ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << '\n';);
+            app_ref eq_rev(m.mk_eq(we.second, we.first), m);
+
+            if(ctx.is_relevant(eq_rev.get())) {
+                if(!this->m_word_eq_todo_rel.contains({we.second, we.first})) {
+                    this->m_word_eq_todo_rel.push_back({we.second, we.first});
+                }
                 continue;
             }
+            if(ctx.is_relevant(eq.get())) {
+                if(!this->m_word_eq_todo_rel.contains(we)) {
+                    this->m_word_eq_todo_rel.push_back(we);
+                }
+                continue;
+            }
+
+            STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
+                ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
 
             // app_ref double_not(m.mk_not(m.mk_not(eq)), m);
             // ctx.internalize(double_not, false);
@@ -609,10 +630,7 @@ namespace smt::noodler {
             //         ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
             //     continue;
             // }
-
-            if(!this->m_word_eq_todo_rel.contains(we)) {
-                this->m_word_eq_todo_rel.push_back(we);
-            }
+   
         }
 
         for (const auto& we : m_word_diseq_todo) {
@@ -697,6 +715,9 @@ namespace smt::noodler {
             }
             STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
+
+        // so-far we are not able to do inequalities
+        assert(this->m_word_diseq_todo_rel.empty());
 
         Formula instance;
         this->conj_instance(conj_instance, instance);
@@ -883,7 +904,7 @@ namespace smt::noodler {
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         } else {
-            STRACE("str", tout << __LINE__ << " " << __FUNCTION__ << "already contains " << mk_pp(e, m) << std::endl;);
+            //STRACE("str", tout << __LINE__ << " " << __FUNCTION__ << "already contains " << mk_pp(e, m) << std::endl;);
         }
     }
 
@@ -922,10 +943,11 @@ namespace smt::noodler {
      * @param e str.at(s, i)
      */
     void theory_str_noodler::handle_char_at(expr *e) {
-        if (axiomatized_terms.contains(e))
+        STRACE("str", tout << "handle-charat: " << mk_pp(e, m) << '\n';);
+        if (axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *s = nullptr, *i = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
@@ -977,10 +999,11 @@ namespace smt::noodler {
      * @param e str.substr(s, i, l)
      */
     void theory_str_noodler::handle_substr(expr *e) {
-        if (axiomatized_terms.contains(e))
+        STRACE("str", tout << "handle-substr: " << mk_pp(e, m) << '\n';);
+        if (axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
 
         ast_manager &m = get_manager();
         expr *s = nullptr, *i = nullptr, *l = nullptr;
@@ -1049,6 +1072,8 @@ namespace smt::noodler {
      * @param r replace term
      */
     void theory_str_noodler::handle_replace(expr *r) {
+        STRACE("str", tout << "handle-replace: " << mk_pp(r, m) << '\n';);
+
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
@@ -1106,10 +1131,11 @@ namespace smt::noodler {
      * @param i indexof term
      */
     void theory_str_noodler::handle_index_of(expr *i) {
-        if(axiomatized_terms.contains(i))
+        STRACE("str", tout << "handle-indexof: " << mk_pp(i, m) << '\n';);
+        if(axiomatized_persist_terms.contains(i))
             return;
 
-        axiomatized_terms.insert(i);
+        axiomatized_persist_terms.insert(i);
         ast_manager &m = get_manager();
         expr *s = nullptr, *t = nullptr, *offset = nullptr;
         rational r;
@@ -1278,10 +1304,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1305,10 +1331,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1362,10 +1388,10 @@ namespace smt::noodler {
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1376,8 +1402,6 @@ namespace smt::noodler {
         literal not_e = mk_literal(mk_not({e, m}));
         add_axiom({not_e, mk_eq(y, px, false)});
     }
-
-    // e = suffix(x, y), check if x is not a suffix of y
 
     /**
      * @brief Handle not(suffix(x,y)); suffix(x,y) = @p e
@@ -1391,10 +1415,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1448,10 +1472,10 @@ namespace smt::noodler {
      * @param e str.contains(x,y)
      */
     void theory_str_noodler::handle_contains(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
@@ -1472,10 +1496,10 @@ namespace smt::noodler {
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
-        if(axiomatized_terms.contains(e))
+        if(axiomatized_persist_terms.contains(e))
             return;
 
-        axiomatized_terms.insert(e);
+        axiomatized_persist_terms.insert(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
@@ -1500,12 +1524,20 @@ namespace smt::noodler {
         /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms),
         /// this complex term T is replaced by a fresh variable X. The following axioms are hence added: X = T && X in RE.
         if(re_constr->get_num_args() != 0) {
-            app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
-            expr_ref eq_fv(mk_eq_atom(fv.get(), s), m);
-            expr_ref n_re(this->m_util_s.re.mk_in_re(fv, re), m);
+            expr_ref var(m);
+            if(this->predicate_replace.contains(re_constr)) {
+                var = expr_ref(this->predicate_replace[re_constr], m);
+            } else {
+                var = mk_str_var("revar");
+                this->predicate_replace.insert(re_constr.get(), var.get());
+            }
+            
+            // app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
+            expr_ref eq_fv(mk_eq_atom(var.get(), s), m);
+            expr_ref n_re(this->m_util_s.re.mk_in_re(var, re), m);
             add_axiom(eq_fv);
             add_axiom(n_re);
-            re_constr = fv;
+            re_constr = to_app(var); 
         }
 
         expr_ref r{re, m};
@@ -1539,6 +1571,8 @@ namespace smt::noodler {
         expr *refinement = nullptr;
         STRACE("str", tout << "[Refinement]\nformulas:\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
+            // we create the equation according to we
+            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
             expr *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
             refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
             STRACE("str", tout << we.first << " = " << we.second << '\n';);

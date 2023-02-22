@@ -4527,7 +4527,7 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
         return BR_REWRITE_FULL;
     }
 
-    if (get_re_head_tail(b, hd, tl)) {
+    if (false && get_re_head_tail(b, hd, tl)) { // FIXME: NOODLER replacing regexes to substr is not beneficial for noodler
         SASSERT(re().min_length(hd) == re().max_length(hd));
         expr_ref len_hd(m_autil.mk_int(re().min_length(hd)), m()); 
         expr_ref len_a(str().mk_length(a), m());

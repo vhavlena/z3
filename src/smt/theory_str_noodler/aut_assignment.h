@@ -11,6 +11,7 @@
 
 #include "formula.h"
 #include <mata/nfa.hh>
+#include <mata/nfa-strings.hh>
 
 namespace smt::noodler {
 
@@ -62,8 +63,7 @@ namespace smt::noodler {
         }
 
         bool is_epsilon(const BasicTerm &t) const {
-            Mata::Nfa::Nfa v = Mata::Nfa::minimize(*(this->at(t))); // TODO if we are sure that we have epsilon-free automata, we can skip remove_epsilon
-            return v.get_num_of_trans() == 0 && v.initial.size() == 1 && v.final.size();
+            return Mata::Strings::is_lang_eps(*(this->at(t)));
         }
 
         // adds all mappings of variables from other to this assignment except those which already exists in this assignment

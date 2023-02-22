@@ -7,6 +7,10 @@ namespace smt::noodler {
     FormulaVar::FormulaVar(const Formula& conj) : allpreds(), input_size(0) {
         const std::vector<Predicate>& preds = conj.get_predicates();
         for(size_t i = 0; i < preds.size(); i++) {
+            // we skip equations of the form X = X
+            if(preds[i].is_equation() && preds[i].get_left_side() == preds[i].get_right_side()) {
+                continue;
+            }
             if(this->allpreds.find(preds[i]) == this->allpreds.end()) {
                 this->predicates[i] = preds[i];
                 this->allpreds.insert(preds[i]);
@@ -343,6 +347,10 @@ namespace smt::noodler {
             size_t index = worklist.front();
             worklist.pop_front();
             Predicate eq = this->formula.get_predicate(index);
+            if(eq.get_left_side() == eq.get_right_side()) {
+                this->formula.remove_predicate(index);
+                continue;
+            }
 
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
@@ -870,6 +878,25 @@ namespace smt::noodler {
         // We do not need to update dependencies
         for(const auto& pr : updates) {
             this->update_predicate(pr.first, pr.second);
+        }
+    }
+
+    /**
+     * @brief Remove trivial equations of the form X = X
+     */
+    void FormulaPreprocess::remove_trivial() {
+        std::set<size_t> rem_ids;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_equation())
+                continue;
+
+            if(pr.second.get_left_side() == pr.second.get_right_side()) {
+                rem_ids.insert(pr.first);
+            }
+        }
+
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
         }
     }
 

@@ -422,6 +422,7 @@ namespace smt::noodler {
         this->prep_handler.remove_regular();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
+        this->prep_handler.remove_trivial();
 
         // Refresh the instance
         this->init_aut_ass = this->prep_handler.get_aut_assignment();
@@ -468,6 +469,7 @@ namespace smt::noodler {
         for(const auto& cns : aut_constr) {
             res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
         }
+        res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(this->m_util_s.str.mk_length(var), this->m_util_a.mk_int(0))), this->m);
         return res;
     }
 
