@@ -469,6 +469,7 @@ namespace smt::noodler {
         for(const auto& cns : aut_constr) {
             res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
         }
+        res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(this->m_util_s.str.mk_length(var), this->m_util_a.mk_int(0))), this->m);
         return res;
     }
 
