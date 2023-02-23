@@ -440,7 +440,6 @@ namespace smt::noodler {
                     if (term.is_literal()) { // Handle string literal.
                         BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
                         ++counter;
-                        STRACE("str", tout << term.get_name() << " = " << fresh_variable.get_name() << "\n");
                         Mata::Nfa::Nfa nfa{ util::create_word_nfa(term.get_name()) };
                         init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(std::move(nfa)));
                         term = fresh_variable;
