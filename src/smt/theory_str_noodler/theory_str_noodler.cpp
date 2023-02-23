@@ -671,6 +671,12 @@ namespace smt::noodler {
 
         remove_irrelevant_constr();
 
+        // difficult not(contains) predicates -> unknown
+        if(!this->m_not_contains_todo.empty()) {
+            return FC_GIVEUP;
+        }
+
+
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
 

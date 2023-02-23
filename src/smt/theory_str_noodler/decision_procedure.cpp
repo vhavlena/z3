@@ -90,10 +90,10 @@ namespace smt::noodler {
             /** process left side **/
             std::vector<std::shared_ptr<Mata::Nfa::Nfa>> left_side_automata;
             const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
-            STRACE("str", tout << "Left automata:" << std::endl);
+            STRACE("str-nfa", tout << "Left automata:" << std::endl);
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
-                STRACE("str", left_side_automata.back()->print_to_DOT(tout););
+                STRACE("str-nfa", left_side_automata.back()->print_to_DOT(tout););
             }
             /** end of left side processing **/
 
@@ -141,8 +141,8 @@ namespace smt::noodler {
                     }
                 }
                 right_side_automata.push_back(next_aut);
-                STRACE("str", tout << "Right automata:" << std::endl);
-                STRACE("str", right_side_automata.back()->print_to_DOT(tout););
+                STRACE("str-nfa", tout << "Right automata:" << std::endl);
+                STRACE("str-nfa", right_side_automata.back()->print_to_DOT(tout););
                 right_side_division.push_back(next_division);
             }
             /** end of right side combining **/
