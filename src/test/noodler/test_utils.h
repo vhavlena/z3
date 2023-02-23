@@ -38,21 +38,21 @@ public:
 };
 
 // variables have one char names
-inline Predicate create_equality(std::string left_side, std::string right_side) {
+inline Predicate create_equality(const std::string& left_side, const std::string& right_side) {
     std::vector<BasicTerm> left_side_vars;
     for (char var_name : left_side) {
-        left_side_vars.push_back(BasicTerm(BasicTermType::Variable, std::string(1, var_name)));
+        left_side_vars.emplace_back(BasicTermType::Variable, std::string(1, var_name));
     }
     std::vector<BasicTerm> right_side_vars;
     for (char var_name : right_side) {
-        right_side_vars.push_back(BasicTerm(BasicTermType::Variable, std::string(1, var_name)));
+        right_side_vars.emplace_back(BasicTermType::Variable, std::string(1, var_name));
     }
     return Predicate(PredicateType::Equation, { left_side_vars, right_side_vars});
 }
 
 
 inline BasicTerm get_var(char var) {
-    return BasicTerm(BasicTermType::Variable, std::string(1, var));
+    return { BasicTermType::Variable, std::string(1, var) };
 }
 
 inline std::shared_ptr<Mata::Nfa::Nfa> regex_to_nfa(const std::string& regex) {
@@ -65,7 +65,7 @@ inline std::map<BasicTerm, expr_ref> create_var_map(const std::unordered_set<Bas
     std::map<BasicTerm, expr_ref> ret;
 
     for(const BasicTerm& v : vars) {
-        expr_ref var(m_util_s.mk_skolem(symbol(v.get_name()), 0, nullptr, m_util_s.mk_string_sort()), m);
+        expr_ref var(m_util_s.mk_skolem(symbol(v.get_name().encode()), 0, nullptr, m_util_s.mk_string_sort()), m);
         ret.insert({v, var});
     }
 

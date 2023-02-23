@@ -361,7 +361,7 @@ namespace smt::noodler::util {
             regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")+";
         } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
             SASSERT(expr->get_num_parameters() == 1);
-            const zstring string_literal{ zstring{ expr->get_parameter(0).get_zstring().encode() } };
+            const zstring string_literal{ expr->get_parameter(0).get_zstring() };
             std::stringstream convert_stream;
             for (size_t i{ 0 }; i < string_literal.length(); ++i) {
                 convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
@@ -377,10 +377,110 @@ namespace smt::noodler::util {
     }
 
     [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
-                                              const std::set<uint32_t>& alphabet, bool make_complement) {
-        const std::string regex{ conv_to_regex_hex(expr, m_util_s, m, alphabet) };
-        Nfa nfa;
-        Mata::RE2Parser::create_nfa(&nfa, regex);
+                                      const std::set<uint32_t>& alphabet, bool make_complement) {
+        Nfa nfa{};
+
+        if (m_util_s.re.is_to_re(expr)) { // Handle conversion of to regex function call.
+            // Assume that expression inside re.to_re() function is a string of characters.
+            SASSERT(expr->get_num_args() == 1);
+            const auto arg{ expr->get_arg(0) };
+            nfa = conv_to_nfa_hex(to_app(arg), m_util_s, m, alphabet);
+        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
+            SASSERT(expr->get_num_args() == 2);
+            const auto left{ expr->get_arg(0) };
+            const auto right{ expr->get_arg(1) };
+            SASSERT(is_app(left));
+            SASSERT(is_app(right));
+            auto first_nfa{ conv_to_nfa_hex(to_app(left), m_util_s, m, alphabet) };
+            auto second_nfa{ conv_to_nfa_hex(to_app(right), m_util_s, m, alphabet) };
+            nfa = Mata::Nfa::concatenate(first_nfa, second_nfa);
+        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
+            assert(false && "re.is_antimirov_union(expr)");
+        } else if (m_util_s.re.is_complement(expr)) { // Handle complement.
+            assert(false && "re.is_complement(expr)");
+        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative.
+            assert(false && "re.is_derivative(expr)");
+        } else if (m_util_s.re.is_diff(expr)) { // Handle diff.
+            assert(false && "re.is_diff(expr)");
+        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus.
+            assert(false && "re.is_dot_plus(expr)");
+        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
+            assert(false && "re.is_empty(expr)");
+        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon.
+            assert(false && "re.is_epsilon(expr)");
+        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char (single occurrence of any string symbol, '.').
+            nfa.initial.add(0);
+            nfa.final.add(1);
+            for (const auto& symbol : alphabet) {
+                nfa.delta.add(0, symbol, 1);
+            }
+        } else if (m_util_s.re.is_full_seq(expr)) {
+            nfa.initial.add(0);
+            nfa.final.add(0);
+            for (const auto& symbol : alphabet) {
+                nfa.delta.add(0, symbol, 0);
+            }
+        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
+            assert(false && "re.is_intersection(expr)");
+        } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
+            assert(false && "re.is_loop(expr)");
+        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
+            assert(false && "re.is_of_pred(expr)");
+        } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            for (const auto& initial : nfa.initial) {
+                // FIXME: Cannot that introduce errors if there are transitions leading to the initial states?
+                nfa.final.add(initial);
+            }
+        } else if (m_util_s.re.is_range(expr)) { // Handle range.
+            assert(false && "re.is_range(expr)");
+        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
+            assert(false && "re.is_reverse(expr)");
+        } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
+            SASSERT(expr->get_num_args() == 2);
+            const auto left{ expr->get_arg(0) };
+            const auto right{ expr->get_arg(1) };
+            SASSERT(is_app(left));
+            SASSERT(is_app(right));
+            nfa = Mata::Nfa::uni(conv_to_nfa_hex(to_app(left), m_util_s, m, alphabet),
+                                 conv_to_nfa_hex(to_app(right), m_util_s, m, alphabet));
+        } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            for (const auto& final : nfa.final) {
+                for (const auto& initial : nfa.initial) {
+                    nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                }
+            }
+            nfa.remove_epsilon();
+
+            // Make one initial final in order to accept empty string as is required by kleene-star.
+            SASSERT(!nfa.initial.empty());
+            nfa.final.add(*nfa.initial.begin());
+        } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
+            SASSERT(expr->get_num_args() == 1);
+            const auto child{ expr->get_arg(0) };
+            SASSERT(is_app(child));
+            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            for (const auto& final : nfa.final) {
+                for (const auto& initial : nfa.initial) {
+                    nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                }
+            }
+            nfa.remove_epsilon();
+        } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
+            SASSERT(expr->get_num_parameters() == 1);
+            nfa = create_word_nfa(expr->get_parameter(0).get_zstring());
+        } else if(is_variable(expr, m_util_s)) { // Handle variable.
+            assert(false && "is_variable(expr)");
+        }
+
+        // Whether to create complement of the final automaton.
         if (make_complement) {
             Mata::OnTheFlyAlphabet mata_alphabet{ Mata::Nfa::create_alphabet(nfa) };
             nfa = Mata::Nfa::complement(nfa, mata_alphabet);
@@ -388,11 +488,22 @@ namespace smt::noodler::util {
         return nfa;
     }
 
+    Nfa create_word_nfa(const zstring& word) {
+        Nfa nfa{};
+        nfa.initial.add(0);
+        size_t state{ 0 };
+        for (; state < word.length(); ++state) {
+            nfa.delta.add(state, word[state], state + 1);
+        }
+        nfa.final.add(state);
+        return nfa;
+    }
+
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms) {
 
-        if(m_util_s.str.is_string(ex)) {
-            terms.emplace_back(BasicTermType::Literal, util::conv_to_regex_hex(ex, m_util_s, m, {}));
+        if(m_util_s.str.is_string(ex)) { // Handle string literals.
+            terms.emplace_back(BasicTermType::Literal, ex->get_parameter(0).get_zstring());
             return;
         }
 

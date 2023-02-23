@@ -806,8 +806,7 @@ namespace smt::noodler {
     }
 
 
-    expr_ref
-    theory_str_noodler::mk_skolem(symbol const &name, expr *e1, expr *e2, expr *e3, expr *e4, sort *sort) {
+    expr_ref theory_str_noodler::mk_skolem(symbol const &name, expr *e1, expr *e2, expr *e3, expr *e4, sort *sort) {
         ast_manager &m = get_manager();
         expr *es[4] = {e1, e2, e3, e4};
         unsigned len = e4 ? 4 : (e3 ? 3 : (e2 ? 2 : 1));
@@ -1754,7 +1753,7 @@ namespace smt::noodler {
 
     /**
     Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
-    variables (BasicTerm) to the corresponding z2 expr.
+    variables (BasicTerm) to the corresponding z3 expr.
     @param ex Z3 expression to be converted to Predicate.
     @return Instance of predicate
     */

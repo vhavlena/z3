@@ -92,6 +92,8 @@ namespace smt::noodler::util {
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @return Set of symbols in the whole formula.
+     *
+     * TODO: Test.
      */
     [[nodiscard]] std::set<uint32_t> get_symbols_for_formula(
             const vector<expr_pair>& equations,
@@ -109,6 +111,8 @@ namespace smt::noodler::util {
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @return Automata assignment for the whole formula.
+     *
+     * TODO: Test.
      */
     [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
             const vector<expr_pair>& equations,
@@ -142,16 +146,24 @@ namespace smt::noodler::util {
     [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
                                               const std::set<uint32_t>& alphabet, bool make_complement = false);
 
+    /**
+     * Create NFA accepting a word in Z3 zstring representation.
+     * @param word Word to accept.
+     * @return NFA.
+     */
+    Mata::Nfa::Nfa create_word_nfa(const zstring& word);
 
     /**
-     * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms
-     * to the output parameter @p terms.
+     * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter
+     *  @p terms.
      * @param ex Expression to be checked for basic terms.
      * @param m_util_s Seq util for AST
      * @param pred_replace Replacement of predicate and functions
      * @param[out] terms Vector of found BasicTerm (in right order).
+     *
+     * TODO: Test.
      */
-    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
+    void collect_terms(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::vector<BasicTerm>& terms
     );
 
@@ -159,6 +171,8 @@ namespace smt::noodler::util {
      * Convert variable in @c expr form to @c BasicTerm.
      * @param variable Variable to be converted to @c BasicTerm.
      * @return Passed @p variable as a @c BasicTerm
+     *
+     * TODO: Test.
      */
     BasicTerm get_variable_basic_term(expr* const variable);
 
@@ -208,14 +222,14 @@ namespace smt::noodler::util {
         switch(node->type) {
         case LenFormulaType::LEAF:
             if(node->atom_val.is_literal())
-                return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name())), m);
+                return expr_ref(m_util_a.mk_int(std::stoi(node->atom_val.get_name().encode())), m);
             else {
                 auto it = variable_map.find(node->atom_val);
                 expr_ref var_expr(m);
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name(), m, m_util_s)), m);
+                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name().encode(), m, m_util_s)), m);
                 }
                 return var_expr;
             }
@@ -253,9 +267,10 @@ namespace smt::noodler::util {
             return andref;
         }
 
-        default:
-            assert(false);
         }
+
+        assert(false);
+        return {{}, m};
     }
 }
 

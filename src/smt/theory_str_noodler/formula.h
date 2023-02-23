@@ -23,6 +23,7 @@
 #include <set>
 #include <unordered_set>
 #include <iostream>
+#include "util/zstring.h"
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -77,15 +78,15 @@ namespace smt::noodler {
     class BasicTerm {
     public:
         explicit BasicTerm(BasicTermType type): type(type) {}
-        BasicTerm(BasicTermType type, std::string_view name): type(type), name(name) {}
+        BasicTerm(BasicTermType type, zstring name): type(type), name(std::move(name)) {}
 
         [[nodiscard]] BasicTermType get_type() const { return type; }
         [[nodiscard]] bool is_variable() const { return type == BasicTermType::Variable; }
         [[nodiscard]] bool is_literal() const { return type == BasicTermType::Literal; }
         [[nodiscard]] bool is(BasicTermType term_type) const { return type == term_type; }
 
-        [[nodiscard]] std::string get_name() const { return name; }
-        void set_name(std::string_view new_name) { name = new_name; }
+        [[nodiscard]] zstring get_name() const { return name; }
+        void set_name(zstring new_name) { name = std::move(new_name); }
 
         [[nodiscard]] bool equals(const BasicTerm& other) const {
             return type == other.get_type() && name == other.get_name();
@@ -96,14 +97,14 @@ namespace smt::noodler {
         struct HashFunction {
             size_t operator() (const BasicTerm& basic_term) const {
                 size_t row_hash = std::hash<BasicTermType>()(basic_term.type);
-                size_t col_hash = std::hash<std::string>()(basic_term.name) << 1;
+                size_t col_hash = basic_term.name.hash() << 1;
                 return row_hash ^ col_hash;
             }
         };
 
     private:
         BasicTermType type;
-        std::string name;
+        zstring name;
     }; // Class BasicTerm.
 
     [[nodiscard]] static std::string to_string(const BasicTerm& basic_term) {
@@ -179,9 +180,9 @@ namespace smt::noodler {
             }
         }
 
-        explicit Predicate(const PredicateType type, std::vector<std::vector<BasicTerm>> par): 
-            type(type), 
-            params(par) 
+        explicit Predicate(const PredicateType type, std::vector<std::vector<BasicTerm>> par):
+            type(type),
+            params(par)
             { }
 
         [[nodiscard]] PredicateType get_type() const { return type; }
@@ -261,7 +262,7 @@ namespace smt::noodler {
         /**
          * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
          * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
-         * 
+         *
          * @return LenNode* Root of the length formula
          */
         LenNode* get_formula_eq() const {
@@ -279,14 +280,14 @@ namespace smt::noodler {
                 for(const BasicTerm& t : side) {
                     LenNode *n = new LenNode(LenFormulaType::LEAF, t, {});
                     ops.push_back(n);
-                } 
+                }
                 return new LenNode(LenFormulaType::PLUS, ops);
             };
 
             left = plus_chain(this->params[0]);
             right = plus_chain(this->params[1]);
             LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
-            return eq;         
+            return eq;
         }
 
         std::vector<BasicTerm>& get_side(EquationSideType side);
@@ -300,7 +301,7 @@ namespace smt::noodler {
 
         /**
          * @brief Replace BasicTerm @p find in the given concatenation
-         * 
+         *
          * @param concat Concatenation to be searche/replaced
          * @param find  Find
          * @param replace Replace
@@ -308,8 +309,8 @@ namespace smt::noodler {
          * @return Does the concatenation contain at least one occurrence of @p find ?
          */
         static bool replace_concat(
-                const std::vector<BasicTerm>& concat, 
-                const std::vector<BasicTerm>& find, 
+                const std::vector<BasicTerm>& concat,
+                const std::vector<BasicTerm>& find,
                 const std::vector<BasicTerm>& replace,
                 std::vector<BasicTerm>& res) {
             bool modif = false;
@@ -328,7 +329,7 @@ namespace smt::noodler {
 
         /**
          * @brief Replace BasicTerm @p find in the predicate (do not modify the current one).
-         * 
+         *
          * @param find Find
          * @param replace Replace
          * @param res Where to store the modified predicate
@@ -453,7 +454,7 @@ namespace smt::noodler {
 
         /**
          * @brief Get union of variables from all predicates
-         * 
+         *
          * @return std::set<BasicTerm> Variables
          */
         std::set<BasicTerm> get_vars() const {
