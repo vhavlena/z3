@@ -161,7 +161,6 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
                 } else {
                     // In different equation.
                 }
-
             } else {
                 // Have same var and sides are not equal, automatically add a new edge.
             }
@@ -199,7 +198,7 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
                 inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
                 if (simplified_splitting_graph.initial_nodes.count(node) > 0) {
                     inclusion_graph.initial_nodes.insert(node);
-                } 
+                }
 
                 out_node_order.push_back(node);
 

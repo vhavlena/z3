@@ -195,13 +195,25 @@ namespace smt::noodler {
         AutAssignment init_aut_ass;
 
         /**
-         * Convert all string literals in @c formula to fresh variables with automata in automata assignment.
+         * @brief Convert all string literals in @c formula to fresh string literals with automata in automata assignment.
          *
-         * All string literals are converted to fresh variables with assigned automata equal to the string literal
+         * All string literals are converted to fresh string literals with assigned automata equal to the string literal
          *  expression.
-         * We get a new fresh variable for each separate string literal, even if there are multiple same string literals.
+         * We get a new fresh literal for each separate string literal, but multiple occurrences of the same string
+         *  literal have the same name.
          */
-        void conv_str_lits_to_fresh_vars();
+        void conv_str_lits_to_fresh_lits();
+
+        /**
+         * Convert string literals on a single side to fresh string literals with the same literals having the same name.
+         * @param side Side for which to convert literals in place.
+         * @param fresh_lits_counter Counter for unique trailing numbers where to start for creating unique names of
+         *  fresh string literals.
+         * @param converted_str_literals Map of found string literals to their fresh names.
+         */
+        void conv_str_lits_to_fresh_lits_for_side(std::vector<BasicTerm>& side, size_t& fresh_lits_counter,
+                                                  std::map<zstring, std::string>& converted_str_literals);
+
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
