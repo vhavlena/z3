@@ -185,7 +185,7 @@ namespace smt::noodler {
              */
 
 
-            
+
             /**
              * We get noodles where each noodle consists of automata connected with a vector of numbers
              * So for example if we have some noodle and automaton noodle[i].first, then noodle[i].second is a vector, where first element
@@ -204,7 +204,7 @@ namespace smt::noodler {
             for (const auto &noodle : noodles) {
                 SolvingState new_element = element_to_process;
                 // we need to make a deep copy, because we will be updating this graph
-                // TODO if !is_there_length_on_right we should not copy somehow, if there are no automata accepting only empty word 
+                // TODO if !is_there_length_on_right we should not copy somehow, if there are no automata accepting only empty word
                 auto new_node_to_process = new_element.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
 
                 //remove processed inclusion from the inclusion graph
@@ -369,7 +369,7 @@ namespace smt::noodler {
     void DecisionProcedure::preprocess() {
         // As a first preprocessing operation, convert string literals to fresh variables with automata assignment
         //  representing their string literal.
-        conv_str_lits_to_fresh_vars();
+        conv_str_lits_to_fresh_lits();
         this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars);
 
         // So-far just lightweight preprocessing
@@ -429,30 +429,34 @@ namespace smt::noodler {
         return res;
     }
 
-    void DecisionProcedure::conv_str_lits_to_fresh_vars() {
-        constexpr char name_prefix[] = "str_lit_to_var_";
+    void DecisionProcedure::conv_str_lits_to_fresh_lits() {
         size_t counter{ 0 };
+        std::map<zstring, std::string> str_literals{};
         for (auto& predicate : formula.get_predicates()) {
             if (predicate.is_eq_or_ineq()) {
-                for (auto& term : predicate.get_left_side()) {
-                    if (term.is_literal()) { // Handle string literal.
-                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
-                        ++counter;
-                        Mata::Nfa::Nfa nfa{ util::create_word_nfa(term.get_name()) };
-                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(std::move(nfa)));
-                        term = fresh_variable;
-                    }
+                conv_str_lits_to_fresh_lits_for_side(predicate.get_left_side(), counter, str_literals);
+                conv_str_lits_to_fresh_lits_for_side(predicate.get_right_side(), counter, str_literals);
+            }
+        }
+    }
+
+    void DecisionProcedure::conv_str_lits_to_fresh_lits_for_side(
+        std::vector<BasicTerm>& side, size_t& fresh_lits_counter, std::map<zstring, std::string>& converted_str_literals) {
+        constexpr char name_prefix[]{ "fresh_str_lit_" };
+        for (auto& term : side) {
+            if (term.is_literal()) { // Handle string literal.
+                BasicTerm fresh_literal{ BasicTermType::Literal };
+                auto fresh_literal_iter{ converted_str_literals.find(term.get_name()) };
+                if (fresh_literal_iter != converted_str_literals.end()) {
+                    fresh_literal.set_name(fresh_literal_iter->second);
+                } else {
+                    fresh_literal.set_name(name_prefix + std::to_string(fresh_lits_counter));
+                    ++fresh_lits_counter;
+                    Nfa nfa{ util::create_word_nfa(term.get_name()) };
+                    init_aut_ass.emplace(fresh_literal, std::make_shared<Nfa>(std::move(nfa)));
                 }
 
-                for (auto& term : predicate.get_right_side()) {
-                    if (term.is_literal()) { // Handle string literal.
-                        BasicTerm fresh_variable{ BasicTermType::Variable, name_prefix + std::to_string(counter)};
-                        ++counter;
-                        Mata::Nfa::Nfa nfa{ util::create_word_nfa(term.get_name()) };
-                        init_aut_ass.emplace(fresh_variable, std::make_shared<Mata::Nfa::Nfa>(std::move(nfa)));
-                        term = fresh_variable;
-                    }
-                }
+                term = fresh_literal;
             }
         }
     }
