@@ -95,7 +95,8 @@ namespace smt::noodler {
 
         void assert_expr(expr * e) {
             if(!unsat_core){
-                m_kernel.assert_expr(e);
+                erv.push_back(e);
+                // m_kernel.assert_expr(e);
 
             } else {
                 erv.push_back(e);
