@@ -77,7 +77,19 @@ namespace smt::noodler::util {
             extract_symbols(to_app(child), m_util_s, m, alphabet);
             return;
         } else if (m_util_s.re.is_range(ex_app)) { // Handle range.
-            assert(false && "re.is_range(ex_app)");
+            SASSERT(ex_app->get_num_args() == 2);
+            const auto range_begin{ ex_app->get_arg(0) };
+            const auto range_end{ ex_app->get_arg(1) };
+            SASSERT(is_app(range_begin));
+            SASSERT(is_app(range_end));
+            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+
+            auto current_value{ range_begin_value };
+            while (current_value <= range_end_value) {
+                alphabet.insert(current_value);
+                ++current_value;
+            }
         } else if (m_util_s.re.is_reverse(ex_app)) { // Handle reverse.
             assert(false && "re.is_reverse(ex_app)");
         } else if (m_util_s.re.is_union(ex_app)) { // Handle union (= or; A|B).
@@ -335,7 +347,20 @@ namespace smt::noodler::util {
             SASSERT(is_app(child));
             regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")?";
         } else if (m_util_s.re.is_range(expr)) { // Handle range.
-            assert(false && "re.is_range(expr)");
+            SASSERT(expr->get_num_args() == 2);
+            const auto range_begin{ expr->get_arg(0) };
+            const auto range_end{ expr->get_arg(1) };
+            SASSERT(is_app(range_begin));
+            SASSERT(is_app(range_end));
+            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            auto current_value{ range_begin_value };
+            std::stringstream convert_stream;
+            while (current_value <= range_end_value) {
+                convert_stream << std::dec << "\\x{" << std::hex << current_value << std::dec << "}";
+                ++current_value;
+            }
+            regex = "[" + convert_stream.str() + "]";
         } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
             assert(false && "re.is_reverse(expr)");
         } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
@@ -432,7 +457,21 @@ namespace smt::noodler::util {
                 nfa.final.add(initial);
             }
         } else if (m_util_s.re.is_range(expr)) { // Handle range.
-            assert(false && "re.is_range(expr)");
+            SASSERT(expr->get_num_args() == 2);
+            const auto range_begin{ expr->get_arg(0) };
+            const auto range_end{ expr->get_arg(1) };
+            SASSERT(is_app(range_begin));
+            SASSERT(is_app(range_end));
+            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+
+            nfa.initial.add(0);
+            nfa.final.add(1);
+            auto current_value{ range_begin_value };
+            while (current_value <= range_end_value) {
+                nfa.delta.add(0, current_value, 1);
+                ++current_value;
+            }
         } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
             assert(false && "re.is_reverse(expr)");
         } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
