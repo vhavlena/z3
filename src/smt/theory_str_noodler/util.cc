@@ -458,6 +458,7 @@ namespace smt::noodler::util {
             nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
             for (const auto& initial : nfa.initial) {
                 // FIXME: Cannot that introduce errors if there are transitions leading to the initial states?
+                //  Solution: Unify initial and add the unified initial as a final.
                 nfa.final.add(initial);
             }
         } else if (m_util_s.re.is_range(expr)) { // Handle range.
