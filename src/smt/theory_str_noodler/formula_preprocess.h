@@ -168,6 +168,8 @@ namespace smt::noodler {
                     ret.insert(pr.first);
                 if(pred_set.size() == 1 && is_init(*pred_set.begin()))
                     ret.insert(pr.first);
+                if(pred_set.size() == 1 && this->succ.at(*pred_set.begin()).size() > 1)
+                    ret.insert(pr.first);
             }
             return ret;
         }

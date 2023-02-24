@@ -340,6 +340,8 @@ namespace smt::noodler {
             lengths = this->m.mk_and(lengths, prep_formula);
         }
 
+        STRACE("str", tout << mk_pp(lengths, this->m) << "\n");
+
         return lengths;
     }
 
