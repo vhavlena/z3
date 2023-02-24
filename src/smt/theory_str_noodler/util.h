@@ -173,7 +173,7 @@ namespace smt::noodler::util {
      *
      * TODO: Test.
      */
-    BasicTerm get_variable_basic_term(expr* const variable);
+    BasicTerm get_variable_basic_term(expr* variable);
 
     void get_len_exprs(app* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res);
 
