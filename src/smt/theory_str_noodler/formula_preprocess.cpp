@@ -944,6 +944,38 @@ namespace smt::noodler {
         return ret;
     }
 
+    /**
+     * @brief Reduce the number of diseqalities.
+     */
+    void FormulaPreprocess::reduce_diseqalities() {
+        std::set<size_t> rem_ids;
+
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(pr.second.is_equation())
+                continue;
+            
+            if(pr.second.get_left_side().size() == 1) {
+                BasicTerm var = pr.second.get_left_side()[0];
+                Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
+                    rem_ids.insert(pr.first);
+                    continue;
+                }
+            }
+            if(pr.second.get_right_side().size() == 1) {
+                BasicTerm var = pr.second.get_right_side()[0];
+                Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
+                    rem_ids.insert(pr.first);
+                }
+            }
+        }
+
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+    }
+
 
 
 } // Namespace smt::noodler.

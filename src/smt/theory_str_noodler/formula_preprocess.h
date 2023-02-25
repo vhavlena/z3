@@ -343,6 +343,8 @@ namespace smt::noodler {
         void remove_extension();
         void remove_trivial();
 
+        void reduce_diseqalities();
+
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
          *

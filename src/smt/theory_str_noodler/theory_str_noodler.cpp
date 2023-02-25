@@ -727,7 +727,9 @@ namespace smt::noodler {
         }
 
         // so-far we are not able to do inequalities
-        assert(this->m_word_diseq_todo_rel.empty());
+        // if(!this->m_word_diseq_todo_rel.empty()) {
+        //     return FC_GIVEUP;
+        // }
 
         Formula instance;
         this->conj_instance(conj_instance, instance);
