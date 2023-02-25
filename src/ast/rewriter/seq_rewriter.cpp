@@ -4490,7 +4490,7 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
         return BR_DONE;
     }
     expr_ref b_s(m());
-    if (lift_str_from_to_re(b, b_s)) {
+    if (false && lift_str_from_to_re(b, b_s)) { // FIXME: NOODLER replacing regexes to disequalities is not beneficial for noodler
        result = m_br.mk_eq_rw(a, b_s);
        return BR_REWRITE_FULL;
     }
