@@ -519,8 +519,17 @@ namespace smt::noodler {
         app_ref neg(m.mk_not(l_eq_r), m);
         ctx.internalize(neg, false);
 
+        /**
+         * this is quite a dirty workaround. Z3 for some reason do not mark disequalities 
+         * that occurs in the first scope level as relevant. Therefore, we mark them as relevant 
+         * explicitly, otherwise we would ignore them.
+         */ 
+        if(m_scope_level == 0) {
+            ctx.mark_as_relevant(neg.get());
+        }
+
         STRACE("str", tout << ctx.find_assignment(l_eq_r.get()) << " " << ctx.find_assignment(neg.get()) << '\n';);
-        STRACE("str", tout << "new_diseq: " << l << " != " << r << " @" << m_scope_level<< " " << ctx.get_bool_var(l_eq_r.get()) << " " << ctx.get_bool_var(neg) << '\n';);
+        STRACE("str", tout << "new_diseq: " << l << " != " << r << " @" << m_scope_level<< " " << ctx.get_bool_var(l_eq_r.get()) << " " << ctx.is_relevant(neg.get()) << ":" << ctx.is_relevant(l_eq_r.get()) << '\n';);
     }
 
     bool theory_str_noodler::can_propagate() {
@@ -641,7 +650,8 @@ namespace smt::noodler {
                     ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
                 continue;
             }
-            if(!this->m_word_diseq_todo_rel.contains(we)) {
+            // Sometimes we have both L != R and R != L; we keep only one of them
+            if(!this->m_word_diseq_todo_rel.contains(we) && !this->m_word_diseq_todo_rel.contains({we.second, we.first})) {
                 this->m_word_diseq_todo_rel.push_back(we);
             }
         }
@@ -652,13 +662,13 @@ namespace smt::noodler {
                 in_app = m.mk_not(in_app);
             }
             if(ctx.is_relevant(in_app.get())) {
-                STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
-                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
                 continue;
+            } else {
+                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
+                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
             }
         }
     }
