@@ -242,12 +242,19 @@ namespace smt::noodler::util {
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
             variables_with_regex.insert(variable_name);
-            BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-            assert(aut_assignment.find(variable_term) == aut_assignment.end());
-
+            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
-            aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+            Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
+            auto aut_ass_it{ aut_assignment.find(variable_term) };
+            if (aut_ass_it != aut_assignment.end()) {
+                // This variable already has some regular constraints. Hence, we create an intersection of the new one
+                //  with the previously existing.
+                aut_ass_it->second = std::make_shared<Nfa>(
+                        Mata::Nfa::intersection(nfa, *aut_ass_it->second));
+            } else { // We create a regular constraint for the current variable for the first time.
+                aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+            }
         }
 
         // Assign sigma start automata for all yet unassigned variables.
