@@ -524,9 +524,9 @@ namespace smt::noodler {
          * that occurs in the first scope level as relevant. Therefore, we mark them as relevant 
          * explicitly, otherwise we would ignore them.
          */ 
-        if(m_scope_level == 0) {
-            ctx.mark_as_relevant(neg.get());
-        }
+        // if(m_scope_level == 0) {
+        //     ctx.mark_as_relevant(neg.get());
+        // }
 
         STRACE("str", tout << ctx.find_assignment(l_eq_r.get()) << " " << ctx.find_assignment(neg.get()) << '\n';);
         STRACE("str", tout << "new_diseq: " << l << " != " << r << " @" << m_scope_level<< " " << ctx.get_bool_var(l_eq_r.get()) << " " << ctx.is_relevant(neg.get()) << ":" << ctx.is_relevant(l_eq_r.get()) << '\n';);
@@ -631,25 +631,17 @@ namespace smt::noodler {
 
             STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
                 ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
-
-            // app_ref double_not(m.mk_not(m.mk_not(eq)), m);
-            // ctx.internalize(double_not, false);
-            // if(ctx.find_assignment(double_not.get()) != l_undef && !ctx.is_relevant(double_not.get())) {
-            //     STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(double_not.get(), m) << " relevant: " <<
-            //         ctx.is_relevant(double_not.get()) << " assign: " << ctx.find_assignment(double_not.get()) << '\n';);
-            //     continue;
-            // }
-   
         }
 
         for (const auto& we : m_word_diseq_todo) {
-            app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
+            app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
-            if(!ctx.is_relevant(dis.get())) {
-                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
-                    ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
-                continue;
-            }
+            // if(!ctx.is_relevant(dis.get())) {
+            //     STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
+            //         ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
+            //     continue;
+            // }
+
             // Sometimes we have both L != R and R != L; we keep only one of them
             if(!this->m_word_diseq_todo_rel.contains(we) && !this->m_word_diseq_todo_rel.contains({we.second, we.first})) {
                 this->m_word_diseq_todo_rel.push_back(we);
@@ -661,15 +653,15 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            if(ctx.is_relevant(in_app.get())) {
+            // if(ctx.is_relevant(in_app.get())) {
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
                 continue;
-            } else {
-                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
-                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-            }
+            // } else {
+            //      STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
+            //         ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
+            // }
         }
     }
 
@@ -680,6 +672,8 @@ namespace smt::noodler {
         TRACE("str", tout << "final_check starts\n";);
 
         remove_irrelevant_constr();
+
+        STRACE("str", tout << "eq: " << this->m_word_eq_todo_rel.size() << " diseq: " << this->m_word_diseq_todo_rel.size() << " res: " << this->m_membership_todo_rel.size() << std::endl);
 
         // difficult not(contains) predicates -> unknown
         if(!this->m_not_contains_todo.empty()) {
@@ -861,7 +855,7 @@ namespace smt::noodler {
             ctx.internalize(ex, false);
         }
         enode *const n = ctx.get_enode(ex);
-        ctx.mark_as_relevant(n);
+        //ctx.mark_as_relevant(n);
         return ctx.get_literal(ex);
     }
 
@@ -915,7 +909,7 @@ namespace smt::noodler {
             }
             ctx.internalize(e, false);
             literal l{ctx.get_literal(e)};
-            ctx.mark_as_relevant(l);
+            // ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         } else {
@@ -931,7 +925,7 @@ namespace smt::noodler {
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
-                ctx.mark_as_relevant(l);
+                // ctx.mark_as_relevant(l);
                 lv.push_back(l);
             }
         }
@@ -1089,6 +1083,10 @@ namespace smt::noodler {
     void theory_str_noodler::handle_replace(expr *r) {
         STRACE("str", tout << "handle-replace: " << mk_pp(r, m) << '\n';);
 
+        if(axiomatized_persist_terms.contains(r))
+            return;
+
+        axiomatized_persist_terms.insert(r);
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
@@ -1535,6 +1533,10 @@ namespace smt::noodler {
         ast_manager& m = get_manager();
         STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
+        // if(m_scope_level == 0 && !is_true) {
+        //     ctx.mark_as_relevant(m.mk_not(e));
+        // }
+
         app_ref re_constr(to_app(s), m);
         /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms),
         /// this complex term T is replaced by a fresh variable X. The following axioms are hence added: X = T && X in RE.
@@ -1550,6 +1552,9 @@ namespace smt::noodler {
             // app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
             expr_ref eq_fv(mk_eq_atom(var.get(), s), m);
             expr_ref n_re(this->m_util_s.re.mk_in_re(var, re), m);
+            if(!is_true) {
+                n_re = m.mk_not(n_re);
+            }
             add_axiom(eq_fv);
             add_axiom(n_re);
             re_constr = to_app(var); 
