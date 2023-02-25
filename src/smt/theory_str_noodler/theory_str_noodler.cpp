@@ -223,8 +223,8 @@ namespace smt::noodler {
         }
         //We do not mark the expression as relevant since we do not want bias a
         //fresh SAT solution by the newly added theory axioms.
-        //enode *n = ctx.get_enode(expr);
-        //ctx.mark_as_relevant(n);
+        // enode *n = ctx.get_enode(expr);
+        // ctx.mark_as_relevant(expr);
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -616,18 +616,18 @@ namespace smt::noodler {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
 
-            if(ctx.is_relevant(eq_rev.get())) {
+            // if(ctx.is_relevant(eq_rev.get())) {
                 if(!this->m_word_eq_todo_rel.contains({we.second, we.first})) {
                     this->m_word_eq_todo_rel.push_back({we.second, we.first});
                 }
                 continue;
-            }
-            if(ctx.is_relevant(eq.get())) {
+            // }
+            // if(ctx.is_relevant(eq.get())) {
                 if(!this->m_word_eq_todo_rel.contains(we)) {
                     this->m_word_eq_todo_rel.push_back(we);
                 }
                 continue;
-            }
+           //  }
 
             STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
                 ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
@@ -855,7 +855,7 @@ namespace smt::noodler {
             ctx.internalize(ex, false);
         }
         enode *const n = ctx.get_enode(ex);
-        //ctx.mark_as_relevant(n);
+        ctx.mark_as_relevant(n);
         return ctx.get_literal(ex);
     }
 
@@ -1555,7 +1555,7 @@ namespace smt::noodler {
             if(!is_true) {
                 n_re = m.mk_not(n_re);
             }
-            add_axiom(eq_fv);
+            add_axiom({mk_literal(eq_fv)});
             add_axiom(n_re);
             re_constr = to_app(var); 
         }
