@@ -692,11 +692,6 @@ namespace smt::noodler {
         // Add dummy symbols for all disequations.
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(m_word_diseq_todo_rel, symbols_in_formula) };
 
-        // Create automata assignment for the formula.
-        AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
-                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m, symbols_in_formula
-        ) };
-
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
@@ -736,6 +731,11 @@ namespace smt::noodler {
         for(const auto& f : instance.get_predicates()) {
             STRACE("str", tout << f.to_string() << std::endl);
         }
+
+        // Create automata assignment for the formula.
+        AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
+                instance, m_membership_todo_rel, m_util_s, m, symbols_in_formula
+        ) };
 
         // TODO: this is not correct
         if(instance.get_predicates().empty()) {

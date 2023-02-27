@@ -115,8 +115,7 @@ namespace smt::noodler::util {
      * TODO: Test.
      */
     [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
+            const Formula& instance,
             const vector<expr_pair_flag>& regexes,
             const seq_util& m_util_s,
             const ast_manager& m,
