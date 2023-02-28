@@ -15,6 +15,50 @@ namespace {
         }
         return false;
     }
+
+    /**
+     * Convert graph node into string representation.
+     * @param node Node to convert.
+     * @return String representation of @p node.
+     */
+    std::string conv_node_to_string(const std::shared_ptr<GraphNode>& node) {
+        auto& predicate{ node->get_predicate() };
+        std::string result{};
+        switch (predicate.get_type()) {
+            case PredicateType::Equation:
+            case PredicateType::Inequation: {
+                std::string left_side{};
+                for (auto& item : predicate.get_left_side()) {
+                    if (!left_side.empty()) { left_side += " "; }
+                    left_side += item.to_string();
+                }
+
+                std::string right_side{};
+                for (auto& item : predicate.get_right_side()) {
+                    if (!right_side.empty()) { right_side += " "; }
+                    right_side += item.to_string();
+                }
+                result = left_side;
+                if (predicate.get_type() == PredicateType::Inequation) {
+                    result += " !";
+                } else {
+                    result += " ";
+                }
+                result += "<= ";
+                result += right_side;
+                break;
+            }
+            case PredicateType::Default: {
+                result = "default predicate type";
+                break;
+            }
+            case PredicateType::Contains: {
+                result = "contains predicate type";
+                break;
+            }
+        }
+        return result;
+    }
 } // Anonymous namespace.
 
 const smt::noodler::Graph::Nodes smt::noodler::Graph::empty_nodes = smt::noodler::Graph::Nodes();
@@ -228,4 +272,16 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
     inclusion_graph.add_inclusion_graph_edges();
 
     return inclusion_graph;
+}
+
+void Graph::print_to_dot(std::ostream &output_stream) const {
+    output_stream << "digraph inclusionGraph {\nnode [shape=none];\n";
+    for (const auto& edge : edges) {
+        output_stream << "\"" << conv_node_to_string(edge.first) << "\" -> {";
+        for (const auto& target : edge.second) {
+            output_stream << "\"" << conv_node_to_string(target) << "\" ";
+        }
+        output_stream << "} [label=\"\"]\n";
+    }
+    output_stream << "}" << std::endl;
 }

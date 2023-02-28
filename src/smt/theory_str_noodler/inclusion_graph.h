@@ -173,7 +173,6 @@ namespace smt::noodler {
             return new_node;
         }
 
-
         /**
          * @brief adds node with predicate to graph (even if a node with such predicate exists in graph)
          *
@@ -211,6 +210,12 @@ namespace smt::noodler {
         static Graph create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> &out_node_order);
         static Graph create_simplified_splitting_graph(const Formula& formula);
         static Graph create_inclusion_graph(Graph& simplified_splitting_graph, std::deque<std::shared_ptr<GraphNode>> &out_node_order);
+
+        /**
+         * Print the inclusion graph in a DOT format.
+         * @param output_stream Stream to print the graph to.
+         */
+        void print_to_dot(std::ostream &output_stream) const;
     }; // Class Graph.
 }
 
