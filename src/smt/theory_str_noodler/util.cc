@@ -213,22 +213,18 @@ namespace smt::noodler::util {
     }
 
     AutAssignment create_aut_assignment_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
+            const Formula& instance,
             const vector<expr_pair_flag>& regexes,
             const seq_util& m_util_s,
             const ast_manager& m,
             const std::set<uint32_t>& noodler_alphabet
     ) {
         // Find all variables in the whole formula.
-        std::unordered_set<std::string> variables_in_formula{};
-        for (const auto &word_equation: equations) {
-            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
-            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
-        }
-        for (const auto &word_equation: disequations) {
-            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
-            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
+        std::unordered_set<BasicTerm> variables_in_formula{};
+
+        for (const auto &pred: instance.get_predicates()) {
+            auto vars = pred.get_vars();
+            variables_in_formula.insert(vars.begin(), vars.end());
         }
 
         AutAssignment aut_assignment{};
@@ -265,11 +261,10 @@ namespace smt::noodler::util {
         }
 
         const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(&mata_alphabet) };
-        for (const auto& variable_name : variables_in_formula) {
-            if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
-                BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-                assert(aut_assignment.find(variable_term) == aut_assignment.end());
-                aut_assignment[variable_term] = std::make_shared<Nfa>(nfa_sigma_star);
+        for (const auto& variable : variables_in_formula) {
+            if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
+                assert(aut_assignment.find(variable) == aut_assignment.end());
+                aut_assignment[variable] = std::make_shared<Nfa>(nfa_sigma_star);
             }
         }
 
