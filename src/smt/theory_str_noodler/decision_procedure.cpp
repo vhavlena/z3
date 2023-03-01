@@ -403,6 +403,7 @@ namespace smt::noodler {
         this->prep_handler.remove_regular();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
+        this->prep_handler.refine_languages();
         this->prep_handler.reduce_diseqalities();
         this->prep_handler.remove_trivial();
         // replace disequalities

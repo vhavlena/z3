@@ -945,6 +945,25 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Refine languages for equations of the form X = R (|X|=1) to the L(X) = L(X) \cap L(R).
+     */
+    void FormulaPreprocess::refine_languages() {
+        for(const auto& pr :this->formula.get_predicates()) {
+            if(!pr.second.is_equation())
+                continue;
+
+            if(pr.second.get_left_side().size() == 1) {
+                BasicTerm var = pr.second.get_left_side()[0];
+                update_reg_constr(var, pr.second.get_right_side());
+            }
+            if(pr.second.get_right_side().size() == 1) {
+                BasicTerm var = pr.second.get_right_side()[0];
+                update_reg_constr(var, pr.second.get_left_side());
+            }
+        }
+    }
+
+    /**
      * @brief Reduce the number of diseqalities.
      */
     void FormulaPreprocess::reduce_diseqalities() {
@@ -953,20 +972,47 @@ namespace smt::noodler {
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_inequation())
                 continue;
+
+            Mata::Nfa::Nfa aut_left = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+            Mata::Nfa::Nfa aut_right = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+            if(Mata::Nfa::is_lang_empty((Mata::Nfa::intersection(aut_left, aut_right)))) { // L(left) \cap L(right) == empty
+                rem_ids.insert(pr.first);
+                continue;
+            }
             
-            if(pr.second.get_left_side().size() == 1) {
+            if(pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_variable()) {
                 BasicTerm var = pr.second.get_left_side()[0];
                 Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
                 if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
                     rem_ids.insert(pr.first);
                     continue;
                 }
+                if(pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_literal()) {
+                    auto alphabet =  this->aut_ass.get_alphabet(false);
+                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    for (const auto& symbol : alphabet) {
+                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+                    }
+                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(*this->aut_ass.at(var), Mata::Nfa::complement(other, mata_alphabet)));
+                    rem_ids.insert(pr.first);
+                    continue;
+                }
             }
-            if(pr.second.get_right_side().size() == 1) {
+            if(pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_variable()) {
                 BasicTerm var = pr.second.get_right_side()[0];
                 Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
                 if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
                     rem_ids.insert(pr.first);
+                }
+                if(pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_literal()) {
+                    auto alphabet =  this->aut_ass.get_alphabet(false);
+                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    for (const auto& symbol : alphabet) {
+                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+                    }
+                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(*this->aut_ass.at(var), Mata::Nfa::complement(other, mata_alphabet)));
+                    rem_ids.insert(pr.first);
+                    continue;
                 }
             }
         }
