@@ -951,7 +951,7 @@ namespace smt::noodler {
         std::set<size_t> rem_ids;
 
         for(const auto& pr : this->formula.get_predicates()) {
-            if(pr.second.is_equation())
+            if(!pr.second.is_inequation())
                 continue;
             
             if(pr.second.get_left_side().size() == 1) {
@@ -973,6 +973,46 @@ namespace smt::noodler {
 
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
+        }
+    }
+
+    /**
+     * @brief Replace disequalities with equalities
+     */
+    void FormulaPreprocess::replace_disequalities() {
+        std::set<std::pair<size_t,Predicate>> ineqs;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_inequation())
+                continue;
+            ineqs.insert(pr);
+        }
+
+        for(const auto& pr : ineqs) {
+            BasicTerm x1 = this->create_fresh_var();
+            BasicTerm a1 = this->create_fresh_var();
+            BasicTerm y1 = this->create_fresh_var();
+            BasicTerm x2 = this->create_fresh_var();
+            BasicTerm a2 = this->create_fresh_var();
+            BasicTerm y2 = this->create_fresh_var();
+
+            Predicate fst(PredicateType::Equation, {pr.second.get_left_side(), Concat{x1, a1, y1}});
+            Predicate snd(PredicateType::Equation, {pr.second.get_right_side(), Concat{x2, a2, y2}});
+
+            this->formula.remove_predicate(pr.first);
+            this->formula.add_predicate(fst);
+            this->formula.add_predicate(snd);
+
+            this->len_variables.insert(x1);
+            this->len_variables.insert(x2);
+            this->diseq_variables.insert({a1,a2});
+            this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq()); // |x1| = |x2|
+
+            this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+            this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+            this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+            this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+            this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
+            this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
         }
     }
 
