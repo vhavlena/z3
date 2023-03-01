@@ -212,7 +212,7 @@ namespace smt::noodler {
          * @param converted_str_literals Map of found string literals to their fresh names.
          */
         void conv_str_lits_to_fresh_lits_for_side(std::vector<BasicTerm>& side, size_t& fresh_lits_counter,
-                                                  std::map<zstring, std::string>& converted_str_literals);
+                                                  std::map<zstring, zstring>& converted_str_literals);
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);

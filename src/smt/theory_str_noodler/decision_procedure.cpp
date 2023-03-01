@@ -460,7 +460,7 @@ namespace smt::noodler {
 
     void DecisionProcedure::conv_str_lits_to_fresh_lits() {
         size_t counter{ 0 };
-        std::map<zstring, std::string> str_literals{};
+        std::map<zstring, zstring> str_literals{};
         for (auto& predicate : formula.get_predicates()) {
             if (predicate.is_eq_or_ineq()) {
                 conv_str_lits_to_fresh_lits_for_side(predicate.get_left_side(), counter, str_literals);
@@ -470,7 +470,7 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::conv_str_lits_to_fresh_lits_for_side(
-        std::vector<BasicTerm>& side, size_t& fresh_lits_counter, std::map<zstring, std::string>& converted_str_literals) {
+        std::vector<BasicTerm>& side, size_t& fresh_lits_counter, std::map<zstring, zstring>& converted_str_literals) {
         constexpr char name_prefix[]{ "fresh_str_lit_" };
         for (auto& term : side) {
             if (term.is_literal()) { // Handle string literal.
@@ -479,10 +479,12 @@ namespace smt::noodler {
                 if (fresh_literal_iter != converted_str_literals.end()) {
                     fresh_literal.set_name(fresh_literal_iter->second);
                 } else {
-                    fresh_literal.set_name(name_prefix + std::to_string(fresh_lits_counter));
+                    std::string fresh_name{ name_prefix + std::to_string(fresh_lits_counter) };
+                    fresh_literal.set_name(fresh_name);
                     ++fresh_lits_counter;
                     Nfa nfa{ util::create_word_nfa(term.get_name()) };
                     init_aut_ass.emplace(fresh_literal, std::make_shared<Nfa>(std::move(nfa)));
+                    converted_str_literals.emplace(term.get_name(), fresh_name);
                 }
 
                 term = fresh_literal;
