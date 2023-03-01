@@ -298,6 +298,7 @@ namespace smt::noodler {
         AutAssignment aut_ass;
         std::vector<LenNode*> len_formulae;
         std::unordered_set<BasicTerm> len_variables;
+        std::unordered_set<std::pair<BasicTerm,BasicTerm>> diseq_variables;
 
         Dependency dependency;
 
@@ -333,6 +334,7 @@ namespace smt::noodler {
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
 
         Formula get_modified_formula() const;
+        const std::unordered_set<std::pair<BasicTerm,BasicTerm>>& get_diseq_variables() const { return this->diseq_variables; }
 
         void remove_regular();
         void propagate_variables();
@@ -342,6 +344,9 @@ namespace smt::noodler {
         void separate_eqs();
         void remove_extension();
         void remove_trivial();
+
+        void reduce_diseqalities();
+        void replace_disequalities();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.

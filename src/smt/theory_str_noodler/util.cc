@@ -225,22 +225,18 @@ namespace smt::noodler::util {
     }
 
     AutAssignment create_aut_assignment_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
+            const Formula& instance,
             const vector<expr_pair_flag>& regexes,
             const seq_util& m_util_s,
             const ast_manager& m,
             const std::set<uint32_t>& noodler_alphabet
     ) {
         // Find all variables in the whole formula.
-        std::unordered_set<std::string> variables_in_formula{};
-        for (const auto &word_equation: equations) {
-            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
-            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
-        }
-        for (const auto &word_equation: disequations) {
-            util::get_variable_names(word_equation.first, m_util_s, m, variables_in_formula);
-            util::get_variable_names(word_equation.second, m_util_s, m, variables_in_formula);
+        std::unordered_set<BasicTerm> variables_in_formula{};
+
+        for (const auto &pred: instance.get_predicates()) {
+            auto vars = pred.get_vars();
+            variables_in_formula.insert(vars.begin(), vars.end());
         }
 
         AutAssignment aut_assignment{};
@@ -254,33 +250,33 @@ namespace smt::noodler::util {
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
             variables_with_regex.insert(variable_name);
-            BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-            assert(aut_assignment.find(variable_term) == aut_assignment.end());
-
+            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ conv_to_nfa_hex(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
-            aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+            Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
+            auto aut_ass_it{ aut_assignment.find(variable_term) };
+            if (aut_ass_it != aut_assignment.end()) {
+                // This variable already has some regular constraints. Hence, we create an intersection of the new one
+                //  with the previously existing.
+                aut_ass_it->second = std::make_shared<Nfa>(
+                        Mata::Nfa::intersection(nfa, *aut_ass_it->second));
+            } else { // We create a regular constraint for the current variable for the first time.
+                aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+            }
         }
 
         // Assign sigma start automata for all yet unassigned variables.
         Mata::OnTheFlyAlphabet mata_alphabet{};
-        std::stringstream string_stream;
-        string_stream << std::hex;
         std::string hex_symbol_string;
         for (const uint32_t symbol : noodler_alphabet) {
-            string_stream << symbol;
-            string_stream >> hex_symbol_string;
-            hex_symbol_string = "\\x{" + hex_symbol_string + "}";
-            mata_alphabet.add_new_symbol(hex_symbol_string, symbol);
-            string_stream.clear();
+            mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
         }
 
         const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(&mata_alphabet) };
-        for (const auto& variable_name : variables_in_formula) {
-            if (variables_with_regex.find(variable_name) == variables_with_regex.end()) {
-                BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-                assert(aut_assignment.find(variable_term) == aut_assignment.end());
-                aut_assignment[variable_term] = std::make_shared<Nfa>(nfa_sigma_star);
+        for (const auto& variable : variables_in_formula) {
+            if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
+                assert(aut_assignment.find(variable) == aut_assignment.end());
+                aut_assignment[variable] = std::make_shared<Nfa>(nfa_sigma_star);
             }
         }
 
@@ -401,23 +397,23 @@ namespace smt::noodler::util {
         return regex;
     }
 
-    [[nodiscard]] Nfa conv_to_nfa_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
-                                      const std::set<uint32_t>& alphabet, bool make_complement) {
+    [[nodiscard]] Nfa conv_to_nfa(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+                                  const std::set<uint32_t>& alphabet, bool make_complement) {
         Nfa nfa{};
 
         if (m_util_s.re.is_to_re(expr)) { // Handle conversion of to regex function call.
             // Assume that expression inside re.to_re() function is a string of characters.
             SASSERT(expr->get_num_args() == 1);
             const auto arg{ expr->get_arg(0) };
-            nfa = conv_to_nfa_hex(to_app(arg), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet);
         } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
             SASSERT(expr->get_num_args() == 2);
             const auto left{ expr->get_arg(0) };
             const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            auto first_nfa{ conv_to_nfa_hex(to_app(left), m_util_s, m, alphabet) };
-            auto second_nfa{ conv_to_nfa_hex(to_app(right), m_util_s, m, alphabet) };
+            auto first_nfa{ conv_to_nfa(to_app(left), m_util_s, m, alphabet) };
+            auto second_nfa{ conv_to_nfa(to_app(right), m_util_s, m, alphabet) };
             nfa = Mata::Nfa::concatenate(first_nfa, second_nfa);
         } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
             assert(false && "re.is_antimirov_union(expr)");
@@ -455,7 +451,8 @@ namespace smt::noodler::util {
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
+            nfa.unify_initial();
             for (const auto& initial : nfa.initial) {
                 // FIXME: Cannot that introduce errors if there are transitions leading to the initial states?
                 //  Solution: Unify initial and add the unified initial as a final.
@@ -485,13 +482,13 @@ namespace smt::noodler::util {
             const auto right{ expr->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            nfa = Mata::Nfa::uni(conv_to_nfa_hex(to_app(left), m_util_s, m, alphabet),
-                                 conv_to_nfa_hex(to_app(right), m_util_s, m, alphabet));
+            nfa = Mata::Nfa::uni(conv_to_nfa(to_app(left), m_util_s, m, alphabet),
+                                 conv_to_nfa(to_app(right), m_util_s, m, alphabet));
         } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
                     nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
@@ -506,7 +503,7 @@ namespace smt::noodler::util {
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa_hex(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
                     nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
@@ -522,7 +519,10 @@ namespace smt::noodler::util {
 
         // Whether to create complement of the final automaton.
         if (make_complement) {
-            Mata::OnTheFlyAlphabet mata_alphabet{ Mata::Nfa::create_alphabet(nfa) };
+            Mata::OnTheFlyAlphabet mata_alphabet{};
+            for (const auto& symbol : alphabet) {
+                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+            }
             nfa = Mata::Nfa::complement(nfa, mata_alphabet);
         }
         return nfa;

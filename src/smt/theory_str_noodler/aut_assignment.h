@@ -54,6 +54,16 @@ namespace smt::noodler {
             return nfa;
         }
 
+        Mata::Nfa::Nfa sigma_automaton() const {
+            Mata::Nfa::Nfa nfa(2);
+            nfa.initial = {0};
+            nfa.final = {1};
+            for (const Mata::Symbol& symb : this->alphabet) {
+                nfa.delta.add(0, symb, 1);
+            }
+            return nfa;
+        }
+
         Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             Mata::Nfa::Nfa ret = Mata::Nfa::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {

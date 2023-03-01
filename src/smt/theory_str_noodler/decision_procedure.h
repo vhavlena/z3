@@ -218,6 +218,8 @@ namespace smt::noodler {
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 
+        bool check_diseqs(const AutAssignment& ass);
+
     public:
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
