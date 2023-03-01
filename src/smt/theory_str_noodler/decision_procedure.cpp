@@ -351,10 +351,10 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Check that disequalities are satisfiable. Assumed to be called if the 
+     * @brief Check that disequalities are satisfiable. Assumed to be called if the
      * decision procedure returns SAT.
-     * 
-     * @param ass SAT automata assignment 
+     *
+     * @param ass SAT automata assignment
      * @return true Disequalities are SAT
      */
     bool DecisionProcedure::check_diseqs(const AutAssignment& ass) {
