@@ -340,9 +340,32 @@ namespace smt::noodler {
             lengths = this->m.mk_and(lengths, prep_formula);
         }
 
+        // check whether disequalities are satisfiable
+        if(!check_diseqs(ass)) {
+            lengths = this->m.mk_and(lengths, this->m.mk_false());
+        }
+
         STRACE("str", tout << mk_pp(lengths, this->m) << "\n");
 
         return lengths;
+    }
+
+    /**
+     * @brief Check that disequalities are satisfiable. Assumed to be called if the 
+     * decision procedure returns SAT.
+     * 
+     * @param ass SAT automata assignment 
+     * @return true Disequalities are SAT
+     */
+    bool DecisionProcedure::check_diseqs(const AutAssignment& ass) {
+        for(const auto& pr : this->prep_handler.get_diseq_variables()) {
+            auto s1 = Mata::Strings::get_shortest_words(*ass.at(pr.first));
+            auto s2 = Mata::Strings::get_shortest_words(*ass.at(pr.second));
+            if(s1.size() == 1 && s2.size() == 1 && s1 == s2) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -382,6 +405,8 @@ namespace smt::noodler {
         this->prep_handler.propagate_variables();
         this->prep_handler.reduce_diseqalities();
         this->prep_handler.remove_trivial();
+        // replace disequalities
+        this->prep_handler.replace_disequalities();
 
         // Refresh the instance
         this->init_aut_ass = this->prep_handler.get_aut_assignment();
