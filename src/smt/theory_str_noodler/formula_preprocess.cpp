@@ -948,17 +948,32 @@ namespace smt::noodler {
      * @brief Refine languages for equations of the form X = R (|X|=1) to the L(X) = L(X) \cap L(R).
      */
     void FormulaPreprocess::refine_languages() {
+        std::set<BasicTerm> ineq_vars;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_inequation())
+                continue;
+
+            if(pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_variable()) {
+                ineq_vars.insert(pr.second.get_left_side()[0]);
+            }
+            if(pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_variable()) {
+                ineq_vars.insert(pr.second.get_right_side()[0]);
+            }
+        }
+
         for(const auto& pr :this->formula.get_predicates()) {
             if(!pr.second.is_equation())
                 continue;
 
             if(pr.second.get_left_side().size() == 1) {
                 BasicTerm var = pr.second.get_left_side()[0];
-                update_reg_constr(var, pr.second.get_right_side());
+                if(ineq_vars.find(var) != ineq_vars.end())
+                    update_reg_constr(var, pr.second.get_right_side());
             }
             if(pr.second.get_right_side().size() == 1) {
                 BasicTerm var = pr.second.get_right_side()[0];
-                update_reg_constr(var, pr.second.get_left_side());
+                if(ineq_vars.find(var) != ineq_vars.end())
+                    update_reg_constr(var, pr.second.get_left_side());
             }
         }
     }
