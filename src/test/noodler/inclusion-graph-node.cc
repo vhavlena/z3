@@ -337,3 +337,26 @@ TEST_CASE("Splitting graph", "[noodler]") {
         CHECK(graph.get_edges().empty());
     }
 }
+
+TEST_CASE("print_to_dot()") {
+    Graph graph;
+    Formula formula;
+
+    BasicTerm u{ BasicTermType::Variable, "u" };
+    BasicTerm v{ BasicTermType::Variable, "v" };
+    BasicTerm x{ BasicTermType::Variable, "x" };
+    BasicTerm y{ BasicTermType::Variable, "y" };
+    BasicTerm z{ BasicTermType::Variable, "z" };
+
+    Predicate predicate{ PredicateType::Equation, { { u }, { z } } };
+    Predicate predicate2{ PredicateType::Equation, { { v }, { u } } };
+    Predicate predicate3{ PredicateType::Equation, { { x }, { u, v, x } } };
+
+    formula.add_predicate(predicate);
+    formula.add_predicate(predicate2);
+    formula.add_predicate(predicate3);
+    graph = Graph::create_inclusion_graph(formula);
+    std::stringstream stream;
+    graph.print_to_dot(stream);
+    CHECK(!stream.str().empty());
+}
