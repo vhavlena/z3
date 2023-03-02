@@ -732,11 +732,6 @@ namespace smt::noodler {
                 instance, m_membership_todo_rel, m_util_s, m, symbols_in_formula
         ) };
 
-        // TODO: this is not correct
-        if(instance.get_predicates().empty()) {
-            return FC_DONE;
-        }
-
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
@@ -1107,7 +1102,7 @@ namespace smt::noodler {
         add_axiom({~cnt, a_emp, s_emp, mk_eq(a, xsy,false)});
         // contains(a,s) && a != eps && s != eps -> v = x.t.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
-        ctx.force_phase(cnt);
+        // ctx.force_phase(cnt);
         // tighttestprefix(s,t)
         tightest_prefix(s, x);
 
@@ -1486,6 +1481,7 @@ namespace smt::noodler {
             return;
 
         axiomatized_persist_terms.insert(e);
+        STRACE("str", tout  << "handle contains " << mk_pp(e, m) << std::endl;);
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
@@ -1506,13 +1502,15 @@ namespace smt::noodler {
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
+        expr* cont = this->m.mk_not(e);
+        if(axiomatized_persist_terms.contains(cont))
             return;
 
-        axiomatized_persist_terms.insert(e);
+        axiomatized_persist_terms.insert(cont);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
+        STRACE("str", tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),

@@ -437,7 +437,7 @@ namespace smt::noodler {
 
         if(v2 != 0) {
             expr_ref right(this->m_util_a.mk_add(c1, this->m_util_a.mk_mul(k, c2)), this->m);
-            return expr_ref(this->m.mk_eq(len_x, right), this->m);
+            return expr_ref(this->m.mk_and(this->m.mk_eq(len_x, right), this->m_util_a.mk_ge(k, this->m_util_a.mk_int(0))), this->m);
         }
         return expr_ref(this->m.mk_eq(len_x, c1), this->m);
     }
