@@ -217,6 +217,7 @@ namespace smt::noodler {
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
+        expr_ref get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
 
         bool check_diseqs(const AutAssignment& ass);
 

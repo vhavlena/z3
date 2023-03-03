@@ -125,6 +125,8 @@ namespace smt::noodler {
         expr_ref mk_first(expr* e);
         expr_ref mk_concat(expr* e1, expr* e2);
 
+        lbool check_len_sat(expr_ref len_formula);
+
 
         bool has_length(expr *e) const { return m_has_length.contains(e); }
         void add_length(expr* e);

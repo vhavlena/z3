@@ -308,16 +308,17 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get length constraints of the solution
-     *
-     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-     * @return expr_ref Length formula describing all solutions
+     * @brief Get length formula from the automata assignment @p ass wrt variables @p vars.
+     * 
+     * @param variable_map Mapping of BasicTerm variables to Z3 expressions
+     * @param ass Automata assignment
+     * @param vars Set of variables
+     * @return expr_ref Length formula
      */
-    expr_ref DecisionProcedure::get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
-        AutAssignment ass = this->solution.flatten_substition_map();
+    expr_ref DecisionProcedure::get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars) {
         expr_ref lengths(this->m.mk_true(), this->m);
 
-        for(const BasicTerm& var : this->init_length_sensitive_vars) {
+        for(const BasicTerm& var :vars) {
             std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
 
             auto it = variable_map.find(var);
@@ -351,7 +352,24 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Check that disequalities are satisfiable. Assumed to be called if the 
+     * @brief Get length constraints of the solution
+     *
+     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
+     * @return expr_ref Length formula describing all solutions
+     */
+    expr_ref DecisionProcedure::get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+        AutAssignment ass;
+        if(this->solution.aut_ass.size() == 0) {
+            ass = this->init_aut_ass;
+            return get_length_ass(variable_map, ass, ass.get_keys());
+        } else {
+            ass = this->solution.flatten_substition_map();
+            return get_length_ass(variable_map, ass, this->init_length_sensitive_vars);
+        }
+    }
+
+    /**
+     * @brief Check that disequalities are satisfiable. Assumed to be called if the
      * decision procedure returns SAT.
      * 
      * @param ass SAT automata assignment 
