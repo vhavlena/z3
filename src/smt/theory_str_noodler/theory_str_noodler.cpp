@@ -202,7 +202,7 @@ namespace smt::noodler {
             obj_hashtable<app> lens;
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
-                util::get_str_variables(a, this->m_util_s, m, this->len_vars);
+                util::get_str_variables(a, this->m_util_s, m, this->len_vars, &this->predicate_replace);
             }
 
             expr *ex = ctx.get_asserted_formula(i);
@@ -636,11 +636,11 @@ namespace smt::noodler {
         for (const auto& we : m_word_diseq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
-            // if(!ctx.is_relevant(dis.get())) {
-            //     STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
-            //         ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
-            //     continue;
-            // }
+            if(!ctx.is_relevant(dis.get())) {
+                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
+                    ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
+                continue;
+            }
 
             // Sometimes we have both L != R and R != L; we keep only one of them
             if(!this->m_word_diseq_todo_rel.contains(we) && !this->m_word_diseq_todo_rel.contains({we.second, we.first})) {
@@ -653,15 +653,15 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            // if(ctx.is_relevant(in_app.get())) {
+            if(ctx.is_relevant(in_app.get())) {
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
                 continue;
-            // } else {
-            //      STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
-            //         ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-            // }
+            } else {
+                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
+                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
+            }
         }
     }
 
@@ -926,7 +926,7 @@ namespace smt::noodler {
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
-                // ctx.mark_as_relevant(l);
+                ctx.mark_as_relevant(l);
                 lv.push_back(l);
             }
         }
@@ -1101,17 +1101,18 @@ namespace smt::noodler {
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
         // replace(a,s,t) = v
+        add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
-        add_axiom({~a_emp, s_emp, mk_eq(v, a,false)});
+        add_axiom({~a_emp, s_emp, mk_eq(v, a, false)});
         // (not(contains(a,s))) -> v = a
-        add_axiom({cnt,  mk_eq(v, a, false)});
+        add_axiom({cnt, mk_eq(v, a, false)});
         // s = eps -> v = t.a
         add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
         // contains(a,s) && a != eps && s != eps -> a = x.s.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(a, xsy,false)});
         // contains(a,s) && a != eps && s != eps -> v = x.t.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
-        // ctx.force_phase(cnt);
+        ctx.force_phase(cnt);
         // tighttestprefix(s,t)
         tightest_prefix(s, x);
 
@@ -1798,13 +1799,14 @@ namespace smt::noodler {
         obj_hashtable<expr> vars;
         util::get_str_variables(ex, this->m_util_s, this->m, vars);
         for(expr * const v : vars) {
+
             BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
             this->var_name.insert({vterm, expr_ref(v, this->m)});
         }
 
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, left);
-        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, right);
+        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, this->var_name, left);
+        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }

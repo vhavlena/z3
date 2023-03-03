@@ -35,8 +35,9 @@ namespace smt::noodler::util {
     @param m_util_s Seq util for AST
     @param m AST manager
     @param[out] res Vector of found variables (may contain duplicities).
+    @param pred_map predicate to variable mapping
     */
-    void get_str_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res);
+    void get_str_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res, obj_map<expr, expr*>* pred_map=nullptr);
 
     /**
      * Check whether an @p expression is a string variable.
@@ -165,7 +166,7 @@ namespace smt::noodler::util {
      * TODO: Test.
      */
     void collect_terms(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
-                       std::vector<BasicTerm>& terms
+                       std::map<BasicTerm, expr_ref>& var_name, std::vector<BasicTerm>& terms
     );
 
     /**
