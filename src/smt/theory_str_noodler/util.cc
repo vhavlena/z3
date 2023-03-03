@@ -266,13 +266,13 @@ namespace smt::noodler::util {
         }
 
         // Assign sigma start automata for all yet unassigned variables.
-        Mata::OnTheFlyAlphabet mata_alphabet{};
+        Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
         std::string hex_symbol_string;
         for (const uint32_t symbol : noodler_alphabet) {
-            mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+            mata_alphabet->add_new_symbol(std::to_string(symbol), symbol);
         }
 
-        const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(&mata_alphabet) };
+        const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(mata_alphabet) };
         for (const auto& variable : variables_in_formula) {
             if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
                 assert(aut_assignment.find(variable) == aut_assignment.end());
@@ -529,7 +529,12 @@ namespace smt::noodler::util {
     }
 
     Nfa create_word_nfa(const zstring& word) {
-        Nfa nfa{};
+        const size_t word_length{ word.length() };
+        Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
+        for (size_t i{ 0 }; i < word_length; ++i) {
+            mata_alphabet->try_add_new_symbol(std::to_string(word[i]), word[i]);
+        }
+        Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length }, mata_alphabet };
         nfa.initial.add(0);
         size_t state{ 0 };
         for (; state < word.length(); ++state) {

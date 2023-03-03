@@ -45,7 +45,7 @@ namespace smt::noodler {
         };
 
         Mata::Nfa::Nfa sigma_star_automaton() const {
-            Mata::Nfa::Nfa nfa(1);
+            Mata::Nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {0};
             for (const Mata::Symbol& symb : this->alphabet) {
@@ -55,7 +55,7 @@ namespace smt::noodler {
         }
 
         Mata::Nfa::Nfa sigma_automaton() const {
-            Mata::Nfa::Nfa nfa(2);
+            Mata::Nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {1};
             for (const Mata::Symbol& symb : this->alphabet) {
@@ -102,7 +102,7 @@ namespace smt::noodler {
 
         /**
          * @brief Check if all automata in the map have non-empty language.
-         * 
+         *
          * @return true All have non-empty language
          * @return false There is at least one NFA with the empty language
          */
@@ -121,6 +121,19 @@ namespace smt::noodler {
              for (auto& pr : *this) {
                 pr.second = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(*pr.second));
             }
+        }
+
+        /**
+         * @brief Get all keys from the assignment
+         * 
+         * @return std::unordered_set<BasicTerm> Keys
+         */
+        std::unordered_set<BasicTerm> get_keys() const {
+            std::unordered_set<BasicTerm> ret;
+            for(const auto & pr : *this) {
+                ret.insert(pr.first);
+            }
+            return ret;
         }
 
     };
