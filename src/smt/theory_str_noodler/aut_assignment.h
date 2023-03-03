@@ -45,7 +45,7 @@ namespace smt::noodler {
         };
 
         Mata::Nfa::Nfa sigma_star_automaton() const {
-            Mata::Nfa::Nfa nfa(1);
+            Mata::Nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {0};
             for (const Mata::Symbol& symb : this->alphabet) {
@@ -55,7 +55,7 @@ namespace smt::noodler {
         }
 
         Mata::Nfa::Nfa sigma_automaton() const {
-            Mata::Nfa::Nfa nfa(2);
+            Mata::Nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {1};
             for (const Mata::Symbol& symb : this->alphabet) {
@@ -102,7 +102,7 @@ namespace smt::noodler {
 
         /**
          * @brief Check if all automata in the map have non-empty language.
-         * 
+         *
          * @return true All have non-empty language
          * @return false There is at least one NFA with the empty language
          */
