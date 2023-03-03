@@ -683,14 +683,7 @@ namespace smt::noodler {
 
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
-
-        // Get symbols in the whole formula.
-        std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
-                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
-        )};
-
-        // Add dummy symbols for all disequations.
-        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(m_word_diseq_todo_rel, symbols_in_formula) };
+        size_t new_symbs = this->m_word_diseq_todo_rel.size();
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
@@ -717,6 +710,7 @@ namespace smt::noodler {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
+                new_symbs++;
             }
             STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
@@ -727,9 +721,19 @@ namespace smt::noodler {
             STRACE("str", tout << f.to_string() << std::endl);
         }
 
+        // Get symbols in the whole formula.
+        std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
+        )};
+
+        // Add dummy symbols for all disequations.
+        if(symbols_in_formula.size() + new_symbs <= 1) { // alphabet should have at least 2 symbols
+            new_symbs++;
+        }
+        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
-                instance, m_membership_todo_rel, m_util_s, m, symbols_in_formula
+                instance, m_membership_todo_rel, this->var_name, m_util_s, m, symbols_in_formula
         ) };
 
         expr_ref lengths(m);

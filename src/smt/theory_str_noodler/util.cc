@@ -183,10 +183,10 @@ namespace smt::noodler::util {
         return false;
     }
 
-    std::set<uint32_t> get_dummy_symbols(const vector<expr_pair>& disequations, std::set<uint32_t>& symbols_to_append_to) {
+    std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to) {
         std::set<uint32_t> dummy_symbols{};
         uint32_t dummy_symbol{ 0 };
-        const size_t disequations_number{ disequations.size() };
+        const size_t disequations_number{ new_symb_num };
         for (size_t diseq_index{ 0 }; diseq_index < disequations_number; ++diseq_index) {
             while (symbols_to_append_to.find(dummy_symbol) != symbols_to_append_to.end()) { ++dummy_symbol; }
             dummy_symbols.insert(dummy_symbol);
@@ -227,6 +227,7 @@ namespace smt::noodler::util {
     AutAssignment create_aut_assignment_for_formula(
             const Formula& instance,
             const vector<expr_pair_flag>& regexes,
+            std::map<BasicTerm, expr_ref>& var_name,
             const seq_util& m_util_s,
             const ast_manager& m,
             const std::set<uint32_t>& noodler_alphabet
@@ -250,7 +251,7 @@ namespace smt::noodler::util {
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
             variables_with_regex.insert(variable_name);
-            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            const BasicTerm variable_term{ BasicTermType::Variable, variable_name }; 
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
@@ -262,6 +263,7 @@ namespace smt::noodler::util {
                         Mata::Nfa::intersection(nfa, *aut_ass_it->second));
             } else { // We create a regular constraint for the current variable for the first time.
                 aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+                var_name.insert({variable_term, variable});
             }
         }
 
