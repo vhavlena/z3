@@ -736,13 +736,18 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
-        dec_proc.init_computation();
+        
+        // check if the initial assignment is len unsat
+        lengths = dec_proc.get_lengths(this->var_name);
+        if(check_len_sat(lengths) == l_false) {
+            block_curr_assignment();
+            return FC_CONTINUE;
+        }
 
+        dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
-            int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-            m_int_solver.initialize(get_context());
-            if(m_int_solver.check_sat(lengths) == l_true) {
+            if(check_len_sat(lengths) == l_true) {
                 return FC_DONE;
             }
             STRACE("str", tout << "len unsat\n";);
@@ -1822,5 +1827,17 @@ namespace smt::noodler {
                 init_lengths.emplace(v);
         }
         return init_lengths;
+    }
+
+    /**
+     * @brief Check if the length formula @p len_formula is satisfiable.
+     * 
+     * @param len_formula Formula to be check
+     * @return lbool Sat
+     */
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+        int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
+        m_int_solver.initialize(get_context());
+        return m_int_solver.check_sat(len_formula);
     }
 }
