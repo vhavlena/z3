@@ -207,6 +207,7 @@ namespace smt::noodler {
 
             expr *ex = ctx.get_asserted_formula(i);
             string_theory_propagation(ex);
+            ctx.mark_as_relevant(ex);
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
@@ -224,7 +225,7 @@ namespace smt::noodler {
         //We do not mark the expression as relevant since we do not want bias a
         //fresh SAT solution by the newly added theory axioms.
         // enode *n = ctx.get_enode(expr);
-        // ctx.mark_as_relevant(expr);
+        // ctx.mark_as_relevant(n);
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -1557,13 +1558,17 @@ namespace smt::noodler {
             // app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
             expr_ref eq_fv(mk_eq_atom(var.get(), s), m);
             expr_ref n_re(this->m_util_s.re.mk_in_re(var, re), m);
+            expr_ref re_orig(e, m);
+            
             if(!is_true) {
                 n_re = m.mk_not(n_re);
+                re_orig = m.mk_not(re_orig);
             }
             add_axiom({mk_literal(eq_fv)});
-            add_axiom(n_re);
+            add_axiom({~mk_literal(re_orig), mk_literal(n_re)});
+            
             re_constr = to_app(var); 
-        }
+        } 
 
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
