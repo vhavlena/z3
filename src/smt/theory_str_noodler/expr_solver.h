@@ -64,6 +64,7 @@ namespace smt::noodler {
 
         void initialize(context& ctx) {
             bool on_screen =false;
+            bool include_ass = false;
             if(!initialized){
                 initialized=true;
                 expr_ref_vector Assigns(m),Literals(m);
@@ -75,7 +76,7 @@ namespace smt::noodler {
 
                 }
                 for (auto & e : Assigns){
-                    if(ctx.is_relevant(e)) {
+                    if(ctx.is_relevant(e) && include_ass) {
                         if(on_screen) std::cout << "check_sat context from assign:" << mk_pp(e, m) << std::endl;
                         assert_expr(e);
                     }
