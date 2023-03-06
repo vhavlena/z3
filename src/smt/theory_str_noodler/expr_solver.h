@@ -46,7 +46,6 @@ namespace smt::noodler {
         lbool check_sat(expr* e) override {
                 bool on_screen =false;
     //        m_kernel.push();
-
             erv.push_back(e);
             lbool r = m_kernel.check(erv);
             erv.pop_back();
@@ -64,7 +63,7 @@ namespace smt::noodler {
 
         void initialize(context& ctx) {
             bool on_screen =false;
-            bool include_ass = false;
+            bool include_ass = true;
             if(!initialized){
                 initialized=true;
                 expr_ref_vector Assigns(m),Literals(m);

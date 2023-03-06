@@ -57,6 +57,7 @@ namespace smt::noodler {
         // mapping predicates and function to variables that they substitute to
         obj_map<expr, expr*> predicate_replace;
 
+        std::vector<app_ref> axiomatized_len_axioms;
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> axiomatized_persist_terms;
         obj_hashtable<expr> propgated_string_theory;
@@ -182,6 +183,7 @@ namespace smt::noodler {
         void handle_in_re(expr *e, bool is_true);
         void set_conflict(const literal_vector& ls);
         void block_curr_assignment();
+        void block_curr_len(expr_ref len_formula);
         void dump_assignments() const;
         void string_theory_propagation(expr * ex);
         void propagate_concat_axiom(enode * cat);
