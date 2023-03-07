@@ -506,9 +506,12 @@ namespace smt::noodler {
         if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
             axiomatized_eq_vars.insert(std::make_pair(x, y));
 
-            literal l_eq_r = mk_eq(l, r, false);
-            literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
-            add_axiom({~l_eq_r, len_l_eq_len_r});
+            expr* eq = ctx.mk_eq_atom(l, r);
+            if(ctx.is_relevant(eq)) {
+                literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
+                literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
+                add_axiom({~l_eq_r, len_l_eq_len_r});
+            }
         }
         m_word_eq_todo.push_back({l, r});
         STRACE("str", tout << "new_eq: " << l <<  " = " << r << '\n';);
@@ -632,6 +635,10 @@ namespace smt::noodler {
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
+
+            if(!ctx.is_relevant(eq.get()) && !ctx.is_relevant(eq_rev.get())) {
+                continue;
+            }
 
             // if(ctx.is_relevant(eq_rev.get())) {
                 if(!this->m_word_eq_todo_rel.contains({we.second, we.first})) {
@@ -764,12 +771,15 @@ namespace smt::noodler {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         
-        // check if the initial assignment is len unsat
-        lengths = dec_proc.get_lengths(this->var_name);
-        if(check_len_sat(lengths) == l_false) {
-            block_curr_len(lengths);
-            return FC_DONE;
+        if(init_length_sensitive_vars.size() > 0) {
+            // check if the initial assignment is len unsat
+            lengths = dec_proc.get_lengths(this->var_name);
+            if(check_len_sat(lengths) == l_false) {
+                block_curr_len(lengths);
+                return FC_DONE;
+            }
         }
+        
 
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
