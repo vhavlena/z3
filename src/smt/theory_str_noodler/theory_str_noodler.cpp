@@ -780,18 +780,22 @@ namespace smt::noodler {
             }
         }
         
-
+        expr_ref block_len(m.mk_false(), m);
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_true) {
                 return FC_DONE;
             }
+            if(init_length_sensitive_vars.size() > 0) {
+                block_len = m.mk_or(block_len, lengths);
+            }
             STRACE("str", tout << "len unsat\n";);
         }
 
         // all len solutions are unsat, we block the current assignment
-        block_curr_assignment();
+        block_curr_len(block_len);
+        //block_curr_assignment();
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
