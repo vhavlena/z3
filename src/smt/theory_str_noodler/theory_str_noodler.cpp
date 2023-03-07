@@ -206,8 +206,9 @@ namespace smt::noodler {
             }
 
             expr *ex = ctx.get_asserted_formula(i);
-            string_theory_propagation(ex);
             ctx.mark_as_relevant(ex);
+            string_theory_propagation(ex);
+            
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
@@ -506,8 +507,7 @@ namespace smt::noodler {
         if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
             axiomatized_eq_vars.insert(std::make_pair(x, y));
 
-            expr* eq = ctx.mk_eq_atom(l, r);
-            if(ctx.is_relevant(eq)) {
+            if(ctx.is_relevant(m.mk_eq(l, r)) || ctx.is_relevant(m.mk_eq(r, l))) {
                 literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
                 literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
                 add_axiom({~l_eq_r, len_l_eq_len_r});
@@ -633,7 +633,7 @@ namespace smt::noodler {
         this->m_membership_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
-            app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
+            app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
 
             if(!ctx.is_relevant(eq.get()) && !ctx.is_relevant(eq_rev.get())) {
