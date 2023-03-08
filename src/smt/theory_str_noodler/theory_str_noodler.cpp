@@ -202,11 +202,13 @@ namespace smt::noodler {
             obj_hashtable<app> lens;
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
-                util::get_str_variables(a, this->m_util_s, m, this->len_vars);
+                util::get_str_variables(a, this->m_util_s, m, this->len_vars, &this->predicate_replace);
             }
 
             expr *ex = ctx.get_asserted_formula(i);
+            ctx.mark_as_relevant(ex);
             string_theory_propagation(ex);
+            
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
@@ -224,7 +226,7 @@ namespace smt::noodler {
         //We do not mark the expression as relevant since we do not want bias a
         //fresh SAT solution by the newly added theory axioms.
         // enode *n = ctx.get_enode(expr);
-        // ctx.mark_as_relevant(expr);
+        // ctx.mark_as_relevant(n);
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -287,9 +289,12 @@ namespace smt::noodler {
                       << std::endl;
 
         // finally assert equality between the two subexpressions
-        app *eq = m.mk_eq(len_xy, len_x_plus_len_y);
+        app_ref eq(m.mk_eq(len_xy, len_x_plus_len_y), m);
+        //ctx.internalize(eq, false);
         SASSERT(eq);
         add_axiom(eq);
+        // std::cout << mk_pp(eq, m) << std::endl;
+        this->axiomatized_len_axioms.push_back(eq);
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
@@ -334,6 +339,7 @@ namespace smt::noodler {
             unsigned int l = strconst.length();
             expr_ref len(m_util_a.mk_numeral(rational(l), true), m);
 
+            this->axiomatized_len_axioms.push_back(app_ref(m.mk_eq(len_str, len), m));
             literal lit(mk_eq(len_str, len, false));
             // ctx.mark_as_relevant(lit);
             ctx.mk_th_axiom(get_id(), 1, &lit);
@@ -346,7 +352,7 @@ namespace smt::noodler {
                  * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
                  * properly relevancy propagated...)
                  */
-                return; // 
+                //return; 
                 if (on_screen) std::cout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS
@@ -358,10 +364,20 @@ namespace smt::noodler {
                 zero = m_util_a.mk_numeral(rational(0), true);
                 SASSERT(zero);
                 // build LHS >= RHS and assert
-                app *lhs_ge_rhs = m_util_a.mk_ge(len_str, zero);
+                app_ref lhs_ge_rhs(m_util_a.mk_ge(len_str, zero), m);
+                ctx.internalize(lhs_ge_rhs, false);
                 SASSERT(lhs_ge_rhs);
                 STRACE("str", tout << "string axiom 1: " << mk_ismt2_pp(lhs_ge_rhs, m) << std::endl;);
-                add_axiom(lhs_ge_rhs);
+
+                add_axiom({mk_literal(lhs_ge_rhs)});
+                
+ 
+                this->axiomatized_len_axioms.push_back(lhs_ge_rhs);
+                    
+
+                
+                
+                return;
             }
 
             // build axiom 2: Length(a_str) == 0 <=> a_str == ""
@@ -395,8 +411,10 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::add_length_axiom(expr *n) {
-        add_axiom(m_util_a.mk_ge(n, m_util_a.mk_int(0)));
-
+        app_ref ln(m_util_a.mk_ge(n, m_util_a.mk_int(0)), m);
+        ctx.internalize(ln, false);
+        add_axiom(ln);
+        this->axiomatized_len_axioms.push_back(ln);
     }
 
     void theory_str_noodler::relevant_eh(app *const n) {
@@ -489,9 +507,11 @@ namespace smt::noodler {
         if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
             axiomatized_eq_vars.insert(std::make_pair(x, y));
 
-            literal l_eq_r = mk_eq(l, r, false);
-            literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
-            add_axiom({~l_eq_r, len_l_eq_len_r});
+            if(ctx.is_relevant(m.mk_eq(l, r)) || ctx.is_relevant(m.mk_eq(r, l))) {
+                literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
+                literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
+                add_axiom({~l_eq_r, len_l_eq_len_r});
+            }
         }
         m_word_eq_todo.push_back({l, r});
         STRACE("str", tout << "new_eq: " << l <<  " = " << r << '\n';);
@@ -613,8 +633,12 @@ namespace smt::noodler {
         this->m_membership_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
-            app_ref eq(ctx.mk_eq_atom(we.first, we.second), m);
+            app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
+
+            if(!ctx.is_relevant(eq.get()) && !ctx.is_relevant(eq_rev.get())) {
+                continue;
+            }
 
             // if(ctx.is_relevant(eq_rev.get())) {
                 if(!this->m_word_eq_todo_rel.contains({we.second, we.first})) {
@@ -636,11 +660,11 @@ namespace smt::noodler {
         for (const auto& we : m_word_diseq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref dis(m.mk_not(eq), m);
-            // if(!ctx.is_relevant(dis.get())) {
-            //     STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
-            //         ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
-            //     continue;
-            // }
+            if(!ctx.is_relevant(dis.get())) {
+                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
+                    ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
+                continue;
+            }
 
             // Sometimes we have both L != R and R != L; we keep only one of them
             if(!this->m_word_diseq_todo_rel.contains(we) && !this->m_word_diseq_todo_rel.contains({we.second, we.first})) {
@@ -653,15 +677,15 @@ namespace smt::noodler {
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            // if(ctx.is_relevant(in_app.get())) {
+            if(ctx.is_relevant(in_app.get())) {
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
                 continue;
-            // } else {
-            //      STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
-            //         ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
-            // }
+            } else {
+                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
+                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
+            }
         }
     }
 
@@ -684,11 +708,17 @@ namespace smt::noodler {
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
         size_t new_symbs = this->m_word_diseq_todo_rel.size();
+        expr_ref eq_prop(m);
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
             conj.insert(e);
             conj_instance.insert(e);
+            if(eq_prop == nullptr) {
+                eq_prop = e;
+            } else {
+                eq_prop = m.mk_and(eq_prop, e);
+            }
 
             STRACE("str", tout << print_word_term(we.first) << std::flush);
             STRACE("str", tout << "="<<std::flush);
@@ -741,24 +771,31 @@ namespace smt::noodler {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         
-        // check if the initial assignment is len unsat
-        lengths = dec_proc.get_lengths(this->var_name);
-        if(check_len_sat(lengths) == l_false) {
-            block_curr_assignment();
-            return FC_CONTINUE;
+        if(init_length_sensitive_vars.size() > 0) {
+            // check if the initial assignment is len unsat
+            lengths = dec_proc.get_lengths(this->var_name);
+            if(check_len_sat(lengths) == l_false) {
+                block_curr_len(lengths);
+                return FC_DONE;
+            }
         }
-
+        
+        expr_ref block_len(m.mk_false(), m);
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_true) {
                 return FC_DONE;
             }
+            if(init_length_sensitive_vars.size() > 0) {
+                block_len = m.mk_or(block_len, lengths);
+            }
             STRACE("str", tout << "len unsat\n";);
         }
 
         // all len solutions are unsat, we block the current assignment
-        block_curr_assignment();
+        block_curr_len(block_len);
+        //block_curr_assignment();
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
@@ -910,7 +947,7 @@ namespace smt::noodler {
             }
             ctx.internalize(e, false);
             literal l{ctx.get_literal(e)};
-            // ctx.mark_as_relevant(l);
+            ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         } else {
@@ -926,7 +963,7 @@ namespace smt::noodler {
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
-                // ctx.mark_as_relevant(l);
+                ctx.mark_as_relevant(l);
                 lv.push_back(l);
             }
         }
@@ -934,7 +971,7 @@ namespace smt::noodler {
         if (on_screen) STRACE("str_axiom", std::cout << __LINE__ << " " << __FUNCTION__;);
         if (on_screen) STRACE("str_axiom", ctx.display_literals_verbose(std::cout, lv) << std::endl;);
         STRACE("str_axiom", ctx.display_literals_verbose(tout << "[Assert_c]\n", lv) << '\n';);
-        STRACE("str_axiom", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
+        STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
     }
 
     /**
@@ -1101,17 +1138,18 @@ namespace smt::noodler {
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
         // replace(a,s,t) = v
+        add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
-        add_axiom({~a_emp, s_emp, mk_eq(v, a,false)});
+        add_axiom({~a_emp, s_emp, mk_eq(v, a, false)});
         // (not(contains(a,s))) -> v = a
-        add_axiom({cnt,  mk_eq(v, a, false)});
+        add_axiom({cnt, mk_eq(v, a, false)});
         // s = eps -> v = t.a
         add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
         // contains(a,s) && a != eps && s != eps -> a = x.s.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(a, xsy,false)});
         // contains(a,s) && a != eps && s != eps -> v = x.t.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
-        // ctx.force_phase(cnt);
+        ctx.force_phase(cnt);
         // tighttestprefix(s,t)
         tightest_prefix(s, x);
 
@@ -1556,13 +1594,19 @@ namespace smt::noodler {
             // app_ref fv(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(), 0, nullptr, this->m_util_s.mk_string_sort()), m);
             expr_ref eq_fv(mk_eq_atom(var.get(), s), m);
             expr_ref n_re(this->m_util_s.re.mk_in_re(var, re), m);
+            expr_ref re_orig(e, m);
+
+            // propagate_basic_string_axioms(ctx.get_enode(eq_fv));
+            
             if(!is_true) {
                 n_re = m.mk_not(n_re);
+                re_orig = m.mk_not(re_orig);
             }
             add_axiom({mk_literal(eq_fv)});
-            add_axiom(n_re);
+            add_axiom({~mk_literal(re_orig), mk_literal(n_re)});
+            
             re_constr = to_app(var); 
-        }
+        } 
 
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
@@ -1621,6 +1665,46 @@ namespace smt::noodler {
 
         if (refinement != nullptr) {
             add_block_axiom(refinement);
+        }
+        STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
+
+    }
+
+    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
+        STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+
+        bool on_screen=false;
+        context& ctx = get_context();
+
+        ast_manager& m = get_manager();
+        expr *refinement = nullptr;
+        STRACE("str", tout << "[Refinement]\nformulas:\n";);
+        for (const auto& we : this->m_word_eq_todo_rel) {
+            // we create the equation according to we
+            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+        }
+
+        literal_vector ls;
+        for (const auto& wi : this->m_word_diseq_todo_rel) {
+//            expr *const e = mk_eq_atom(wi.first, wi.second);
+            expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+            //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
+        }
+
+        for (const auto& in : this->m_membership_todo_rel) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
+            if(!std::get<2>(in)){
+                in_app = m.mk_not(in_app);
+            }
+            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
+            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+        }
+
+        if (refinement != nullptr) {
+            add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
@@ -1798,13 +1882,14 @@ namespace smt::noodler {
         obj_hashtable<expr> vars;
         util::get_str_variables(ex, this->m_util_s, this->m, vars);
         for(expr * const v : vars) {
+
             BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
             this->var_name.insert({vterm, expr_ref(v, this->m)});
         }
 
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, left);
-        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, right);
+        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, this->var_name, left);
+        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }
