@@ -34,7 +34,8 @@ namespace smt::noodler {
         m_util_a(m),
         m_util_s(m),
         state_len(),
-        m_length(m) {
+        m_length(m),
+        dec_proc(m, m_util_s, m_util_a) {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -768,12 +769,13 @@ namespace smt::noodler {
 
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
-        dec_proc.preprocess();
+
+        this->dec_proc.set_instance(instance, aut_assignment, init_length_sensitive_vars);
+        this->dec_proc.preprocess();
         
         if(init_length_sensitive_vars.size() > 0) {
             // check if the initial assignment is len unsat
-            lengths = dec_proc.get_lengths(this->var_name);
+            lengths = this->dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_false) {
                 block_curr_len(lengths);
                 return FC_DONE;
@@ -781,9 +783,9 @@ namespace smt::noodler {
         }
         
         expr_ref block_len(m.mk_false(), m);
-        dec_proc.init_computation();
-        while(dec_proc.compute_next_solution()) {
-            lengths = dec_proc.get_lengths(this->var_name);
+        this->dec_proc.init_computation();
+        while(this->dec_proc.compute_next_solution()) {
+            lengths = this->dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_true) {
                 return FC_DONE;
             }
@@ -1575,11 +1577,8 @@ namespace smt::noodler {
         ast_manager& m = get_manager();
         STRACE("str", tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
-        // if(m_scope_level == 0 && !is_true) {
-        //     ctx.mark_as_relevant(m.mk_not(e));
-        // }
-
         app_ref re_constr(to_app(s), m);
+        expr_ref re_atom(e, m);
         /// Check if @p re_constr is a simple variable. If not (it is, e.g., concatenation of string terms),
         /// this complex term T is replaced by a fresh variable X. The following axioms are hence added: X = T && X in RE.
         if(re_constr->get_num_args() != 0) {
@@ -1606,8 +1605,22 @@ namespace smt::noodler {
             add_axiom({~mk_literal(re_orig), mk_literal(n_re)});
             
             re_constr = to_app(var); 
+            re_atom = n_re;
         } 
 
+        // generate length formula for the regular expression
+        if(ctx.is_relevant(e) && is_true) {
+            std::set<uint32_t> alphabet;
+            util::extract_symbols(re, this->m_util_s, this->m, alphabet);
+            util::get_dummy_symbols(2, alphabet);
+            Mata::Nfa::Nfa aut = util::conv_to_nfa(to_app(re), this->m_util_s, this->m, alphabet, !is_true);
+            auto aut_lens = Mata::Strings::get_word_lengths(aut);
+
+            expr_ref len_formula = this->dec_proc.mk_len_aut(expr_ref(re_constr, m), aut_lens);
+            add_axiom({~mk_literal(re_atom), mk_literal(len_formula)});
+            STRACE("str", tout << "re-axiom: " << mk_pp(len_formula, m) << "\n"; );
+        }
+        
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
     }

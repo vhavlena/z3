@@ -56,15 +56,12 @@ namespace smt::noodler {
         return result;
     }
 
-    DecisionProcedure::DecisionProcedure(
-            const Formula &equalities, AutAssignment init_aut_ass,
-            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-            ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-    ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars), m{ m }, m_util_s{ m_util_s },
+    DecisionProcedure::DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) 
+        : prep_handler(Formula(), AutAssignment(), {}), m{ m }, m_util_s{ m_util_s },
         m_util_a{ m_util_a },
-        init_length_sensitive_vars{ init_length_sensitive_vars },
-        formula { equalities },
-        init_aut_ass{ init_aut_ass } {
+        init_length_sensitive_vars{ },
+        formula { },
+        init_aut_ass{ } {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -474,6 +471,20 @@ namespace smt::noodler {
         }
         res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(this->m_util_s.str.mk_length(var), this->m_util_a.mk_int(0))), this->m);
         return res;
+    }
+
+    /**
+     * @brief Set new instance for the decision procedure.
+     * 
+     * @param equalities Equalities
+     * @param init_aut_ass Initial automata assignment
+     * @param init_length_sensitive_vars Length sensitive vars
+     */
+    void DecisionProcedure::set_instance(const Formula &equalities, AutAssignment init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
+        this->init_length_sensitive_vars = init_length_sensitive_vars;
+        this->formula = equalities;
+        this->init_aut_ass = init_aut_ass;
+        this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars);
     }
 
     void DecisionProcedure::conv_str_lits_to_fresh_lits() {

@@ -216,22 +216,23 @@ namespace smt::noodler {
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
         expr_ref get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
 
         bool check_diseqs(const AutAssignment& ass);
 
     public:
-        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
-                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                          ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-        );
+        DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
 
+        void set_instance(const Formula &equalities, AutAssignment init_aut_ass,
+                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;
         expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
 
         void preprocess() override;
+
+        expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
+
     };
 }
 
