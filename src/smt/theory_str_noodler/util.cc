@@ -83,7 +83,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(range_begin));
             SASSERT(is_app(range_end));
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
 
             auto current_value{ range_begin_value };
             while (current_value <= range_end_value) {
@@ -142,7 +142,7 @@ namespace smt::noodler::util {
             if(pred_map->find(ex_app, rpl)) {
                 get_str_variables(rpl, m_util_s, m, res, pred_map);
             }
-        } 
+        }
 
         for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
             SASSERT(is_app(ex_app->get_arg(i)));
@@ -257,7 +257,7 @@ namespace smt::noodler::util {
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
             variables_with_regex.insert(variable_name);
-            const BasicTerm variable_term{ BasicTermType::Variable, variable_name }; 
+            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
@@ -361,7 +361,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(range_begin));
             SASSERT(is_app(range_end));
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
             auto current_value{ range_begin_value };
             std::stringstream convert_stream;
             while (current_value <= range_end_value) {
@@ -473,7 +473,7 @@ namespace smt::noodler::util {
             SASSERT(is_app(range_begin));
             SASSERT(is_app(range_end));
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
 
             nfa.initial.add(0);
             nfa.final.add(1);
