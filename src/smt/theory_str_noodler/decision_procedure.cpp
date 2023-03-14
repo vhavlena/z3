@@ -84,6 +84,7 @@ namespace smt::noodler {
             element_to_process.nodes_to_process.pop_front();
 
             STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() <<std::endl;);
+            STRACE("str", tout << "Length variables are:"; for(auto const &var : node_to_process->get_predicate().get_vars()) {if (element_to_process.length_sensitive_vars.count(var)) {tout << " " << var.to_string() <<std::endl;}});
 
             bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
 
