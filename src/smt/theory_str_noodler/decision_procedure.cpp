@@ -416,6 +416,7 @@ namespace smt::noodler {
         this->prep_handler.propagate_variables();
         this->prep_handler.propagate_eps();
         this->prep_handler.remove_regular();
+        this->prep_handler.skip_len_sat();
         this->prep_handler.generate_identities();
         this->prep_handler.propagate_variables();
         this->prep_handler.refine_languages();
