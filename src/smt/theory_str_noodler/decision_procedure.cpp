@@ -285,6 +285,7 @@ namespace smt::noodler {
                         } else {
                             // right_var is not substitued by anything yet, we will substitute it
                             substitution_map[right_var] = right_side_divisions_to_new_vars[i];
+                            STRACE("str", tout << "left side var " << right_var.get_name() << " replaced with:"; for (auto const &var : right_side_divisions_to_new_vars[i]) { tout << " " << var.get_name(); } tout << std::endl; );
                             // as right_var wil be substituted in the inclusion graph, we do not need to remember the automaton assignment for it
                             new_element.aut_ass.erase(right_var);
                             // update the length variables
@@ -316,6 +317,7 @@ namespace smt::noodler {
                         // TODO make this function or something, we do the same thing here as for the right side when substituting
                         // left_var is not substitued by anything yet, we will substitute it
                         substitution_map[left_var] = left_side_vars_to_new_vars[i];
+                        STRACE("str", tout << "left side var " << left_var.get_name() << " replaced with:"; for (auto const &var : left_side_vars_to_new_vars[i]) { tout << " " << var.get_name(); } tout << std::endl; );
                         // as left_var wil be substituted in the inclusion graph, we do not need to remember the automaton assignment for it
                         new_element.aut_ass.erase(left_var);
                         // update the length variables
