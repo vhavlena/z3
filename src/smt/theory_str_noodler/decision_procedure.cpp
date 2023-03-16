@@ -84,12 +84,82 @@ namespace smt::noodler {
             element_to_process.nodes_to_process.pop_front();
 
             STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() <<std::endl;);
+            STRACE("str", tout << "Length variables are:"; for(auto const &var : node_to_process->get_predicate().get_vars()) {if (element_to_process.length_sensitive_vars.count(var)) {tout << " " << var.to_string() <<std::endl;}});
+
+            const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
+            const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
+
+            bool is_there_length_on_right = false;
+            for (auto const &right_var : right_side_vars) {
+                if (element_to_process.length_sensitive_vars.count(right_var) > 0) {
+                    is_there_length_on_right = true;
+                    break;
+                }
+            }
 
             bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
+            
+            // as kinda opmtimalization step, we do "noodlification" for empty sides separately (i.e. sides that represent empty string)
+            // this is because it is simpler, we would get only one noodle so we just need to check
+            // that the non-empty side actually contain empty string and replace the vars on that side by epsilon
+            if (right_side_vars.empty() || left_side_vars.empty()) {
+                std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
+                auto const &non_empty_side_vars = right_side_vars.empty() ? node_to_process->get_predicate().get_left_set() : node_to_process->get_predicate().get_right_set();
+                bool non_empty_side_contains_empty_word = true;
+                for (const auto &var : non_empty_side_vars) {
+                    if (Mata::Nfa::is_in_lang(*element_to_process.aut_ass.at(var), {{}, {}})) {
+                        if (!right_side_vars.empty() || element_to_process.length_sensitive_vars.count(var) > 0) {
+                            assert(substitution_map.count(var) == 0 && element_to_process.aut_ass.count(var) > 0);
+                            // we prepare substitution for all vars on the left or only the length vars on the right (as non-length vars are probably not needed? TODO: would it make sense to update non-length vars too?)
+                            substitution_map[var] = {};
+                            element_to_process.aut_ass.erase(var);
+                        }
+                    } else {
+                        non_empty_side_contains_empty_word = false;
+                        break;
+                    }
+                }
+                if (!non_empty_side_contains_empty_word) {
+                    // in the case that the non_empty side does not contain empty word
+                    // the inclusion cannot hold (noodlification would not create anything)
+                    continue;
+                }
+
+                // TODO: all this following shit is done also during normal noodlification, I need to split it to some better defined functions
+
+                // we might remove some variables from the left side
+                // so we need to add all nodes whose variable assignments are going to change on the right side (i.e. we follow inclusion graph) for processing
+                for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
+                    // we push only those nodes which are not already in nodes_to_process
+                    // if the node_to_process is on cycle, we need to do BFS
+                    // if it is not on cycle, we can do DFS
+                    // TODO: can we really do DFS??
+                    element_to_process.push_unique(node, is_node_to_process_on_cycle);
+                }
+
+                // we need to make a deep copy, because we will be updating this graph
+                auto new_node_to_process = element_to_process.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
+                //remove processed inclusion from the inclusion graph
+                element_to_process.inclusion_graph->remove_node(new_node_to_process); // TODO: is this safe?
+                // do substitution in the inclusion graph
+                element_to_process.substitute_vars(substitution_map);
+                // update inclusion graph edges
+                element_to_process.inclusion_graph->add_inclusion_graph_edges();
+                // update the substitution_map of new_element by the new substitutions
+                element_to_process.substitution_map.merge(substitution_map);
+
+                // TODO: should we really push to front when not on cycle?
+                // TODO: maybe for this case of one side being empty, we should just push to front? 
+                if (!is_node_to_process_on_cycle) {
+                    worklist.push_front(element_to_process);
+                } else {
+                    worklist.push_back(element_to_process);
+                }
+                continue;
+            }
 
             /** process left side **/
             std::vector<std::shared_ptr<Mata::Nfa::Nfa>> left_side_automata;
-            const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
             STRACE("str-nfa", tout << "Left automata:" << std::endl);
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
@@ -100,67 +170,53 @@ namespace smt::noodler {
 
             /** Combine the right side into automata where we concatenate non-length-aware vars next to each other **/
             std::vector<std::shared_ptr<Mata::Nfa::Nfa>> right_side_automata;
-            const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
             // each right side automaton corresponds to either concatenation of non-length-aware vars (vector of basic terms) or one lenght-aware var (vector of one basic term)
             std::vector<std::vector<BasicTerm>> right_side_division;
-            bool is_there_length_on_right = false;
+            assert(!right_side_vars.empty());
+            auto right_var_it = right_side_vars.begin();
+            auto right_side_end = right_side_vars.end();
 
-            if (!right_side_vars.empty()) {
-                auto right_var_it = right_side_vars.begin();
-                auto right_side_end = right_side_vars.end();
+            std::shared_ptr<Mata::Nfa::Nfa> next_aut = element_to_process.aut_ass[*right_var_it];
+            std::vector<BasicTerm> next_division{ *right_var_it };
+            bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
+            ++right_var_it;
 
-                std::shared_ptr<Mata::Nfa::Nfa> next_aut = element_to_process.aut_ass[*right_var_it];
-                std::vector<BasicTerm> next_division{ *right_var_it };
-                bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
-                is_there_length_on_right = last_was_length;
-                ++right_var_it;
-
-                for (; right_var_it != right_side_end; ++right_var_it) {
-                    std::shared_ptr<Mata::Nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
-                    if (element_to_process.length_sensitive_vars.count(*right_var_it) > 0) {
-                        // current right_var is length-aware
+            for (; right_var_it != right_side_end; ++right_var_it) {
+                std::shared_ptr<Mata::Nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
+                if (element_to_process.length_sensitive_vars.count(*right_var_it) > 0) {
+                    // current right_var is length-aware
+                    right_side_automata.push_back(next_aut);
+                    right_side_division.push_back(next_division);
+                    next_aut = right_var_aut;
+                    next_division = std::vector<BasicTerm>{ *right_var_it };
+                    last_was_length = true;
+                } else {
+                    // current right_var is not length-aware
+                    if (last_was_length) {
                         right_side_automata.push_back(next_aut);
                         right_side_division.push_back(next_division);
                         next_aut = right_var_aut;
                         next_division = std::vector<BasicTerm>{ *right_var_it };
-                        last_was_length = true;
-                        is_there_length_on_right = true;
                     } else {
-                        // current right_var is not length-aware
-                        if (last_was_length) {
-                            right_side_automata.push_back(next_aut);
-                            right_side_division.push_back(next_division);
-                            next_aut = right_var_aut;
-                            next_division = std::vector<BasicTerm>{ *right_var_it };
-                        } else {
-                            next_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*next_aut, *right_var_aut));
-                            next_division.push_back(*right_var_it);
-                            // TODO probably reduce size here
-                        }
-                        last_was_length = false;
+                        next_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*next_aut, *right_var_aut));
+                        next_division.push_back(*right_var_it);
+                        // TODO probably reduce size here
                     }
+                    last_was_length = false;
                 }
-                right_side_automata.push_back(next_aut);
-                STRACE("str-nfa", tout << "Right automata:" << std::endl);
-                STRACE("str-nfa", right_side_automata.back()->print_to_DOT(tout););
-                right_side_division.push_back(next_division);
             }
+            right_side_automata.push_back(next_aut);
+            STRACE("str-nfa", tout << "Right automata:" << std::endl);
+            STRACE("str-nfa", right_side_automata.back()->print_to_DOT(tout););
+            right_side_division.push_back(next_division);
             /** end of right side combining **/
 
             if (!is_there_length_on_right) {
                 // we have no length-aware variables on the right hand side => we need to check if inclusion holds
-
-                std::shared_ptr<Mata::Nfa::Nfa> right_side_automaton;
-                if (right_side_vars.empty()) {
-                    right_side_automaton = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::create_empty_string_nfa());
-                } else {
-                    assert(right_side_automata.size() == 1);
-                    right_side_automaton = right_side_automata[0];
-                }
-
+                assert(right_side_automata.size() == 1); // there should be exactly one element in right_side_automata as we do not have length variables
                 // TODO probably we should try shortest words, it might work correctly
                 if (is_node_to_process_on_cycle // TODO should we not test inclusion if we have node that is not on cycle? because we will not go back to it, so it should make sense to just do noodlification
-                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *right_side_automaton)) { // there should be exactly one element in right_side_automata as we do not have length variables
+                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *right_side_automata[0])) {
                     // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.nodes_to_process is empty), or just to get to sat faster
                     worklist.push_front(element_to_process);
                     // we continue as there is no need for noodlification, inclusion already holds
@@ -192,14 +248,7 @@ namespace smt::noodler {
              * i_l = noodle[i].second[0] tells us that automaton noodle[i].first belongs to the i_l-th left var (i.e. left_side_vars[i_l])
              * and the second element i_r = noodle[i].second[1] tell us that it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
              **/
-            std::vector<std::vector<std::pair<std::shared_ptr<Mata::Nfa::Nfa>, std::vector<unsigned>>>> noodles;
-            if (right_side_vars.empty() || left_side_vars.empty()) {
-                assert(!(right_side_vars.empty() && left_side_vars.empty()));
-                // as noodlification probably cannot handle situation where we have no automata on one side (representing empty word), we handle it here, by adding one empty noodle
-                noodles.push_back({});
-            } else {
-                noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata, false, {{"reduce", "true"}});
-            }
+            auto noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, right_side_automata, false, {{"reduce", "true"}});
 
             for (const auto &noodle : noodles) {
                 SolvingState new_element = element_to_process;
@@ -238,6 +287,7 @@ namespace smt::noodler {
                         } else {
                             // right_var is not substitued by anything yet, we will substitute it
                             substitution_map[right_var] = right_side_divisions_to_new_vars[i];
+                            STRACE("str", tout << "left side var " << right_var.get_name() << " replaced with:"; for (auto const &var : right_side_divisions_to_new_vars[i]) { tout << " " << var.get_name(); } tout << std::endl; );
                             // as right_var wil be substituted in the inclusion graph, we do not need to remember the automaton assignment for it
                             new_element.aut_ass.erase(right_var);
                             // update the length variables
@@ -269,6 +319,7 @@ namespace smt::noodler {
                         // TODO make this function or something, we do the same thing here as for the right side when substituting
                         // left_var is not substitued by anything yet, we will substitute it
                         substitution_map[left_var] = left_side_vars_to_new_vars[i];
+                        STRACE("str", tout << "left side var " << left_var.get_name() << " replaced with:"; for (auto const &var : left_side_vars_to_new_vars[i]) { tout << " " << var.get_name(); } tout << std::endl; );
                         // as left_var wil be substituted in the inclusion graph, we do not need to remember the automaton assignment for it
                         new_element.aut_ass.erase(left_var);
                         // update the length variables
