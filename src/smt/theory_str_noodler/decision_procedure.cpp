@@ -98,15 +98,6 @@ namespace smt::noodler {
             }
 
             bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
-
-            // // for the case that left side is empty and there are no length vars (i.e. no splitting needed), the inclusion trivially holds
-            // if (left_side_vars.empty() && !is_there_length_on_right) {
-            //     STRACE("str", tout << "Inclusion has empty left and right does not contain length aware vars, i.e. inclusion holds." << std::endl);
-            //     // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.nodes_to_process is empty), or just to get to sat faster
-            //     worklist.push_front(element_to_process);
-            //     // we continue as there is no need for noodlification, inclusion already holds
-            //     continue;
-            // }
             
             // as kinda opmtimalization step, we do "noodlification" for empty sides separately (i.e. sides that represent empty string)
             // this is because it is simpler, we would get only one noodle so we just need to check
