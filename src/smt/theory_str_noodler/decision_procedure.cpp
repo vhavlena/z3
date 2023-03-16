@@ -109,7 +109,8 @@ namespace smt::noodler {
                 for (const auto &var : non_empty_side_vars) {
                     if (Mata::Nfa::is_in_lang(*element_to_process.aut_ass.at(var), {{}, {}})) {
                         if (!right_side_vars.empty() || element_to_process.length_sensitive_vars.count(var) > 0) {
-                            // we prepare substitution for vars on left or only length vars on right (as non-length vars are probably not needed? TODO: does it makes sense to update non-length vars too?)
+                            assert(substitution_map.count(var) == 0 && element_to_process.aut_ass.count(var) > 0);
+                            // we prepare substitution for all vars on the left or only the length vars on the right (as non-length vars are probably not needed? TODO: would it make sense to update non-length vars too?)
                             substitution_map[var] = {};
                             element_to_process.aut_ass.erase(var);
                         }
@@ -154,6 +155,7 @@ namespace smt::noodler {
                 } else {
                     worklist.push_back(element_to_process);
                 }
+                continue;
             }
 
             /** process left side **/
