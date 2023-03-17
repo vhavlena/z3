@@ -1002,7 +1002,7 @@ namespace smt::noodler {
                     rem_ids.insert(pr.first);
                     continue;
                 }
-                if(pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_literal()) {
+                if(pr.second.get_right_side().size() < 1 || (pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_literal())) {
                     auto alphabet =  this->aut_ass.get_alphabet(false);
                     Mata::OnTheFlyAlphabet mata_alphabet{};
                     for (const auto& symbol : alphabet) {
@@ -1018,8 +1018,9 @@ namespace smt::noodler {
                 Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
                 if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
                     rem_ids.insert(pr.first);
+                    continue;
                 }
-                if(pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_literal()) {
+                if(pr.second.get_left_side().size() < 1 || (pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_literal())) {
                     auto alphabet =  this->aut_ass.get_alphabet(false);
                     Mata::OnTheFlyAlphabet mata_alphabet{};
                     for (const auto& symbol : alphabet) {
