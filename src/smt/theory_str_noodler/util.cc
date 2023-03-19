@@ -600,4 +600,24 @@ namespace smt::noodler::util {
             get_len_exprs(arg, m_util_s, m, res);
         }
     }
+
+    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res) {
+        expr* num = nullptr;
+        expr* len = nullptr;
+        expr* str = nullptr;
+        if(!m_util_a.is_add(val, num, len)) {
+            return false;
+        }
+
+        if(!m_util_a.is_int(num)) {
+            return false;
+        }
+        num_res = num;
+
+        if(!m_util_s.str.is_length(len, str) || str->hash() != s->hash()) {
+            return false;
+        } 
+        
+        return true;
+    }
 }

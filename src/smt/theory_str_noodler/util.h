@@ -211,6 +211,19 @@ namespace smt::noodler::util {
     }
 
     /**
+     * @brief Check whether the expression @p val is of the form ( @p num_res ) + (len @p s ).
+     * 
+     * @param val Expression to be checked
+     * @param s String term with length
+     * @param m ast manager
+     * @param m_util_s string ast util
+     * @param m_util_a arith ast util
+     * @param[out] num_res expression to be substracked from length term
+     * @return Is of the form.
+     */
+    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res);
+
+    /**
      * @brief Convert Length node to z3 length formula
      *
      * @param node Length node
