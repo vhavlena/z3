@@ -999,25 +999,29 @@ namespace smt::noodler {
         expr *s = nullptr, *i = nullptr, *res = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
 
+        expr_ref fresh = mk_str_var("at");
+        expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref zero(m_util_a.mk_int(0), m);
+        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
+        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero));
+        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
+
         rational r;
         if(m_util_a.is_numeral(i, r)) {
             int val = r.get_int32();
 
             expr_ref y = mk_str_var("at_right");
-            expr_ref fresh = mk_str_var("at");
 
             for(int j = val; j >= 0; j--) {
                 y = m_util_s.str.mk_concat(m_util_s.str.mk_at(s, m_util_a.mk_int(j)), y);
             }
             string_theory_propagation(y);
 
-            expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
-            expr_ref zero(m_util_a.mk_int(0), m);
-            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-
-            add_axiom({mk_eq(s, y, false)});
+            add_axiom({i_ge_len_s, mk_eq(s, y, false)});
+            add_axiom({i_ge_len_s, mk_literal(re)});
             add_axiom({mk_eq(fresh, e, false)});
-            add_axiom({mk_literal(re)});
+            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
+            add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
 
             predicate_replace.insert(e, fresh.get());
             return;
@@ -1026,42 +1030,29 @@ namespace smt::noodler {
             int val = r.get_int32();
 
             expr_ref y = mk_str_var("at_left");
-            expr_ref fresh = mk_str_var("at");
 
             for(int j = val; j > 0; j++) {
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);
 
-            expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
-            expr_ref zero(m_util_a.mk_int(0), m);
-            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-
             add_axiom({~i_ge_0, mk_eq(s, y, false)});
             add_axiom({mk_eq(fresh, e, false)});
             add_axiom({~i_ge_0, mk_literal(re)});
+            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
 
             predicate_replace.insert(e, fresh.get());
             return;
         }
 
-
-        expr_ref len_s(m_util_s.str.mk_length(s), m);
-        expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref one(m_util_a.mk_int(1), m);
-
-        expr_ref fresh = mk_str_var("at");
         expr_ref x = mk_str_var("at_left");
         expr_ref y = mk_str_var("at_right");
         expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(fresh, y)), m);
         string_theory_propagation(xey);
 
         expr_ref len_x(m_util_s.str.mk_length(x), m);
-        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
-        expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero));
-
+ 
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_literal(re)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(i, len_x, false)});

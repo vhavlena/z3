@@ -1050,6 +1050,19 @@ namespace smt::noodler {
         }
 
         for(const auto& pr : ineqs) {
+
+            if(pr.second.get_left_side().size() == 1 && pr.second.get_right_side().size() == 1) {
+                Mata::Nfa::Nfa autl = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                Mata::Nfa::Nfa autr = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
+
+                if(Mata::Nfa::are_equivalent(autl, sigma) && Mata::Nfa::are_equivalent(autr, sigma)) {
+                    this->formula.remove_predicate(pr.first);
+                    this->diseq_variables.insert({pr.second.get_left_side()[0], pr.second.get_right_side()[0]});
+                    continue;;
+                }
+            }
+
             BasicTerm x1 = this->create_fresh_var();
             BasicTerm a1 = this->create_fresh_var();
             BasicTerm y1 = this->create_fresh_var();
