@@ -1067,6 +1067,7 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(i, len_x, false)});
         add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
         add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
+        add_axiom({mk_eq(fresh, e, false)});
 
         // add the replacement charat -> v
         predicate_replace.insert(e, fresh.get());
@@ -1143,7 +1144,7 @@ namespace smt::noodler {
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
-        // add_axiom({mk_eq(v, e, false)});
+        add_axiom({mk_eq(v, e, false)});
 
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());
