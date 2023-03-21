@@ -343,7 +343,7 @@ namespace smt::noodler {
             literal lit(mk_eq(len_str, len, false));
             // ctx.mark_as_relevant(lit);
             ctx.mk_th_axiom(get_id(), 1, &lit);
-        } else {
+        } else if(!m.is_ite(a_str)) {
             // build axiom 1: Length(a_str) >= 0
             { 
                 /**
