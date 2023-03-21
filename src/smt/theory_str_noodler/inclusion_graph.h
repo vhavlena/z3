@@ -58,11 +58,6 @@ namespace smt::noodler {
         Edges edges;
         Edges inverse_edges;
         static const Nodes empty_nodes;
-        // set of nodes that do not have edge coming to them
-        // it is guaranteed to be correct ONLY after creating splitting/inclusion graph
-        // methods adding/removing edges DO NOT UPDATE this set, i.e. IT MIGHT NOT BE CORRECT
-        // TODO: probably not needed
-        std::unordered_set<std::shared_ptr<GraphNode>> initial_nodes;
         // set of nodes that are NOT on some cycle
         // it is guaranteed to be correct ONLY after creating inclusion graph???
         std::unordered_set<std::shared_ptr<GraphNode>> nodes_not_on_cycle;
