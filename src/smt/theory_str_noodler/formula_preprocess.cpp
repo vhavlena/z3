@@ -352,6 +352,19 @@ namespace smt::noodler {
                 continue;
             }
 
+            if(!eq.get_left_side()[0].is_variable()) {
+                eq = eq.get_switched_sides_predicate();
+            }
+            if(!eq.get_left_side()[0].is_variable()) {
+                continue;
+            }
+            if(!eq.get_right_side()[0].is_variable()) {
+                BasicTerm v_left = eq.get_left_side()[0]; // X
+                update_reg_constr(v_left, eq.get_right_side());
+                this->formula.remove_predicate(index);
+                continue;
+            }
+
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
