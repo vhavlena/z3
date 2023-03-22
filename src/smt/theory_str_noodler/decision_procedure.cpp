@@ -415,7 +415,7 @@ namespace smt::noodler {
             return get_length_ass(variable_map, ass, ass.get_keys());
         } else {
             ass = this->solution.flatten_substition_map();
-            return get_length_ass(variable_map, ass, this->init_length_sensitive_vars);
+            return get_length_ass(variable_map, ass, ass.get_keys());
         }
     }
 
