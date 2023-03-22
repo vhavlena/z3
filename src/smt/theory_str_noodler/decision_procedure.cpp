@@ -344,6 +344,7 @@ namespace smt::noodler {
                                                                         {{"reduce", "true"}});
 
             for (const auto &noodle : noodles) {
+                STRACE("str", tout << "Processing noodle" << std::endl; );
                 SolvingState new_element = element_to_process;
                 // we need to make a deep copy, because we will be updating this graph
                 // TODO if !is_there_length_on_right we should not copy somehow, if there are no automata accepting only empty word
@@ -396,11 +397,14 @@ namespace smt::noodler {
                         if (substitution_map.count(right_var)) {
                             // right_var is already substituted, therefore we add 'new_vars ⊆ right_var' to the inclusion graph
                             const auto &new_inclusion = new_element.inclusion_graph->add_node(right_side_divisions_to_new_vars[i], division);
+                            // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
+                            new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
                             // we also add this inclusion to the worklist, as it represents unification
                             // we push it to the front if we are processing node that is not on the cycle, because it should not get stuck in the cycle then
                             // TODO: is this correct? can we push to the front?
                             // TODO: can't we push to front even if it is on cycle??
                             new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
+                            STRACE("str", tout << "added new inclusion from the right side because it could not be substituted: " << new_inclusion->get_predicate() << std::endl; );
                         } else {
                             // right_var is not substitued by anything yet, we will substitute it
                             substitution_map[right_var] = right_side_divisions_to_new_vars[i];
@@ -416,6 +420,8 @@ namespace smt::noodler {
                     } else {
                         // right side is non-length concatenation "y_1...y_n" => we are adding new inclusion "new_vars ⊆ y1...y_n"
                         const auto &new_inclusion = new_element.inclusion_graph->add_node(right_side_divisions_to_new_vars[i], division);
+                        // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
+                        new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
                         // we add this inclusion to the worklist only if the right side contains something that was on the left (i.e. it was possibly changed)
                         for (const auto &right_var : division) {
                             if (left_vars_set.count(right_var) > 0) {
@@ -424,6 +430,7 @@ namespace smt::noodler {
                                 break;
                             }
                         }
+                        STRACE("str", tout << "added new inclusion from the right side (non-length): " << new_inclusion->get_predicate() << std::endl; );
                     }
                 }
 
@@ -446,11 +453,14 @@ namespace smt::noodler {
                         // left_var is already substituted, therefore we add 'left_var ⊆ left_side_vars_to_new_vars[i]' to the inclusion graph
                         std::vector<BasicTerm> new_inclusion_left_side{ left_var };
                         const auto &new_inclusion = new_element.inclusion_graph->add_node(new_inclusion_left_side, left_side_vars_to_new_vars[i]);
+                        // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
+                        new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
                         // we also add this inclusion to the worklist, as it represents unification
                         // we push it to the front if we are processing node that is not on the cycle, because it should not get stuck in the cycle then
                         // TODO: is this correct? can we push to the front?
                         // TODO: can't we push to front even if it is on cycle??
                         new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
+                        STRACE("str", tout << "added new inclusion from the left side because it could not be substituted: " << new_inclusion->get_predicate() << std::endl; );
                     } else {
                         // TODO make this function or something, we do the same thing here as for the right side when substituting
                         // left_var is not substitued by anything yet, we will substitute it
