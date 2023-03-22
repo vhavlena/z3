@@ -506,6 +506,10 @@ namespace smt::noodler {
         if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
             axiomatized_eq_vars.insert(std::make_pair(x, y));
 
+            if(!ctx.e_internalized(m.mk_eq(l, r))) {
+                ctx.mark_as_relevant(m.mk_eq(l, r));
+            }
+
             if(ctx.is_relevant(m.mk_eq(l, r)) || ctx.is_relevant(m.mk_eq(r, l))) {
                 literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
                 literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
@@ -636,6 +640,9 @@ namespace smt::noodler {
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
 
             if(!ctx.is_relevant(eq.get()) && !ctx.is_relevant(eq_rev.get())) {
+                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
+                ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
+
                 continue;
             }
 
@@ -703,7 +710,7 @@ namespace smt::noodler {
             return FC_GIVEUP;
         }
 
-
+        expr* fls = nullptr; // false term
         obj_hashtable<expr> conj;
         obj_hashtable<app> conj_instance;
         size_t new_symbs = this->m_word_diseq_todo_rel.size();
@@ -711,6 +718,9 @@ namespace smt::noodler {
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
+            if(m.is_false(e)) {
+                fls = m.mk_eq(we.first, we.second);
+            }
             conj.insert(e);
             conj_instance.insert(e);
             if(eq_prop == nullptr) {
@@ -742,6 +752,12 @@ namespace smt::noodler {
                 new_symbs++;
             }
             STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
+        }
+
+        // if an equation is of the form "aa" = "bbb", we immediately quit
+        if(fls != nullptr) {
+            add_axiom(m.mk_not(fls));
+            return FC_CONTINUE;
         }
 
         Formula instance;
@@ -784,6 +800,7 @@ namespace smt::noodler {
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_true) {
+                STRACE("str", tout << "len sat " << mk_pp(lengths, m););
                 return FC_DONE;
             }
             if(init_length_sensitive_vars.size() > 0) {
