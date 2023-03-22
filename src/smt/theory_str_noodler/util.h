@@ -196,6 +196,13 @@ namespace smt::noodler::util {
         return var;
     }
 
+    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
+        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
+            nullptr, int_sort), m);
+        return var;
+    }
+
     /**
      * @brief Create a fresh int variable.
      *
@@ -244,7 +251,7 @@ namespace smt::noodler::util {
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name().encode(), m, m_util_s)), m);
+                    var_expr = expr_ref(mk_int_var(node->atom_val.get_name().encode(), m, m_util_s, m_util_a), m);
                 }
                 return var_expr;
             }
