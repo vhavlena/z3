@@ -104,43 +104,55 @@ namespace smt::noodler {
 
     };
 
-
+    /// A state of decision procedure that can lead to a solution
     struct SolvingState {
+        // aut_ass[x] assigns variable x to some autoamton while substitution_map[x] maps variable x to
+        // the concatenation of variables for which x was substituted (i.e. its automaton is concatenation
+        // of the automata from these variables). Each variable is either assigned in aut_ass or
+        // substituted in substitution_map, but not both!
         AutAssignment aut_ass;
-        std::deque<std::shared_ptr<GraphNode>> nodes_to_process;
+        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
+
+        // inclusion_graph contains inclusions of concatenation of variables (where each variable occuring in
+        // this inclusion graph should be in either aut_ass or substitution_map) and we are trying to find
+        // aut_ass + substitution_map such that these inclusions will hold
         std::shared_ptr<Graph> inclusion_graph;
+
+        // contains inclusions from inclusion_graph that needs to be processed (i.e. checked if the inclusion
+        // holds and if not, do something so that inclusion holds)
+        std::deque<std::shared_ptr<GraphNode>> nodes_to_process;
+
+        // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
-        // substitution_map[x] maps variable x to the concatenation of variables for which x was substituted
-        // each variable should be either assigned in aut_ass or substituted in this map
-        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
-                        std::deque<std::shared_ptr<GraphNode>> nodes_to_process,
-                        std::shared_ptr<Graph> inclusion_graph,
-                        std::unordered_set<BasicTerm> length_sensitive_vars,
-                        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::deque<std::shared_ptr<GraphNode>> nodes_to_process,
+                     std::shared_ptr<Graph> inclusion_graph,
+                     std::unordered_set<BasicTerm> length_sensitive_vars,
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
                         : aut_ass(aut_ass),
-                          nodes_to_process(nodes_to_process),
+                          substitution_map(substitution_map),
                           inclusion_graph(inclusion_graph),
-                          length_sensitive_vars(length_sensitive_vars),
-                          substitution_map(substitution_map) {}
+                          nodes_to_process(nodes_to_process),
+                          length_sensitive_vars(length_sensitive_vars) {}
 
-        // pushes node to the beginning of nodes_to_process but only if it is not in it yet
+        /// pushes node to the beginning of nodes_to_process but only if it is not in it yet
         void push_front_unique(const std::shared_ptr<GraphNode> &node) {
             if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
                 nodes_to_process.push_front(node);
             }
         }
 
-        // pushes node to the end of nodes_to_process but only if it is not in it yet
+        /// pushes node to the end of nodes_to_process but only if it is not in it yet
         void push_back_unique(const std::shared_ptr<GraphNode> &node) {
             if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
                 nodes_to_process.push_back(node);
             }
         }
 
+        /// pushes node either to the end or beginning of nodes_to_process (according to @p to_back) but only if it is not in it yet
         void push_unique(const std::shared_ptr<GraphNode> &node, bool to_back) {
             if (to_back) {
                 push_back_unique(node);
@@ -149,11 +161,16 @@ namespace smt::noodler {
             }
         }
 
-        // inclusion_graph will become a new deep copy of the existing inclusion_graph
-        // edges are removed
-        // nodes_to_process are updated so that the pointers point to the nodes of this deep copy
-        // processed_node is the node that is being processed, the return value is this node in the deep copy
-        // TODO this function is really ugly, I should do something about it
+        /**
+         * This function makes a deep copy of the existing inclusion_graph (i.e. nodes are copied), removes all edges
+         * and also updates nodes_to_process so that pointers point into the nodes of this deep copy.
+         * and also remove all edges
+         * 
+         * TODO: this function is really ugly, I should do something about it
+         * 
+         * @param processed_node node that is being processed in original inclusion graph
+         * @return the new processed_node in the deep copy
+         */
         std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
 
         // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process (and also nodes that have same sides are deleted)
@@ -164,7 +181,6 @@ namespace smt::noodler {
          *
          * For example, if we have aut_ass[x] = aut1, aut_ass[y] = aut2, and substitution_map[z] = xy, then this will return
          * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
-         *
          */
         AutAssignment flatten_substition_map();
     };
@@ -180,7 +196,7 @@ namespace smt::noodler {
 
         FormulaPreprocess prep_handler;
 
-
+        // a deque containing states of decision procedure, each of them can lead to a solution
         std::deque<SolvingState> worklist;
 
         /// State of a found satisfiable solution set when one is computed using
@@ -222,6 +238,20 @@ namespace smt::noodler {
         bool check_diseqs(const AutAssignment& ass);
 
     public:
+        /**
+         * Initialize a new decision procedure that can solve word equations
+         * (equalities of concatenations of string variables) with regular constraints
+         * (variables belong to some regular language represented by automaton) while
+         * keeping the length dependencies between variables (for the variables that
+         * occur in some length constraint in the rest of the formula).
+         * 
+         * @param equalities encodes the word equations
+         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
+         * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
+         * @param m Z3 AST manager
+         * @param m_util_s Z3 string manager
+         * @param m_util_a Z3 arithmetic manager
+         */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
