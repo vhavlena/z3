@@ -537,7 +537,7 @@ namespace smt::noodler::util {
     }
 
     Nfa create_word_nfa(const zstring& word) {
-        const size_t word_length{ word.length() };
+        const unsigned word_length{ word.length() };
         Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
         for (size_t i{ 0 }; i < word_length; ++i) {
             mata_alphabet->try_add_new_symbol(std::to_string(word[i]), word[i]);
