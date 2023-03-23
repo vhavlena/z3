@@ -995,6 +995,36 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
+     * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
+     */
+    void FormulaPreprocess::skip_len_sat() {
+        std::set<size_t> rem_ids;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_equation())
+                continue;
+
+            if(this->formula.single_occurr(pr.second.get_left_set())) {
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                    rem_ids.insert(pr.first);
+                }
+            }
+            if(this->formula.single_occurr(pr.second.get_right_set())) {
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                    rem_ids.insert(pr.first);
+                }
+            }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+    }
+
+    /**
      * @brief Reduce the number of diseqalities.
      */
     void FormulaPreprocess::reduce_diseqalities() {
