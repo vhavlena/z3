@@ -346,6 +346,9 @@ namespace smt::noodler {
         while(!worklist.empty()) {
             size_t index = worklist.front();
             worklist.pop_front();
+            if(this->formula.get_predicates().find(index) == this->formula.get_predicates().end()) {
+                continue;
+            }
             Predicate eq = this->formula.get_predicate(index);
             if(eq.get_left_side() == eq.get_right_side()) {
                 this->formula.remove_predicate(index);
