@@ -375,9 +375,9 @@ namespace smt::noodler {
             auto it = variable_map.find(var);
             expr_ref var_expr(this->m);
             if(it != variable_map.end()) { // take the existing variable from the map
-                var_expr = it->second;
+                var_expr = m_util_s.str.mk_length(it->second);
             } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_str_var(var.get_name().encode(), this->m, this->m_util_s);
+                var_expr = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
             }
             lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
         }
@@ -397,10 +397,46 @@ namespace smt::noodler {
             lengths = this->m.mk_and(lengths, this->m.mk_false());
         }
 
-        STRACE("str", tout << mk_pp(lengths, this->m) << "\n");
-
         return lengths;
     }
+
+    expr_ref DecisionProcedure::get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state) {
+        expr_ref fl(m.mk_true(), m);
+        
+        for(const BasicTerm& term : state.length_sensitive_vars) {
+            auto it = state.substitution_map.find(term);
+            if(it == state.substitution_map.end()) {
+                continue;
+            }
+
+            expr_ref left(m);
+            auto varit = variable_map.find(term);
+            expr_ref var_expr(this->m);
+            if(varit != variable_map.end()) { // take the existing variable from the map
+                var_expr = m_util_s.str.mk_length(varit->second);
+            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+                var_expr = util::mk_int_var(term.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+            }
+            left = var_expr;
+
+            expr_ref sum(m_util_a.mk_int(0), m);
+            for(const BasicTerm&tp : it->second) {
+
+                auto varit = variable_map.find(tp);
+                expr_ref var_expr(this->m);
+                if(varit != variable_map.end()) { // take the existing variable from the map
+                    var_expr = m_util_s.str.mk_length(varit->second);
+                } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+                    var_expr = util::mk_int_var(tp.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+                }
+
+                sum = m_util_a.mk_add(sum, var_expr);
+            }
+            fl = m.mk_and(fl, m.mk_eq(left, sum), m_util_a.mk_ge(left, m_util_a.mk_int(0)));
+        }
+
+        return fl;
+    }   
 
     /**
      * @brief Get length constraints of the solution
@@ -415,7 +451,12 @@ namespace smt::noodler {
             return get_length_ass(variable_map, ass, ass.get_keys());
         } else {
             ass = this->solution.flatten_substition_map();
-            return get_length_ass(variable_map, ass, this->init_length_sensitive_vars);
+            
+            expr_ref sm = get_subs_map_len(variable_map, this->solution);
+            expr_ref faut = get_length_ass(variable_map, ass, this->solution.length_sensitive_vars);
+            expr_ref res(m.mk_and(sm, faut), m);
+
+            return res;
         }
     }
 
@@ -499,7 +540,7 @@ namespace smt::noodler {
      * @return expr_ref Length formula
      */
     expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
-        expr_ref len_x(this->m_util_s.str.mk_length(var), this->m);
+        expr_ref len_x(var, this->m);
         expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_s, this->m_util_a);
         expr_ref c1(this->m_util_a.mk_int(v1), this->m);
         expr_ref c2(this->m_util_a.mk_int(v2), this->m);
@@ -523,7 +564,7 @@ namespace smt::noodler {
         for(const auto& cns : aut_constr) {
             res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
         }
-        res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(this->m_util_s.str.mk_length(var), this->m_util_a.mk_int(0))), this->m);
+        res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(var, this->m_util_a.mk_int(0))), this->m);
         return res;
     }
 

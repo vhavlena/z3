@@ -219,6 +219,8 @@ namespace smt::noodler {
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
         expr_ref get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
 
+        expr_ref get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
+
         bool check_diseqs(const AutAssignment& ass);
 
     public:
