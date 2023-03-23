@@ -1734,7 +1734,7 @@ namespace smt::noodler {
         } 
 
         // generate length formula for the regular expression
-        if(ctx.is_relevant(e) && is_true) {
+        if(ctx.is_relevant(e) && is_true && false) { // turn it off for now
             std::set<uint32_t> alphabet;
             util::extract_symbols(re, this->m_util_s, this->m, alphabet);
             util::get_dummy_symbols(2, alphabet);
