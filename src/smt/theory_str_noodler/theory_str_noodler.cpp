@@ -1741,7 +1741,8 @@ namespace smt::noodler {
             Mata::Nfa::Nfa aut = util::conv_to_nfa(to_app(re), this->m_util_s, this->m, alphabet, !is_true);
             auto aut_lens = Mata::Strings::get_word_lengths(aut);
 
-            expr_ref len_formula = this->dec_proc.mk_len_aut(expr_ref(re_constr, m), aut_lens);
+            expr_ref len_re(m_util_s.str.mk_length(re_constr), m);
+            expr_ref len_formula = this->dec_proc.mk_len_aut(len_re, aut_lens);
             add_axiom({~mk_literal(re_atom), mk_literal(len_formula)});
             STRACE("str", tout << "re-axiom: " << mk_pp(len_formula, m) << "\n"; );
         }

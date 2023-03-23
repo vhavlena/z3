@@ -108,6 +108,8 @@ namespace smt::noodler {
      */
     bool FormulaVar::single_occurr(const std::set<BasicTerm>& items) const {
         for(const BasicTerm& t : items) {
+            if(t.get_type() != BasicTermType::Variable)
+                continue;
             assert(t.get_type() == BasicTermType::Variable);
             if(this->varmap.at(t).size() > 1) {
                 return false;
