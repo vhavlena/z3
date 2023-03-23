@@ -773,9 +773,6 @@ namespace smt::noodler {
         )};
 
         // Add dummy symbols for all disequations.
-        if(symbols_in_formula.size() + new_symbs <= 1) { // alphabet should have at least 2 symbols
-            new_symbs++;
-        }
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
