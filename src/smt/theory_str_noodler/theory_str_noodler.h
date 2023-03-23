@@ -54,8 +54,6 @@ namespace smt::noodler {
 
         std::map<BasicTerm, expr_ref> var_name;
 
-        DecisionProcedure dec_proc;
-
         // mapping predicates and function to variables that they substitute to
         obj_map<expr, expr*> predicate_replace;
 

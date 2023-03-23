@@ -225,6 +225,11 @@ namespace smt::noodler {
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
 
+        DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
+                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+         );
+
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;

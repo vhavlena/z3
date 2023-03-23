@@ -613,4 +613,16 @@ namespace smt::noodler {
             }
         }
     }
+
+    DecisionProcedure::DecisionProcedure(
+             const Formula &equalities, AutAssignment init_aut_ass,
+             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+     ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars), m{ m }, m_util_s{ m_util_s },
+     m_util_a{ m_util_a },
+     init_length_sensitive_vars{ init_length_sensitive_vars },
+         formula { equalities },
+         init_aut_ass{ init_aut_ass } {
+         }
+
 } // Namespace smt::noodler.

@@ -34,8 +34,7 @@ namespace smt::noodler {
         m_util_a(m),
         m_util_s(m),
         state_len(),
-        m_length(m),
-        dec_proc(m, m_util_s, m_util_a) {
+        m_length(m) {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -782,12 +781,12 @@ namespace smt::noodler {
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
-        this->dec_proc.set_instance(instance, aut_assignment, init_length_sensitive_vars);
-        this->dec_proc.preprocess();
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
+        dec_proc.preprocess();
         
         if(init_length_sensitive_vars.size() > 0) {
             // check if the initial assignment is len unsat
-            lengths = this->dec_proc.get_lengths(this->var_name);
+            lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_false) {
                 block_curr_len(lengths);
                 return FC_DONE;
@@ -795,9 +794,9 @@ namespace smt::noodler {
         }
 
         expr_ref block_len(m.mk_false(), m);
-        this->dec_proc.init_computation();
-        while(this->dec_proc.compute_next_solution()) {
-            lengths = this->dec_proc.get_lengths(this->var_name);
+        dec_proc.init_computation();
+        while(dec_proc.compute_next_solution()) {
+            lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m););
                 return FC_DONE;
@@ -1734,18 +1733,18 @@ namespace smt::noodler {
         } 
 
         // generate length formula for the regular expression
-        if(ctx.is_relevant(e) && is_true && false) { // turn it off for now
-            std::set<uint32_t> alphabet;
-            util::extract_symbols(re, this->m_util_s, this->m, alphabet);
-            util::get_dummy_symbols(2, alphabet);
-            Mata::Nfa::Nfa aut = util::conv_to_nfa(to_app(re), this->m_util_s, this->m, alphabet, !is_true);
-            auto aut_lens = Mata::Strings::get_word_lengths(aut);
+        // if(ctx.is_relevant(e) && is_true && false) { // turn it off for now
+        //     std::set<uint32_t> alphabet;
+        //     util::extract_symbols(re, this->m_util_s, this->m, alphabet);
+        //     util::get_dummy_symbols(2, alphabet);
+        //     Mata::Nfa::Nfa aut = util::conv_to_nfa(to_app(re), this->m_util_s, this->m, alphabet, !is_true);
+        //     auto aut_lens = Mata::Strings::get_word_lengths(aut);
 
-            expr_ref len_re(m_util_s.str.mk_length(re_constr), m);
-            expr_ref len_formula = this->dec_proc.mk_len_aut(len_re, aut_lens);
-            add_axiom({~mk_literal(re_atom), mk_literal(len_formula)});
-            STRACE("str", tout << "re-axiom: " << mk_pp(len_formula, m) << "\n"; );
-        }
+        //     expr_ref len_re(m_util_s.str.mk_length(re_constr), m);
+        //     expr_ref len_formula = this->dec_proc.mk_len_aut(len_re, aut_lens);
+        //     add_axiom({~mk_literal(re_atom), mk_literal(len_formula)});
+        //     STRACE("str", tout << "re-axiom: " << mk_pp(len_formula, m) << "\n"; );
+        // }
         
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
