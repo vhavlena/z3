@@ -453,7 +453,7 @@ namespace smt::noodler {
             ass = this->solution.flatten_substition_map();
             
             expr_ref sm = get_subs_map_len(variable_map, this->solution);
-            expr_ref faut = get_length_ass(variable_map, ass, ass.get_keys());
+            expr_ref faut = get_length_ass(variable_map, ass, this->solution.length_sensitive_vars);
             expr_ref res(m.mk_and(sm, faut), m);
 
             return res;
