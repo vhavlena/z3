@@ -50,7 +50,8 @@ namespace smt::noodler::util {
             }
             extract_symbols(to_app(arg), m_util_s, m, alphabet);
             return;
-        } else if (m_util_s.re.is_concat(ex_app) // Handle concatenation.
+        } else if (m_util_s.re.is_concat(ex_app) // Handle regex concatenation.
+                || m_util_s.str.is_concat(ex_app) // Handle string concatenation.
                 || m_util_s.re.is_intersection(ex_app) // Handle intersection.
             ) {
             for (unsigned int i = 0; i < ex_app->get_num_args(); ++i) {
@@ -123,14 +124,7 @@ namespace smt::noodler::util {
         } else if(is_variable(ex_app, m_util_s)) { // Handle variable.
             throw_error("variable should not occur here");
         } else {
-            throw_error("something unsupported");
-
-            // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
-            for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-                SASSERT(is_app(ex_app->get_arg(i)));
-                app *arg = to_app(ex_app->get_arg(i));
-                extract_symbols(arg, m_util_s, m, alphabet);
-            }
+            throw_error("unsupported string operation");
         }
     }
 
@@ -429,7 +423,9 @@ namespace smt::noodler::util {
                 throw_error("we support only string literals in str.to_re");
             }
             nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet);
-        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
+        } else if (m_util_s.re.is_concat(expr) // Handle regex concatenation.
+                || m_util_s.str.is_concat(expr) // Handle string concatenation.
+                ) {
             SASSERT(expr->get_num_args() > 0);
             nfa = conv_to_nfa(to_app(expr->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expr->get_num_args(); ++i) {
@@ -548,7 +544,7 @@ namespace smt::noodler::util {
             SASSERT(expr->get_num_parameters() == 1);
             nfa = create_word_nfa(expr->get_parameter(0).get_zstring());
         } else if(is_variable(expr, m_util_s)) { // Handle variable.
-            throw_error("variable should not occur here");
+            throw_error("variable in regexes are unsupported");
         } else {
             throw_error("unsupported operation");
         }
