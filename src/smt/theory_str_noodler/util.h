@@ -30,6 +30,15 @@ namespace smt::noodler::util {
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
 
     /**
+     * Throws error and select which class to throw based on debug (if we are
+     * debugging, we do not want z3 to catch our error, if we are not debugging
+     * we want z3 to catch it and return unknown).
+     * 
+     * @param errMsg Error message
+     */
+    void throw_error(std::string errMsg);
+
+    /**
     Get variables from a given expression @p ex. Append to the output parameter @p res.
     @param ex Expression to be checked for variables.
     @param m_util_s Seq util for AST
