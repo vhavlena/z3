@@ -477,7 +477,51 @@ namespace smt::noodler::util {
                 nfa = Mata::Nfa::intersection(nfa, conv_to_nfa(to_app(expr->get_arg(i)), m_util_s, m, alphabet));
             }
         } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
-            throw_error("regex loop is unsupported");
+            unsigned low, high;
+            expr *body;
+            bool is_high_set = false;
+            if (m_util_s.re.is_loop(expr, body, low, high)) {
+                is_high_set = true;
+            } else if (m_util_s.re.is_loop(expr, body, low)) {
+                is_high_set = false;
+            } else {
+                throw_error("loop should contain at least lower bound");
+            }
+
+            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet);
+            nfa = Mata::Nfa::create_empty_string_nfa();
+            // we need to repeat body_nfa at least low times
+            for (unsigned i = 0; i < low; ++i) {
+                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+            }
+
+            // we will now either repeat body_nfa high-low times (if is_high_set) or
+            // unlimited times (if it is not set), but we have to accept after each loop,
+            // so we add an empty word into body_nfa by making some initial state final
+            if (body_nfa.initial.empty()) {
+                State new_state = body_nfa.add_state();
+                body_nfa.initial.add(new_state);
+                body_nfa.final.add(new_state);
+            } else {
+                body_nfa.final.add(*(body_nfa.initial.begin()));
+            }
+
+            if (is_high_set) {
+                // if high is set, we repeat body_nfa another high-low times
+                for (unsigned i = 0; i < high - low; ++i) {
+                    nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+                }
+            } else {
+                // if high is not set, we can repeat body_nfa unlimited more times
+                // so we do star operation on body_nfa and add it to end of nfa
+                for (const auto& final : body_nfa.final) {
+                    for (const auto& initial : body_nfa.initial) {
+                        body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                    }
+                }
+                body_nfa.remove_epsilon();
+                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+            }
         } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
             throw_error("of predicate is unsupported");
         } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
@@ -530,8 +574,13 @@ namespace smt::noodler::util {
             nfa.remove_epsilon();
 
             // Make one initial final in order to accept empty string as is required by kleene-star.
-            SASSERT(!nfa.initial.empty());
-            nfa.final.add(*nfa.initial.begin());
+            if (nfa.initial.empty()) {
+                State new_state = nfa.add_state();
+                nfa.initial.add(new_state);
+                nfa.final.add(new_state);
+            } else {
+                nfa.final.add(*(body_nfa.initial.begin()));
+            }
         } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
             SASSERT(expr->get_num_args() == 1);
             const auto child{ expr->get_arg(0) };
@@ -549,11 +598,11 @@ namespace smt::noodler::util {
         } else if(is_variable(expr, m_util_s)) { // Handle variable.
             throw_error("variable in regexes are unsupported");
         } else {
-            throw_error("unsupported operation");
+            throw_error(std::string("unsupported operation in regex: ") + expr->get_name());
         }
 
         // Whether to create complement of the final automaton.
-        // Warning: if you by any chance want to change this, is_complement assumes we do the following!
+        // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
             Mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : alphabet) {
