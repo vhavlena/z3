@@ -83,13 +83,12 @@ namespace smt::noodler::util {
         } else if (m_util_s.re.is_full_seq(ex_app)) {
             // Handle full sequence of characters (any sequence of characters, '.*') (SMT2: re.all).
             return;
-        } else if (m_util_s.re.is_loop(ex_app)) { // Handle loop.
-            throw_error("regex loop is unsupported");
         } else if (m_util_s.re.is_of_pred(ex_app)) { // Handle of predicate.
             throw_error("of predicate is unsupported");
         } else if (m_util_s.re.is_opt(ex_app) // Handle optional.
                 || m_util_s.re.is_plus(ex_app) // Handle positive iteration.
                 || m_util_s.re.is_star(ex_app) // Handle star iteration.
+                || m_util_s.re.is_loop(ex_app) // Handle loop.
             ) {
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
@@ -124,7 +123,13 @@ namespace smt::noodler::util {
         } else if(is_variable(ex_app, m_util_s)) { // Handle variable.
             throw_error("variable should not occur here");
         } else {
-            throw_error("unsupported string operation");
+            // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
+            // TODO: maybe we can just leave is_range, is_variable and is_string in this function and otherwise do this:
+            for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+                SASSERT(is_app(ex_app->get_arg(i)));
+                app *arg = to_app(ex_app->get_arg(i));
+                extract_symbols(arg, m_util_s, m, alphabet);
+            }
         }
     }
 
@@ -423,9 +428,7 @@ namespace smt::noodler::util {
                 throw_error("we support only string literals in str.to_re");
             }
             nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet);
-        } else if (m_util_s.re.is_concat(expr) // Handle regex concatenation.
-                || m_util_s.str.is_concat(expr) // Handle string concatenation.
-                ) {
+        } else if (m_util_s.re.is_concat(expr)) { // Handle regex concatenation.
             SASSERT(expr->get_num_args() > 0);
             nfa = conv_to_nfa(to_app(expr->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expr->get_num_args(); ++i) {
