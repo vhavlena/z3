@@ -1094,7 +1094,7 @@ namespace smt::noodler {
         expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
-        
+
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
@@ -1112,22 +1112,47 @@ namespace smt::noodler {
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
         }
 
-        //expr_ref lx(m_util_s.str.mk_length(x), m);
         expr_ref le(m_util_s.str.mk_length(v), m);
-
         expr_ref y = mk_str_var("post_substr");
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
+        
+        rational rl;
+        expr * num_len;
+        if(m_util_a.is_numeral(l, rl)) {
+            int lval = rl.get_int32();
+            expr_ref substr_re(m);
+            for(int i = 0; i < lval; i++) {
+                if(substr_re == nullptr) {
+                    substr_re = m_util_s.re.mk_full_char(nullptr);
+                } else {
+                    substr_re = m_util_s.re.mk_concat(substr_re, m_util_s.re.mk_full_char(nullptr));
+                }  
+            }
+            expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
+
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
+            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
+            // 0 <= i <= |s| && |s| < l + i  -> s = x.v
+            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(xe, s, false)});
+        } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)) {
+            xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
+            xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
+        } else {
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
+             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+             // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
+             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
+             this->len_vars.insert(v);
+        }
 
         string_theory_propagation(xe);
         string_theory_propagation(xey);
-
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
         add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-        add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
         // 0 <= i <= |s| && l < 0 -> v = eps
         add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
@@ -1143,8 +1168,6 @@ namespace smt::noodler {
         this->predicate_replace.insert(e, v.get());
         // update length variables
         util::get_str_variables(s, this->m_util_s, m, this->len_vars);
-        this->len_vars.insert(v);
-
     }
 
     /**

@@ -514,6 +514,7 @@ namespace smt::noodler {
         this->prep_handler.refine_languages();
         this->prep_handler.reduce_diseqalities();
         this->prep_handler.remove_trivial();
+        this->prep_handler.remove_regular();
         // replace disequalities
         this->prep_handler.replace_disequalities();
 
