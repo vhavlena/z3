@@ -1136,7 +1136,7 @@ namespace smt::noodler {
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(xe, s, false)});
-        } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)) {
+        } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
         } else {
