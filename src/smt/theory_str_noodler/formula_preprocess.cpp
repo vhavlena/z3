@@ -108,6 +108,8 @@ namespace smt::noodler {
      */
     bool FormulaVar::single_occurr(const std::set<BasicTerm>& items) const {
         for(const BasicTerm& t : items) {
+            if(t.get_type() != BasicTermType::Variable)
+                continue;
             assert(t.get_type() == BasicTermType::Variable);
             if(this->varmap.at(t).size() > 1) {
                 return false;
@@ -346,8 +348,24 @@ namespace smt::noodler {
         while(!worklist.empty()) {
             size_t index = worklist.front();
             worklist.pop_front();
+            if(this->formula.get_predicates().find(index) == this->formula.get_predicates().end()) {
+                continue;
+            }
             Predicate eq = this->formula.get_predicate(index);
             if(eq.get_left_side() == eq.get_right_side()) {
+                this->formula.remove_predicate(index);
+                continue;
+            }
+
+            if(!eq.get_left_side()[0].is_variable()) {
+                eq = eq.get_switched_sides_predicate();
+            }
+            if(!eq.get_left_side()[0].is_variable()) {
+                continue;
+            }
+            if(!eq.get_right_side()[0].is_variable()) {
+                BasicTerm v_left = eq.get_left_side()[0]; // X
+                update_reg_constr(v_left, eq.get_right_side());
                 this->formula.remove_predicate(index);
                 continue;
             }
@@ -979,6 +997,36 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
+     * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
+     */
+    void FormulaPreprocess::skip_len_sat() {
+        std::set<size_t> rem_ids;
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_equation())
+                continue;
+
+            if(this->formula.single_occurr(pr.second.get_left_set())) {
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                    rem_ids.insert(pr.first);
+                }
+            }
+            if(this->formula.single_occurr(pr.second.get_right_set())) {
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                    rem_ids.insert(pr.first);
+                }
+            }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+    }
+
+    /**
      * @brief Reduce the number of diseqalities.
      */
     void FormulaPreprocess::reduce_diseqalities() {
@@ -1050,6 +1098,19 @@ namespace smt::noodler {
         }
 
         for(const auto& pr : ineqs) {
+
+            if(pr.second.get_left_side().size() == 1 && pr.second.get_right_side().size() == 1) {
+                Mata::Nfa::Nfa autl = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                Mata::Nfa::Nfa autr = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
+
+                if(Mata::Nfa::are_equivalent(autl, sigma) && Mata::Nfa::are_equivalent(autr, sigma)) {
+                    this->formula.remove_predicate(pr.first);
+                    this->diseq_variables.insert({pr.second.get_left_side()[0], pr.second.get_right_side()[0]});
+                    continue;;
+                }
+            }
+
             BasicTerm x1 = this->create_fresh_var();
             BasicTerm a1 = this->create_fresh_var();
             BasicTerm y1 = this->create_fresh_var();

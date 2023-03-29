@@ -56,9 +56,11 @@ namespace smt::noodler {
     template<typename T>
     bool set_disjoint(const std::unordered_set<T>& t1, const std::set<T>& t2) {
         std::set<T> inter;
-        std::set_intersection(t1.begin(), t1.end(), t2.begin(), t2.end(),
-            std::inserter(inter, inter.begin()));
-        return inter.empty();
+        for(const auto& t : t2) {
+            if(t1.find(t) != t1.end())
+                return false;
+        }
+        return true;
     }
 
     template<typename T, typename S, typename P>
@@ -344,6 +346,7 @@ namespace smt::noodler {
         void separate_eqs();
         void remove_extension();
         void remove_trivial();
+        void skip_len_sat();
 
         void refine_languages();
         void reduce_diseqalities();

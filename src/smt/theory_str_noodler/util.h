@@ -30,6 +30,15 @@ namespace smt::noodler::util {
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
 
     /**
+     * Throws error and select which class to throw based on debug (if we are
+     * debugging, we do not want z3 to catch our error, if we are not debugging
+     * we want z3 to catch it and return unknown).
+     * 
+     * @param errMsg Error message
+     */
+    void throw_error(std::string errMsg);
+
+    /**
     Get variables from a given expression @p ex. Append to the output parameter @p res.
     @param ex Expression to be checked for variables.
     @param m_util_s Seq util for AST
@@ -138,14 +147,14 @@ namespace smt::noodler::util {
 
     /**
      * Convert expression @p expr to NFA using hexadecimal values as symbols.
-     * @param[in] expr Expression to be converted to regex.
+     * @param[in] expression Expression to be converted to regex.
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
      * @param[in] make_complement Whether to make complement of the passed @p expr instead.
      * @return The resulting regex.
      */
-    [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
                                              const std::set<uint32_t>& alphabet, bool make_complement = false);
 
     /**
@@ -196,6 +205,13 @@ namespace smt::noodler::util {
         return var;
     }
 
+    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
+        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
+            nullptr, int_sort), m);
+        return var;
+    }
+
     /**
      * @brief Create a fresh int variable.
      *
@@ -209,6 +225,19 @@ namespace smt::noodler::util {
             nullptr, m_util_s.mk_string_sort()), m);
         return var;
     }
+
+    /**
+     * @brief Check whether the expression @p val is of the form ( @p num_res ) + (len @p s ).
+     * 
+     * @param val Expression to be checked
+     * @param s String term with length
+     * @param m ast manager
+     * @param m_util_s string ast util
+     * @param m_util_a arith ast util
+     * @param[out] num_res expression to be substracked from length term
+     * @return Is of the form.
+     */
+    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res);
 
     /**
      * @brief Convert Length node to z3 length formula
@@ -231,7 +260,7 @@ namespace smt::noodler::util {
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = expr_ref(m_util_s.str.mk_length(mk_str_var(node->atom_val.get_name().encode(), m, m_util_s)), m);
+                    var_expr = expr_ref(mk_int_var(node->atom_val.get_name().encode(), m, m_util_s, m_util_a), m);
                 }
                 return var_expr;
             }

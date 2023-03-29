@@ -5,12 +5,24 @@
 #include "theory_str_noodler.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
+#include "util/z3_exception.h"
 
 namespace {
     using Mata::Nfa::Nfa;
 }
 
 namespace smt::noodler::util {
+
+    void throw_error(std::string errMsg) {
+#ifndef NDEBUG
+        // for debugging, we use std::runtime_error, because that one is not caught by z3
+        throw std::runtime_error(errMsg);
+#else
+        // for release, we use this, as it is caught by z3 and it transform it into 'unknown'
+        throw default_exception(std::move(errMsg));
+#endif
+    }
+
     void extract_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
         if (m_util_s.str.is_string(ex)) {
             auto ex_app{ to_app(ex) };
@@ -30,47 +42,54 @@ namespace smt::noodler::util {
         app* ex_app = to_app(ex);
 
         if (m_util_s.re.is_to_re(ex_app)) { // Handle conversion to regex function call.
-            // Assume that expression inside re.to_re() function is a string of characters.
             SASSERT(ex_app->get_num_args() == 1);
             const auto arg{ ex_app->get_arg(0) };
+            // Assume that expression inside re.to_re() function is a string of characters.
+            if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
+                throw_error("we support only string literals in str.to_re");
+            }
             extract_symbols(to_app(arg), m_util_s, m, alphabet);
             return;
-        } else if (m_util_s.re.is_concat(ex_app)) { // Handle concatenation.
-            SASSERT(ex_app->get_num_args() == 2);
-            const auto left{ex_app->get_arg(0)};
-            const auto right{ex_app->get_arg(1)};
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            extract_symbols(to_app(left), m_util_s, m, alphabet);
-            extract_symbols(to_app(right), m_util_s, m, alphabet);
+        } else if (m_util_s.re.is_concat(ex_app) // Handle regex concatenation.
+                || m_util_s.str.is_concat(ex_app) // Handle string concatenation.
+                || m_util_s.re.is_intersection(ex_app) // Handle intersection.
+            ) {
+            for (unsigned int i = 0; i < ex_app->get_num_args(); ++i) {
+                extract_symbols(to_app(ex_app->get_arg(i)), m_util_s, m, alphabet);
+            }
             return;
         } else if (m_util_s.re.is_antimirov_union(ex_app)) { // Handle Antimirov union.
-            assert(false && "re.is_antimirov_union(ex_app)");
+            throw_error("antimirov union is unsupported");
         } else if (m_util_s.re.is_complement(ex_app)) { // Handle complement.
-            assert(false && "re.is_complement(ex_app)");
+            SASSERT(ex_app->get_num_args() == 1);
+            const auto child{ ex_app->get_arg(0) };
+            SASSERT(is_app(child));
+            extract_symbols(to_app(child), m_util_s, m, alphabet);
+            return;
         } else if (m_util_s.re.is_derivative(ex_app)) { // Handle derivative.
-            assert(false && "re.is_derivative(ex_app)");
+            throw_error("derivative is unsupported");
         } else if (m_util_s.re.is_diff(ex_app)) { // Handle diff.
-            assert(false && "re.is_diff(ex_app)");
+            throw_error("regex difference is unsupported");
         } else if (m_util_s.re.is_dot_plus(ex_app)) { // Handle dot plus.
-            assert(false && "re.is_dot_plus(ex_app)");
-        } else if (m_util_s.re.is_empty(ex_app)) { // Handle empty string.
-            assert(false && "re.is_empty(ex_app)");
+            // Handle repeated full char ('.+') (SMT2: (re.+ re.allchar)).
+            return;
+        } else if (m_util_s.re.is_empty(ex_app)) { // Handle empty language.
+            return;
         } else if (m_util_s.re.is_epsilon(ex_app)) { // Handle epsilon.
-            assert(false && "re.is_epsilon(ex_app)");
+            return;
         } else if (m_util_s.re.is_full_char(ex_app)) {
             // Handle full char (single occurrence of any string symbol, '.') (SMT2: re.allchar).
             return;
         } else if (m_util_s.re.is_full_seq(ex_app)) {
             // Handle full sequence of characters (any sequence of characters, '.*') (SMT2: re.all).
             return;
-        } else if (m_util_s.re.is_intersection(ex_app)) { // Handle intersection.
-            assert(false && "re.is_intersection(ex_app)");
-        } else if (m_util_s.re.is_loop(ex_app)) { // Handle loop.
-            assert(false && "re.is_loop(ex_app)");
         } else if (m_util_s.re.is_of_pred(ex_app)) { // Handle of predicate.
-            assert(false && "re.is_of_pred(ex_app)");
-        } else if (m_util_s.re.is_opt(ex_app)) { // Handle optional.
+            throw_error("of predicate is unsupported");
+        } else if (m_util_s.re.is_opt(ex_app) // Handle optional.
+                || m_util_s.re.is_plus(ex_app) // Handle positive iteration.
+                || m_util_s.re.is_star(ex_app) // Handle star iteration.
+                || m_util_s.re.is_loop(ex_app) // Handle loop.
+            ) {
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
@@ -91,7 +110,7 @@ namespace smt::noodler::util {
                 ++current_value;
             }
         } else if (m_util_s.re.is_reverse(ex_app)) { // Handle reverse.
-            assert(false && "re.is_reverse(ex_app)");
+            throw_error("reverse is unsupported");
         } else if (m_util_s.re.is_union(ex_app)) { // Handle union (= or; A|B).
             SASSERT(ex_app->get_num_args() == 2);
             const auto left{ ex_app->get_arg(0) };
@@ -101,27 +120,16 @@ namespace smt::noodler::util {
             extract_symbols(to_app(left), m_util_s, m, alphabet);
             extract_symbols(to_app(right), m_util_s, m, alphabet);
             return;
-        } else if (m_util_s.re.is_star(ex_app)) { // Handle star iteration.
-            SASSERT(ex_app->get_num_args() == 1);
-            const auto child{ ex_app->get_arg(0) };
-            SASSERT(is_app(child));
-            extract_symbols(to_app(child), m_util_s, m, alphabet);
-            return;
-        } else if (m_util_s.re.is_plus(ex_app)) { // Handle positive iteration.
-            SASSERT(ex_app->get_num_args() == 1);
-            const auto child{ ex_app->get_arg(0) };
-            SASSERT(is_app(child));
-            extract_symbols(to_app(child), m_util_s, m, alphabet);
-            return;
         } else if(is_variable(ex_app, m_util_s)) { // Handle variable.
-            assert(false && "is_variable(ex_app)");
-        }
-
-        // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
-        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-            SASSERT(is_app(ex_app->get_arg(i)));
-            app *arg = to_app(ex_app->get_arg(i));
-            extract_symbols(arg, m_util_s, m, alphabet);
+            throw_error("variable should not occur here");
+        } else {
+            // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
+            // TODO: maybe we can just leave is_range, is_variable and is_string in this function and otherwise do this:
+            for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
+                SASSERT(is_app(ex_app->get_arg(i)));
+                app *arg = to_app(ex_app->get_arg(i));
+                extract_symbols(arg, m_util_s, m, alphabet);
+            }
         }
     }
 
@@ -181,6 +189,7 @@ namespace smt::noodler::util {
             return false;
         }
 
+        // TODO: we are not sure if this is correct, we just hope
         if (m_util_s.is_string(expression->get_sort()) &&
             is_app(expression) && to_app(expression)->get_num_args() == 0) {
             return true;
@@ -288,11 +297,13 @@ namespace smt::noodler::util {
             }
         }
 
-        // DEBUG.
-        //for (const auto& single_aut_assignment: aut_assignment) {
-        //    std::cout << single_aut_assignment.first.get_name() << ":\n";
-        //    single_aut_assignment.second->print_to_DOT(std::cout);
-        //}
+        STRACE("str-nfa",
+            tout << "Created automata assignment for formula:" << std::endl;
+            for (const auto& single_aut_assignment: aut_assignment) {
+               tout << single_aut_assignment.first.get_name() << std::endl;
+               single_aut_assignment.second->print_to_DOT(tout);
+            }
+        );
 
         return aut_assignment;
     }
@@ -405,71 +416,127 @@ namespace smt::noodler::util {
         return regex;
     }
 
-    [[nodiscard]] Nfa conv_to_nfa(const app *expr, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const std::set<uint32_t>& alphabet, bool make_complement) {
         Nfa nfa{};
 
-        if (m_util_s.re.is_to_re(expr)) { // Handle conversion of to regex function call.
+        if (m_util_s.re.is_to_re(expression)) { // Handle conversion of to regex function call.
+            SASSERT(expression->get_num_args() == 1);
+            const auto arg{ expression->get_arg(0) };
             // Assume that expression inside re.to_re() function is a string of characters.
-            SASSERT(expr->get_num_args() == 1);
-            const auto arg{ expr->get_arg(0) };
+            if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
+                throw_error("we support only string literals in str.to_re");
+            }
             nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet);
-        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{ expr->get_arg(0) };
-            const auto right{ expr->get_arg(1) };
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            auto first_nfa{ conv_to_nfa(to_app(left), m_util_s, m, alphabet) };
-            auto second_nfa{ conv_to_nfa(to_app(right), m_util_s, m, alphabet) };
-            nfa = Mata::Nfa::concatenate(first_nfa, second_nfa);
-        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
-            assert(false && "re.is_antimirov_union(expr)");
-        } else if (m_util_s.re.is_complement(expr)) { // Handle complement.
-            assert(false && "re.is_complement(expr)");
-        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative.
-            assert(false && "re.is_derivative(expr)");
-        } else if (m_util_s.re.is_diff(expr)) { // Handle diff.
-            assert(false && "re.is_diff(expr)");
-        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus.
-            assert(false && "re.is_dot_plus(expr)");
-        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
-            assert(false && "re.is_empty(expr)");
-        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon.
-            assert(false && "re.is_epsilon(expr)");
-        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char (single occurrence of any string symbol, '.').
+        } else if (m_util_s.re.is_concat(expression)) { // Handle regex concatenation.
+            SASSERT(expression->get_num_args() > 0);
+            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
+            for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
+                nfa = Mata::Nfa::concatenate(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet));
+            }
+        } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
+            throw_error("antimirov union is unsupported");
+        } else if (m_util_s.re.is_complement(expression)) { // Handle complement.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
+            SASSERT(is_app(child));
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
+            // According to make_complement, we do complement at the end, so we just invert it
+            make_complement = !make_complement;
+        } else if (m_util_s.re.is_derivative(expression)) { // Handle derivative.
+            throw_error("derivative is unsupported");
+        } else if (m_util_s.re.is_diff(expression)) { // Handle diff.
+            throw_error("regex difference is unsupported");
+        } else if (m_util_s.re.is_dot_plus(expression)) { // Handle dot plus.
+            nfa.initial.add(0);
+            nfa.final.add(1);
+            for (const auto& symbol : alphabet) {
+                nfa.delta.add(0, symbol, 1);
+                nfa.delta.add(1, symbol, 1);
+            }
+        } else if (m_util_s.re.is_empty(expression)) { // Handle empty language.
+            // Do nothing, as nfa is initialized empty
+        } else if (m_util_s.re.is_epsilon(expression)) { // Handle epsilon.
+            nfa = Mata::Nfa::create_empty_string_nfa();
+        } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
             nfa.initial.add(0);
             nfa.final.add(1);
             for (const auto& symbol : alphabet) {
                 nfa.delta.add(0, symbol, 1);
             }
-        } else if (m_util_s.re.is_full_seq(expr)) {
+        } else if (m_util_s.re.is_full_seq(expression)) {
             nfa.initial.add(0);
             nfa.final.add(0);
             for (const auto& symbol : alphabet) {
                 nfa.delta.add(0, symbol, 0);
             }
-        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
-            assert(false && "re.is_intersection(expr)");
-        } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
-            assert(false && "re.is_loop(expr)");
-        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
-            assert(false && "re.is_of_pred(expr)");
-        } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
+        } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
+            SASSERT(expression->get_num_args() > 0);
+            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
+            for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
+                nfa = Mata::Nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet));
+            }
+        } else if (m_util_s.re.is_loop(expression)) { // Handle loop.
+            unsigned low, high;
+            expr *body;
+            bool is_high_set = false;
+            if (m_util_s.re.is_loop(expression, body, low, high)) {
+                is_high_set = true;
+            } else if (m_util_s.re.is_loop(expression, body, low)) {
+                is_high_set = false;
+            } else {
+                throw_error("loop should contain at least lower bound");
+            }
+
+            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet);
+            nfa = Mata::Nfa::create_empty_string_nfa();
+            // we need to repeat body_nfa at least low times
+            for (unsigned i = 0; i < low; ++i) {
+                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+            }
+
+            // we will now either repeat body_nfa high-low times (if is_high_set) or
+            // unlimited times (if it is not set), but we have to accept after each loop,
+            // so we add an empty word into body_nfa by making some initial state final
+            if (body_nfa.initial.empty()) {
+                State new_state = body_nfa.add_state();
+                body_nfa.initial.add(new_state);
+                body_nfa.final.add(new_state);
+            } else {
+                body_nfa.final.add(*(body_nfa.initial.begin()));
+            }
+
+            if (is_high_set) {
+                // if high is set, we repeat body_nfa another high-low times
+                for (unsigned i = 0; i < high - low; ++i) {
+                    nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+                }
+            } else {
+                // if high is not set, we can repeat body_nfa unlimited more times
+                // so we do star operation on body_nfa and add it to end of nfa
+                for (const auto& final : body_nfa.final) {
+                    for (const auto& initial : body_nfa.initial) {
+                        body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                    }
+                }
+                body_nfa.remove_epsilon();
+                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+            }
+        } else if (m_util_s.re.is_of_pred(expression)) { // Handle of predicate.
+            throw_error("of predicate is unsupported");
+        } else if (m_util_s.re.is_opt(expression)) { // Handle optional.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             nfa.unify_initial();
             for (const auto& initial : nfa.initial) {
-                // FIXME: Cannot that introduce errors if there are transitions leading to the initial states?
-                //  Solution: Unify initial and add the unified initial as a final.
                 nfa.final.add(initial);
             }
-        } else if (m_util_s.re.is_range(expr)) { // Handle range.
-            SASSERT(expr->get_num_args() == 2);
-            const auto range_begin{ expr->get_arg(0) };
-            const auto range_end{ expr->get_arg(1) };
+        } else if (m_util_s.re.is_range(expression)) { // Handle range.
+            SASSERT(expression->get_num_args() == 2);
+            const auto range_begin{ expression->get_arg(0) };
+            const auto range_end{ expression->get_arg(1) };
             SASSERT(is_app(range_begin));
             SASSERT(is_app(range_end));
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
@@ -482,19 +549,19 @@ namespace smt::noodler::util {
                 nfa.delta.add(0, current_value, 1);
                 ++current_value;
             }
-        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
-            assert(false && "re.is_reverse(expr)");
-        } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{ expr->get_arg(0) };
-            const auto right{ expr->get_arg(1) };
+        } else if (m_util_s.re.is_reverse(expression)) { // Handle reverse.
+            throw_error("reverse is unsupported");
+        } else if (m_util_s.re.is_union(expression)) { // Handle union (= or; A|B).
+            SASSERT(expression->get_num_args() == 2);
+            const auto left{ expression->get_arg(0) };
+            const auto right{ expression->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             nfa = Mata::Nfa::uni(conv_to_nfa(to_app(left), m_util_s, m, alphabet),
                                  conv_to_nfa(to_app(right), m_util_s, m, alphabet));
-        } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
+        } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
@@ -505,11 +572,16 @@ namespace smt::noodler::util {
             nfa.remove_epsilon();
 
             // Make one initial final in order to accept empty string as is required by kleene-star.
-            SASSERT(!nfa.initial.empty());
-            nfa.final.add(*nfa.initial.begin());
-        } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
+            if (nfa.initial.empty()) {
+                State new_state = nfa.add_state();
+                nfa.initial.add(new_state);
+                nfa.final.add(new_state);
+            } else {
+                nfa.final.add(*(nfa.initial.begin()));
+            }
+        } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
@@ -518,14 +590,17 @@ namespace smt::noodler::util {
                 }
             }
             nfa.remove_epsilon();
-        } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
-            SASSERT(expr->get_num_parameters() == 1);
-            nfa = create_word_nfa(expr->get_parameter(0).get_zstring());
-        } else if(is_variable(expr, m_util_s)) { // Handle variable.
-            assert(false && "is_variable(expr)");
+        } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
+            SASSERT(expression->get_num_parameters() == 1);
+            nfa = create_word_nfa(expression->get_parameter(0).get_zstring());
+        } else if(is_variable(expression, m_util_s)) { // Handle variable.
+            throw_error("variable in regexes are unsupported");
+        } else {
+            throw_error("unsupported operation in regex");
         }
 
         // Whether to create complement of the final automaton.
+        // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
             Mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : alphabet) {
@@ -599,5 +674,25 @@ namespace smt::noodler::util {
             app *arg = to_app(ex->get_arg(i));
             get_len_exprs(arg, m_util_s, m, res);
         }
+    }
+
+    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res) {
+        expr* num = nullptr;
+        expr* len = nullptr;
+        expr* str = nullptr;
+        if(!m_util_a.is_add(val, num, len)) {
+            return false;
+        }
+
+        if(!m_util_a.is_int(num)) {
+            return false;
+        }
+        num_res = num;
+
+        if(!m_util_s.str.is_length(len, str) || str->hash() != s->hash()) {
+            return false;
+        } 
+        
+        return true;
     }
 }

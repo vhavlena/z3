@@ -99,7 +99,7 @@ TEST_CASE("theory_str_noodler::util") {
         ));
 
         alphabet.insert({ '\x45', '\x02', '\x03', '\x00' });
-        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(disequations, alphabet) };
+        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(disequations.size(), alphabet) };
         CHECK(dummy_symbols == std::set<uint32_t>{ '\x01', '\x04' });
         CHECK(alphabet == std::set<uint32_t>{ '\x00', '\x01', '\x02', '\x03', '\x04', '\x45', '\x78', '\x79', '\x7a' });
     }
