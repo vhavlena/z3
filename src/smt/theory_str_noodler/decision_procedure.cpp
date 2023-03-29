@@ -94,7 +94,10 @@ namespace smt::noodler {
             element_to_process.nodes_to_process.pop_front();
             assert(node_to_process != nullptr);
 
-            STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() <<std::endl;);
+            // this will decide whether we will continue in our search by DFS or by BFS
+            bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
+
+            STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() << " which is" << (is_node_to_process_on_cycle ? " " : " not ") << "on the cycle" << std::endl;);
             STRACE("str", tout << "Length variables are:"; 
                           for(auto const &var : node_to_process->get_predicate().get_vars()) {
                               if (element_to_process.length_sensitive_vars.count(var)) {
@@ -106,10 +109,6 @@ namespace smt::noodler {
 
             const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
             const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
-
-            // this will decide whether we will continue in our search by DFS or by BFS
-            bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
-
 
             /********************************************************************************************************/
             /****************************************** One side is empty *******************************************/
