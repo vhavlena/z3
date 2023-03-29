@@ -540,7 +540,7 @@ namespace smt::noodler {
                 std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i]);
 
                 // do not include length variables
-                if(this->len_variables.find(side[i]) != this->len_variables.end()) {
+                if(false && this->len_variables.find(side[i]) != this->len_variables.end()) {
                     break;
                 }
                 if(side[i].is_variable() && vns != occurs_act) {
