@@ -76,6 +76,10 @@ namespace smt::noodler {
     bool DecisionProcedure::compute_next_solution() {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
+        STRACE("str", tout << "------------------------"
+                           << "Getting another solution"
+                           << "------------------------" << std::endl;);
+
         while (!worklist.empty()) {
             SolvingState element_to_process = std::move(worklist.front());
             worklist.pop_front();
@@ -98,14 +102,15 @@ namespace smt::noodler {
             bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
 
             STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() << " which is" << (is_node_to_process_on_cycle ? " " : " not ") << "on the cycle" << std::endl;);
-            STRACE("str", tout << "Length variables are:"; 
-                          for(auto const &var : node_to_process->get_predicate().get_vars()) {
-                              if (element_to_process.length_sensitive_vars.count(var)) {
-                                  tout << " " << var.to_string();
-                              }
-                          }
-                          tout << std::endl;
-                          );
+            STRACE("str",
+                tout << "Length variables are:";
+                for(auto const &var : node_to_process->get_predicate().get_vars()) {
+                    if (element_to_process.length_sensitive_vars.count(var)) {
+                        tout << " " << var.to_string();
+                    }
+                }
+                tout << std::endl;
+            );
 
             const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
             const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
