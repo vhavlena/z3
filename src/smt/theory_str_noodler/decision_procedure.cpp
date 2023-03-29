@@ -680,7 +680,7 @@ namespace smt::noodler {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
-        STRACE("str", tout << "preprocess-output: " << std::endl << this->formula.to_string() << "\n" );
+        STRACE("str", tout << "preprocess-output:" << std::endl << this->formula.to_string() << std::endl; );
     }
 
     /**
