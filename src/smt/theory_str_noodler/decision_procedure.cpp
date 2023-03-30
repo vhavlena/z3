@@ -696,6 +696,7 @@ namespace smt::noodler {
         this->prep_handler.reduce_diseqalities();
         this->prep_handler.remove_trivial();
         this->prep_handler.reduce_regular_sequence(3);
+        this->prep_handler.skip_len_sat(true);
         // replace disequalities
         this->prep_handler.replace_disequalities();
 

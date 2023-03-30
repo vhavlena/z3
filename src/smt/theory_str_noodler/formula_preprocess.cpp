@@ -312,10 +312,15 @@ namespace smt::noodler {
             assert(pr.second.get_left_side().size() == 1);
 
             // right side containts len variables; skip
-            if(!set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
+            bool is_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
+            if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_len) {
                 continue;
             }
             update_reg_constr(pr.second.get_left_side()[0], pr.second.get_right_side());
+
+            if(is_len) {
+                this->len_variables.insert(pr.second.get_left_side()[0]);
+            }
 
             std::set<BasicTerm> vars = pr.second.get_vars();
             this->formula.remove_predicate(pr.first);
@@ -1000,25 +1005,75 @@ namespace smt::noodler {
      * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
      * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
      */
-    void FormulaPreprocess::skip_len_sat() {
+    void FormulaPreprocess::skip_len_sat(bool co_finite) {
         std::set<size_t> rem_ids;
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(co_finite) {
+                    std::vector<std::pair<BasicTerm, int>> neqs;
+                    bool found = true;
+                    for(const auto & t : pr.second.get_left_side()) {
+                        int ln = 0;
+                        if(!this->aut_ass.is_co_finite(t, ln)) {
+                            found = false;
+                            continue;
+                        }
+                        if(ln > 0) {
+                            neqs.push_back({t, ln});
+                        }
+                    }
+                    if(!found) continue;
+                    for(const auto& pr : neqs) {
+                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(pr.second)), {});
+                    LenNode* left = new LenNode(LenFormulaType::LEAF, pr.first, {});
+                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
+                    }
+
                     rem_ids.insert(pr.first);
+                } else {
+                    Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                    Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+
+
+                    if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                        rem_ids.insert(pr.first);
+                    }
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(co_finite) {
+                    std::vector<std::pair<BasicTerm, int>> neqs;
+                    bool found = true;
+                    for(const auto & t : pr.second.get_right_side()) {
+                        int ln = 0;
+                        if(!this->aut_ass.is_co_finite(t, ln)) {
+                            found = false;
+                            continue;
+                        }
+                        if(ln > 0) {
+                            neqs.push_back({t, ln});
+                        }
+                    }
+                    if(!found) continue;
+                    for(const auto& pr : neqs) {
+                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(pr.second)), {});
+                    LenNode* left = new LenNode(LenFormulaType::LEAF, pr.first, {});
+                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
+                    }
+
                     rem_ids.insert(pr.first);
-                }
+                } else {
+                    Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                    Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                    if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                        rem_ids.insert(pr.first);
+                    }
+                }                
             }
         }
         for(const size_t & i : rem_ids) {

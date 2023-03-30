@@ -346,7 +346,7 @@ namespace smt::noodler {
         void separate_eqs();
         void remove_extension();
         void remove_trivial();
-        void skip_len_sat();
+        void skip_len_sat(bool co_finite = false);
 
         void refine_languages();
         void reduce_diseqalities();

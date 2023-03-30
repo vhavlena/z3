@@ -375,12 +375,12 @@ namespace smt::noodler {
 
                 
                 
-                return;
+                //return;
             }
 
             // build axiom 2: Length(a_str) == 0 <=> a_str == ""
             {
-                return;
+                // return;
                 if (on_screen) std::cout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS of iff
@@ -401,9 +401,10 @@ namespace smt::noodler {
                 rhs = ctx.mk_eq_atom(a_str, empty_str);
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
-                literal l(mk_eq(lhs, rhs, true));
-                ctx.mark_as_relevant(l);
-                ctx.mk_th_axiom(get_id(), 1, &l);
+                
+                literal l1 = mk_literal(lhs);
+                literal l2 = mk_literal(rhs);
+                add_axiom({~l1, l2});
             }
 
         }
@@ -784,10 +785,11 @@ namespace smt::noodler {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         
+        model_ref mod;
         if(init_length_sensitive_vars.size() > 0) {
             // check if the initial assignment is len unsat
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths) == l_false) {
+            if(check_len_sat(lengths, mod) == l_false) {
                 block_curr_len(lengths);
                 return FC_DONE;
             }
@@ -797,7 +799,7 @@ namespace smt::noodler {
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths) == l_true) {
+            if(check_len_sat(lengths, mod) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m););
                 return FC_DONE;
             }
@@ -2085,9 +2087,10 @@ namespace smt::noodler {
      * @param len_formula Formula to be check
      * @return lbool Sat
      */
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         m_int_solver.initialize(get_context());
-        return m_int_solver.check_sat(len_formula);
+        auto ret = m_int_solver.check_sat(len_formula);
+        return ret;
     }
 }

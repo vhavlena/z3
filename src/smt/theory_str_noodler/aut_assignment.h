@@ -101,6 +101,24 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Is language complement of a singleton?
+         * 
+         * @param t Variable whose language to be checked
+         * @param[out] len Length of the word missing in the language
+         * @return true Is complement of a word
+         */
+        bool is_co_finite(const BasicTerm& t, int& len) {
+            Mata::OnTheFlyAlphabet mata_alphabet{};
+            for (const auto& symbol : this->alphabet) {
+                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+            }
+
+            auto cmp = Mata::Nfa::minimize(Mata::Nfa::complement(*(*this)[t], mata_alphabet));
+            len = cmp.size() - 1;
+            return cmp.size() == cmp.get_num_of_trans() + 1;
+        }
+
+        /**
          * @brief Check if all automata in the map have non-empty language.
          *
          * @return true All have non-empty language

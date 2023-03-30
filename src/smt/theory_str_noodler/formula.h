@@ -132,6 +132,7 @@ namespace smt::noodler {
     enum struct LenFormulaType {
         PLUS,
         EQ,
+        NOT,
         LEQ,
         LEAF,
         AND,
