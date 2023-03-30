@@ -424,13 +424,13 @@ namespace smt::noodler {
                         // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
                         new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
                         // we add this inclusion to the worklist only if the right side contains something that was on the left (i.e. it was possibly changed)
-                        for (const auto &right_var : division) {
-                            if (left_vars_set.count(right_var) > 0) {
-                                // TODO: again, push to front? back? where the fuck to push??
-                                new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
-                                break;
-                            }
-                        }
+                        // for (const auto &right_var : division) {
+                        //     if (left_vars_set.count(right_var) > 0) {
+                        //         // TODO: again, push to front? back? where the fuck to push??
+                        //         new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
+                        //         break;
+                        //     }
+                        // }
                         STRACE("str", tout << "added new inclusion from the right side (non-length): " << new_inclusion->get_predicate() << std::endl; );
                     }
                 }
