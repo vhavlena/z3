@@ -288,7 +288,7 @@ namespace smt::noodler {
         if(iter != this->aut_ass.end()) {
             Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(iter->second), concat);
             inters.trim();
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(inters);
+            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
         } else {
             this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(concat);
         }
@@ -1005,81 +1005,50 @@ namespace smt::noodler {
      * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
      * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
      */
-    void FormulaPreprocess::skip_len_sat(bool co_finite) {
+    void FormulaPreprocess::skip_len_sat() {
         std::set<size_t> rem_ids;
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                if(co_finite) {
-                    std::vector<std::pair<BasicTerm, int>> neqs;
-                    bool found = true;
-                    for(const auto & t : pr.second.get_left_side()) {
-                        int ln = 0;
-                        if(!this->aut_ass.is_co_finite(t, ln)) {
-                            found = false;
-                            continue;
-                        }
-                        if(ln > 0) {
-                            neqs.push_back({t, ln});
-                        }
-                    }
-                    if(!found) continue;
-                    for(const auto& pr : neqs) {
-                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(pr.second)), {});
-                    LenNode* left = new LenNode(LenFormulaType::LEAF, pr.first, {});
-                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
-                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
-                    }
-
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
                     rem_ids.insert(pr.first);
-                } else {
-                    Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                    Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-
-
-                    if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
-                        rem_ids.insert(pr.first);
-                    }
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                if(co_finite) {
-                    std::vector<std::pair<BasicTerm, int>> neqs;
-                    bool found = true;
-                    for(const auto & t : pr.second.get_right_side()) {
-                        int ln = 0;
-                        if(!this->aut_ass.is_co_finite(t, ln)) {
-                            found = false;
-                            continue;
-                        }
-                        if(ln > 0) {
-                            neqs.push_back({t, ln});
-                        }
-                    }
-                    if(!found) continue;
-                    for(const auto& pr : neqs) {
-                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(pr.second)), {});
-                    LenNode* left = new LenNode(LenFormulaType::LEAF, pr.first, {});
-                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
-                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
-                    }
-
+                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
                     rem_ids.insert(pr.first);
-                } else {
-                    Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-                    Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                    if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
-                        rem_ids.insert(pr.first);
-                    }
-                }                
+                }               
             }
         }
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
     }
+
+    /**
+     * @brief Underapproximates the languages. Replace co-finite languages with length constraints while 
+     * setting their languages to \Sigma^*.
+     */
+    void FormulaPreprocess::underapprox_languages() {
+        for(const Predicate& pred : this->formula.get_predicates_set()) {
+            for(const BasicTerm& var : pred.get_vars()) {
+                int ln = 0;
+                if(this->aut_ass.is_co_finite(var, ln) && ln > 0) {
+                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
+                    LenNode* left = new LenNode(LenFormulaType::LEAF, var, {});
+                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
+                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+                }
+            }
+        }
+    } 
 
     /**
      * @brief Reduce the number of diseqalities.
