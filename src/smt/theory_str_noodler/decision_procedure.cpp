@@ -8,30 +8,76 @@
 #include "decision_procedure.h"
 
 namespace smt::noodler {
-    std::shared_ptr<GraphNode> SolvingState::make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
-        assert(inclusion_graph->get_nodes().count(processed_node) > 0);
-        Graph graph_to_copy = *inclusion_graph;
-        graph_to_copy.remove_all_edges();
-        assert(graph_to_copy.get_nodes().count(processed_node) > 0);
-        std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
-        inclusion_graph = std::make_shared<Graph>(graph_to_copy.deep_copy(node_mapping));
-        std::deque<std::shared_ptr<GraphNode>> new_nodes_to_process;
-        while (!nodes_to_process.empty()) {
-            new_nodes_to_process.push_back(node_mapping.at(nodes_to_process.front()));
-            nodes_to_process.pop_front();
-        }
-        nodes_to_process = new_nodes_to_process;
-        return node_mapping.at(processed_node);
-    }
+    // std::shared_ptr<GraphNode> SolvingState::make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
+    //     assert(inclusion_graph->get_nodes().count(processed_node) > 0);
+    //     Graph graph_to_copy = *inclusion_graph;
+    //     graph_to_copy.remove_all_edges();
+    //     assert(graph_to_copy.get_nodes().count(processed_node) > 0);
+    //     std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
+    //     inclusion_graph = std::make_shared<Graph>(graph_to_copy.deep_copy(node_mapping));
+    //     std::deque<std::shared_ptr<GraphNode>> new_nodes_to_process;
+    //     while (!inclusions_to_process.empty()) {
+    //         new_nodes_to_process.push_back(node_mapping.at(inclusions_to_process.front()));
+    //         inclusions_to_process.pop_front();
+    //     }
+    //     inclusions_to_process = new_nodes_to_process;
+    //     return node_mapping.at(processed_node);
+    // }
 
     void SolvingState::substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map) {
-        std::unordered_set<std::shared_ptr<GraphNode>> deleted_nodes;
-        inclusion_graph->substitute_vars(substitution_map, deleted_nodes);
+        // substitutes variables in a vector using substitution_map
+        auto substitute_vector = [&substitution_map](const std::vector<BasicTerm> &vector) {
+            std::vector<BasicTerm> result;
+            for (const BasicTerm &var : vector) {
+                if (substitution_map.count(var) == 0) {
+                    result.push_back(var);
+                } else {
+                    const auto &to_this = substitution_map.at(var);
+                    result.insert(result.end(), to_this.begin(), to_this.end());
+                }
+            }
+            return result;
+        };
 
-        // remove all deleted_nodes from the nodes_to_process (using remove/erase)
-        // TODO: is this correct?? I assume that if we delete copy of a merged node from nodes_to_process, it either does not need to be processed or the merged node will be in nodes_to_process
-        auto is_deleted = [&deleted_nodes](std::shared_ptr<GraphNode> node) { return (deleted_nodes.count(node) > 0) ; };
-        nodes_to_process.erase(std::remove_if(nodes_to_process.begin(), nodes_to_process.end(), is_deleted), nodes_to_process.end());
+        // substitutes variables in both sides of inclusion using substitution_map
+        auto substitute_inclusion = [&substitute_vector](const Predicate &inclusion) {
+            std::vector<BasicTerm> new_left_side = substitute_vector(inclusion.get_left_side());
+            std::vector<BasicTerm> new_right_side = substitute_vector(inclusion.get_right_side());
+            return Predicate{inclusion.get_type(), { new_left_side, new_right_side }};
+        };
+
+        // returns true if the inclusion has the same thing on both sides
+        auto inclusion_has_same_sides = [](const Predicate &inclusion) { return inclusion.get_left_side() == inclusion.get_right_side(); };
+
+        // substitutes variables of inclusions in a vector using substitute_map, but does not keep the ones that have the same sides after substitution
+        auto substitute_set = [&substitute_inclusion, &inclusion_has_same_sides](const std::set<Predicate> inclusions) {
+            std::set<Predicate> new_inclusions;
+            for (const auto &old_inclusion : inclusions) {
+                auto new_inclusion = substitute_inclusion(old_inclusion);
+                if (!inclusion_has_same_sides(new_inclusion)) {
+                    new_inclusions.insert(new_inclusion);
+                }
+            }
+            return new_inclusions;
+        };
+
+        inclusions = substitute_set(inclusions);
+        inclusions_not_on_cycle = substitute_set(inclusions_not_on_cycle);
+
+        // substituting inclusions to process is bit harder, it is possible that two inclusions that were supposed to
+        // be processed become same after substituting, so we do not want to keep both in inclusions to process
+        std::set<Predicate> substituted_inclusions_to_process;
+        std::deque<Predicate> new_inclusions_to_process;
+        while (!inclusions_to_process.empty()) {
+            Predicate substituted_inclusion = substitute_inclusion(inclusions_to_process.front());
+            inclusions_to_process.pop_front();
+            
+            if (!inclusion_has_same_sides(substituted_inclusion) // we do not want to add inclusion that is already in inclusions_to_process
+                && substituted_inclusions_to_process.count(substituted_inclusion) == 0) {
+                new_inclusions_to_process.push_back(substituted_inclusion);
+            }
+        }
+        inclusions_to_process = new_inclusions_to_process;
     }
 
     AutAssignment SolvingState::flatten_substition_map() {
@@ -81,7 +127,7 @@ namespace smt::noodler {
             SolvingState element_to_process = std::move(worklist.front());
             worklist.pop_front();
 
-            if (element_to_process.nodes_to_process.empty()) {
+            if (element_to_process.inclusions_to_process.empty()) {
                 // we found another solution, element_to_process contain the automata
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
@@ -91,17 +137,17 @@ namespace smt::noodler {
 
             // we will now process one inclusion from the inclusion graph which is at front
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            std::shared_ptr<GraphNode> node_to_process = element_to_process.nodes_to_process.front();
-            element_to_process.nodes_to_process.pop_front();
-            assert(node_to_process != nullptr);
+            Predicate inclusion_to_process = element_to_process.inclusions_to_process.front();
+            element_to_process.inclusions_to_process.pop_front();
+            assert(inclusion_to_process != nullptr);
 
             // this will decide whether we will continue in our search by DFS or by BFS
-            bool is_node_to_process_on_cycle = element_to_process.inclusion_graph->is_on_cycle(node_to_process);
+            bool is_inclusion_to_process_on_cycle = element_to_process.is_inclusion_on_cycle(inclusion_to_process);
 
-            STRACE("str", tout << "Processing node with inclusion " << node_to_process->get_predicate() << " which is" << (is_node_to_process_on_cycle ? " " : " not ") << "on the cycle" << std::endl;);
+            STRACE("str", tout << "Processing node with inclusion " << inclusion_to_process << " which is" << (is_inclusion_to_process_on_cycle ? " " : " not ") << "on the cycle" << std::endl;);
             STRACE("str",
                 tout << "Length variables are:";
-                for(auto const &var : node_to_process->get_predicate().get_vars()) {
+                for(auto const &var : inclusion_to_process.get_vars()) {
                     if (element_to_process.length_sensitive_vars.count(var)) {
                         tout << " " << var.to_string();
                     }
@@ -109,8 +155,8 @@ namespace smt::noodler {
                 tout << std::endl;
             );
 
-            const auto &left_side_vars = node_to_process->get_predicate().get_left_side();
-            const auto &right_side_vars = node_to_process->get_predicate().get_right_side();
+            const auto &left_side_vars = inclusion_to_process.get_left_side();
+            const auto &right_side_vars = inclusion_to_process.get_right_side();
 
             /********************************************************************************************************/
             /****************************************** One side is empty *******************************************/
@@ -121,8 +167,8 @@ namespace smt::noodler {
             if (right_side_vars.empty() || left_side_vars.empty()) {
                 std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
                 auto const non_empty_side_vars = right_side_vars.empty() ? 
-                                                        node_to_process->get_predicate().get_left_set()
-                                                      : node_to_process->get_predicate().get_right_set();
+                                                        inclusion_to_process.get_left_set()
+                                                      : inclusion_to_process.get_right_set();
                 bool non_empty_side_contains_empty_word = true;
                 for (const auto &var : non_empty_side_vars) {
                     if (Mata::Nfa::is_in_lang(*element_to_process.aut_ass.at(var), {{}, {}})) {
@@ -150,31 +196,27 @@ namespace smt::noodler {
 
                 // TODO: all this following shit is done also during normal noodlification, I need to split it to some better defined functions
 
+                element_to_process.remove_inclusion(inclusion_to_process);
+
                 // We might be updating left side, in that case we need to process all nodes that contain the variables from the left,
-                // i.e. those nodes to which node_to_process goes to. In the case we are updating right side, there will be no edges
-                // coming from node_to_process, so this for loop will do nothing.
-                for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
-                    // we push only those nodes which are not already in nodes_to_process
-                    // if the node_to_process is on cycle, we need to do BFS
+                // i.e. those nodes to which inclusion_to_process goes to. In the case we are updating right side, there will be no edges
+                // coming from inclusion_to_process, so this for loop will do nothing.
+                for (const auto &dependent_inclusion : element_to_process.get_dependent_inclusions(inclusion_to_process)) {
+                    // we push only those nodes which are not already in inclusions_to_process
+                    // if the inclusion_to_process is on cycle, we need to do BFS
                     // if it is not on cycle, we can do DFS
                     // TODO: can we really do DFS??
-                    element_to_process.push_unique(node, is_node_to_process_on_cycle);
+                    element_to_process.push_unique(dependent_inclusion, is_inclusion_to_process_on_cycle);
                 }
 
-                // we need to make a deep copy, because we will be updating this graph
-                auto new_node_to_process = element_to_process.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
-                //remove processed inclusion from the inclusion graph
-                element_to_process.inclusion_graph->remove_node(new_node_to_process); // TODO: is this safe?
                 // do substitution in the inclusion graph
                 element_to_process.substitute_vars(substitution_map);
-                // update inclusion graph edges
-                element_to_process.inclusion_graph->add_inclusion_graph_edges();
                 // update the substitution_map of new_element by the new substitutions
                 element_to_process.substitution_map.merge(substitution_map);
 
                 // TODO: should we really push to front when not on cycle?
                 // TODO: maybe for this case of one side being empty, we should just push to front?
-                if (!is_node_to_process_on_cycle) {
+                if (!is_inclusion_to_process_on_cycle) {
                     worklist.push_front(element_to_process);
                 } else {
                     worklist.push_back(element_to_process);
@@ -293,9 +335,9 @@ namespace smt::noodler {
                 // we have no length-aware variables on the right hand side => we need to check if inclusion holds
                 assert(right_side_automata.size() == 1); // there should be exactly one element in right_side_automata as we do not have length variables
                 // TODO probably we should try shortest words, it might work correctly
-                if (is_node_to_process_on_cycle // we do not test inclusion if we have node that is not on cycle, because we will not go back to it (TODO: should we really not test it?)
+                if (is_inclusion_to_process_on_cycle // we do not test inclusion if we have node that is not on cycle, because we will not go back to it (TODO: should we really not test it?)
                     && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *right_side_automata[0])) {
-                    // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.nodes_to_process is empty), or just to get to sat faster
+                    // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.inclusions_to_process is empty), or just to get to sat faster
                     worklist.push_front(element_to_process);
                     // we continue as there is no need for noodlification, inclusion already holds
                     continue;
@@ -305,20 +347,21 @@ namespace smt::noodler {
             /*************************************** End of inclusion test ******************************************/
             /********************************************************************************************************/
 
+            element_to_process.remove_inclusion(inclusion_to_process);
 
             // We are going to change the automata on the left side (potentially also split some on the right side, but that should not have impact)
             // so we need to add all nodes whose variable assignments are going to change on the right side (i.e. we follow inclusion graph) for processing.
-            // Warning: Self-loops are not in inclusion graph, but we might still want to add this node again to nodes_to_process, however, this node will be
+            // Warning: Self-loops are not in inclusion graph, but we might still want to add this node again to inclusions_to_process, however, this node will be
             // split during noodlification, so we will only add parts whose right sides actually change (see below in noodlification)
-            for (const auto &node : element_to_process.inclusion_graph->get_edges_from(node_to_process)) {
-                // we push only those nodes which are not already in nodes_to_process
-                // if the node_to_process is on cycle, we need to do BFS
+            for (const auto &node : element_to_process.get_dependent_inclusions(inclusion_to_process)) {
+                // we push only those nodes which are not already in inclusions_to_process
+                // if the inclusion_to_process is on cycle, we need to do BFS
                 // if it is not on cycle, we can do DFS
                 // TODO: can we really do DFS??
-                element_to_process.push_unique(node, is_node_to_process_on_cycle);
+                element_to_process.push_unique(node, is_inclusion_to_process_on_cycle);
             }
             // We will need the set of left vars, so we can sort the 'non-existing self-loop' in noodlification (see previous warning)
-            const auto left_vars_set = node_to_process->get_predicate().get_left_set();
+            const auto left_vars_set = inclusion_to_process.get_left_set();
 
 
             /* TODO check here if we have empty elements_to_process, if we do, then every noodle we get should finish and return sat
@@ -347,12 +390,6 @@ namespace smt::noodler {
             for (const auto &noodle : noodles) {
                 STRACE("str", tout << "Processing noodle" << std::endl; );
                 SolvingState new_element = element_to_process;
-                // we need to make a deep copy, because we will be updating this graph
-                // TODO if !is_there_length_on_right we should not copy somehow, if there are no automata accepting only empty word
-                auto new_node_to_process = new_element.make_deep_copy_of_inclusion_graph_only_nodes(node_to_process);
-
-                //remove processed inclusion from the inclusion graph
-                new_element.inclusion_graph->remove_node(new_node_to_process); // TODO: is this safe?
 
                 /* Explanation of the next code on an example:
                  * Left side has variables x_1, x_2, x_3, x_2 while the right side has variables x_4, x_1, x_5, x_6, where x_1
@@ -397,15 +434,14 @@ namespace smt::noodler {
                         const BasicTerm &right_var = division[0];
                         if (substitution_map.count(right_var)) {
                             // right_var is already substituted, therefore we add 'new_vars ⊆ right_var' to the inclusion graph
-                            const auto &new_inclusion = new_element.inclusion_graph->add_node(right_side_divisions_to_new_vars[i], division);
                             // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
-                            new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
+                            const auto &new_inclusion = new_element.add_inclusion(right_side_divisions_to_new_vars[i], division, is_inclusion_to_process_on_cycle);
                             // we also add this inclusion to the worklist, as it represents unification
                             // we push it to the front if we are processing node that is not on the cycle, because it should not get stuck in the cycle then
                             // TODO: is this correct? can we push to the front?
                             // TODO: can't we push to front even if it is on cycle??
-                            new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
-                            STRACE("str", tout << "added new inclusion from the right side because it could not be substituted: " << new_inclusion->get_predicate() << std::endl; );
+                            new_element.push_unique(new_inclusion, is_inclusion_to_process_on_cycle);
+                            STRACE("str", tout << "added new inclusion from the right side because it could not be substituted: " << new_inclusion << std::endl; );
                         } else {
                             // right_var is not substitued by anything yet, we will substitute it
                             substitution_map[right_var] = right_side_divisions_to_new_vars[i];
@@ -420,18 +456,17 @@ namespace smt::noodler {
 
                     } else {
                         // right side is non-length concatenation "y_1...y_n" => we are adding new inclusion "new_vars ⊆ y1...y_n"
-                        const auto &new_inclusion = new_element.inclusion_graph->add_node(right_side_divisions_to_new_vars[i], division);
                         // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
-                        new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
+                        const auto &new_inclusion = new_element.add_inclusion(right_side_divisions_to_new_vars[i], division, is_inclusion_to_process_on_cycle);
                         // we add this inclusion to the worklist only if the right side contains something that was on the left (i.e. it was possibly changed)
-                        // for (const auto &right_var : division) {
-                        //     if (left_vars_set.count(right_var) > 0) {
-                        //         // TODO: again, push to front? back? where the fuck to push??
-                        //         new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
-                        //         break;
-                        //     }
-                        // }
-                        STRACE("str", tout << "added new inclusion from the right side (non-length): " << new_inclusion->get_predicate() << std::endl; );
+                        for (const auto &right_var : division) {
+                            if (left_vars_set.count(right_var) > 0) {
+                                // TODO: again, push to front? back? where the fuck to push??
+                                new_element.push_unique(new_inclusion, is_inclusion_to_process_on_cycle);
+                                break;
+                            }
+                        }
+                        STRACE("str", tout << "added new inclusion from the right side (non-length): " << new_inclusion << std::endl; );
                     }
                 }
 
@@ -453,15 +488,14 @@ namespace smt::noodler {
                     if (substitution_map.count(left_var)) {
                         // left_var is already substituted, therefore we add 'left_var ⊆ left_side_vars_to_new_vars[i]' to the inclusion graph
                         std::vector<BasicTerm> new_inclusion_left_side{ left_var };
-                        const auto &new_inclusion = new_element.inclusion_graph->add_node(new_inclusion_left_side, left_side_vars_to_new_vars[i]);
                         // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
-                        new_element.inclusion_graph->set_is_on_cycle(new_inclusion, is_node_to_process_on_cycle);
+                        const auto &new_inclusion = new_element.add_inclusion(new_inclusion_left_side, left_side_vars_to_new_vars[i], is_inclusion_to_process_on_cycle);
                         // we also add this inclusion to the worklist, as it represents unification
                         // we push it to the front if we are processing node that is not on the cycle, because it should not get stuck in the cycle then
                         // TODO: is this correct? can we push to the front?
                         // TODO: can't we push to front even if it is on cycle??
-                        new_element.push_unique(new_inclusion, is_node_to_process_on_cycle);
-                        STRACE("str", tout << "added new inclusion from the left side because it could not be substituted: " << new_inclusion->get_predicate() << std::endl; );
+                        new_element.push_unique(new_inclusion, is_inclusion_to_process_on_cycle);
+                        STRACE("str", tout << "added new inclusion from the left side because it could not be substituted: " << new_inclusion << std::endl; );
                     } else {
                         // TODO make this function or something, we do the same thing here as for the right side when substituting
                         // left_var is not substitued by anything yet, we will substitute it
@@ -481,20 +515,15 @@ namespace smt::noodler {
                 // do substitution in the inclusion graph
                 new_element.substitute_vars(substitution_map);
 
-                // update inclusion graph edges
-                new_element.inclusion_graph->add_inclusion_graph_edges();
-
                 // update the substitution_map of new_element by the new substitutions
                 new_element.substitution_map.merge(substitution_map);
 
                 // TODO should we really push to front when not on cycle?
-                if (!is_node_to_process_on_cycle) {
+                if (!is_inclusion_to_process_on_cycle) {
                     worklist.push_front(new_element);
                 } else {
                     worklist.push_back(new_element);
                 }
-
-                // TODO: should we do something more here??
 
             }
 
@@ -642,8 +671,20 @@ namespace smt::noodler {
         }
 
         if (!this->formula.get_predicates().empty()) {
-            // TODO the ordering of nodes_to_process right now is given by how they were added from the splitting graph, should we use something different?
-            initialWlEl.inclusion_graph = std::make_shared<Graph>(Graph::create_inclusion_graph(this->formula, initialWlEl.nodes_to_process));
+            // TODO we probably want to completely get rid of inclusion graphs
+            std::deque<std::shared_ptr<GraphNode>> tmp;
+            Graph incl_graph = Graph::create_inclusion_graph(this->formula, tmp);
+            for (auto const &node : incl_graph.get_nodes()) {
+                initialWlEl.inclusions.insert(node->get_predicate());
+                if (!incl_graph.is_on_cycle(node)) {
+                    initialWlEl.inclusions_not_on_cycle.insert(node->get_predicate());
+                }
+            }
+            // TODO the ordering of inclusions_to_process right now is given by how they were added from the splitting graph, should we use something different? also it is not deterministic now, depends on hashes
+            while (!tmp.empty()) {
+                initialWlEl.inclusions_to_process.push_back(tmp.front()->get_predicate());
+                tmp.pop_front();
+            }
         }
 
         worklist.push_back(initialWlEl);

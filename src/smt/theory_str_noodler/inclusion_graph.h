@@ -187,7 +187,7 @@ namespace smt::noodler {
             return (nodes_not_on_cycle.count(node) == 0);
         }
 
-        bool set_is_on_cycle(const std::shared_ptr<GraphNode> &node, bool is_on_cycle) {
+        void set_is_on_cycle(const std::shared_ptr<GraphNode> &node, bool is_on_cycle) {
             assert(nodes.count(node) > 0);
             if (!is_on_cycle) {
                 nodes_not_on_cycle.insert(node);

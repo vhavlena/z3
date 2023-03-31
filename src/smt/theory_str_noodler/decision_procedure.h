@@ -116,11 +116,14 @@ namespace smt::noodler {
         // inclusion_graph contains inclusions of concatenation of variables (where each variable occuring in
         // this inclusion graph should be in either aut_ass or substitution_map) and we are trying to find
         // aut_ass + substitution_map such that these inclusions will hold
-        std::shared_ptr<Graph> inclusion_graph;
+        //std::shared_ptr<Graph> inclusion_graph;
+
+        std::set<Predicate> inclusions;
+        std::set<Predicate> inclusions_not_on_cycle;
 
         // contains inclusions from inclusion_graph that needs to be processed (i.e. checked if the inclusion
         // holds and if not, do something so that inclusion holds)
-        std::deque<std::shared_ptr<GraphNode>> nodes_to_process;
+        std::deque<Predicate> inclusions_to_process;
 
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
@@ -128,42 +131,91 @@ namespace smt::noodler {
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
-                     std::deque<std::shared_ptr<GraphNode>> nodes_to_process,
-                     std::shared_ptr<Graph> inclusion_graph,
+                     std::deque<Predicate> inclusions_to_process,
+                     //std::shared_ptr<Graph> inclusion_graph,
+                     std::set<Predicate> inclusions,
+                     std::set<Predicate> inclusions_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
                      std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
-                          inclusion_graph(inclusion_graph),
-                          nodes_to_process(nodes_to_process),
+                          //inclusion_graph(inclusion_graph),
+                          inclusions(inclusions),
+                          inclusions_not_on_cycle(inclusions_not_on_cycle),
+                          inclusions_to_process(inclusions_to_process),
                           length_sensitive_vars(length_sensitive_vars) {}
 
-        /// pushes node to the beginning of nodes_to_process but only if it is not in it yet
-        void push_front_unique(const std::shared_ptr<GraphNode> &node) {
-            if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
-                nodes_to_process.push_front(node);
+        /// pushes inclusion to the beginning of inclusions_to_process but only if it is not in it yet
+        void push_front_unique(const Predicate &inclusion) {
+            if (std::find(inclusions_to_process.begin(), inclusions_to_process.end(), inclusion) == inclusions_to_process.end()) {
+                inclusions_to_process.push_front(inclusion);
             }
         }
 
         /// pushes node to the end of nodes_to_process but only if it is not in it yet
-        void push_back_unique(const std::shared_ptr<GraphNode> &node) {
-            if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
-                nodes_to_process.push_back(node);
+        void push_back_unique(const Predicate &inclusion) {
+            if (std::find(inclusions_to_process.begin(), inclusions_to_process.end(), inclusion) == inclusions_to_process.end()) {
+                inclusions_to_process.push_back(inclusion);
             }
         }
 
-        /// pushes node either to the end or beginning of nodes_to_process (according to @p to_back) but only if it is not in it yet
-        void push_unique(const std::shared_ptr<GraphNode> &node, bool to_back) {
+        /// pushes node either to the end or beginning of inclusions_to_process (according to @p to_back) but only if it is not in it yet
+        void push_unique(const Predicate &inclusion, bool to_back) {
             if (to_back) {
-                push_back_unique(node);
+                push_back_unique(inclusion);
             } else {
-                push_front_unique(node);
+                push_front_unique(inclusion);
             }
+        }
+
+        bool is_inclusion_on_cycle(const Predicate &inclusion) {
+            return (inclusions_not_on_cycle.count(inclusion) == 0);
+        }
+
+        void add_inclusion(const Predicate &inclusion, bool is_on_cycle = true) {
+            inclusions.insert(inclusion);
+            if (!is_on_cycle) {
+                inclusions_not_on_cycle.insert(inclusion);
+            }
+        }
+
+        Predicate add_inclusion(const std::vector<BasicTerm> &left_side, const std::vector<BasicTerm> &right_side, bool is_on_cycle = true) {
+            Predicate new_inclusion{PredicateType::Equation, std::vector<std::vector<BasicTerm>> {left_side, right_side}};
+            add_inclusion(new_inclusion);
+            return new_inclusion;
+        }
+
+        void remove_inclusion(const Predicate &inclusion) {
+            inclusions.erase(inclusion);
+            inclusions_not_on_cycle.erase(inclusion);
+        }
+
+        std::vector<Predicate> get_dependent_inclusions(const Predicate &inclusion) {
+            std::vector<Predicate> dependent_inclusions;
+            for (const Predicate &other_inclusion : inclusions) {
+                if (is_dependent(inclusion, other_inclusion)) {
+                    dependent_inclusions.push_back(other_inclusion);
+                }
+            }
+            return dependent_inclusions;
+        }
+
+        bool is_dependent(const Predicate &inclusion, const Predicate &inclusion_to_depend) {
+            auto const &left_side_vars =  inclusion.get_left_set();
+            if (left_side_vars.empty()) {
+                return false;
+            }
+            for (auto const &right_var : inclusion_to_depend.get_right_set()) {
+                if (left_side_vars.count(right_var) > 0) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
          * This function makes a deep copy of the existing inclusion_graph (i.e. nodes are copied), removes all edges
-         * and also updates nodes_to_process so that pointers point into the nodes of this deep copy.
+         * and also updates inclusions_to_process so that pointers point into the nodes of this deep copy.
          * and also remove all edges
          * 
          * TODO: this function is really ugly, I should do something about it
@@ -171,9 +223,9 @@ namespace smt::noodler {
          * @param processed_node node that is being processed in original inclusion graph
          * @return the new processed_node in the deep copy
          */
-        std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
+        // std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
 
-        // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process (and also nodes that have same sides are deleted)
+        // substitutes vars and merge same nodes + delete copies of the merged nodes from the inclusions_to_process (and also nodes that have same sides are deleted)
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map);
 
         /**
