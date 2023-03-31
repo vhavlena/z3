@@ -106,23 +106,20 @@ namespace smt::noodler {
 
     /// A state of decision procedure that can lead to a solution
     struct SolvingState {
-        // aut_ass[x] assigns variable x to some autoamton while substitution_map[x] maps variable x to
+        // aut_ass[x] assigns variable x to some automaton while substitution_map[x] maps variable x to
         // the concatenation of variables for which x was substituted (i.e. its automaton is concatenation
         // of the automata from these variables). Each variable is either assigned in aut_ass or
         // substituted in substitution_map, but not both!
         AutAssignment aut_ass;
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
-        // inclusion_graph contains inclusions of concatenation of variables (where each variable occuring in
-        // this inclusion graph should be in either aut_ass or substitution_map) and we are trying to find
-        // aut_ass + substitution_map such that these inclusions will hold
-        //std::shared_ptr<Graph> inclusion_graph;
-
+        // set of inclusions where we are trying to find aut_ass + substitution_map such that they hold 
         std::set<Predicate> inclusions;
+        // set of inclusion from the previous set that for sure are not on cycle in the inclusion graph
+        // that would be generated from inclusions
         std::set<Predicate> inclusions_not_on_cycle;
 
-        // contains inclusions from inclusion_graph that needs to be processed (i.e. checked if the inclusion
-        // holds and if not, do something so that inclusion holds)
+        // contains inclusions where we need to check if it holds (and if not, do something so that the inclusion holds)
         std::deque<Predicate> inclusions_to_process;
 
         // the variables that have length constraint on them in the rest of formula
@@ -168,10 +165,21 @@ namespace smt::noodler {
             }
         }
 
+        /**
+         * Checks whether @p inclusion would be on cycle in the inclusion graph (can overapproxamte
+         * and say that inclusion is on cycle even if it is not).
+         */
         bool is_inclusion_on_cycle(const Predicate &inclusion) {
             return (inclusions_not_on_cycle.count(inclusion) == 0);
         }
 
+        /**
+         * Adds inclusion @p inclusion to this solving state (i.e. we will start checking if
+         * this inclusion should not be added to inclusion_to_process during the decision procedure). 
+         * 
+         * @param inclusion Inclusion to add
+         * @param is_on_cycle Whether the inclusion would be on cycle in the inclusion graph (if not sure, set to true)
+         */
         void add_inclusion(const Predicate &inclusion, bool is_on_cycle = true) {
             inclusions.insert(inclusion);
             if (!is_on_cycle) {
@@ -179,6 +187,15 @@ namespace smt::noodler {
             }
         }
 
+        /**
+         * Adds inclusion with sides @p left_side and @p right_side to this solving state (i.e. we will start checking if
+         * this inclusion should not be added to inclusion_to_process during the decision procedure).
+         * 
+         * @param left_side Left side of the new inclusion
+         * @param right_side Right side of the new inclusion
+         * @param is_on_cycle Whether the inclusion would be on cycle in the inclusion graph (if not sure, set to true)
+         * @return The newly added inclusion
+         */
         Predicate add_inclusion(const std::vector<BasicTerm> &left_side, const std::vector<BasicTerm> &right_side, bool is_on_cycle = true) {
             Predicate new_inclusion{PredicateType::Equation, std::vector<std::vector<BasicTerm>> {left_side, right_side}};
             add_inclusion(new_inclusion);
@@ -190,6 +207,13 @@ namespace smt::noodler {
             inclusions_not_on_cycle.erase(inclusion);
         }
 
+        /**
+         * Returns the vector of inclusions that would depend on the given @p inclusion in the inclusion graph.
+         * That this all inclusions whose right side contain some variable from the left side of the given @p inclusion.
+         * 
+         * @param inclusion Inclusion whose dependencies we are looking for
+         * @return The set of inclusions that depend on @p inclusion
+         */
         std::vector<Predicate> get_dependent_inclusions(const Predicate &inclusion) {
             std::vector<Predicate> dependent_inclusions;
             for (const Predicate &other_inclusion : inclusions) {
@@ -200,6 +224,10 @@ namespace smt::noodler {
             return dependent_inclusions;
         }
 
+        /**
+         * Check if @p inclusion_to_depend depends on @p inclusion in the inclusion graph, i.e.
+         * if right side of @p inclusion_to_depend contain variable from the left side of @p inclusion.
+         */
         bool is_dependent(const Predicate &inclusion, const Predicate &inclusion_to_depend) {
             auto const &left_side_vars =  inclusion.get_left_set();
             if (left_side_vars.empty()) {
@@ -212,18 +240,6 @@ namespace smt::noodler {
             }
             return false;
         }
-
-        /**
-         * This function makes a deep copy of the existing inclusion_graph (i.e. nodes are copied), removes all edges
-         * and also updates inclusions_to_process so that pointers point into the nodes of this deep copy.
-         * and also remove all edges
-         * 
-         * TODO: this function is really ugly, I should do something about it
-         * 
-         * @param processed_node node that is being processed in original inclusion graph
-         * @return the new processed_node in the deep copy
-         */
-        // std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
 
         // substitutes vars and merge same nodes + delete copies of the merged nodes from the inclusions_to_process (and also nodes that have same sides are deleted)
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map);

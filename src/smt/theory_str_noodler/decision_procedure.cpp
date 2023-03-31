@@ -8,21 +8,6 @@
 #include "decision_procedure.h"
 
 namespace smt::noodler {
-    // std::shared_ptr<GraphNode> SolvingState::make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node) {
-    //     assert(inclusion_graph->get_nodes().count(processed_node) > 0);
-    //     Graph graph_to_copy = *inclusion_graph;
-    //     graph_to_copy.remove_all_edges();
-    //     assert(graph_to_copy.get_nodes().count(processed_node) > 0);
-    //     std::unordered_map<std::shared_ptr<GraphNode>, std::shared_ptr<GraphNode>> node_mapping;
-    //     inclusion_graph = std::make_shared<Graph>(graph_to_copy.deep_copy(node_mapping));
-    //     std::deque<std::shared_ptr<GraphNode>> new_nodes_to_process;
-    //     while (!inclusions_to_process.empty()) {
-    //         new_nodes_to_process.push_back(node_mapping.at(inclusions_to_process.front()));
-    //         inclusions_to_process.pop_front();
-    //     }
-    //     inclusions_to_process = new_nodes_to_process;
-    //     return node_mapping.at(processed_node);
-    // }
 
     void SolvingState::substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map) {
         // substitutes variables in a vector using substitution_map
