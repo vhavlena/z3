@@ -782,6 +782,12 @@ namespace smt::noodler {
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
+        // use underapproximation to solve
+        if(solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
+            STRACE("str", tout << "underapprox sat \n";);
+            return FC_DONE;
+        }
+
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
         dec_proc.preprocess();
         
@@ -815,6 +821,30 @@ namespace smt::noodler {
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
+    }
+
+    /**
+     * @brief Solve the given constraint using underapproximation.
+     * 
+     * @param instance Formula
+     * @param aut_assignment Initial automata assignment
+     * @param init_length_sensitive_vars Length sensitive variables
+     * @return lbool SAT
+     */
+    lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
+        dec_proc.preprocess(PreprocessType::UNDERAPPROX);
+        
+        expr_ref lengths(m);
+        model_ref mod;
+        dec_proc.init_computation();
+        while(dec_proc.compute_next_solution()) {
+            lengths = dec_proc.get_lengths(this->var_name);
+            if(check_len_sat(lengths, mod) == l_true) {
+                return l_true;
+            }
+        }
+        return l_false;
     }
 
     model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {

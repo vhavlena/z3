@@ -249,7 +249,7 @@ namespace smt::noodler::util {
      * @param m_util_a arith ast util
      * @return expr_ref
      */
-    static expr_ref len_to_expr(const LenNode * node, std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
+    static expr_ref len_to_expr(const LenNode * node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
         switch(node->type) {
         case LenFormulaType::LEAF:
             if(node->atom_val.get_type() == BasicTermType::Length)

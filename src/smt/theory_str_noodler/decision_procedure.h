@@ -12,6 +12,15 @@
 #include "formula_preprocess.h"
 
 namespace smt::noodler {
+
+    /**
+     * @brief Preprocess options
+     */
+    enum PreprocessType {
+        PLAIN,
+        UNDERAPPROX
+    };
+
     /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
@@ -26,7 +35,7 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
-        virtual void preprocess() {
+        virtual void preprocess(PreprocessType opt) {
             throw std::runtime_error("preprocess unimplemented");
         }
 
@@ -44,7 +53,7 @@ namespace smt::noodler {
          * @return Conjunction of lengths of the current solution for variables in constructor
          *  (variable renames, init length variables).
          */
-        virtual expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+        virtual expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -298,9 +307,9 @@ namespace smt::noodler {
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        expr_ref get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
+        expr_ref get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
 
-        expr_ref get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
+        expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
 
         bool check_diseqs(const AutAssignment& ass);
 
@@ -329,10 +338,10 @@ namespace smt::noodler {
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;
-        expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) override;
+        expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
 
-        void preprocess() override;
+        void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 

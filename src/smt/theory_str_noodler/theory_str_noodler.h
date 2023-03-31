@@ -160,6 +160,8 @@ namespace smt::noodler {
          */
         bool is_variable(const expr* expression) const;
 
+        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+
         expr_ref mk_sub(expr *a, expr *b);
         zstring print_word_term(expr * a) const;
 
