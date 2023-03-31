@@ -114,7 +114,10 @@ namespace smt::noodler {
             }
 
             auto cmp = Mata::Nfa::minimize(Mata::Nfa::complement(*(*this)[t], mata_alphabet));
-            len = cmp.size() - 1;
+            if(!Mata::Nfa::is_lang_empty(cmp))
+                len = cmp.size() - 1;
+            else 
+                len = -1;
             return cmp.size() == cmp.get_num_of_trans() + 1;
         }
 

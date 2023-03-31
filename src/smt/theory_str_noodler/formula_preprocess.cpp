@@ -1039,7 +1039,7 @@ namespace smt::noodler {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 int ln = 0;
-                if(this->aut_ass.is_co_finite(var, ln) && ln > 0) {
+                if(this->aut_ass.is_co_finite(var, ln) && ln >= 0) {
                     LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
                     LenNode* left = new LenNode(LenFormulaType::LEAF, var, {});
                     LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
