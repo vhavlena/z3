@@ -24,6 +24,7 @@ Revision History:
 #include "smt/params/theory_array_params.h"
 #include "smt/params/theory_bv_params.h"
 #include "smt/params/theory_str_params.h"
+#include "smt/params/theory_str_noodler_params.h"
 #include "smt/params/theory_seq_params.h"
 #include "smt/params/theory_pb_params.h"
 #include "smt/params/theory_datatype_params.h"
@@ -79,6 +80,7 @@ struct smt_params : public preprocessor_params,
                     public theory_array_params,
                     public theory_bv_params,
                     public theory_str_params,
+                    public theory_str_noodler_params,
                     public theory_seq_params,
                     public theory_pb_params,
                     public theory_datatype_params {

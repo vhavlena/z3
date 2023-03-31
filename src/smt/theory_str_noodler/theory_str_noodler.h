@@ -19,7 +19,7 @@ Eternal glory to Yu-Fang.
 #include <smt/params/smt_params.h>
 #include "ast/arith_decl_plugin.h"
 #include "ast/seq_decl_plugin.h"
-#include "smt/params/theory_str_params.h"
+#include "smt/params/theory_str_noodler_params.h"
 #include "smt/smt_kernel.h"
 #include "smt/smt_theory.h"
 #include "smt/smt_arith_value.h"
@@ -43,7 +43,7 @@ namespace smt::noodler {
 
         int m_scope_level = 0;
         static bool is_over_approximation;
-        const theory_str_params& m_params;
+        const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
         arith_util m_util_a;
         seq_util m_util_s;
@@ -87,7 +87,7 @@ namespace smt::noodler {
 
     public:
         char const * get_name() const override { return "noodler"; }
-        theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params);
+        theory_str_noodler(context& ctx, ast_manager & m, theory_str_noodler_params const & params);
         void display(std::ostream& os) const override;
         theory *mk_fresh(context * newctx) override { return alloc(theory_str_noodler, *newctx, get_manager(), m_params); }
         void init() override;

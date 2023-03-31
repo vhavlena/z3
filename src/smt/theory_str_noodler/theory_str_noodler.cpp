@@ -27,7 +27,7 @@ namespace smt::noodler {
         bool IN_CHECK_FINAL = false;
     }
 
-    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params):
+    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_noodler_params const & params):
         theory(ctx, ctx.get_manager().mk_family_id("seq")),
         m_params(params),
         m_rewrite(m),
@@ -783,7 +783,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // use underapproximation to solve
-        if(solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
+        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
             return FC_DONE;
         }
