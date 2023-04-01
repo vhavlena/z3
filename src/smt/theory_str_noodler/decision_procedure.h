@@ -306,12 +306,6 @@ namespace smt::noodler {
 
         bool check_diseqs(const AutAssignment& ass);
 
-        /**
-         * Replaces each occurence of a literal in formula by a new variable.
-         * 
-         */
-        // void remove_literals_from_formula();
-
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
         

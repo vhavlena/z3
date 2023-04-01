@@ -644,31 +644,10 @@ namespace smt::noodler {
         return true;
     }
 
-    // void DecisionProcedure::remove_literals_from_formula() {
-    //     unsigned literal_no = 0;
-    //     auto replace_in_vector = [&literal_no, this](std::vector<BasicTerm> &term_vec) {
-    //         for (size_t i = 0; i < term_vec.size(); ++i) {
-    //             BasicTerm &term = term_vec[i];
-    //             if (term.is_literal()) {
-    //                 BasicTerm new_var{BasicTermType::Variable, }
-    //             }
-    //         }
-    //         for (auto &term : term_vec) {
-    //             if (term.is) {
-    //                 term.
-    //             }
-    //         }
-    //     };
-    //     for (const auto &predicate : this->formula.get_predicates()) {
-    //         for (const auto &side : predicate.)
-    //     }
-    // }
-
     /**
      * @brief Creates initial inclusion graph according to the preprocessed instance.
      */
     void DecisionProcedure::init_computation() {
-        // remove_literals_from_formula();
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(this->init_aut_ass);
