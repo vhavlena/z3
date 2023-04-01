@@ -124,7 +124,6 @@ namespace smt::noodler {
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
             Predicate inclusion_to_process = element_to_process.inclusions_to_process.front();
             element_to_process.inclusions_to_process.pop_front();
-            assert(inclusion_to_process != nullptr);
 
             // this will decide whether we will continue in our search by DFS or by BFS
             bool is_inclusion_to_process_on_cycle = element_to_process.is_inclusion_on_cycle(inclusion_to_process);
