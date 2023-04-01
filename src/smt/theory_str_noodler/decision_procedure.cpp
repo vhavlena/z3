@@ -441,14 +441,12 @@ namespace smt::noodler {
                     } else {
                         // right side is non-length concatenation "y_1...y_n" => we are adding new inclusion "new_vars ⊆ y1...y_n"
                         // TODO: how to decide if sometihng is on cycle? by previous node being on cycle, or when we recompute inclusion graph edges?
+                        // TODO: do we need to add inclusion if previous node was not on cycle? because I think it is not possible to get to this new node anyway
                         const auto &new_inclusion = new_element.add_inclusion(right_side_divisions_to_new_vars[i], division, is_inclusion_to_process_on_cycle);
                         // we add this inclusion to the worklist only if the right side contains something that was on the left (i.e. it was possibly changed)
-                        for (const auto &right_var : division) {
-                            if (left_vars_set.count(right_var) > 0) {
-                                // TODO: again, push to front? back? where the fuck to push??
-                                new_element.push_unique(new_inclusion, is_inclusion_to_process_on_cycle);
-                                break;
-                            }
+                        if (SolvingState::is_dependent(left_vars_set, new_inclusion.get_right_set())) {
+                            // TODO: again, push to front? back? where the fuck to push??
+                            new_element.push_unique(new_inclusion, is_inclusion_to_process_on_cycle);
                         }
                         STRACE("str", tout << "added new inclusion from the right side (non-length): " << new_inclusion << std::endl; );
                     }
@@ -469,6 +467,10 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < left_side_vars.size(); ++i) {
                     // TODO maybe if !is_there_length_on_right, we should just do intersection and not create new inclusions
                     const BasicTerm &left_var = left_side_vars[i];
+                    if (left_var.is_literal()) {
+                        // we skip literals, we do not want to substitute them
+                        continue;
+                    }
                     if (substitution_map.count(left_var)) {
                         // left_var is already substituted, therefore we add 'left_var ⊆ left_side_vars_to_new_vars[i]' to the inclusion graph
                         std::vector<BasicTerm> new_inclusion_left_side{ left_var };
@@ -642,10 +644,31 @@ namespace smt::noodler {
         return true;
     }
 
+    // void DecisionProcedure::remove_literals_from_formula() {
+    //     unsigned literal_no = 0;
+    //     auto replace_in_vector = [&literal_no, this](std::vector<BasicTerm> &term_vec) {
+    //         for (size_t i = 0; i < term_vec.size(); ++i) {
+    //             BasicTerm &term = term_vec[i];
+    //             if (term.is_literal()) {
+    //                 BasicTerm new_var{BasicTermType::Variable, }
+    //             }
+    //         }
+    //         for (auto &term : term_vec) {
+    //             if (term.is) {
+    //                 term.
+    //             }
+    //         }
+    //     };
+    //     for (const auto &predicate : this->formula.get_predicates()) {
+    //         for (const auto &side : predicate.)
+    //     }
+    // }
+
     /**
      * @brief Creates initial inclusion graph according to the preprocessed instance.
      */
     void DecisionProcedure::init_computation() {
+        // remove_literals_from_formula();
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(this->init_aut_ass);

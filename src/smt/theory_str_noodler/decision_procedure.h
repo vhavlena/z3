@@ -216,8 +216,9 @@ namespace smt::noodler {
          */
         std::vector<Predicate> get_dependent_inclusions(const Predicate &inclusion) {
             std::vector<Predicate> dependent_inclusions;
+            auto left_vars_set = inclusion.get_left_set();
             for (const Predicate &other_inclusion : inclusions) {
-                if (is_dependent(inclusion, other_inclusion)) {
+                if (is_dependent(left_vars_set, other_inclusion.get_right_set())) {
                     dependent_inclusions.push_back(other_inclusion);
                 }
             }
@@ -225,16 +226,15 @@ namespace smt::noodler {
         }
 
         /**
-         * Check if @p inclusion_to_depend depends on @p inclusion in the inclusion graph, i.e.
-         * if right side of @p inclusion_to_depend contain variable from the left side of @p inclusion.
+         * Check if the vector @p right_side_vars depends on @p left_side_vars, i.e. if some variable
+         * (NOT literal) occuring in @p right_side_vars occurs also in @p left_side_vars
          */
-        bool is_dependent(const Predicate &inclusion, const Predicate &inclusion_to_depend) {
-            auto const &left_side_vars =  inclusion.get_left_set();
+        static bool is_dependent(const std::set<BasicTerm> &left_side_vars, const std::set<BasicTerm> &right_side_vars) {
             if (left_side_vars.empty()) {
                 return false;
             }
-            for (auto const &right_var : inclusion_to_depend.get_right_set()) {
-                if (left_side_vars.count(right_var) > 0) {
+            for (auto const &right_var : right_side_vars) {
+                if (right_var.is_variable() && left_side_vars.count(right_var) > 0) {
                     return true;
                 }
             }
@@ -305,6 +305,12 @@ namespace smt::noodler {
         expr_ref get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
 
         bool check_diseqs(const AutAssignment& ass);
+
+        /**
+         * Replaces each occurence of a literal in formula by a new variable.
+         * 
+         */
+        // void remove_literals_from_formula();
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
