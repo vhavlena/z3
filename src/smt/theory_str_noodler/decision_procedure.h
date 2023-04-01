@@ -129,14 +129,12 @@ namespace smt::noodler {
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
                      std::deque<Predicate> inclusions_to_process,
-                     //std::shared_ptr<Graph> inclusion_graph,
                      std::set<Predicate> inclusions,
                      std::set<Predicate> inclusions_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
                      std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
-                          //inclusion_graph(inclusion_graph),
                           inclusions(inclusions),
                           inclusions_not_on_cycle(inclusions_not_on_cycle),
                           inclusions_to_process(inclusions_to_process),

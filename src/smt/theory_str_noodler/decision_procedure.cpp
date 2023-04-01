@@ -145,7 +145,7 @@ namespace smt::noodler {
             /********************************************************************************************************/
             /****************************************** One side is empty *******************************************/
             /********************************************************************************************************/
-            // As kinda opmtimalization step, we do "noodlification" for empty sides separately (i.e. sides that
+            // As kinda optimization step, we do "noodlification" for empty sides separately (i.e. sides that
             // represent empty string). This is because it is simpler, we would get only one noodle so we just need to
             // check that the non-empty side actually contains empty string and replace the vars on that side by epsilon.
             if (right_side_vars.empty() || left_side_vars.empty()) {
