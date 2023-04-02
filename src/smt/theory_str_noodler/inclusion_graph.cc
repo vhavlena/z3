@@ -82,6 +82,12 @@ Graph smt::noodler::Graph::deep_copy(std::unordered_map<std::shared_ptr<GraphNod
         }
     }
 
+    for (const auto &node_not_on_cycle : nodes_not_on_cycle) {
+        if (get_nodes().count(node_not_on_cycle) > 0) {
+            new_graph.nodes_not_on_cycle.insert(node_mapping.at(node_not_on_cycle));
+        }
+    }
+
     return new_graph;
 }
 
@@ -213,14 +219,6 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
         }
     }
 
-    // initial nodes TODO: do we need them???
-    for (auto& node: graph.get_nodes()) {
-        // auto node{ const_cast<GraphNode *>(&const_node) };
-        if (graph.inverse_edges.count(node) == 0) {
-            graph.initial_nodes.insert(node);
-        }
-    }
-
     return graph;
 }
 
@@ -239,10 +237,8 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
         for (auto& node: simplified_splitting_graph.get_nodes()) {
             if (simplified_splitting_graph.inverse_edges.count(node) == 0) {
                 inclusion_graph.nodes.insert(node);
+                STRACE("str", tout << "Added node " << node->get_predicate() << " to the graph without the reversed inclusion." << std::endl;);
                 inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
-                if (simplified_splitting_graph.initial_nodes.count(node) > 0) {
-                    inclusion_graph.initial_nodes.insert(node);
-                }
 
                 out_node_order.push_back(node);
 
@@ -262,10 +258,10 @@ Graph smt::noodler::Graph::create_inclusion_graph(Graph& simplified_splitting_gr
         }
     }
 
-    // we add rest of the nodes (the ones on the cycle) to the inclusion graph and make them initial
+    // we add rest of the nodes (the ones on the cycle) to the inclusion graph
     for (auto& node: simplified_splitting_graph.get_nodes()) {
-        inclusion_graph.initial_nodes.insert(node);
         out_node_order.push_back(node);
+        STRACE("str", tout << "Added node " << node->get_predicate() << " to the graph with its reversed inclusion." << std::endl;);
     }
     inclusion_graph.nodes.merge(simplified_splitting_graph.nodes);
 

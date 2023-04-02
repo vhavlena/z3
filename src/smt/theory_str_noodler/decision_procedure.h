@@ -104,59 +104,142 @@ namespace smt::noodler {
 
     };
 
-
+    /// A state of decision procedure that can lead to a solution
     struct SolvingState {
+        // aut_ass[x] assigns variable x to some automaton while substitution_map[x] maps variable x to
+        // the concatenation of variables for which x was substituted (i.e. its automaton is concatenation
+        // of the automata from these variables). Each variable is either assigned in aut_ass or
+        // substituted in substitution_map, but not both!
         AutAssignment aut_ass;
-        std::deque<std::shared_ptr<GraphNode>> nodes_to_process;
-        std::shared_ptr<Graph> inclusion_graph;
+        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
+
+        // set of inclusions where we are trying to find aut_ass + substitution_map such that they hold 
+        std::set<Predicate> inclusions;
+        // set of inclusion from the previous set that for sure are not on cycle in the inclusion graph
+        // that would be generated from inclusions
+        std::set<Predicate> inclusions_not_on_cycle;
+
+        // contains inclusions where we need to check if it holds (and if not, do something so that the inclusion holds)
+        std::deque<Predicate> inclusions_to_process;
+
+        // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
-        // substitution_map[x] maps variable x to the concatenation of variables for which x was substituted
-        // each variable should be either assigned in aut_ass or substituted in this map
-        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
-                        std::deque<std::shared_ptr<GraphNode>> nodes_to_process,
-                        std::shared_ptr<Graph> inclusion_graph,
-                        std::unordered_set<BasicTerm> length_sensitive_vars,
-                        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::deque<Predicate> inclusions_to_process,
+                     std::set<Predicate> inclusions,
+                     std::set<Predicate> inclusions_not_on_cycle,
+                     std::unordered_set<BasicTerm> length_sensitive_vars,
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
                         : aut_ass(aut_ass),
-                          nodes_to_process(nodes_to_process),
-                          inclusion_graph(inclusion_graph),
-                          length_sensitive_vars(length_sensitive_vars),
-                          substitution_map(substitution_map) {}
+                          substitution_map(substitution_map),
+                          inclusions(inclusions),
+                          inclusions_not_on_cycle(inclusions_not_on_cycle),
+                          inclusions_to_process(inclusions_to_process),
+                          length_sensitive_vars(length_sensitive_vars) {}
 
-        // pushes node to the beginning of nodes_to_process but only if it is not in it yet
-        void push_front_unique(const std::shared_ptr<GraphNode> &node) {
-            if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
-                nodes_to_process.push_front(node);
+        /// pushes inclusion to the beginning of inclusions_to_process but only if it is not in it yet
+        void push_front_unique(const Predicate &inclusion) {
+            if (std::find(inclusions_to_process.begin(), inclusions_to_process.end(), inclusion) == inclusions_to_process.end()) {
+                inclusions_to_process.push_front(inclusion);
             }
         }
 
-        // pushes node to the end of nodes_to_process but only if it is not in it yet
-        void push_back_unique(const std::shared_ptr<GraphNode> &node) {
-            if (std::find(nodes_to_process.begin(), nodes_to_process.end(), node) == nodes_to_process.end()) {
-                nodes_to_process.push_back(node);
+        /// pushes node to the end of nodes_to_process but only if it is not in it yet
+        void push_back_unique(const Predicate &inclusion) {
+            if (std::find(inclusions_to_process.begin(), inclusions_to_process.end(), inclusion) == inclusions_to_process.end()) {
+                inclusions_to_process.push_back(inclusion);
             }
         }
 
-        void push_unique(const std::shared_ptr<GraphNode> &node, bool to_back) {
+        /// pushes node either to the end or beginning of inclusions_to_process (according to @p to_back) but only if it is not in it yet
+        void push_unique(const Predicate &inclusion, bool to_back) {
             if (to_back) {
-                push_back_unique(node);
+                push_back_unique(inclusion);
             } else {
-                push_front_unique(node);
+                push_front_unique(inclusion);
             }
         }
 
-        // inclusion_graph will become a new deep copy of the existing inclusion_graph
-        // edges are removed
-        // nodes_to_process are updated so that the pointers point to the nodes of this deep copy
-        // processed_node is the node that is being processed, the return value is this node in the deep copy
-        // TODO this function is really ugly, I should do something about it
-        std::shared_ptr<GraphNode> make_deep_copy_of_inclusion_graph_only_nodes(std::shared_ptr<GraphNode> processed_node);
+        /**
+         * Checks whether @p inclusion would be on cycle in the inclusion graph (can overapproxamte
+         * and say that inclusion is on cycle even if it is not).
+         */
+        bool is_inclusion_on_cycle(const Predicate &inclusion) {
+            return (inclusions_not_on_cycle.count(inclusion) == 0);
+        }
 
-        // substitutes vars and merge same nodes + delete copies of the merged nodes from the nodes_to_process (and also nodes that have same sides are deleted)
+        /**
+         * Adds inclusion @p inclusion to this solving state (i.e. we will start checking if
+         * this inclusion should not be added to inclusion_to_process during the decision procedure). 
+         * 
+         * @param inclusion Inclusion to add
+         * @param is_on_cycle Whether the inclusion would be on cycle in the inclusion graph (if not sure, set to true)
+         */
+        void add_inclusion(const Predicate &inclusion, bool is_on_cycle = true) {
+            inclusions.insert(inclusion);
+            if (!is_on_cycle) {
+                inclusions_not_on_cycle.insert(inclusion);
+            }
+        }
+
+        /**
+         * Adds inclusion with sides @p left_side and @p right_side to this solving state (i.e. we will start checking if
+         * this inclusion should not be added to inclusion_to_process during the decision procedure).
+         * 
+         * @param left_side Left side of the new inclusion
+         * @param right_side Right side of the new inclusion
+         * @param is_on_cycle Whether the inclusion would be on cycle in the inclusion graph (if not sure, set to true)
+         * @return The newly added inclusion
+         */
+        Predicate add_inclusion(const std::vector<BasicTerm> &left_side, const std::vector<BasicTerm> &right_side, bool is_on_cycle = true) {
+            Predicate new_inclusion{PredicateType::Equation, std::vector<std::vector<BasicTerm>> {left_side, right_side}};
+            add_inclusion(new_inclusion);
+            return new_inclusion;
+        }
+
+        void remove_inclusion(const Predicate &inclusion) {
+            inclusions.erase(inclusion);
+            inclusions_not_on_cycle.erase(inclusion);
+        }
+
+        /**
+         * Returns the vector of inclusions that would depend on the given @p inclusion in the inclusion graph.
+         * That this all inclusions whose right side contain some variable from the left side of the given @p inclusion.
+         * 
+         * @param inclusion Inclusion whose dependencies we are looking for
+         * @return The set of inclusions that depend on @p inclusion
+         */
+        std::vector<Predicate> get_dependent_inclusions(const Predicate &inclusion) {
+            std::vector<Predicate> dependent_inclusions;
+            auto left_vars_set = inclusion.get_left_set();
+            for (const Predicate &other_inclusion : inclusions) {
+                if (is_dependent(left_vars_set, other_inclusion.get_right_set())) {
+                    dependent_inclusions.push_back(other_inclusion);
+                }
+            }
+            return dependent_inclusions;
+        }
+
+        /**
+         * Check if the vector @p right_side_vars depends on @p left_side_vars, i.e. if some variable
+         * (NOT literal) occuring in @p right_side_vars occurs also in @p left_side_vars
+         */
+        static bool is_dependent(const std::set<BasicTerm> &left_side_vars, const std::set<BasicTerm> &right_side_vars) {
+            if (left_side_vars.empty()) {
+                return false;
+            }
+            for (auto const &right_var : right_side_vars) {
+                if (right_var.is_variable() && left_side_vars.count(right_var) > 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // substitutes vars and merge same nodes + delete copies of the merged nodes from the inclusions_to_process (and also nodes that have same sides are deleted)
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map);
 
         /**
@@ -164,7 +247,6 @@ namespace smt::noodler {
          *
          * For example, if we have aut_ass[x] = aut1, aut_ass[y] = aut2, and substitution_map[z] = xy, then this will return
          * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
-         *
          */
         AutAssignment flatten_substition_map();
     };
@@ -180,7 +262,7 @@ namespace smt::noodler {
 
         FormulaPreprocess prep_handler;
 
-
+        // a deque containing states of decision procedure, each of them can lead to a solution
         std::deque<SolvingState> worklist;
 
         /// State of a found satisfiable solution set when one is computed using
@@ -224,7 +306,21 @@ namespace smt::noodler {
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
-
+        
+        /**
+         * Initialize a new decision procedure that can solve word equations
+         * (equalities of concatenations of string variables) with regular constraints
+         * (variables belong to some regular language represented by automaton) while
+         * keeping the length dependencies between variables (for the variables that
+         * occur in some length constraint in the rest of the formula).
+         * 
+         * @param equalities encodes the word equations
+         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
+         * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
+         * @param m Z3 AST manager
+         * @param m_util_s Z3 string manager
+         * @param m_util_a Z3 arithmetic manager
+         */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                            ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
