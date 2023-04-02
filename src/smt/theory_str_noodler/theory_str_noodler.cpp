@@ -391,20 +391,19 @@ namespace smt::noodler {
                 zero = m_util_a.mk_numeral(rational(0), true);
                 SASSERT(zero);
                 expr_ref lhs(m);
-                lhs = ctx.mk_eq_atom(len_str, zero);
+                lhs = m_util_a.mk_le(len_str, zero);
                 SASSERT(lhs);
                 // build RHS of iff
                 expr_ref empty_str(m);
-                empty_str = m_util_s.str.mk_string(zstring(""));
+                empty_str = m_util_s.str.mk_empty(a_str->get_sort());
                 SASSERT(empty_str);
                 expr_ref rhs(m);
-                rhs = ctx.mk_eq_atom(a_str, empty_str);
+                rhs = m.mk_eq(a_str, empty_str);
+                ctx.internalize(rhs, false);
+                ctx.internalize(lhs, false);
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
-                
-                literal l1 = mk_literal(lhs);
-                literal l2 = mk_literal(rhs);
-                add_axiom({~l1, l2});
+                add_axiom(m.mk_or(m.mk_not(lhs), rhs));
             }
 
         }
