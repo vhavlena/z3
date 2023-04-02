@@ -6,6 +6,7 @@
 struct theory_str_noodler_params {
    
     bool m_underapproximation = false;
+    bool m_preprocess_red = false;
 
     theory_str_noodler_params(params_ref const & p = params_ref()) {
         updt_params(p);

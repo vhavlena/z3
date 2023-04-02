@@ -8,6 +8,7 @@
 #include <queue>
 #include <string>
 
+#include "smt/params/theory_str_noodler_params.h"
 #include <util/trace.h>
 #include "formula.h"
 #include "aut_assignment.h"
@@ -301,6 +302,7 @@ namespace smt::noodler {
         std::vector<LenNode*> len_formulae;
         std::unordered_set<BasicTerm> len_variables;
         std::unordered_set<std::pair<BasicTerm,BasicTerm>> diseq_variables;
+        theory_str_noodler_params m_params;
 
         Dependency dependency;
 
@@ -318,11 +320,12 @@ namespace smt::noodler {
         void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
 
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv) :
+        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv, const theory_str_noodler_params& par) :
             formula(conj),
             fresh_var_cnt(0),
             aut_ass(ass),
             len_variables(lv),
+            m_params(par),
             dependency() { };
 
         const FormulaVar& get_formula() const { return this->formula; };

@@ -288,7 +288,11 @@ namespace smt::noodler {
         if(iter != this->aut_ass.end()) {
             Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(iter->second), concat);
             inters.trim();
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+            if(this->m_params.m_preprocess_red) {
+                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+            } else {
+                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(inters);
+            }     
         } else {
             this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(concat);
         }

@@ -5,6 +5,7 @@
 #include <deque>
 #include <algorithm>
 
+#include "smt/params/theory_str_noodler_params.h"
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
@@ -284,6 +285,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+        const theory_str_noodler_params& m_params;
 
         /**
          * @brief Convert all string literals in @c formula to fresh string literals with automata in automata assignment.
@@ -314,6 +316,8 @@ namespace smt::noodler {
         bool check_diseqs(const AutAssignment& ass);
 
     public:
+        DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
+
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
         
         /**
@@ -329,10 +333,12 @@ namespace smt::noodler {
          * @param m Z3 AST manager
          * @param m_util_s Z3 string manager
          * @param m_util_a Z3 arithmetic manager
+         * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
+                           const theory_str_noodler_params& par
          );
 
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
