@@ -93,11 +93,12 @@ namespace smt::noodler {
         return result;
     }
 
-    DecisionProcedure::DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) 
-        : prep_handler(Formula(), AutAssignment(), {}), m{ m }, m_util_s{ m_util_s },
+    DecisionProcedure::DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par) 
+        : prep_handler(Formula(), AutAssignment(), {}, par), m{ m }, m_util_s{ m_util_s },
         m_util_a{ m_util_a },
         init_length_sensitive_vars{ },
         formula { },
+        m_params(par),
         init_aut_ass{ } {
     }
 
@@ -532,7 +533,7 @@ namespace smt::noodler {
      * @param vars Set of variables
      * @return expr_ref Length formula
      */
-    expr_ref DecisionProcedure::get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars) {
+    expr_ref DecisionProcedure::get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars) {
         expr_ref lengths(this->m.mk_true(), this->m);
 
         for(const BasicTerm& var :vars) {
@@ -566,7 +567,7 @@ namespace smt::noodler {
         return lengths;
     }
 
-    expr_ref DecisionProcedure::get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state) {
+    expr_ref DecisionProcedure::get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state) {
         expr_ref fl(m.mk_true(), m);
         
         for(const BasicTerm& term : state.length_sensitive_vars) {
@@ -610,7 +611,7 @@ namespace smt::noodler {
      * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
      * @return expr_ref Length formula describing all solutions
      */
-    expr_ref DecisionProcedure::get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+    expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
         AutAssignment ass;
         if(this->solution.aut_ass.size() == 0) {
             ass = this->init_aut_ass;
@@ -679,11 +680,11 @@ namespace smt::noodler {
     /**
      * @brief Preprocessing.
      */
-    void DecisionProcedure::preprocess() {
+    void DecisionProcedure::preprocess(PreprocessType opt) {
         // As a first preprocessing operation, convert string literals to fresh variables with automata assignment
         //  representing their string literal.
         conv_str_lits_to_fresh_lits();
-        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars);
+        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
         // So-far just lightweight preprocessing
         this->prep_handler.propagate_variables();
@@ -695,7 +696,16 @@ namespace smt::noodler {
         this->prep_handler.refine_languages();
         this->prep_handler.reduce_diseqalities();
         this->prep_handler.remove_trivial();
+        this->prep_handler.reduce_regular_sequence(3);
         this->prep_handler.remove_regular();
+        // underapproximation
+        if(opt == PreprocessType::UNDERAPPROX) {
+            this->prep_handler.underapprox_languages();
+            this->prep_handler.skip_len_sat();
+            this->prep_handler.reduce_regular_sequence(3);
+            this->prep_handler.remove_regular();
+            this->prep_handler.skip_len_sat();
+        }
         // replace disequalities
         this->prep_handler.replace_disequalities();
 
@@ -759,7 +769,7 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = init_length_sensitive_vars;
         this->formula = equalities;
         this->init_aut_ass = init_aut_ass;
-        this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars);
+        this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars, m_params);
     }
 
     void DecisionProcedure::conv_str_lits_to_fresh_lits() {
@@ -799,12 +809,14 @@ namespace smt::noodler {
     DecisionProcedure::DecisionProcedure(
              const Formula &equalities, AutAssignment init_aut_ass,
              const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-     ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars), m{ m }, m_util_s{ m_util_s },
+             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
+             const theory_str_noodler_params& par
+     ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par), m{ m }, m_util_s{ m_util_s },
      m_util_a{ m_util_a },
      init_length_sensitive_vars{ init_length_sensitive_vars },
          formula { equalities },
-         init_aut_ass{ init_aut_ass } {
+         init_aut_ass{ init_aut_ass },
+         m_params(par) {
          }
 
 } // Namespace smt::noodler.

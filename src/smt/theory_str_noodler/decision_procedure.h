@@ -5,6 +5,7 @@
 #include <deque>
 #include <algorithm>
 
+#include "smt/params/theory_str_noodler_params.h"
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
@@ -12,6 +13,15 @@
 #include "formula_preprocess.h"
 
 namespace smt::noodler {
+
+    /**
+     * @brief Preprocess options
+     */
+    enum PreprocessType {
+        PLAIN,
+        UNDERAPPROX
+    };
+
     /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
@@ -26,7 +36,7 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
-        virtual void preprocess() {
+        virtual void preprocess(PreprocessType opt) {
             throw std::runtime_error("preprocess unimplemented");
         }
 
@@ -44,7 +54,7 @@ namespace smt::noodler {
          * @return Conjunction of lengths of the current solution for variables in constructor
          *  (variable renames, init length variables).
          */
-        virtual expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) {
+        virtual expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -275,6 +285,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+        const theory_str_noodler_params& m_params;
 
         /**
          * @brief Convert all string literals in @c formula to fresh string literals with automata in automata assignment.
@@ -298,13 +309,15 @@ namespace smt::noodler {
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        expr_ref get_length_ass(std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
+        expr_ref get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
 
-        expr_ref get_subs_map_len(std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
+        expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
 
         bool check_diseqs(const AutAssignment& ass);
 
     public:
+        DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
+
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
         
         /**
@@ -320,19 +333,21 @@ namespace smt::noodler {
          * @param m Z3 AST manager
          * @param m_util_s Z3 string manager
          * @param m_util_a Z3 arithmetic manager
+         * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
+                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
+                           const theory_str_noodler_params& par
          );
 
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;
-        expr_ref get_lengths(std::map<BasicTerm, expr_ref>& variable_map) override;
+        expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
 
-        void preprocess() override;
+        void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 

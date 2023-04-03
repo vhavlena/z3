@@ -27,7 +27,7 @@ namespace smt::noodler {
         bool IN_CHECK_FINAL = false;
     }
 
-    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_params const & params):
+    theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_noodler_params const & params):
         theory(ctx, ctx.get_manager().mk_family_id("seq")),
         m_params(params),
         m_rewrite(m),
@@ -375,12 +375,12 @@ namespace smt::noodler {
 
                 
                 
-                return;
+                //return;
             }
 
             // build axiom 2: Length(a_str) == 0 <=> a_str == ""
             {
-                return;
+                // return;
                 if (on_screen) std::cout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl;
 
                 // build LHS of iff
@@ -391,19 +391,19 @@ namespace smt::noodler {
                 zero = m_util_a.mk_numeral(rational(0), true);
                 SASSERT(zero);
                 expr_ref lhs(m);
-                lhs = ctx.mk_eq_atom(len_str, zero);
+                lhs = m_util_a.mk_le(len_str, zero);
                 SASSERT(lhs);
                 // build RHS of iff
                 expr_ref empty_str(m);
-                empty_str = m_util_s.str.mk_string(zstring(""));
+                empty_str = m_util_s.str.mk_empty(a_str->get_sort());
                 SASSERT(empty_str);
                 expr_ref rhs(m);
-                rhs = ctx.mk_eq_atom(a_str, empty_str);
+                rhs = m.mk_eq(a_str, empty_str);
+                ctx.internalize(rhs, false);
+                ctx.internalize(lhs, false);
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
-                literal l(mk_eq(lhs, rhs, true));
-                ctx.mark_as_relevant(l);
-                ctx.mk_th_axiom(get_id(), 1, &l);
+                add_axiom(m.mk_or(m.mk_not(lhs), rhs));
             }
 
         }
@@ -781,13 +781,20 @@ namespace smt::noodler {
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a };
+        // use underapproximation to solve
+        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
+            STRACE("str", tout << "underapprox sat \n";);
+            return FC_DONE;
+        }
+
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
         dec_proc.preprocess();
         
+        model_ref mod;
         if(init_length_sensitive_vars.size() > 0) {
             // check if the initial assignment is len unsat
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths) == l_false) {
+            if(check_len_sat(lengths, mod) == l_false) {
                 block_curr_len(lengths);
                 return FC_DONE;
             }
@@ -797,7 +804,7 @@ namespace smt::noodler {
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths) == l_true) {
+            if(check_len_sat(lengths, mod) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m););
                 return FC_DONE;
             }
@@ -813,6 +820,30 @@ namespace smt::noodler {
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
+    }
+
+    /**
+     * @brief Solve the given constraint using underapproximation.
+     * 
+     * @param instance Formula
+     * @param aut_assignment Initial automata assignment
+     * @param init_length_sensitive_vars Length sensitive variables
+     * @return lbool SAT
+     */
+    lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
+        dec_proc.preprocess(PreprocessType::UNDERAPPROX);
+        
+        expr_ref lengths(m);
+        model_ref mod;
+        dec_proc.init_computation();
+        while(dec_proc.compute_next_solution()) {
+            lengths = dec_proc.get_lengths(this->var_name);
+            if(check_len_sat(lengths, mod) == l_true) {
+                return l_true;
+            }
+        }
+        return l_false;
     }
 
     model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
@@ -2085,9 +2116,10 @@ namespace smt::noodler {
      * @param len_formula Formula to be check
      * @return lbool Sat
      */
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         m_int_solver.initialize(get_context());
-        return m_int_solver.check_sat(len_formula);
+        auto ret = m_int_solver.check_sat(len_formula);
+        return ret;
     }
 }

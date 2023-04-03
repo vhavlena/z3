@@ -288,7 +288,11 @@ namespace smt::noodler {
         if(iter != this->aut_ass.end()) {
             Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(iter->second), concat);
             inters.trim();
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(inters);
+            if(this->m_params.m_preprocess_red) {
+                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+            } else {
+                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(inters);
+            }     
         } else {
             this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(concat);
         }
@@ -312,10 +316,15 @@ namespace smt::noodler {
             assert(pr.second.get_left_side().size() == 1);
 
             // right side containts len variables; skip
-            if(!set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
+            bool is_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
+            if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_len) {
                 continue;
             }
             update_reg_constr(pr.second.get_left_side()[0], pr.second.get_right_side());
+
+            if(is_len) {
+                this->len_variables.insert(pr.second.get_left_side()[0]);
+            }
 
             std::set<BasicTerm> vars = pr.second.get_vars();
             this->formula.remove_predicate(pr.first);
@@ -540,7 +549,7 @@ namespace smt::noodler {
                 std::set<VarNode> occurs_act = this->formula.get_var_occurr(side[i]);
 
                 // do not include length variables
-                if(this->len_variables.find(side[i]) != this->len_variables.end()) {
+                if(false && this->len_variables.find(side[i]) != this->len_variables.end()) {
                     break;
                 }
                 if(side[i].is_variable() && vns != occurs_act) {
@@ -1018,13 +1027,32 @@ namespace smt::noodler {
                 Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
                 if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
                     rem_ids.insert(pr.first);
-                }
+                }               
             }
         }
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
     }
+
+    /**
+     * @brief Underapproximates the languages. Replace co-finite languages with length constraints while 
+     * setting their languages to \Sigma^*.
+     */
+    void FormulaPreprocess::underapprox_languages() {
+        for(const Predicate& pred : this->formula.get_predicates_set()) {
+            for(const BasicTerm& var : pred.get_vars()) {
+                int ln = 0;
+                if(this->aut_ass.is_co_finite(var, ln) && ln >= 0) {
+                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
+                    LenNode* left = new LenNode(LenFormulaType::LEAF, var, {});
+                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
+                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+                }
+            }
+        }
+    } 
 
     /**
      * @brief Reduce the number of diseqalities.
