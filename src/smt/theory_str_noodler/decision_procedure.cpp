@@ -560,9 +560,12 @@ namespace smt::noodler {
         }
 
         // check whether disequalities are satisfiable
-        if(!check_diseqs(ass)) {
-            lengths = this->m.mk_and(lengths, this->m.mk_false());
-        }
+
+        lengths = this->m.mk_and(lengths, len_diseqs(ass, variable_map));
+
+        // if(!check_diseqs(ass)) {
+        //     lengths = this->m.mk_and(lengths, this->m.mk_false());
+        // }
 
         return lengths;
     }
@@ -643,6 +646,43 @@ namespace smt::noodler {
             }
         }
         return true;
+    }
+
+    bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr) {
+        auto s1p = Mata::Strings::get_shortest_words(*ass.at(pr.first));
+        auto s2p = Mata::Strings::get_shortest_words(*ass.at(pr.second));
+        Mata::Nfa::WordSet s1;
+        Mata::Nfa::WordSet s2;
+        for(const auto& p: s1p) {
+            if(p.size() > 0) s1.insert(p);
+        }
+        for(const auto& p: s2p) {
+            if(p.size() > 0) s2.insert(p);
+        }
+        if(s1.size() == 1 && s2.size() == 1 && s1 == s2) {
+            return false;
+        }
+        return true;
+    }
+
+    expr_ref DecisionProcedure::len_diseqs(const AutAssignment& ass, const std::map<BasicTerm, expr_ref>& variable_map) {
+        expr_ref ret(this->m.mk_true(), this->m);
+        for(const auto& pr: this->prep_handler.get_diseq_len()) {
+            expr_ref f1 = util::len_to_expr(
+                pr.second.first,
+                variable_map,
+                this->m, this->m_util_s, this->m_util_a );
+            expr_ref f2 = util::len_to_expr(
+                pr.second.second,
+                variable_map,
+                this->m, this->m_util_s, this->m_util_a );
+            expr_ref dis_check(this->m.mk_true(), this->m);
+            if(!check_diseq(ass, pr.first)) {
+                dis_check = this->m.mk_false();
+            }
+            ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, dis_check)));
+        }
+        return ret;
     }
 
     /**

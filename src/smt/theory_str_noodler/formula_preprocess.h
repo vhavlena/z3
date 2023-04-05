@@ -300,6 +300,7 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
         std::vector<LenNode*> len_formulae;
+        std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode*, LenNode*>> dis_len;
         std::unordered_set<BasicTerm> len_variables;
         std::unordered_set<std::pair<BasicTerm,BasicTerm>> diseq_variables;
         theory_str_noodler_params m_params;
@@ -337,6 +338,7 @@ namespace smt::noodler {
         Dependency get_flat_dependency() const;
         const LenNode* get_len_formula() const { return new LenNode(LenFormulaType::AND, this->len_formulae); }
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
+        const std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode*, LenNode*>> get_diseq_len() const {return this->dis_len;} 
 
         Formula get_modified_formula() const;
         const std::unordered_set<std::pair<BasicTerm,BasicTerm>>& get_diseq_variables() const { return this->diseq_variables; }

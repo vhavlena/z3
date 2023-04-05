@@ -314,6 +314,8 @@ namespace smt::noodler {
         expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
 
         bool check_diseqs(const AutAssignment& ass);
+        bool check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr);
+        expr_ref len_diseqs(const AutAssignment& ass, const std::map<BasicTerm, expr_ref>& variable_map);
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);

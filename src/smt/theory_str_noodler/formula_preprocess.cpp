@@ -1155,15 +1155,23 @@ namespace smt::noodler {
 
             this->len_variables.insert(x1);
             this->len_variables.insert(x2);
+            for(const auto& t : pr.second.get_vars()) {
+                this->len_variables.insert(t);
+            }
+
             this->diseq_variables.insert({a1,a2});
-            this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq()); // |x1| = |x2|
+            // this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq()); // |x1| = |x2|
+
+            auto len1 = Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq();
+            auto len2 = pr.second.get_formula_eq();
+            this->dis_len.insert({{a1, a2}, {len1, len2}});
 
             this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-            this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
-            this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
+            this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
+            this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
         }
     }
 
