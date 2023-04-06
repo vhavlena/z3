@@ -560,12 +560,9 @@ namespace smt::noodler {
         }
 
         // check whether disequalities are satisfiable
-
+        // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
+        // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
         lengths = this->m.mk_and(lengths, len_diseqs(ass, variable_map));
-
-        // if(!check_diseqs(ass)) {
-        //     lengths = this->m.mk_and(lengths, this->m.mk_false());
-        // }
 
         return lengths;
     }
@@ -649,16 +646,17 @@ namespace smt::noodler {
     }
 
     bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr) {
-        auto s1p = Mata::Strings::get_shortest_words(*ass.at(pr.first));
-        auto s2p = Mata::Strings::get_shortest_words(*ass.at(pr.second));
-        Mata::Nfa::WordSet s1;
-        Mata::Nfa::WordSet s2;
-        for(const auto& p: s1p) {
-            if(p.size() > 0) s1.insert(p);
-        }
-        for(const auto& p: s2p) {
-            if(p.size() > 0) s2.insert(p);
-        }
+        auto get_symbol_word = [](Nfa &nfa) { // assumes that nfa accepts words of size 0 or 1
+            nfa.trim();
+            std::set<Mata::Symbol> symbols;
+            for (const auto &tran : nfa.delta) {
+                symbols.insert(tran.symb);
+            }
+            return symbols;
+        };
+
+        auto s1 = get_symbol_word(*ass.at(pr.first));
+        auto s2 = get_symbol_word(*ass.at(pr.second));
         if(s1.size() == 1 && s2.size() == 1 && s1 == s2) {
             return false;
         }

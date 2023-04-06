@@ -353,6 +353,8 @@ namespace smt::noodler {
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 
+        std::unordered_set<BasicTerm> &get_init_length_vars() { return init_length_sensitive_vars; }
+
     };
 }
 

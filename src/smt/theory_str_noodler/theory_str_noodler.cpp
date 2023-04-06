@@ -808,10 +808,10 @@ namespace smt::noodler {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m););
                 return FC_DONE;
             }
-            if(init_length_sensitive_vars.size() > 0) {
+            if(dec_proc.get_init_length_vars().size() > 0) {
                 block_len = m.mk_or(block_len, lengths);
             }
-            STRACE("str", tout << "len unsat\n";);
+            STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
         }
 
         // all len solutions are unsat, we block the current assignment
