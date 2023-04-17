@@ -313,7 +313,24 @@ namespace smt::noodler {
 
         expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
 
+        /**
+         * Check that disequalities are satisfiable. Assumed to be called if the
+         * decision procedure returns SAT.
+         * 
+         * WARNING: probably does not work correctly
+         *
+         * @param ass SAT automata assignment
+         * @return true Disequalities are SAT
+         */
         bool check_diseqs(const AutAssignment& ass);
+        /**
+         * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
+         * decision procedure returns SAT. It checks whether the languages for a1 and a2, which
+         * should represent symbols (or epsilon), contain different symbols.
+         * 
+         * @param ass automata assignment of variables to languages
+         * @param pr pair (a1, a2) of the variables whose disequality we are checking
+         */
         bool check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr);
         expr_ref len_diseqs(const AutAssignment& ass, const std::map<BasicTerm, expr_ref>& variable_map);
 
