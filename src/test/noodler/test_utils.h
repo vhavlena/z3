@@ -16,7 +16,7 @@ using namespace smt::noodler;
 
 class TheoryStrNoodlerCUT : public theory_str_noodler {
 public:
-    TheoryStrNoodlerCUT(smt::context &ctx, ast_manager &m, const theory_str_params &params)
+    TheoryStrNoodlerCUT(smt::context &ctx, ast_manager &m, const theory_str_noodler_params& params)
             : theory_str_noodler(ctx, m, params) {}
 
     using theory_str_noodler::m_util_s, theory_str_noodler::m, theory_str_noodler::m_util_a;
@@ -27,8 +27,8 @@ class DecisionProcedureCUT : public DecisionProcedure {
 public:
     DecisionProcedureCUT(const Formula &equalities, AutAssignment init_aut_ass,
                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                         ast_manager& m, seq_util& m_util_s, arith_util& m_util_a
-    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s, m_util_a) {}
+                         ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par
+    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s, m_util_a, par) {}
 
     using DecisionProcedure::compute_next_solution;
     using DecisionProcedure::get_lengths;
