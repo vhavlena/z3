@@ -1133,16 +1133,22 @@ namespace smt::noodler {
             // from decision procedure.
 
             // This optimization represents the situation where L = a1 and R = a2
-            // and we know that a1,a2 \in \Sigma (so we do not create new equalities)
-            // TODO is this optimization now correct? will we check for diseq_variables if they are not in dis_len?
+            // and we know that a1,a2 \in \Sigma. We do not create new equalities, instead
+            // we can represent it by formula (false || (true and a1 != a2))
             if(pr.second.get_left_side().size() == 1 && pr.second.get_right_side().size() == 1) {
                 Mata::Nfa::Nfa autl = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
                 Mata::Nfa::Nfa autr = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
                 Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
 
-                if(Mata::Nfa::are_equivalent(autl, sigma) && Mata::Nfa::are_equivalent(autr, sigma)) {
+                if(Mata::Nfa::is_included(autl, sigma) && Mata::Nfa::is_included(autr, sigma)) {
                     this->formula.remove_predicate(pr.first);
-                    this->diseq_variables.insert({pr.second.get_left_side()[0], pr.second.get_right_side()[0]});
+                    // we add to dis_len (false || (true and a1 != a2))
+                    this->dis_len.insert({
+                        {pr.second.get_left_side()[0], // a1
+                        pr.second.get_right_side()[0]}, // a2
+                        {new LenNode(LenFormulaType::TRUE, {}), // represents |a1| == |a2|, must be true, as a1 and a2 have length 1
+                        new LenNode(LenFormulaType::FALSE, {})} // represents |a1| != |a2|, must be false
+                    });
                     continue;;
                 }
             }
@@ -1184,9 +1190,8 @@ namespace smt::noodler {
             // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
             this->len_variables.insert(a1);
             this->len_variables.insert(a2);
-            this->diseq_variables.insert({a1,a2});
 
-            // we will create len2 or (len1 and a1 != a2) from this
+            // we will create (len2 or (len1 and a1 != a2)) from this
             this->dis_len.insert({{a1, a2}, {len1, len2}});
         }
     }

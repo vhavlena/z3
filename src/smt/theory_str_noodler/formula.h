@@ -136,6 +136,8 @@ namespace smt::noodler {
         LEQ,
         LEAF,
         AND,
+        TRUE,
+        FALSE,
     };
 
     struct LenNode {

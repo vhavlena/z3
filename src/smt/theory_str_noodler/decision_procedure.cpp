@@ -614,7 +614,7 @@ namespace smt::noodler {
     expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
         AutAssignment ass;
         if(this->solution.aut_ass.size() == 0) {
-            // TODO why is this happening here and something else down, what does the condition means semantically, it feels like it used for two different contexts, shouldnt this be two different functions then?
+            // if the decision procedure was not run yet, we return lengths of the initial assignment
             ass = this->init_aut_ass;
             return get_length_ass(variable_map, ass, ass.get_keys());
         } else {
@@ -626,17 +626,6 @@ namespace smt::noodler {
 
             return res;
         }
-    }
-
-    bool DecisionProcedure::check_diseqs(const AutAssignment& ass) {
-        for(const auto& pr : this->prep_handler.get_diseq_variables()) {
-            auto s1 = Mata::Strings::get_shortest_words(*ass.at(pr.first));
-            auto s2 = Mata::Strings::get_shortest_words(*ass.at(pr.second));
-            if(s1.size() == 1 && s2.size() == 1 && s1 == s2) {
-                return false;
-            }
-        }
-        return true;
     }
 
     bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr) {
@@ -654,7 +643,7 @@ namespace smt::noodler {
         auto s1 = get_symbol_word(*ass.at(pr.first));
         auto s2 = get_symbol_word(*ass.at(pr.second));
         STRACE("str", tout << "diseq check s1:"; for (const auto s1el : s1) {tout << " " << s1el;} tout << std::endl << "diseq check s2:"; for (const auto s2el : s2) {tout << " " << s2el;} tout << std::endl;);
-        if((s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, we return unsat TODO WHY???
+        if((s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
             (s1.size() == 1 && s2.size() == 1 && s1 == s2) // if we can only assign the same symbol to the variables, it is unsat
           ) {
             return false;

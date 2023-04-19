@@ -300,9 +300,9 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
         std::vector<LenNode*> len_formulae;
+        // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
         std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode*, LenNode*>> dis_len;
         std::unordered_set<BasicTerm> len_variables;
-        std::unordered_set<std::pair<BasicTerm,BasicTerm>> diseq_variables;
         theory_str_noodler_params m_params;
 
         Dependency dependency;
@@ -341,7 +341,6 @@ namespace smt::noodler {
         const std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode*, LenNode*>> get_diseq_len() const {return this->dis_len;} 
 
         Formula get_modified_formula() const;
-        const std::unordered_set<std::pair<BasicTerm,BasicTerm>>& get_diseq_variables() const { return this->diseq_variables; }
 
         void remove_regular();
         void propagate_variables();
