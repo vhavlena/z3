@@ -772,6 +772,7 @@ namespace smt::noodler {
         )};
 
         // Add dummy symbols for all disequations.
+        // FIXME: we can possibly create more dummy symbols than the size of alphabet (196607 - from string theory standard), but it is edge-case that is nearly impossible to happen
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(

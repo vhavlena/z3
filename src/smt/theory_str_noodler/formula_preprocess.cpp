@@ -1133,21 +1133,24 @@ namespace smt::noodler {
             // from decision procedure.
 
             // This optimization represents the situation where L = a1 and R = a2
-            // and we know that a1,a2 \in \Sigma. We do not create new equalities, instead
-            // we can represent it by formula (false || (true and a1 != a2))
+            // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
             if(pr.second.get_left_side().size() == 1 && pr.second.get_right_side().size() == 1) {
-                Mata::Nfa::Nfa autl = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                Mata::Nfa::Nfa autr = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                BasicTerm a1 = pr.second.get_left_side()[0];
+                BasicTerm a2 = pr.second.get_right_side()[0];
+                auto autl = this->aut_ass.at(a1);
+                auto autr = this->aut_ass.at(a2);
                 Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
 
-                if(Mata::Nfa::is_included(autl, sigma) && Mata::Nfa::is_included(autr, sigma)) {
+                if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
                     this->formula.remove_predicate(pr.first);
-                    // we add to dis_len (false || (true and a1 != a2))
+                    // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+                    this->len_variables.insert(a1);
+                    this->len_variables.insert(a2);
+                    // we add to dis_len the pair ((a1, a2), (|a1| == |a2|, |a1| != |a2|)) representing the formula (|a1| != |a2| || (|a1| == |a2| && a1 != a2))
                     this->dis_len.insert({
-                        {pr.second.get_left_side()[0], // a1
-                        pr.second.get_right_side()[0]}, // a2
-                        {new LenNode(LenFormulaType::TRUE, {}), // represents |a1| == |a2|, must be true, as a1 and a2 have length 1
-                        new LenNode(LenFormulaType::FALSE, {})} // represents |a1| != |a2|, must be false
+                        {a1, a2},
+                        // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
+                        {new LenNode(LenFormulaType::TRUE, {}), new LenNode(LenFormulaType::FALSE, {})} 
                     });
                     continue;;
                 }
@@ -1176,7 +1179,8 @@ namespace smt::noodler {
             this->formula.add_predicate(snd);
 
             // we create |L| != |P|, making all variables in both sides length ones
-            // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently
+            // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
+            // for example by taking L = x1y1, P = x2y2 and checking (|x1| = |y2| and some first symbol of y1,y2 differ)
             for(const auto& t : pr.second.get_vars()) {
                 this->len_variables.insert(t);
             }
@@ -1191,7 +1195,7 @@ namespace smt::noodler {
             this->len_variables.insert(a1);
             this->len_variables.insert(a2);
 
-            // we will create (len2 or (len1 and a1 != a2)) from this
+            // we will create (len2 || (len1 && a1 != a2)) from this
             this->dis_len.insert({{a1, a2}, {len1, len2}});
         }
     }
