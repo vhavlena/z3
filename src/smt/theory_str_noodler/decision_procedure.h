@@ -286,6 +286,8 @@ namespace smt::noodler {
         Formula formula;
         AutAssignment init_aut_ass;
         const theory_str_noodler_params& m_params;
+        // equivalence class holding variables with the same length
+        BasicTermEqiv len_eq_vars;
 
         /**
          * @brief Convert all string literals in @c formula to fresh string literals with automata in automata assignment.
@@ -333,11 +335,13 @@ namespace smt::noodler {
          * @param m Z3 AST manager
          * @param m_util_s Z3 string manager
          * @param m_util_a Z3 arithmetic manager
+         * @param len_eq_vars Equivalence clsss holding variables with the same length
          * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                            ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
+                           const BasicTermEqiv& len_eq_vars,
                            const theory_str_noodler_params& par
          );
 

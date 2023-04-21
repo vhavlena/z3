@@ -698,6 +698,14 @@ namespace smt::noodler {
         this->prep_handler.remove_trivial();
         this->prep_handler.reduce_regular_sequence(3);
         this->prep_handler.remove_regular();
+
+        // the following should help with Leetcode
+        /// TODO: should be simplyfied? So many preprocessing steps now
+        this->prep_handler.generate_equiv(this->len_eq_vars);
+        this->prep_handler.propagate_variables();
+        this->prep_handler.generate_identities();
+        this->prep_handler.remove_regular();
+        this->prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             this->prep_handler.underapprox_languages();
@@ -810,12 +818,14 @@ namespace smt::noodler {
              const Formula &equalities, AutAssignment init_aut_ass,
              const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
              ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
+             const BasicTermEqiv& len_eq_vars,
              const theory_str_noodler_params& par
      ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par), m{ m }, m_util_s{ m_util_s },
      m_util_a{ m_util_a },
      init_length_sensitive_vars{ init_length_sensitive_vars },
          formula { equalities },
          init_aut_ass{ init_aut_ass },
+        len_eq_vars{ len_eq_vars },
          m_params(par) {
          }
 
