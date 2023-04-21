@@ -13,6 +13,7 @@
 #include "formula.h"
 #include "aut_assignment.h"
 #include <mata/nfa.hh>
+#include "var_union_find.h"
 
 namespace smt::noodler {
 
@@ -308,6 +309,7 @@ namespace smt::noodler {
 
     protected:
         void update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd);
+        bool propagate_regular_eqs(const std::set<VarNode>& diff1, const std::set<VarNode>& diff2, Predicate& new_pred) const;
         VarNodeSymDiff get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const;
         bool generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const;
         ConcatGraph get_concat_graph() const;
@@ -318,6 +320,8 @@ namespace smt::noodler {
         void separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const;
 
         void gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res);
+
+        bool same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const;
 
     public:
         FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv, const theory_str_noodler_params& par) :
@@ -351,6 +355,7 @@ namespace smt::noodler {
         void remove_trivial();
         void skip_len_sat();
         void underapprox_languages();
+        void generate_equiv(const BasicTermEqiv& ec);
 
         void refine_languages();
         void reduce_diseqalities();
