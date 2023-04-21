@@ -122,6 +122,23 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if the language of the basic term has a fixed length
+         * 
+         * @param t BasicTerm
+         * @param n[out] fixed length
+         * @return True->fixed length
+         */
+        bool fixed_length(const BasicTerm& t, int& n) const {
+            auto lengths = Mata::Strings::get_word_lengths(*this->at(t));
+            if(lengths.size() > 1) {
+                return false;
+            }
+            auto pr = *lengths.begin();
+            n = pr.first;
+            return pr.second == 0;
+        }
+
+        /**
          * @brief Check if all automata in the map have non-empty language.
          *
          * @return true All have non-empty language
