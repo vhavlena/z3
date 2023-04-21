@@ -787,7 +787,16 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
+        // for(const auto& t : this->var_eqs.get_equivalence_bt()) {
+        //     for (const auto& s : t) {
+        //         std::cout << s.to_string() << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
+
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
+            init_length_sensitive_vars, m, m_util_s, m_util_a, 
+            this->var_eqs.get_equivalence_bt(), m_params };
         dec_proc.preprocess();
         
         model_ref mod;
@@ -831,7 +840,9 @@ namespace smt::noodler {
      * @return lbool SAT
      */
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
+            init_length_sensitive_vars, m, m_util_s, m_util_a, 
+            this->var_eqs.get_equivalence_bt(), m_params };
         dec_proc.preprocess(PreprocessType::UNDERAPPROX);
         
         expr_ref lengths(m);
@@ -1064,6 +1075,7 @@ namespace smt::noodler {
 
             add_axiom({i_ge_len_s, mk_eq(s, y, false)});
             add_axiom({i_ge_len_s, mk_literal(re)});
+            add_axiom({i_ge_len_s, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
             add_axiom({mk_eq(fresh, e, false)});
             add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
             add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
@@ -1082,6 +1094,7 @@ namespace smt::noodler {
             string_theory_propagation(y);
 
             add_axiom({~i_ge_0, mk_eq(s, y, false)});
+            add_axiom({~i_ge_0, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
             add_axiom({mk_eq(fresh, e, false)});
             add_axiom({~i_ge_0, mk_literal(re)});
             add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
@@ -1099,6 +1112,7 @@ namespace smt::noodler {
         expr_ref len_x(m_util_s.str.mk_length(x), m);
  
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
+        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(fresh), false)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_literal(re)});
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(i, len_x, false)});
         add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
@@ -1199,6 +1213,10 @@ namespace smt::noodler {
         this->predicate_replace.insert(e, v.get());
         // update length variables
         util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+        // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+        // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
+        // after that)
+        this->var_eqs.add(expr_ref(l, m), v);
     }
 
     /**
@@ -1230,17 +1248,39 @@ namespace smt::noodler {
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
+        expr* num = nullptr;
+        expr* pred = nullptr;
+        rational r;
         if(m_util_a.is_numeral(i)) {
             handle_substr_int(e);
             return;
         }
 
+        expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
+        m_rewrite(post_bound); // simplify
+
         expr_ref v = mk_str_var("substr");
-        expr_ref x = mk_str_var("pre_substr");
+        expr_ref xvar = mk_str_var("pre_substr");
+        expr_ref x = xvar;
         expr_ref y = mk_str_var("post_substr");
+
+        // if i + l >= |s|, we can set post_substr to eps
+        if(m.is_true(post_bound)) {
+            y = expr_ref(m_util_s.str.mk_string(""), m);
+        }
+        std::vector<expr_ref> vars;
+        // if i is of the form i = n + ...., create pre_substr . in_substr1 ... in_substrn to be x
+        if(m_util_a.is_add(i, num, pred) && m_util_a.is_numeral(num, r)) {
+            for(int i = 0; i < r.get_int32(); i++) {
+                expr_ref fv = mk_str_var("in_substr");
+                x = m_util_s.str.mk_concat(x, fv);
+                vars.push_back(fv);
+            }    
+        }
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
+       
         expr_ref ls(m_util_s.str.mk_length(s), m);
         expr_ref lx(m_util_s.str.mk_length(x), m);
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -1258,6 +1298,11 @@ namespace smt::noodler {
         string_theory_propagation(xe);
         string_theory_propagation(xey);
 
+        // create axioms in_substri is Sigma
+        for(const expr_ref& val : vars) {
+            expr_ref re(m_util_s.re.mk_in_re(val, m_util_s.re.mk_full_char(nullptr)), m);
+            add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+        }
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
         // 0 <= i <= |s| -> |x| = i
@@ -1281,8 +1326,14 @@ namespace smt::noodler {
         this->predicate_replace.insert(e, v.get());
         // update length variables
         util::get_str_variables(s, this->m_util_s, m, this->len_vars);
-        this->len_vars.insert(x);
         this->len_vars.insert(v);
+        if(vars.size() > 0) {
+            this->var_eqs.add(expr_ref(pred, m), xvar);
+            this->len_vars.insert(xvar);
+        } else {
+            this->var_eqs.add(expr_ref(i, m), x);
+            this->len_vars.insert(x);
+        }        
     }
 
     /**
@@ -1407,6 +1458,7 @@ namespace smt::noodler {
 
             // update length variables
             this->len_vars.insert(x);
+            this->var_eqs.add(expr_ref(i, m), x);
 
         } else {
             expr_ref len_t(m_util_s.str.mk_length(t), m);
