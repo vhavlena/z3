@@ -16,7 +16,7 @@ TEST_CASE("theory_str_noodler::util::conv_to_regex_hex()", "[noodler]") {
     ast_manager ast_m;
     reg_decl_plugins(ast_m);
     smt::context ctx{ast_m, params };
-    theory_str_params str_params{};
+    theory_str_noodler_params str_params{};
     TheoryStrNoodlerCUT noodler{ctx, ast_m, str_params };
     std::set<uint32_t> alphabet{ '\x78', '\x79', '\x7A' };
     auto& m_util_s{ noodler.m_util_s };
@@ -76,7 +76,7 @@ TEST_CASE("theory_str_noodler::util") {
     ast_manager ast_m;
     reg_decl_plugins(ast_m);
     smt::context ctx{ast_m, params };
-    theory_str_params str_params{};
+    theory_str_noodler_params str_params{};
     TheoryStrNoodlerCUT noodler{ctx, ast_m, str_params };
     std::set<uint32_t> alphabet{ '\x78', '\x79', '\x7A' };
     auto& m_util_s{ noodler.m_util_s };
