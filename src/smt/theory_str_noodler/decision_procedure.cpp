@@ -687,6 +687,7 @@ namespace smt::noodler {
         this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
         // So-far just lightweight preprocessing
+        this->prep_handler.reduce_diseqalities();
         this->prep_handler.propagate_variables();
         this->prep_handler.propagate_eps();
         this->prep_handler.remove_regular();
