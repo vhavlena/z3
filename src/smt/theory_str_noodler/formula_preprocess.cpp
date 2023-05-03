@@ -372,13 +372,14 @@ namespace smt::noodler {
             if(!eq.get_left_side()[0].is_variable()) {
                 continue;
             }
-            /// TODO: the following case might be sometimes beneficial
-            // if(!eq.get_right_side()[0].is_variable()) {
-            //     BasicTerm v_left = eq.get_left_side()[0]; // X
-            //     update_reg_constr(v_left, eq.get_right_side());
-            //     this->formula.replace(eq.get_right_side(), eq.get_left_side());
-            //     continue;
-            // }
+            /// if X = lit it is better to keep only lit
+            if(!eq.get_right_side()[0].is_variable()) {
+                BasicTerm v_left = eq.get_left_side()[0]; // X
+                update_reg_constr(v_left, eq.get_right_side());
+                this->formula.replace(eq.get_left_side(), eq.get_right_side());
+                this->formula.remove_predicate(index);
+                continue;
+            }
 
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
