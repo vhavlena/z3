@@ -688,6 +688,9 @@ namespace smt::noodler {
 
         // So-far just lightweight preprocessing
         this->prep_handler.reduce_diseqalities();
+        if (opt == PreprocessType::UNDERAPPROX) {
+            this->prep_handler.underapprox_languages();
+        }
         this->prep_handler.propagate_variables();
         this->prep_handler.propagate_eps();
         this->prep_handler.remove_regular();
