@@ -1,6 +1,7 @@
 #include <queue>
 #include <utility>
 #include <algorithm>
+#include <functional>
 
 #include <mata/nfa-strings.hh>
 #include "util.h"
@@ -525,85 +526,60 @@ namespace smt::noodler {
         return false;
     }
 
-    /**
-     * @brief Get length formula from the automata assignment @p ass wrt variables @p vars.
-     * 
-     * @param variable_map Mapping of BasicTerm variables to Z3 expressions
-     * @param ass Automata assignment
-     * @param vars Set of variables
-     * @return expr_ref Length formula
-     */
-    expr_ref DecisionProcedure::get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars) {
-        expr_ref lengths(this->m.mk_true(), this->m);
-
-        for(const BasicTerm& var :vars) {
-            std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
-
+    expr_ref DecisionProcedure::get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars) {
+        expr_ref lengths(m.mk_true(), m);
+        
+        for(const BasicTerm& var : vars) {
+            
+            // get the z3 variable from var
+            expr_ref z3_var(this->m);
             auto it = variable_map.find(var);
-            expr_ref var_expr(this->m);
-            if(it != variable_map.end()) { // take the existing variable from the map
-                var_expr = m_util_s.str.mk_length(it->second);
-            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+            if(it != variable_map.end()) {
+                // take the existing variable from the map
+                z3_var = m_util_s.str.mk_length(it->second);
+            } else {
+                // if the variable is not found, it was introduced during preprocessing or decision procedure
+                // we therefore create a z3 variable using the name of var
+                z3_var = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
             }
-            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
+
+            // add |z3_var| >= 0, important probably only for the case that var was introduced during preprocessing
+            // or decision procedure, existing z3 vars should have this already in the LIA solver
+            lengths = m.mk_and(lengths, m_util_a.mk_ge(z3_var, m_util_a.mk_int(0)));
+
+            if (state.aut_ass.count(var) > 0) {
+                // if var is not substituted, get length constraint from its automaton
+                std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*state.aut_ass.at(var));
+                lengths = this->m.mk_and(lengths, mk_len_aut(z3_var, aut_constr));
+            } else if (state.substitution_map.count(var) > 0) {
+                // if var is substituted, then we have to create length equation
+                // i.e. if state.substitution_map[var] = x_1 x_2 ... x_n, then we create |var| = |x_1| + |x_2| + ... + |x_n|
+
+                // translate each x_i to z3 var and create the sum |x_1| + |x_2| + ... + |x_n|
+                expr_ref sum(m_util_a.mk_int(0), m);
+                for(const BasicTerm&x_i : state.substitution_map.at(var)) {
+                    expr_ref z3_x_i(this->m);
+                    auto varit = variable_map.find(x_i);
+                    if(varit != variable_map.end()) {
+                        // take the existing variable from the map
+                        z3_x_i = m_util_s.str.mk_length(varit->second);
+                    } else {
+                        // if the variable is not found, it was introduced during preprocessing or decision procedure
+                        // we therefore create a z3 variable using the name of x_i
+                        z3_x_i = util::mk_int_var(x_i.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+                    }
+
+                    sum = m_util_a.mk_add(sum, z3_x_i);
+                }
+                lengths = m.mk_and(lengths, m.mk_eq(z3_var, sum));
+
+            } else {
+                util::throw_error("Variable was neither in automata assignment nor was substituted");
+            }
         }
-
-        // collect lengths introduced by the preprocessing
-        expr_ref prep_formula = util::len_to_expr(
-                this->prep_handler.get_len_formula(),
-                variable_map,
-                this->m, this->m_util_s, this->m_util_a );
-
-        if(!this->m.is_true(prep_formula)) {
-            lengths = this->m.mk_and(lengths, prep_formula);
-        }
-
-        // check whether disequalities are satisfiable
-        // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
-        // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
-        lengths = this->m.mk_and(lengths, len_diseqs(ass, variable_map));
 
         return lengths;
     }
-
-    expr_ref DecisionProcedure::get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state) {
-        expr_ref fl(m.mk_true(), m);
-        
-        for(const BasicTerm& term : state.length_sensitive_vars) {
-            auto it = state.substitution_map.find(term);
-            if(it == state.substitution_map.end()) {
-                continue;
-            }
-
-            expr_ref left(m);
-            auto varit = variable_map.find(term);
-            expr_ref var_expr(this->m);
-            if(varit != variable_map.end()) { // take the existing variable from the map
-                var_expr = m_util_s.str.mk_length(varit->second);
-            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_int_var(term.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-            }
-            left = var_expr;
-
-            expr_ref sum(m_util_a.mk_int(0), m);
-            for(const BasicTerm&tp : it->second) {
-
-                auto varit = variable_map.find(tp);
-                expr_ref var_expr(this->m);
-                if(varit != variable_map.end()) { // take the existing variable from the map
-                    var_expr = m_util_s.str.mk_length(varit->second);
-                } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = util::mk_int_var(tp.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-                }
-
-                sum = m_util_a.mk_add(sum, var_expr);
-            }
-            fl = m.mk_and(fl, m.mk_eq(left, sum), m_util_a.mk_ge(left, m_util_a.mk_int(0)));
-        }
-
-        return fl;
-    }   
 
     /**
      * @brief Get length constraints of the solution
@@ -612,24 +588,41 @@ namespace smt::noodler {
      * @return expr_ref Length formula describing all solutions
      */
     expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        AutAssignment ass;
-        if(this->solution.aut_ass.size() == 0) {
-            // if the decision procedure was not run yet, we return lengths of the initial assignment
-            ass = this->init_aut_ass;
-            return get_length_ass(variable_map, ass, ass.get_keys());
-        } else {
-            ass = this->solution.flatten_substition_map();
-            
-            expr_ref sm = get_subs_map_len(variable_map, this->solution);
-            expr_ref faut = get_length_ass(variable_map, ass, this->solution.length_sensitive_vars);
-            expr_ref res(m.mk_and(sm, faut), m);
+        expr_ref lengths(m.mk_true(), m);
 
-            return res;
+        // collect lengths introduced by the preprocessing
+        expr_ref prep_formula = util::len_to_expr(
+                this->prep_handler.get_len_formula(),
+                variable_map,
+                this->m, this->m_util_s, this->m_util_a );
+        lengths = this->m.mk_and(lengths, prep_formula);
+
+        if(this->solution.aut_ass.size() == 0) {
+            // if the decision procedure was not run yet, we return lengths of the initial assignment TODO rewrite
+            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, worklist.front(), worklist.front().aut_ass.get_keys()));
+        } else {
+            // TODO explain
+
+            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, solution, solution.length_sensitive_vars));
+
+            // check whether disequalities are satisfiable
+            // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
+            // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+            lengths = this->m.mk_and(lengths, len_diseqs(ass, variable_map));
+            
         }
+
+        return lengths;
     }
 
-    bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr) {
-        auto get_symbol_word = [](Nfa &nfa) {
+    bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::pair<BasicTerm, BasicTerm>& pr) {
+        std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&)> get_substituted_var;
+        get_substituted_var = [](const smt::noodler::BasicTerm &var) {
+            if (substitution_map)
+            return var;
+        }
+
+        auto get_symbol_word = [](const Nfa &nfa) {
             // get all one-symbol words accepted by nfa assuming
             // that nfa accepts words of size 0 and 1
             nfa.trim();
@@ -651,7 +644,7 @@ namespace smt::noodler {
         return true;
     }
 
-    expr_ref DecisionProcedure::len_diseqs(const AutAssignment& ass, const std::map<BasicTerm, expr_ref>& variable_map) {
+    expr_ref DecisionProcedure::len_diseqs(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::map<BasicTerm, expr_ref>& variable_map) {
         expr_ref ret(this->m.mk_true(), this->m);
         for(const auto& pr: this->prep_handler.get_diseq_len()) {
             expr_ref f1 = util::len_to_expr(
@@ -663,7 +656,7 @@ namespace smt::noodler {
                 variable_map,
                 this->m, this->m_util_s, this->m_util_a );
             expr_ref dis_check(this->m.mk_true(), this->m);
-            if(!check_diseq(ass, pr.first)) {
+            if(!check_diseq(ass, substitution_map, pr.first)) {
                 dis_check = this->m.mk_false();
             }
             ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, dis_check)));

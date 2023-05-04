@@ -309,9 +309,20 @@ namespace smt::noodler {
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        expr_ref get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
+        
 
-        expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
+        /**
+         * Get length formula from the solving state @p state wrt variables @p vars. For each var x in @p vars it
+         * creates either equation |x| = |x_1| + ... + |x_n| if x is substituted by 'x_1 ... x_n' or it add
+         * constraint created from the automaton to which x is mapped.
+         * 
+         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
+         * @param state Solving state from which the lengths are created
+         * @param vars Set of variables for which we create the lenghts (should be some subset of variables)
+         * @return expr_ref Length formula
+         */
+        expr_ref get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars);
+
 
         /**
          * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
@@ -321,8 +332,8 @@ namespace smt::noodler {
          * @param ass automata assignment of variables to languages
          * @param pr pair (a1, a2) of the variables whose disequality we are checking
          */
-        bool check_diseq(const AutAssignment& ass, const std::pair<BasicTerm, BasicTerm>& pr);
-        expr_ref len_diseqs(const AutAssignment& ass, const std::map<BasicTerm, expr_ref>& variable_map);
+        bool check_diseq(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::pair<BasicTerm, BasicTerm>& pr);
+        expr_ref len_diseqs(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::map<BasicTerm, expr_ref>& variable_map);
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
