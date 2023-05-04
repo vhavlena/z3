@@ -327,13 +327,14 @@ namespace smt::noodler {
         /**
          * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
          * decision procedure returns SAT. It checks whether the languages for a1 and a2, which
-         * should represent symbols (or epsilon), contain different symbols.
+         * should represent symbols (or epsilon), contain different symbols. 
+         * See FormulaPreprocess::replace_disequalities().
          * 
          * @param ass automata assignment of variables to languages
          * @param pr pair (a1, a2) of the variables whose disequality we are checking
          */
-        bool check_diseq(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::pair<BasicTerm, BasicTerm>& pr);
-        expr_ref len_diseqs(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::map<BasicTerm, expr_ref>& variable_map);
+        bool check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
+        expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);

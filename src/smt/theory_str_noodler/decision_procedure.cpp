@@ -99,8 +99,8 @@ namespace smt::noodler {
         m_util_a{ m_util_a },
         init_length_sensitive_vars{ },
         formula { },
-        m_params(par),
-        init_aut_ass{ } {
+        init_aut_ass{ },
+        m_params(par) {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -598,45 +598,79 @@ namespace smt::noodler {
         lengths = this->m.mk_and(lengths, prep_formula);
 
         if(this->solution.aut_ass.size() == 0) {
-            // if the decision procedure was not run yet, we return lengths of the initial assignment TODO rewrite
-            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, worklist.front(), worklist.front().aut_ass.get_keys()));
+            // if the decision procedure was not run yet, we return lengths based on the initial assignment it is assumed that this is called for
+            // UNSAT check which is run before decision procedure, so we create length constraints for all variables so that LIA solver can
+            // be more aggressive in giving us UNSAT
+            SolvingState tmp_state;
+            tmp_state.aut_ass = init_aut_ass;
+            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, tmp_state, tmp_state.aut_ass.get_keys()));
         } else {
-            // TODO explain
-
+            // decision procedure was run, we create length constraints from the solution, we only need to look at length sensitive vars
             lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, solution, solution.length_sensitive_vars));
 
             // check whether disequalities are satisfiable
             // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
             // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
-            lengths = this->m.mk_and(lengths, len_diseqs(ass, variable_map));
+            lengths = this->m.mk_and(lengths, len_diseqs(variable_map, solution));
             
         }
 
         return lengths;
     }
 
-    bool DecisionProcedure::check_diseq(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::pair<BasicTerm, BasicTerm>& pr) {
-        std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&)> get_substituted_var;
-        get_substituted_var = [](const smt::noodler::BasicTerm &var) {
-            if (substitution_map)
-            return var;
-        }
-
-        auto get_symbol_word = [](const Nfa &nfa) {
-            // get all one-symbol words accepted by nfa assuming
-            // that nfa accepts words of size 0 and 1
-            nfa.trim();
-            std::set<Mata::Symbol> symbols;
-            for (const auto &tran : nfa.delta) {
-                symbols.insert(tran.symb);
+    bool DecisionProcedure::check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr) {
+        // get_substituted_var(x, s) will get the most deep variable by which x is replaced in state.substitution_map and in
+        // s we keep the symbols by which the nfa for x accepts (the nfa should accept words of size at most 1)
+        std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&, std::set<Mata::Symbol>&)> get_substituted_var;
+        get_substituted_var = [&state, &get_substituted_var](const smt::noodler::BasicTerm &var, std::set<Mata::Symbol> &symbols_of_var) {
+            auto bla = state.substitution_map.find(var);
+            if (bla != state.substitution_map.end()) {
+                // var is substituted
+                if (bla->second.size() == 0) {
+                    // if var is substituted by epsilon, symbols_of_var must be empty and var is the most deep variable
+                    symbols_of_var.clear();
+                    return std::vector<BasicTerm>{var};
+                } else {
+                    // var is substituted by some other var, recurse deeper
+                    assert(bla->second.size() == 1); // var can be substituted by only one variable
+                    return get_substituted_var(bla->second[0], symbols_of_var);
+                }
+            } else {
+                // var is not substituted, get the symbols of its nfa
+                assert(state.aut_ass.count(var) > 0); // var is either in substitution map or in aut_ass
+                auto nfa = state.aut_ass.at(var);
+                nfa->trim();
+                // get all one-symbol words accepted by nfa assuming
+                // that nfa accepts words of size 0 and 1
+                for (const auto &tran : nfa->delta) {
+                    symbols_of_var.insert(tran.symb);
+                }
+                return std::vector<BasicTerm>{var};
             }
-            return symbols;
         };
 
-        auto s1 = get_symbol_word(*ass.at(pr.first));
-        auto s2 = get_symbol_word(*ass.at(pr.second));
-        STRACE("str", tout << "diseq check s1:"; for (const auto s1el : s1) {tout << " " << s1el;} tout << std::endl << "diseq check s2:"; for (const auto s2el : s2) {tout << " " << s2el;} tout << std::endl;);
-        if((s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
+        auto a1 = pr.first;
+        auto a2 = pr.second;
+
+        std::set<Mata::Symbol> s1;
+        std::set<Mata::Symbol> s2;
+        auto subst_a1 = get_substituted_var(a1, s1)[0];
+        auto subst_a2 = get_substituted_var(a2, s2)[0];
+
+        STRACE("str",
+            tout << "diseq check where " << a1.get_name() << " is substituted by " << subst_a1.get_name() << " and s1:";
+            for (const auto s1el : s1) {
+                tout << " " << s1el;
+            }
+            tout << std::endl;
+            tout << "diseq check where " << a2.get_name() << " is substituted by " << subst_a2.get_name() << " and s2:";
+            for (const auto s2el : s2) {
+                tout << " " << s2el;
+            }
+            tout << std::endl;
+        );
+        if( (subst_a1 == subst_a2) || // if a1 and a2 were substituted by the same var, the disequation cannot hold
+            (s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
             (s1.size() == 1 && s2.size() == 1 && s1 == s2) // if we can only assign the same symbol to the variables, it is unsat
           ) {
             return false;
@@ -644,7 +678,7 @@ namespace smt::noodler {
         return true;
     }
 
-    expr_ref DecisionProcedure::len_diseqs(const AutAssignment& ass, const std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map, const std::map<BasicTerm, expr_ref>& variable_map) {
+    expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
         expr_ref ret(this->m.mk_true(), this->m);
         for(const auto& pr: this->prep_handler.get_diseq_len()) {
             expr_ref f1 = util::len_to_expr(
@@ -656,7 +690,7 @@ namespace smt::noodler {
                 variable_map,
                 this->m, this->m_util_s, this->m_util_a );
             expr_ref dis_check(this->m.mk_true(), this->m);
-            if(!check_diseq(ass, substitution_map, pr.first)) {
+            if(!check_diseq(state, pr.first)) {
                 dis_check = this->m.mk_false();
             }
             ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, dis_check)));
