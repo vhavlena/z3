@@ -36,13 +36,9 @@ namespace smt::noodler {
         LangDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
         
         /**
-         * Initialize a new decision procedure that can solve word equations
-         * (equalities of concatenations of string variables) with regular constraints
-         * (variables belong to some regular language represented by automaton) while
-         * keeping the length dependencies between variables (for the variables that
-         * occur in some length constraint in the rest of the formula).
+         * Initialize a new decision procedure that can solve language (dis)equality constraints.
          * 
-         * @param equalities encodes the word equations
+         * @param equalities encodes the language equations
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
          * @param m Z3 AST manager

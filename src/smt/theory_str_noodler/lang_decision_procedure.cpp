@@ -9,6 +9,12 @@
 
 namespace smt::noodler {
 
+    /**
+     * @brief Check if the language (dis)equality is satisfiable.
+     * 
+     * @param pred Language (dis)equality
+     * @return True -> Satisfiable
+     */
     bool LangDecisionProcedure::sat_lang_constr(const Predicate&pred) {
         if(pred.get_left_side().size() != pred.get_right_side().size() || pred.get_right_side().size() != 1) {
             util::throw_error("size mismatch");
@@ -37,15 +43,15 @@ namespace smt::noodler {
      * @brief Get length constraints of the solution
      *
      * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-     * @return expr_ref Length formula describing all solutions
+     * @return expr_ref Length formula describing all solutions (currently true)
      */
     expr_ref LangDecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        expr_ref res(m.mk_false(), m);
+        expr_ref res(m.mk_true(), m);
         return res;
     }
 
     /**
-     * @brief Creates initial inclusion graph according to the preprocessed instance.
+     * @brief Initialize computation.
      */
     void LangDecisionProcedure::init_computation() {
         this->solved = false;
@@ -58,6 +64,11 @@ namespace smt::noodler {
         // do notning for now
     }
 
+    /**
+     * @brief Compute next solution
+     * 
+     * @return True -> satisfiable
+     */
     bool LangDecisionProcedure::compute_next_solution() {
         if(this->solved) return false;
         this->solved = true;
