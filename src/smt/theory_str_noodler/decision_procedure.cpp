@@ -581,12 +581,6 @@ namespace smt::noodler {
         return lengths;
     }
 
-    /**
-     * @brief Get length constraints of the solution
-     *
-     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-     * @return expr_ref Length formula describing all solutions
-     */
     expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
         expr_ref lengths(m.mk_true(), m);
 
@@ -678,6 +672,7 @@ namespace smt::noodler {
         return true;
     }
 
+    // FIXME: multiple disequations can give sat even though it is unsat, for example x != y, y != z, z != x, x,y,z \in {a,b} is unsat but because all the disequations are "solved" locally, the length constraint will be sat
     expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
         expr_ref ret(this->m.mk_true(), this->m);
         for(const auto& pr: this->prep_handler.get_diseq_len()) {

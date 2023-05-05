@@ -328,12 +328,22 @@ namespace smt::noodler {
          * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
          * decision procedure returns SAT. It checks whether the languages for a1 and a2, which
          * should represent symbols (or epsilon), contain different symbols. 
-         * See FormulaPreprocess::replace_disequalities().
+         * See also len_diseqs and FormulaPreprocess::replace_disequalities().
          * 
-         * @param ass automata assignment of variables to languages
+         * @param state the solving state whose automata assignment and substitution map will be used
          * @param pr pair (a1, a2) of the variables whose disequality we are checking
          */
         bool check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
+
+        /**
+         * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint
+         * (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
+         * where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+         * 
+         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
+         * @param state Solving state from which the lengths are created
+         * @return the conjunction of length constraints of each diseqation
+         */
         expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
 
     public:
@@ -365,6 +375,14 @@ namespace smt::noodler {
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;
+
+        /**
+         * @brief Get length constraints of the solution (or overapproximation from initial
+         * assignment if decision procedure was not run yet)
+         *
+         * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
+         * @return expr_ref Length formula describing all solutions
+         */
         expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
 
