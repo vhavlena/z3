@@ -510,6 +510,11 @@ namespace smt::noodler {
                 ctx.mark_as_relevant(m.mk_eq(l, r));
             }
 
+            if(m_util_s.is_re(l) && m_util_s.is_re(r)) {
+                this->m_lang_eq_todo.push_back({l, r});
+                return;
+            }
+
             if(ctx.is_relevant(m.mk_eq(l, r)) || ctx.is_relevant(m.mk_eq(r, l))) {
                 literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
                 literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
@@ -535,8 +540,12 @@ namespace smt::noodler {
         const expr_ref l{get_enode(x)->get_expr(), m};
         const expr_ref r{get_enode(y)->get_expr(), m};
 
-        m_word_diseq_var_todo.push_back({x, y});
-        m_word_diseq_todo.push_back({l, r});
+        if(m_util_s.is_re(l) && m_util_s.is_re(r)) {
+            this->m_lang_diseq_todo.push_back({l, r});
+        } else {
+            m_word_diseq_var_todo.push_back({x, y});
+            m_word_diseq_todo.push_back({l, r});
+        }
 
         app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
         app_ref neg(m.mk_not(l_eq_r), m);
@@ -569,6 +578,8 @@ namespace smt::noodler {
     void theory_str_noodler::push_scope_eh() {
         m_scope_level += 1;
         m_word_eq_todo.push_scope();
+        m_lang_eq_todo.push_scope();
+        m_lang_diseq_todo.push_scope();
         m_word_diseq_todo.push_scope();
         m_word_eq_var_todo.push_scope();
         m_word_diseq_var_todo.push_scope();
@@ -582,6 +593,8 @@ namespace smt::noodler {
         axiomatized_terms.reset();
         m_scope_level -= num_scopes;
         m_word_eq_todo.pop_scope(num_scopes);
+        m_lang_eq_todo.pop_scope(num_scopes);
+        m_lang_diseq_todo.pop_scope(num_scopes);
         m_word_diseq_todo.pop_scope(num_scopes);
         m_word_eq_var_todo.pop_scope(num_scopes);
         m_word_diseq_var_todo.pop_scope(num_scopes);
@@ -634,6 +647,7 @@ namespace smt::noodler {
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
         this->m_membership_todo_rel.clear();
+        this->m_lang_eq_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
@@ -692,6 +706,13 @@ namespace smt::noodler {
                  STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
                     ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
             }
+        }
+
+        for(const auto& we : m_lang_eq_todo) {
+            this->m_lang_eq_todo_rel.push_back({we.first, we.second, true});
+        }
+        for(const auto& we : m_lang_diseq_todo) {
+            this->m_lang_eq_todo_rel.push_back({we.first, we.second, false});
         }
     }
 
@@ -768,7 +789,7 @@ namespace smt::noodler {
 
         // Get symbols in the whole formula.
         std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
-                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_util_s, m
+                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_lang_eq_todo_rel, m_util_s, m
         )};
 
         // Add dummy symbols for all disequations.
@@ -780,6 +801,15 @@ namespace smt::noodler {
 
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
+
+        AutAssignment lang_aut_ass;
+        Formula lang_instance = conv_lang_instance(symbols_in_formula, lang_aut_ass);
+        LangDecisionProcedure lang_proc{ lang_instance, lang_aut_ass, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
+        lang_proc.init_computation();
+        if(!lang_proc.compute_next_solution()) {
+            block_curr_lang();
+            return FC_DONE;
+        }
 
         // use underapproximation to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
@@ -1902,6 +1932,23 @@ namespace smt::noodler {
 
     }
 
+    void theory_str_noodler::block_curr_lang() {
+        context& ctx = get_context();
+        expr *refinement = nullptr;
+
+        for (const auto& in : this->m_lang_eq_todo_rel) {
+            app_ref in_app(ctx.mk_eq_atom(std::get<0>(in), std::get<1>(in)), m);
+            if(!std::get<2>(in)){
+                in_app = m.mk_not(in_app);
+            }
+            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
+        }
+
+        if (refinement != nullptr) {
+            add_axiom(m.mk_not(refinement));
+        }
+    }
+
     void theory_str_noodler::block_len(int n_cnt) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
@@ -2084,6 +2131,26 @@ namespace smt::noodler {
         util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
+    }
+
+    Formula theory_str_noodler::conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out) {
+        Formula res;
+        int cnt = 0;
+
+        for(const auto& item : this->m_lang_eq_todo_rel) {
+            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false );
+            PredicateType tp = std::get<2>(item) ? PredicateType::Equation : PredicateType::Inequation;
+
+            BasicTerm t1(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
+            BasicTerm t2(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
+
+            out[t1] = std::make_shared<Mata::Nfa::Nfa>(nfa1);
+            out[t2] = std::make_shared<Mata::Nfa::Nfa>(nfa2);
+            res.add_predicate(Predicate(tp, {Concat({t1}), Concat({t2})}));
+        }
+
+        return res;
     }
 
     /**

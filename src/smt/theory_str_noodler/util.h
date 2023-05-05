@@ -109,6 +109,7 @@ namespace smt::noodler::util {
             const vector<expr_pair>& equations,
             const vector<expr_pair>& disequations,
             const vector<expr_pair_flag>& regexes,
+            const vector<expr_pair_flag>& lang_regexes,
             const seq_util& m_util_s,
             const ast_manager& m
     );

@@ -219,6 +219,7 @@ namespace smt::noodler::util {
             const vector<expr_pair>& equations,
             const vector<expr_pair>& disequations,
             const vector<expr_pair_flag>& regexes,
+            const vector<expr_pair_flag>& lang_regexes,
             const seq_util& m_util_s,
             const ast_manager& m
     ) {
@@ -235,6 +236,11 @@ namespace smt::noodler::util {
 
         for (const auto &word_equation: regexes) {
             util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto &lang_eq: lang_regexes) {
+            util::extract_symbols(std::get<0>(lang_eq), m_util_s, m, symbols_in_formula);
+            util::extract_symbols(std::get<1>(lang_eq), m_util_s, m, symbols_in_formula);
         }
         return symbols_in_formula;
     }
