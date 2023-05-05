@@ -14,8 +14,6 @@ namespace smt::noodler {
             util::throw_error("size mismatch");
         }
 
-        std::cout << pred.to_string() << std::endl;
-
         BasicTerm t1 = pred.get_left_side()[0];
         BasicTerm t2 = pred.get_right_side()[0];
         if(t1.get_type() != BasicTermType::Lang || t2.get_type() != BasicTermType::Lang) {
