@@ -326,14 +326,15 @@ namespace smt::noodler {
 
         /**
          * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
-         * decision procedure returns SAT. It checks whether the languages for a1 and a2, which
-         * should represent symbols (or epsilon), contain different symbols. 
+         * decision procedure returns SAT. Creates length constraint representing the conjunct:
+         * "a1 equals one of its chars" and "a2 equals one of its chars" and "a1 != a2"
+         * 
          * See also len_diseqs and FormulaPreprocess::replace_disequalities().
          * 
          * @param state the solving state whose automata assignment and substitution map will be used
          * @param pr pair (a1, a2) of the variables whose disequality we are checking
          */
-        bool check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
+        expr_ref check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
 
         /**
          * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint

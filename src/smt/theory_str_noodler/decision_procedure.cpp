@@ -612,7 +612,7 @@ namespace smt::noodler {
         return lengths;
     }
 
-    bool DecisionProcedure::check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr) {
+    expr_ref DecisionProcedure::check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr) {
         // get_substituted_var(x, s) will get the most deep variable by which x is replaced in state.substitution_map and in
         // s we keep the symbols by which the nfa for x accepts (the nfa should accept words of size at most 1)
         std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&, std::set<Mata::Symbol>&)> get_substituted_var;
@@ -646,8 +646,8 @@ namespace smt::noodler {
         auto a1 = pr.first;
         auto a2 = pr.second;
 
-        std::set<Mata::Symbol> s1;
-        std::set<Mata::Symbol> s2;
+        std::set<Mata::Symbol> s1, s2;
+        
         auto subst_a1 = get_substituted_var(a1, s1)[0];
         auto subst_a2 = get_substituted_var(a2, s2)[0];
 
@@ -663,16 +663,48 @@ namespace smt::noodler {
             }
             tout << std::endl;
         );
+
         if( (subst_a1 == subst_a2) || // if a1 and a2 were substituted by the same var, the disequation cannot hold
             (s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
             (s1.size() == 1 && s2.size() == 1 && s1 == s2) // if we can only assign the same symbol to the variables, it is unsat
           ) {
-            return false;
+            return expr_ref(this->m.mk_false(), this->m);
         }
-        return true;
+
+        // gets the disjunction of equations "var == char" for each char in var_chars
+        auto get_char_disjunction = [this](const expr_ref &var, const std::set<Mata::Symbol> var_chars) {
+            expr_ref char_disj(this->m.mk_false(), this->m);
+            for (const auto &var_char : var_chars) {
+                // add "var == symbol" to disjunction
+                char_disj = this->m.mk_or(char_disj, this->m_util_a.mk_eq(var, this->m_util_a.mk_int(var_char)));
+            }
+            return char_disj;
+        };
+
+        // new int variables representing the char values of a1 and a2
+        expr_ref a1_z3_char = util::mk_int_var(subst_a1.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
+        expr_ref a2_z3_char = util::mk_int_var(subst_a2.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
+
+        expr_ref res(this->m.mk_true(), this->m);
+        // char disjunct for a1
+        res = this->m.mk_and(res, get_char_disjunction(a1_z3_char, s1));
+        // char disjunct for a2
+        res = this->m.mk_and(res, get_char_disjunction(a2_z3_char, s2));
+        // a1 != a2
+        expr_ref a1_a2_eq(this->m_util_a.mk_eq(a1_z3_char, a2_z3_char), this->m);
+        res = this->m.mk_and(res, this->m.mk_not(a1_a2_eq));
+        // just to be sure, we also want |a1| == 1 and |a2| == 1
+        expr_ref a1_z3 = util::mk_int_var(subst_a1.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        expr_ref a2_z3 = util::mk_int_var(subst_a2.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        res = this->m.mk_and(
+            res,
+            this->m_util_a.mk_eq(a1_z3, this->m_util_a.mk_int(1)),
+            this->m_util_a.mk_eq(a2_z3, this->m_util_a.mk_int(1))
+        );
+        
+        return res;
     }
 
-    // FIXME: multiple disequations can give sat even though it is unsat, for example x != y, y != z, z != x, x,y,z \in {a,b} is unsat but because all the disequations are "solved" locally, the length constraint will be sat
     expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
         expr_ref ret(this->m.mk_true(), this->m);
         for(const auto& pr: this->prep_handler.get_diseq_len()) {
@@ -684,11 +716,7 @@ namespace smt::noodler {
                 pr.second.second,
                 variable_map,
                 this->m, this->m_util_s, this->m_util_a );
-            expr_ref dis_check(this->m.mk_true(), this->m);
-            if(!check_diseq(state, pr.first)) {
-                dis_check = this->m.mk_false();
-            }
-            ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, dis_check)));
+            ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, check_diseq(state, pr.first))));
         }
         return ret;
     }
