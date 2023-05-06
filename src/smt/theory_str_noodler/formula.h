@@ -55,6 +55,7 @@ namespace smt::noodler {
         Length,
         Substring,
         IndexOf,
+        Lang,
         // TODO: Add additional basic term types.
     };
 
@@ -70,6 +71,8 @@ namespace smt::noodler {
                 return "Substring";
             case BasicTermType::IndexOf:
                 return "IndexOf";
+            case BasicTermType::Lang:
+                return "Lang";
         }
 
         throw std::runtime_error("Unhandled basic term type passed to to_string().");

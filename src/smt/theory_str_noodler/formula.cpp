@@ -164,6 +164,7 @@ namespace smt::noodler {
             case BasicTermType::Length:
             case BasicTermType::Substring:
             case BasicTermType::IndexOf:
+            case BasicTermType::Lang:
                 return name.encode() + " (" + noodler::to_string(type) + ")";
                 // TODO: Decide what will have names and when to use them.
         }

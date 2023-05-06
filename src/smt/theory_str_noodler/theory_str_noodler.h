@@ -33,6 +33,7 @@ Eternal glory to Yu-Fang.
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "decision_procedure.h"
+#include "lang_decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
 #include "var_union_find.h"
@@ -80,12 +81,15 @@ namespace smt::noodler {
         scoped_vector<tvar_pair> m_word_diseq_var_todo;
 
 
+        scoped_vector<expr_pair> m_lang_eq_todo;
         scoped_vector<expr_pair> m_word_eq_todo;
         scoped_vector<expr_pair> m_word_diseq_todo;
+        scoped_vector<expr_pair> m_lang_diseq_todo;
         scoped_vector<expr_pair> m_not_contains_todo;
         scoped_vector<expr_pair_flag> m_membership_todo;
         vector<expr_pair> m_word_eq_todo_rel;
         vector<expr_pair> m_word_diseq_todo_rel;
+        vector<expr_pair_flag> m_lang_eq_todo_rel;
         vector<expr_pair_flag> m_membership_todo_rel;
 
     public:
@@ -190,6 +194,7 @@ namespace smt::noodler {
         void set_conflict(const literal_vector& ls);
         void block_curr_assignment();
         void block_curr_len(expr_ref len_formula);
+        void block_curr_lang();
         void dump_assignments() const;
         void string_theory_propagation(expr * ex);
         void propagate_concat_axiom(enode * cat);
@@ -210,6 +215,7 @@ namespace smt::noodler {
         Predicate conv_eq_pred(app* expr);
 
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
+        Formula conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out);
 
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
