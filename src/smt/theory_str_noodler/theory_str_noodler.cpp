@@ -787,13 +787,6 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
-        // for(const auto& t : this->var_eqs.get_equivalence_bt()) {
-        //     for (const auto& s : t) {
-        //         std::cout << s.to_string() << " ";
-        //     }
-        //     std::cout << std::endl;
-        // }
-
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
             init_length_sensitive_vars, m, m_util_s, m_util_a, 
             this->var_eqs.get_equivalence_bt(), m_params };

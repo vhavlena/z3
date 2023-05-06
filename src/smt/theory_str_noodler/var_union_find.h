@@ -36,6 +36,11 @@ namespace smt::noodler {
         return false;
     }
 
+    /**
+     * @brief Class for union-find like data structure. Allows to handle equivalence classes of 
+     * z3 expressions. It is implemented naively so-far.
+     * 
+     */
     class var_union_find {
 
         obj_map<expr, obj_hashtable<expr>> un_find;
@@ -44,6 +49,13 @@ namespace smt::noodler {
     public:
         var_union_find() : un_find() { }
 
+        /**
+         * @brief Add new item to the equivalence
+         * 
+         * @param key Key of the element. Each element @p val has a key (e.g., 
+         * length term) that is then used for equivalence class merging.
+         * @param val Value (variable) associated with the key.
+         */
         void add(const expr_ref& key, const expr_ref& val) {
             obj_hashtable<expr> found;
             if(this->un_find.find(key, found)) {
@@ -54,10 +66,19 @@ namespace smt::noodler {
             }
         }
 
+        /**
+         * @brief Get the equivalence classes
+         */
         const obj_map<expr, obj_hashtable<expr>>& get_equivalence() const {
             return this->un_find;
         }
 
+        /**
+         * @brief Get the equivalence classes where each z3 term is replaced with the 
+         * equivalent BasicTerm object.
+         * 
+         * @return Equivalence classes consisting of BasicTerms
+         */
         BasicTermEqiv get_equivalence_bt() const {
             std::vector<std::set<BasicTerm>> ret;
             for(const auto& t : this->un_find) {

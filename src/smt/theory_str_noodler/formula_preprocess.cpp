@@ -1143,7 +1143,7 @@ namespace smt::noodler {
      * @param ec Equivalence class containing length-equivalent variables.
      * @param t1 Term1
      * @param t2 Term2
-     * @return Equial length -> true
+     * @return Equal length -> true
      */
     bool FormulaPreprocess::same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const {
         if(ec_are_equal(ec, t1, t2)) {

@@ -705,6 +705,15 @@ namespace smt::noodler {
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
+        STRACE("str",
+            tout << "Variable equivalence classes: " << std::endl;
+            for(const auto& t : len_eq_vars) {
+                for (const auto& s : t) {
+                    tout << s.to_string() << " ";
+                }
+                tout << std::endl;
+            }   
+        );
         this->prep_handler.generate_equiv(this->len_eq_vars);
         this->prep_handler.propagate_variables();
         this->prep_handler.generate_identities();

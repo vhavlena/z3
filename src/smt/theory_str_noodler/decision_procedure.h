@@ -335,7 +335,7 @@ namespace smt::noodler {
          * @param m Z3 AST manager
          * @param m_util_s Z3 string manager
          * @param m_util_a Z3 arithmetic manager
-         * @param len_eq_vars Equivalence clsss holding variables with the same length
+         * @param len_eq_vars Equivalence class holding variables with the same length
          * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,

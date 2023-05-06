@@ -130,7 +130,7 @@ namespace smt::noodler {
          */
         bool fixed_length(const BasicTerm& t, int& n) const {
             auto lengths = Mata::Strings::get_word_lengths(*this->at(t));
-            if(lengths.size() > 1) {
+            if(lengths.size() != 1) {
                 return false;
             }
             auto pr = *lengths.begin();
