@@ -35,6 +35,7 @@ Eternal glory to Yu-Fang.
 #include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
+#include "var_union_find.h"
 
 namespace smt::noodler {
 
@@ -48,6 +49,8 @@ namespace smt::noodler {
         arith_util m_util_a;
         seq_util m_util_s;
         //ast_manager& m;
+
+        var_union_find var_eqs;
 
         StateLen<bool> state_len;
         obj_hashtable<expr> len_vars;

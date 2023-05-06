@@ -372,9 +372,11 @@ namespace smt::noodler {
             if(!eq.get_left_side()[0].is_variable()) {
                 continue;
             }
+            /// if X = lit it is better to keep only lit
             if(!eq.get_right_side()[0].is_variable()) {
                 BasicTerm v_left = eq.get_left_side()[0]; // X
                 update_reg_constr(v_left, eq.get_right_side());
+                this->formula.replace(eq.get_left_side(), eq.get_right_side());
                 this->formula.remove_predicate(index);
                 continue;
             }
@@ -418,6 +420,36 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Propagate new equations having the regular shape. (for generate_identities).
+     * Creates new equations of the form X = Y1 Y2 Y3...
+     * 
+     * @param diff1 First occurrence difference
+     * @param diff2 Second occurrence difference
+     * @param new_pred[out] Newly created equation
+     * @return True -> it is possible to create a new equation
+     */
+    bool FormulaPreprocess::propagate_regular_eqs(const std::set<VarNode>& diff1, const std::set<VarNode>& diff2, Predicate& new_pred) const {
+        VarNode val1 = *diff1.begin();
+        std::set<int> pos1, pos2;
+        std::map<int, BasicTerm> sorted_map;
+        for(int i = 0; i < diff2.size(); i++) pos1.insert(i + val1.position);
+        for(const auto& t : diff2) {
+            pos2.insert(t.position);
+            sorted_map.insert({t.position, t.term});
+        } 
+        if(pos1 == pos2) {
+            Concat right;
+            for(const auto& k : sorted_map) { // in the order of their positions
+                right.push_back(k.second);
+            }
+            new_pred = Predicate(PredicateType::Equation,
+                std::vector<Concat>({Concat({val1.term}), right}));
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * @brief Check whether symmetric difference of term occurrences is suitable for generating identities. The
      * symmetric difference contains different BasicTerms that are on the different positions in the contatenations. If so,
      * set @p new_pred with the new predicate that was generated from the difference.
@@ -436,7 +468,12 @@ namespace smt::noodler {
                     std::vector<BasicTerm>({val2.term})}));
                 return true;
             }
-        } // TODO: allow to generate X = eps
+        } else if(diff.first.size() == 1) {
+            return propagate_regular_eqs(diff.first, diff.second, new_pred);
+        } else if(diff.second.size() == 1) {
+            return propagate_regular_eqs(diff.second, diff.first, new_pred);
+        }
+        /// TODO: allow to generate X = eps
         return false;
     }
 
@@ -446,6 +483,7 @@ namespace smt::noodler {
      */
     void FormulaPreprocess::generate_identities() {
         std::set<std::pair<size_t, Predicate>> new_preds;
+        std::set<size_t> rem_ids;
         size_t index = this->formula.get_max_index() + 1;
 
         for(const auto& pr1 : this->formula.get_predicates()) {
@@ -462,25 +500,34 @@ namespace smt::noodler {
                     diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
                 // L1 = R1 and L2 = R2 and L1 = L2 => R1 = R2
                 } else if(pr1.second.get_left_side() == pr2.second.get_left_side()) {
-                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_right_side());
+                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr2.second.get_right_side());
                 // L1 = R1 and L2 = R2 and L1 = R2 => R1 = L2
                 } else if(pr1.second.get_left_side() == pr2.second.get_right_side()) {
-                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr1.second.get_left_side());
+                    diff = get_eq_sym_diff(pr1.second.get_right_side(), pr2.second.get_left_side());
                 // L1 = R1 and L2 = R2 and R1 = L2 => L2 = R1
                 } else if(pr1.second.get_right_side() == pr2.second.get_left_side()) {
-                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_right_side());
+                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr2.second.get_right_side());
                 // L1 = R1 and L2 = R2 and R1 = R2 => L1 = L2
                 } else if(pr1.second.get_right_side() == pr2.second.get_right_side()) {
-                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr1.second.get_left_side());
+                    diff = get_eq_sym_diff(pr1.second.get_left_side(), pr2.second.get_left_side());
                 }
 
                 Predicate new_pred;
-                if(generate_identities_suit(diff, new_pred)) {
+                if(generate_identities_suit(diff, new_pred) && new_pred != pr1.second && new_pred != pr2.second) {
                     new_preds.insert({index, new_pred});
-                    this->dependency[index] = std::set<size_t>({pr1.first, pr2.first});
+                    /// It assumes L = A B X; L = A B Y1 Y2 ... 
+                    /// diff.first should contain X; diff.second Y1 Y2
+                    if(diff.first.size() == 1) { // if a new predicate is of the form X = Y1 Y2 ... 
+                        rem_ids.insert(pr2.first); // remove L = A B Y1 Y2
+                    } else {
+                        rem_ids.insert(pr1.first);
+                    }
                     index++;
                 }
             }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
         }
         for(const auto &pr : new_preds) {
             this->formula.add_predicate(pr.second, pr.first);
@@ -618,6 +665,9 @@ namespace smt::noodler {
             if(pr.first.is_literal() && pr.first.get_name() == "") {
                 res.insert(pr.first);
             }
+            if(pr.first.is_literal() && this->aut_ass.is_epsilon(pr.first) ) {
+                res.insert(pr.first);
+            }
 
         }
     }
@@ -676,7 +726,6 @@ namespace smt::noodler {
             this->formula.replace(Concat({t}), Concat());
             // add len constraint |X| = 0
             this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
-            assert(t.is_variable() || t.get_name() == "");
         }
         this->formula.clean_predicates();
 
@@ -1033,6 +1082,78 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
+    }
+
+    /**
+     * @brief Generate equalities from the equivalence class containing 
+     * length-equivalent variables.
+     * 
+     * @param ec Equivalence class containing length-equivalent variables.
+     */
+    void FormulaPreprocess::generate_equiv(const BasicTermEqiv& ec) {
+        std::set<Predicate> new_preds;
+        size_t index = this->formula.get_max_index() + 1;
+
+        for(const auto& pr1 : this->formula.get_predicates()) {
+            if(!pr1.second.is_equation())
+                continue;
+            for(const auto& pr2 : this->formula.get_predicates()) {
+                if(!pr2.second.is_equation())
+                    continue;
+                if(pr1.first >= pr2.first)
+                    continue;
+
+                Predicate pc1 = pr1.second;
+                Predicate pc2 = pr2.second;
+                if(pc1.get_left_side() == pc2.get_right_side()) {
+                    pc2 = pc2.get_switched_sides_predicate();
+                } else if(pc1.get_right_side() == pc2.get_left_side()) {
+                    pc1 = pc1.get_switched_sides_predicate();
+                } else if(pc1.get_right_side() == pc2.get_right_side()) {
+                    pc1 = pc1.get_switched_sides_predicate();
+                    pc2 = pc2.get_switched_sides_predicate();
+                } else if(pc1.get_left_side() == pc2.get_left_side()) {
+                    // already set
+                } else {
+                    continue;
+                }
+                if(pc1.get_right_side().size() == 0 || pc2.get_right_side().size() == 0) {
+                    continue;
+                }
+                for(size_t i = 0; i < std::min(pc1.get_right_side().size(), pc2.get_right_side().size()); i++) {
+                    BasicTerm t1 = pc1.get_right_side()[i];
+                    BasicTerm t2 = pc2.get_right_side()[i];
+                    if(same_length(ec, t1, t2)) {
+                        Predicate new_pred(PredicateType::Equation, {Concat({t1}), Concat({t2})});
+                        new_preds.insert(new_pred);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        for(const auto &pr : new_preds) {
+            this->formula.add_predicate(pr);
+        }
+    }
+
+    /**
+     * @brief Check if two languages of two terms have the same length.
+     * 
+     * @param ec Equivalence class containing length-equivalent variables.
+     * @param t1 Term1
+     * @param t2 Term2
+     * @return Equal length -> true
+     */
+    bool FormulaPreprocess::same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const {
+        if(ec_are_equal(ec, t1, t2)) {
+            return true;
+        }
+        int n1, n2;
+        if(this->aut_ass.fixed_length(t1, n1) && this->aut_ass.fixed_length(t2, n2) && n1 == n2) {
+            return true;
+        }
+        return false;
     }
 
     /**
