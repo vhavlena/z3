@@ -1248,43 +1248,76 @@ namespace smt::noodler {
 
         for(const auto& pr : ineqs) {
 
+            // From inequality L != P we create equalities L = x1a1y1 and R = x2a2y2
+            // where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
+            // we will check if (|L| != |P| || (|x1| == |x2| and a1 != a2)) after finding sat solution
+            // from decision procedure.
+
+            // This optimization represents the situation where L = a1 and R = a2
+            // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
             if(pr.second.get_left_side().size() == 1 && pr.second.get_right_side().size() == 1) {
-                Mata::Nfa::Nfa autl = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                Mata::Nfa::Nfa autr = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                BasicTerm a1 = pr.second.get_left_side()[0];
+                BasicTerm a2 = pr.second.get_right_side()[0];
+                auto autl = this->aut_ass.at(a1);
+                auto autr = this->aut_ass.at(a2);
                 Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
 
-                if(Mata::Nfa::are_equivalent(autl, sigma) && Mata::Nfa::are_equivalent(autr, sigma)) {
+                if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
                     this->formula.remove_predicate(pr.first);
-                    this->diseq_variables.insert({pr.second.get_left_side()[0], pr.second.get_right_side()[0]});
+                    // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+                    this->len_variables.insert(a1);
+                    this->len_variables.insert(a2);
+                    // we add to dis_len the pair ((a1, a2), (|a1| == |a2|, |a1| != |a2|)) representing the formula (|a1| != |a2| || (|a1| == |a2| && a1 != a2))
+                    this->dis_len.insert({
+                        {a1, a2},
+                        // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
+                        {new LenNode(LenFormulaType::TRUE, {}), new LenNode(LenFormulaType::FALSE, {})} 
+                    });
                     continue;;
                 }
             }
 
             BasicTerm x1 = this->create_fresh_var();
+            this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             BasicTerm a1 = this->create_fresh_var();
+            this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
             BasicTerm y1 = this->create_fresh_var();
+            this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             BasicTerm x2 = this->create_fresh_var();
+            this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
             BasicTerm a2 = this->create_fresh_var();
+            this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
             BasicTerm y2 = this->create_fresh_var();
+            this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
 
+            // L = x1a1y1
             Predicate fst(PredicateType::Equation, {pr.second.get_left_side(), Concat{x1, a1, y1}});
+            // R = x2a2y2
             Predicate snd(PredicateType::Equation, {pr.second.get_right_side(), Concat{x2, a2, y2}});
 
             this->formula.remove_predicate(pr.first);
             this->formula.add_predicate(fst);
             this->formula.add_predicate(snd);
 
+            // we create |L| != |P|, making all variables in both sides length ones
+            // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
+            // for example by taking L = x1y1, P = x2y2 and checking (|x1| = |y2| and some first symbol of y1,y2 differ)
+            for(const auto& t : pr.second.get_vars()) {
+                this->len_variables.insert(t);
+            }
+            auto len2 = pr.second.get_formula_eq();
+
+            // we want |x1| == |x2|, making x1 and x2 length ones
             this->len_variables.insert(x1);
             this->len_variables.insert(x2);
-            this->diseq_variables.insert({a1,a2});
-            this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq()); // |x1| = |x2|
+            auto len1 = Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq();
 
-            this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-            this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-            this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-            this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-            this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
-            this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_automaton());
+            // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+            this->len_variables.insert(a1);
+            this->len_variables.insert(a2);
+
+            // we will create (len2 || (len1 && a1 != a2)) from this
+            this->dis_len.insert({{a1, a2}, {len1, len2}});
         }
     }
 

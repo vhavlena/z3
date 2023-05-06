@@ -1,6 +1,7 @@
 #include <queue>
 #include <utility>
 #include <algorithm>
+#include <functional>
 
 #include <mata/nfa-strings.hh>
 #include "util.h"
@@ -98,8 +99,8 @@ namespace smt::noodler {
         m_util_a{ m_util_a },
         init_length_sensitive_vars{ },
         formula { },
-        m_params(par),
-        init_aut_ass{ } {
+        init_aut_ass{ },
+        m_params(par) {
     }
 
     bool DecisionProcedure::compute_next_solution() {
@@ -525,124 +526,199 @@ namespace smt::noodler {
         return false;
     }
 
-    /**
-     * @brief Get length formula from the automata assignment @p ass wrt variables @p vars.
-     * 
-     * @param variable_map Mapping of BasicTerm variables to Z3 expressions
-     * @param ass Automata assignment
-     * @param vars Set of variables
-     * @return expr_ref Length formula
-     */
-    expr_ref DecisionProcedure::get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars) {
-        expr_ref lengths(this->m.mk_true(), this->m);
-
-        for(const BasicTerm& var :vars) {
-            std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*ass.at(var));
-
+    expr_ref DecisionProcedure::get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars) {
+        expr_ref lengths(m.mk_true(), m);
+        
+        for(const BasicTerm& var : vars) {
+            
+            // get the z3 variable from var
+            expr_ref z3_var(this->m);
             auto it = variable_map.find(var);
-            expr_ref var_expr(this->m);
-            if(it != variable_map.end()) { // take the existing variable from the map
-                var_expr = m_util_s.str.mk_length(it->second);
-            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+            if(it != variable_map.end()) {
+                // take the existing variable from the map
+                z3_var = m_util_s.str.mk_length(it->second);
+            } else {
+                // if the variable is not found, it was introduced during preprocessing or decision procedure
+                // we therefore create a z3 variable using the name of var
+                z3_var = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
             }
-            lengths = this->m.mk_and(lengths, mk_len_aut(var_expr, aut_constr));
+
+            // add |z3_var| >= 0, important probably only for the case that var was introduced during preprocessing
+            // or decision procedure, existing z3 vars should have this already in the LIA solver
+            lengths = m.mk_and(lengths, m_util_a.mk_ge(z3_var, m_util_a.mk_int(0)));
+
+            if (state.aut_ass.count(var) > 0) {
+                // if var is not substituted, get length constraint from its automaton
+                std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*state.aut_ass.at(var));
+                lengths = this->m.mk_and(lengths, mk_len_aut(z3_var, aut_constr));
+            } else if (state.substitution_map.count(var) > 0) {
+                // if var is substituted, then we have to create length equation
+                // i.e. if state.substitution_map[var] = x_1 x_2 ... x_n, then we create |var| = |x_1| + |x_2| + ... + |x_n|
+
+                // translate each x_i to z3 var and create the sum |x_1| + |x_2| + ... + |x_n|
+                expr_ref sum(m_util_a.mk_int(0), m);
+                for(const BasicTerm&x_i : state.substitution_map.at(var)) {
+                    expr_ref z3_x_i(this->m);
+                    auto varit = variable_map.find(x_i);
+                    if(varit != variable_map.end()) {
+                        // take the existing variable from the map
+                        z3_x_i = m_util_s.str.mk_length(varit->second);
+                    } else {
+                        // if the variable is not found, it was introduced during preprocessing or decision procedure
+                        // we therefore create a z3 variable using the name of x_i
+                        z3_x_i = util::mk_int_var(x_i.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+                    }
+
+                    sum = m_util_a.mk_add(sum, z3_x_i);
+                }
+                lengths = m.mk_and(lengths, m.mk_eq(z3_var, sum));
+
+            } else {
+                util::throw_error("Variable was neither in automata assignment nor was substituted");
+            }
         }
+
+        return lengths;
+    }
+
+    expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
+        expr_ref lengths(m.mk_true(), m);
 
         // collect lengths introduced by the preprocessing
         expr_ref prep_formula = util::len_to_expr(
                 this->prep_handler.get_len_formula(),
                 variable_map,
                 this->m, this->m_util_s, this->m_util_a );
+        lengths = this->m.mk_and(lengths, prep_formula);
 
-        if(!this->m.is_true(prep_formula)) {
-            lengths = this->m.mk_and(lengths, prep_formula);
-        }
+        if(this->solution.aut_ass.size() == 0) {
+            // if the decision procedure was not run yet, we return lengths based on the initial assignment it is assumed that this is called for
+            // UNSAT check which is run before decision procedure, so we create length constraints for all variables so that LIA solver can
+            // be more aggressive in giving us UNSAT
+            SolvingState tmp_state;
+            tmp_state.aut_ass = init_aut_ass;
+            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, tmp_state, tmp_state.aut_ass.get_keys()));
+        } else {
+            // decision procedure was run, we create length constraints from the solution, we only need to look at length sensitive vars
+            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, solution, solution.length_sensitive_vars));
 
-        // check whether disequalities are satisfiable
-        if(!check_diseqs(ass)) {
-            lengths = this->m.mk_and(lengths, this->m.mk_false());
+            // check whether disequalities are satisfiable
+            // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
+            // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+            lengths = this->m.mk_and(lengths, len_diseqs(variable_map, solution));
+            
         }
 
         return lengths;
     }
 
-    expr_ref DecisionProcedure::get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state) {
-        expr_ref fl(m.mk_true(), m);
-        
-        for(const BasicTerm& term : state.length_sensitive_vars) {
-            auto it = state.substitution_map.find(term);
-            if(it == state.substitution_map.end()) {
-                continue;
-            }
-
-            expr_ref left(m);
-            auto varit = variable_map.find(term);
-            expr_ref var_expr(this->m);
-            if(varit != variable_map.end()) { // take the existing variable from the map
-                var_expr = m_util_s.str.mk_length(varit->second);
-            } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                var_expr = util::mk_int_var(term.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-            }
-            left = var_expr;
-
-            expr_ref sum(m_util_a.mk_int(0), m);
-            for(const BasicTerm&tp : it->second) {
-
-                auto varit = variable_map.find(tp);
-                expr_ref var_expr(this->m);
-                if(varit != variable_map.end()) { // take the existing variable from the map
-                    var_expr = m_util_s.str.mk_length(varit->second);
-                } else { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = util::mk_int_var(tp.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+    expr_ref DecisionProcedure::check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr) {
+        // get_substituted_var(x, s) will get the most deep variable by which x is replaced in state.substitution_map and in
+        // s we keep the symbols by which the nfa for x accepts (the nfa should accept words of size at most 1)
+        std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&, std::set<Mata::Symbol>&)> get_substituted_var;
+        get_substituted_var = [&state, &get_substituted_var](const smt::noodler::BasicTerm &var, std::set<Mata::Symbol> &symbols_of_var) {
+            auto bla = state.substitution_map.find(var);
+            if (bla != state.substitution_map.end()) {
+                // var is substituted
+                if (bla->second.size() == 0) {
+                    // if var is substituted by epsilon, symbols_of_var must be empty and var is the most deep variable
+                    symbols_of_var.clear();
+                    return std::vector<BasicTerm>{var};
+                } else {
+                    // var is substituted by some other var, recurse deeper
+                    assert(bla->second.size() == 1); // var can be substituted by only one variable
+                    return get_substituted_var(bla->second[0], symbols_of_var);
                 }
-
-                sum = m_util_a.mk_add(sum, var_expr);
+            } else {
+                // var is not substituted, get the symbols of its nfa
+                assert(state.aut_ass.count(var) > 0); // var is either in substitution map or in aut_ass
+                auto nfa = state.aut_ass.at(var);
+                nfa->trim();
+                // get all one-symbol words accepted by nfa assuming
+                // that nfa accepts words of size 0 and 1
+                for (const auto &tran : nfa->delta) {
+                    symbols_of_var.insert(tran.symb);
+                }
+                return std::vector<BasicTerm>{var};
             }
-            fl = m.mk_and(fl, m.mk_eq(left, sum), m_util_a.mk_ge(left, m_util_a.mk_int(0)));
+        };
+
+        auto a1 = pr.first;
+        auto a2 = pr.second;
+
+        std::set<Mata::Symbol> s1, s2;
+        
+        auto subst_a1 = get_substituted_var(a1, s1)[0];
+        auto subst_a2 = get_substituted_var(a2, s2)[0];
+
+        STRACE("str",
+            tout << "diseq check where " << a1.get_name() << " is substituted by " << subst_a1.get_name() << " and s1:";
+            for (const auto s1el : s1) {
+                tout << " " << s1el;
+            }
+            tout << std::endl;
+            tout << "diseq check where " << a2.get_name() << " is substituted by " << subst_a2.get_name() << " and s2:";
+            for (const auto s2el : s2) {
+                tout << " " << s2el;
+            }
+            tout << std::endl;
+        );
+
+        if( (subst_a1 == subst_a2) || // if a1 and a2 were substituted by the same var, the disequation cannot hold
+            (s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
+            (s1.size() == 1 && s2.size() == 1 && s1 == s2) // if we can only assign the same symbol to the variables, it is unsat
+          ) {
+            return expr_ref(this->m.mk_false(), this->m);
         }
 
-        return fl;
-    }   
+        // gets the disjunction of equations "var == char" for each char in var_chars
+        auto get_char_disjunction = [this](const expr_ref &var, const std::set<Mata::Symbol> var_chars) {
+            expr_ref char_disj(this->m.mk_false(), this->m);
+            for (const auto &var_char : var_chars) {
+                // add "var == symbol" to disjunction
+                char_disj = this->m.mk_or(char_disj, this->m_util_a.mk_eq(var, this->m_util_a.mk_int(var_char)));
+            }
+            return char_disj;
+        };
 
-    /**
-     * @brief Get length constraints of the solution
-     *
-     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-     * @return expr_ref Length formula describing all solutions
-     */
-    expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        AutAssignment ass;
-        if(this->solution.aut_ass.size() == 0) {
-            ass = this->init_aut_ass;
-            return get_length_ass(variable_map, ass, ass.get_keys());
-        } else {
-            ass = this->solution.flatten_substition_map();
-            
-            expr_ref sm = get_subs_map_len(variable_map, this->solution);
-            expr_ref faut = get_length_ass(variable_map, ass, this->solution.length_sensitive_vars);
-            expr_ref res(m.mk_and(sm, faut), m);
+        // new int variables representing the char values of a1 and a2
+        expr_ref a1_z3_char = util::mk_int_var(subst_a1.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
+        expr_ref a2_z3_char = util::mk_int_var(subst_a2.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
 
-            return res;
-        }
+        expr_ref res(this->m.mk_true(), this->m);
+        // char disjunct for a1
+        res = this->m.mk_and(res, get_char_disjunction(a1_z3_char, s1));
+        // char disjunct for a2
+        res = this->m.mk_and(res, get_char_disjunction(a2_z3_char, s2));
+        // a1 != a2
+        expr_ref a1_a2_eq(this->m_util_a.mk_eq(a1_z3_char, a2_z3_char), this->m);
+        res = this->m.mk_and(res, this->m.mk_not(a1_a2_eq));
+        // just to be sure, we also want |a1| == 1 and |a2| == 1
+        expr_ref a1_z3 = util::mk_int_var(subst_a1.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        expr_ref a2_z3 = util::mk_int_var(subst_a2.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        res = this->m.mk_and(
+            res,
+            this->m_util_a.mk_eq(a1_z3, this->m_util_a.mk_int(1)),
+            this->m_util_a.mk_eq(a2_z3, this->m_util_a.mk_int(1))
+        );
+        
+        return res;
     }
 
-    /**
-     * @brief Check that disequalities are satisfiable. Assumed to be called if the
-     * decision procedure returns SAT.
-     *
-     * @param ass SAT automata assignment
-     * @return true Disequalities are SAT
-     */
-    bool DecisionProcedure::check_diseqs(const AutAssignment& ass) {
-        for(const auto& pr : this->prep_handler.get_diseq_variables()) {
-            auto s1 = Mata::Strings::get_shortest_words(*ass.at(pr.first));
-            auto s2 = Mata::Strings::get_shortest_words(*ass.at(pr.second));
-            if(s1.size() == 1 && s2.size() == 1 && s1 == s2) {
-                return false;
-            }
+    expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
+        expr_ref ret(this->m.mk_true(), this->m);
+        for(const auto& pr: this->prep_handler.get_diseq_len()) {
+            expr_ref f1 = util::len_to_expr(
+                pr.second.first,
+                variable_map,
+                this->m, this->m_util_s, this->m_util_a );
+            expr_ref f2 = util::len_to_expr(
+                pr.second.second,
+                variable_map,
+                this->m, this->m_util_s, this->m_util_a );
+            ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, check_diseq(state, pr.first))));
         }
-        return true;
+        return ret;
     }
 
     /**

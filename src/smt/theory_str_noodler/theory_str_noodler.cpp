@@ -793,6 +793,7 @@ namespace smt::noodler {
         )};
 
         // Add dummy symbols for all disequations.
+        // FIXME: we can possibly create more dummy symbols than the size of alphabet (196607 - from string theory standard), but it is edge-case that is nearly impossible to happen
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
@@ -837,13 +838,13 @@ namespace smt::noodler {
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths, mod) == l_true) {
-                STRACE("str", tout << "len sat " << mk_pp(lengths, m););
+                STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                 return FC_DONE;
             }
-            if(init_length_sensitive_vars.size() > 0) {
+            if(dec_proc.get_init_length_vars().size() > 0) {
                 block_len = m.mk_or(block_len, lengths);
             }
-            STRACE("str", tout << "len unsat\n";);
+            STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
         }
 
         // all len solutions are unsat, we block the current assignment

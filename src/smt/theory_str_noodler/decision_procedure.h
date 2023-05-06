@@ -311,11 +311,43 @@ namespace smt::noodler {
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        expr_ref get_length_ass(const std::map<BasicTerm, expr_ref>& variable_map, const AutAssignment& ass, const std::unordered_set<smt::noodler::BasicTerm>& vars);
+        
 
-        expr_ref get_subs_map_len(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState& state);
+        /**
+         * Get length formula from the solving state @p state wrt variables @p vars. For each var x in @p vars it
+         * creates either equation |x| = |x_1| + ... + |x_n| if x is substituted by 'x_1 ... x_n' or it add
+         * constraint created from the automaton to which x is mapped.
+         * 
+         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
+         * @param state Solving state from which the lengths are created
+         * @param vars Set of variables for which we create the lenghts (should be some subset of variables)
+         * @return expr_ref Length formula
+         */
+        expr_ref get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars);
 
-        bool check_diseqs(const AutAssignment& ass);
+
+        /**
+         * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
+         * decision procedure returns SAT. Creates length constraint representing the conjunct:
+         * "a1 equals one of its chars" and "a2 equals one of its chars" and "a1 != a2"
+         * 
+         * See also len_diseqs and FormulaPreprocess::replace_disequalities().
+         * 
+         * @param state the solving state whose automata assignment and substitution map will be used
+         * @param pr pair (a1, a2) of the variables whose disequality we are checking
+         */
+        expr_ref check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
+
+        /**
+         * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint
+         * (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
+         * where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+         * 
+         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
+         * @param state Solving state from which the lengths are created
+         * @return the conjunction of length constraints of each diseqation
+         */
+        expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
 
     public:
         DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
@@ -348,12 +380,22 @@ namespace smt::noodler {
         void set_instance(const Formula &equalities, AutAssignment &init_aut_ass,
                           const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         bool compute_next_solution() override;
+
+        /**
+         * @brief Get length constraints of the solution (or overapproximation from initial
+         * assignment if decision procedure was not run yet)
+         *
+         * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
+         * @return expr_ref Length formula describing all solutions
+         */
         expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
 
         void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
+
+        std::unordered_set<BasicTerm> &get_init_length_vars() { return init_length_sensitive_vars; }
 
     };
 }

@@ -305,6 +305,14 @@ namespace smt::noodler::util {
             return andref;
         }
 
+        case LenFormulaType::TRUE: {
+            return expr_ref(m.mk_true(), m);
+        }
+
+        case LenFormulaType::FALSE: {
+            return expr_ref(m.mk_false(), m);
+        }
+
         }
 
         assert(false);

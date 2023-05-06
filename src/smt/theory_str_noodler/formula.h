@@ -139,6 +139,8 @@ namespace smt::noodler {
         LEQ,
         LEAF,
         AND,
+        TRUE,
+        FALSE,
     };
 
     struct LenNode {
@@ -270,7 +272,6 @@ namespace smt::noodler {
          * @return LenNode* Root of the length formula
          */
         LenNode* get_formula_eq() const {
-            assert(is_equation());
             LenNode* left, *right;
 
             auto plus_chain = [&](const std::vector<BasicTerm>& side) {
@@ -291,6 +292,11 @@ namespace smt::noodler {
             left = plus_chain(this->params[0]);
             right = plus_chain(this->params[1]);
             LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
+
+            if(is_inequation()) {
+                eq =  new LenNode(LenFormulaType::NOT, {eq});
+            }
+
             return eq;
         }
 
