@@ -317,7 +317,7 @@ namespace smt::noodler {
 
             // right side containts len variables; skip
             bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
-            // TODO: why do we not skip situation where on the right side we have exactly one len variable? can we really remove the equation then?
+            // TODO: why do we not skip situation where on the right side we have exactly one len variable? can we really remove the equation then? will it not fuck up for example disequations?
             if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_right_side_len) {
                 continue;
             }
