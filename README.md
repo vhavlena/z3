@@ -36,7 +36,7 @@ cd z3-noodler/build
 vim ../src/test/CMakeLists.txt
 # ... comment out the following line:
 #       add_subdirectory(noodler)
-CC=/opt/rh/devtoolset-8/root/usr/bin/gcc CXX=/opt/rh/devtoolset-8/root/usr/bin/g++ cmake ..
+CC=/opt/rh/devtoolset-8/root/usr/bin/gcc CXX=/opt/rh/devtoolset-8/root/usr/bin/g++ cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
