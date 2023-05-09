@@ -326,7 +326,7 @@ namespace smt::noodler {
             update_reg_constr(left_var, pr.second.get_right_side());
 
             if(is_right_side_len) {
-                // TODO: I assume we add left to len if we have one length variable on the right side
+                // we propagate the lengthness of right side variable to the left side
                 this->len_variables.insert(left_var);
             }
 
