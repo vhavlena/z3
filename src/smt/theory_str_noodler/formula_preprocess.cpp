@@ -384,7 +384,7 @@ namespace smt::noodler {
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
-            this->len_formulae.push_back(eq.get_formula_eq()); // add len constraint |X| = |Y|
+            this->add_to_len_formula(eq.get_formula_eq()); // add len constraint |X| = |Y|
             // propagate len variables: if Y is in len_variables, include also X
             if(this->len_variables.find(eq.get_right_side()[0]) != this->len_variables.end()) {
                 this->len_variables.insert(v_left);
@@ -725,7 +725,7 @@ namespace smt::noodler {
             }
             this->formula.replace(Concat({t}), Concat());
             // add len constraint |X| = 0
-            this->len_formulae.push_back(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
+            this->add_to_len_formula(Predicate(PredicateType::Equation, {Concat({t}), Concat()}).get_formula_eq());
         }
         this->formula.clean_predicates();
 
@@ -1165,10 +1165,10 @@ namespace smt::noodler {
             for(const BasicTerm& var : pred.get_vars()) {
                 int ln = 0;
                 if(this->aut_ass.is_co_finite(var, ln) && ln >= 0) {
-                    LenNode* right = new LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
-                    LenNode* left = new LenNode(LenFormulaType::LEAF, var, {});
-                    LenNode* eq = new LenNode(LenFormulaType::EQ, {left, right});
-                    this->len_formulae.push_back(new LenNode(LenFormulaType::NOT, {eq}));
+                    LenNode right = LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
+                    LenNode left = LenNode(LenFormulaType::LEAF, var, {});
+                    LenNode eq = LenNode(LenFormulaType::EQ, {left, right});
+                    this->add_to_len_formula(LenNode(LenFormulaType::NOT, {eq}));
                     this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
                 }
             }
@@ -1271,7 +1271,7 @@ namespace smt::noodler {
                     this->dis_len.insert({
                         {a1, a2},
                         // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
-                        {new LenNode(LenFormulaType::TRUE, {}), new LenNode(LenFormulaType::FALSE, {})} 
+                        {LenNode(LenFormulaType::TRUE, {}), LenNode(LenFormulaType::FALSE, {})} 
                     });
                     continue;;
                 }

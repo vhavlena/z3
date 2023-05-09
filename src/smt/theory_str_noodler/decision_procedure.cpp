@@ -914,8 +914,8 @@ namespace smt::noodler {
      init_length_sensitive_vars{ init_length_sensitive_vars },
          formula { equalities },
          init_aut_ass{ init_aut_ass },
-        len_eq_vars{ len_eq_vars },
-         m_params(par) {
+         m_params(par),
+         len_eq_vars{ len_eq_vars } {
          }
 
 } // Namespace smt::noodler.
