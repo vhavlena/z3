@@ -1,3 +1,52 @@
+# Z3-Noodler
+
+## Running Z3-Noodler on Starexec VM
+
+```
+0) The VM:
+
+VM: https://www.starexec.org/vmimage/
+user: root
+passwd: St@rexec
+
+1) Install newer CMake:
+
+git clone 'https://gitlab.kitware.com/cmake/cmake.git'
+cd cmake
+./configure
+gmake
+make install
+
+2) Install Mata
+
+git clone 'https://github.com/VeriFIT/mata.git'
+cd mata
+vim CMakeLists.txt
+# ... comment out the following two lines:
+#       include(CodeCoverage)
+#       setup_target_for_coverage(${PROJECT_NAME}_coverage tests coverage)
+CC=/opt/rh/devtoolset-8/root/usr/bin/gcc CXX=/opt/rh/devtoolset-8/root/usr/bin/g++ make release
+make install
+
+3) Compile Noodler:
+
+git clone 'https://github.com/VeriFIT/z3-noodler.git'
+mkdir z3-noodler/build
+cd z3-noodler/build
+vim ../src/test/CMakeLists.txt
+# ... comment out the following line:
+#       add_subdirectory(noodler)
+CC=/opt/rh/devtoolset-8/root/usr/bin/gcc CXX=/opt/rh/devtoolset-8/root/usr/bin/g++ cmake ..
+make
+```
+
+Now you should be able to run Z3-Noodler by typing
+```
+/root/z3-noodler/build/z3 smt.string_solver="noodler" <path/to/instance.smt2>
+```
+
+ORIGINAL Z3 README FOLLOWS:
+
 # Z3
 
 Z3 is a theorem prover from Microsoft Research. 
