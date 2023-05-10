@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <set>
+#include <map>
 #include <unordered_set>
 #include <iostream>
 #include "util/zstring.h"
@@ -531,9 +532,33 @@ namespace smt::noodler {
             return true;
         }
 
+        /**
+         * @brief Replace in all predicates
+         * 
+         * @param find What to find
+         * @param replace What to replace
+         * @return Formula Modified formula according to the replace
+         */
+        Formula replace(const std::vector<BasicTerm>& find, const std::vector<BasicTerm>& replace) const {
+            Formula ret;
+            for(const Predicate& pred : this->predicates) {
+                Predicate res;
+                pred.replace(find, replace, res);
+                ret.add_predicate(res);
+            }
+            return ret;
+        }
+
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
+
+    static bool operator==(const Formula& lhs, const Formula& rhs) { return lhs.get_predicates() == rhs.get_predicates(); }
+    static bool operator!=(const Formula& lhs, const Formula& rhs) { return !(lhs == rhs); }
+    static bool operator<(const Formula& lhs, const Formula& rhs) {
+       return lhs.get_predicates() < rhs.get_predicates();
+    }
+    static bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
 
 } // Namespace smt::noodler.
 
