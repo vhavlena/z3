@@ -426,15 +426,21 @@ namespace smt::noodler {
         if (m_util_s.str.is_extract(n)) {
             handle_substr(n);
         } else if (m_util_s.str.is_itos(n)) {
-            //handle_itos(n);
+            util::throw_error("unsupported predicate: str.from_int");
         } else if (m_util_s.str.is_stoi(n)) {
-            //handle_stoi(n);
+            util::throw_error("unsupported predicate: str.to_int");
         } else if (m_util_s.str.is_at(n)) {
             handle_char_at(n);
         } else if (m_util_s.str.is_replace(n)) {
             handle_replace(n);
         } else if (m_util_s.str.is_index(n)) {
             handle_index_of(n);
+        } else if(m_util_s.str.is_replace_all(n)) {
+            util::throw_error("unsupported predicate: str.replace_all");
+        } else if(m_util_s.str.is_replace_re_all(n)) {
+            util::throw_error("unsupported predicate: str.replace_re_all");
+        } else if(m_util_s.str.is_replace_re(n)) {
+            util::throw_error("unsupported predicate: str.replace_re");
         }
 
         expr *arg;
