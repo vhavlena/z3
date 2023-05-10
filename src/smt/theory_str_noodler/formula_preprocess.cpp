@@ -315,9 +315,8 @@ namespace smt::noodler {
 
             assert(pr.second.get_left_side().size() == 1);
 
-            // right side containts len variables; skip
+            // if right side contains len vars (except when we have X = Y), we must do splitting => cannot remove
             bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
-            // TODO: why do we not skip situation where on the right side we have exactly one len variable? can we really remove the equation then? will it not fuck up for example disequations? we should at least remember that right side var was substituted by left side var
             if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_right_side_len) {
                 continue;
             }
@@ -326,8 +325,11 @@ namespace smt::noodler {
             update_reg_constr(left_var, pr.second.get_right_side());
 
             if(is_right_side_len) {
+                // In the situation where we have X = Y and Y is length
                 // we propagate the lengthness of right side variable to the left side
                 this->len_variables.insert(left_var);
+                // and add len constraint |X| = |Y|
+                this->add_to_len_formula(pr.second.get_formula_eq()); 
             }
 
             this->formula.remove_predicate(pr.first);
