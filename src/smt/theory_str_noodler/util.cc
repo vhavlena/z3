@@ -516,8 +516,11 @@ namespace smt::noodler::util {
 
             if (is_high_set) {
                 // if high is set, we repeat body_nfa another high-low times
+                body_nfa.unify_initial();
+                body_nfa = Mata::Nfa::reduce(body_nfa);
                 for (unsigned i = 0; i < high - low; ++i) {
                     nfa = Mata::Nfa::concatenate(nfa, body_nfa);
+                    nfa = Mata::Nfa::reduce(nfa);
                 }
             } else {
                 // if high is not set, we can repeat body_nfa unlimited more times
@@ -606,6 +609,9 @@ namespace smt::noodler::util {
         } else {
             throw_error("unsupported operation in regex");
         }
+
+        // intermediate automata reduction
+        nfa = Mata::Nfa::reduce(nfa);
 
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
