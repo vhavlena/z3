@@ -315,28 +315,35 @@ namespace smt::noodler {
 
             assert(pr.second.get_left_side().size() == 1);
 
-            // right side containts len variables; skip
-            bool is_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
-            if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_len) {
+            // if right side contains len vars (except when we have X = Y), we must do splitting => cannot remove
+            bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
+            if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_right_side_len) {
                 continue;
             }
-            update_reg_constr(pr.second.get_left_side()[0], pr.second.get_right_side());
 
-            if(is_len) {
-                this->len_variables.insert(pr.second.get_left_side()[0]);
+            BasicTerm left_var = pr.second.get_left_side()[0];
+            update_reg_constr(left_var, pr.second.get_right_side());
+
+            if(is_right_side_len) {
+                // In the situation where we have X = Y and Y is length
+                // we propagate the lengthness of right side variable to the left side
+                this->len_variables.insert(left_var);
+                // and add len constraint |X| = |Y|
+                this->add_to_len_formula(pr.second.get_formula_eq()); 
             }
 
-            std::set<BasicTerm> vars = pr.second.get_vars();
             this->formula.remove_predicate(pr.first);
-            for(const BasicTerm& v : vars) {
-                std::set<VarNode> occurrs = this->formula.get_var_occurr(v);
-                if(occurrs.size() == 1) {
-                    Predicate reg_pred;
-                    if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
-                        worklist.emplace_back(occurrs.begin()->eq_index, reg_pred);
-                        // update dependency
-                        map_set_insert(this->dependency, occurrs.begin()->eq_index, pr.first);
-                    }
+
+            // check if by removing the regular equation, some other equations did not become regular
+            // we only need to check this for left_var, as the variables from the right side do not occur
+            // in the formula anymore (they occured only in pr)
+            std::set<VarNode> occurrs = this->formula.get_var_occurr(left_var);
+            if(occurrs.size() == 1) {
+                Predicate reg_pred;
+                if(this->formula.is_side_regular(this->formula.get_predicate(occurrs.begin()->eq_index), reg_pred)) {
+                    worklist.emplace_back(occurrs.begin()->eq_index, reg_pred);
+                    // update dependency
+                    map_set_insert(this->dependency, occurrs.begin()->eq_index, pr.first);
                 }
             }
         }
