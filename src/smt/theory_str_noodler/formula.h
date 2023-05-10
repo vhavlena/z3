@@ -498,6 +498,39 @@ namespace smt::noodler {
             return ret;
         }
 
+        /**
+         * @brief Check whether a formula is quadratic.
+         * 
+         * @return true -> quadratic
+         */
+        bool is_quadratic() const {
+            std::map<BasicTerm, unsigned> occur_map;
+
+            auto upd = [&occur_map] (const std::vector<BasicTerm>& vc) {
+                for(const BasicTerm& bt : vc) {
+                    if(!bt.is_variable()) continue;
+                    auto it = occur_map.find(bt);
+                    if(it != occur_map.end()) {
+                        it->second++;
+                    } else {
+                        occur_map.insert({bt, 1});
+                    }
+                }
+            };
+            for(const Predicate& pred : this->predicates) {
+                if(!pred.is_equation()) {
+                    return false;
+                }
+                upd(pred.get_right_side());
+                upd(pred.get_left_side());
+            }
+            for(const auto& pr : occur_map) {
+                if(pr.second > 2)
+                    return false;
+            }
+            return true;
+        }
+
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
