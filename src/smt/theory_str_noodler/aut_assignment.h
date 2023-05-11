@@ -86,6 +86,25 @@ namespace smt::noodler {
             return Mata::Strings::is_lang_eps(*(this->at(t)));
         }
 
+        /**
+         * @brief Check if a language of the term is of the form \Sigma*.w where w is a word.
+         * 
+         * @param t Basic Term
+         * @param sigma_star Sigma star automaton
+         * @return true -> is of the desired form
+         */
+        bool is_star_literal(const BasicTerm& t, const Mata::Nfa::Nfa& sigma_star) const {
+            Mata::Nfa::Nfa aut = *this->at(t);
+            Mata::Nfa::WordSet shortest = Mata::Strings::get_shortest_words(aut);
+            if(shortest.size() != 1) return false;
+
+            std::vector<Mata::Symbol> word = *shortest.begin();
+            zstring zword(word.size(), word.data());
+            Mata::Nfa::Nfa word_nfa = AutAssignment::create_word_nfa(zword);
+            Mata::Nfa::Nfa cmp = Mata::Nfa::concatenate(sigma_star, word_nfa);
+            return Mata::Nfa::are_equivalent(cmp, aut);
+        }
+
         // adds all mappings of variables from other to this assignment except those which already exists in this assignment
         // i.e. if this[var] exists, then nothing happens for var, if it does not, then this[var] = other[var]
         // TODO: probably this is the same as just doing this->insert(other.begin(), other.end())
@@ -182,6 +201,27 @@ namespace smt::noodler {
                 ret.insert(pr.first);
             }
             return ret;
+        }
+
+        /**
+         * Create NFA accepting a word in Z3 zstring representation.
+         * @param word Word to accept.
+         * @return NFA.
+         */
+        static Nfa create_word_nfa(const zstring& word) {
+            const size_t word_length{ word.length() };
+            Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
+            for (size_t i{ 0 }; i < word_length; ++i) {
+                mata_alphabet->try_add_new_symbol(std::to_string(word[i]), word[i]);
+            }
+            Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length }, mata_alphabet };
+            nfa.initial.add(0);
+            size_t state{ 0 };
+            for (; state < word.length(); ++state) {
+                nfa.delta.add(state, word[state], state + 1);
+            }
+            nfa.final.add(state);
+            return nfa;
         }
 
     };

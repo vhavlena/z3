@@ -598,7 +598,7 @@ namespace smt::noodler::util {
             nfa.remove_epsilon();
         } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
             SASSERT(expression->get_num_parameters() == 1);
-            nfa = create_word_nfa(expression->get_parameter(0).get_zstring());
+            nfa = AutAssignment::create_word_nfa(expression->get_parameter(0).get_zstring());
         } else if(is_variable(expression, m_util_s)) { // Handle variable.
             throw_error("variable in regexes are unsupported");
         } else {
@@ -614,22 +614,6 @@ namespace smt::noodler::util {
             }
             nfa = Mata::Nfa::complement(nfa, mata_alphabet);
         }
-        return nfa;
-    }
-
-    Nfa create_word_nfa(const zstring& word) {
-        const size_t word_length{ word.length() };
-        Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
-        for (size_t i{ 0 }; i < word_length; ++i) {
-            mata_alphabet->try_add_new_symbol(std::to_string(word[i]), word[i]);
-        }
-        Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length }, mata_alphabet };
-        nfa.initial.add(0);
-        size_t state{ 0 };
-        for (; state < word.length(); ++state) {
-            nfa.delta.add(state, word[state], state + 1);
-        }
-        nfa.final.add(state);
         return nfa;
     }
 

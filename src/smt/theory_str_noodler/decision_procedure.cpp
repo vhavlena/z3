@@ -893,7 +893,7 @@ namespace smt::noodler {
                     std::string fresh_name{ name_prefix + std::to_string(fresh_lits_counter) };
                     fresh_literal.set_name(fresh_name);
                     ++fresh_lits_counter;
-                    Nfa nfa{ util::create_word_nfa(term.get_name()) };
+                    Nfa nfa{ AutAssignment::create_word_nfa(term.get_name()) };
                     init_aut_ass.emplace(fresh_literal, std::make_shared<Nfa>(std::move(nfa)));
                     converted_str_literals.emplace(term.get_name(), fresh_name);
                 }

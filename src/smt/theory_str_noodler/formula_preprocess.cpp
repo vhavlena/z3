@@ -1071,8 +1071,7 @@ namespace smt::noodler {
         auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {
             Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
             for(const BasicTerm& bt : bts) {
-                Mata::Nfa::Nfa aut = *this->aut_ass.at(bt);
-                if(!Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(!this->aut_ass.is_star_literal(bt, sigma_star)) {
                     return false;
                 }
             }

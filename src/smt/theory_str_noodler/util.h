@@ -159,13 +159,6 @@ namespace smt::noodler::util {
                                              const std::set<uint32_t>& alphabet, bool make_complement = false);
 
     /**
-     * Create NFA accepting a word in Z3 zstring representation.
-     * @param word Word to accept.
-     * @return NFA.
-     */
-    Mata::Nfa::Nfa create_word_nfa(const zstring& word);
-
-    /**
      * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter
      *  @p terms.
      * @param ex Expression to be checked for basic terms.
