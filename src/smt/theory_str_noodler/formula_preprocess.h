@@ -325,7 +325,7 @@ namespace smt::noodler {
         bool same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const;
 
     public:
-        FormulaPreprocess(const Formula& conj, const AutAssignment& ass, const std::unordered_set<BasicTerm>& lv, const theory_str_noodler_params& par) :
+        FormulaPreprocess(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
             formula(conj),
             fresh_var_cnt(0),
             aut_ass(ass),
