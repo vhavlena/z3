@@ -1063,27 +1063,35 @@ namespace smt::noodler {
 
     /**
      * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
-     * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
+     * Remove L=R if single_occur(R) and for all variables X from R we have L(X) = \Sigma^*.
      */
     void FormulaPreprocess::skip_len_sat() {
         std::set<size_t> rem_ids;
+
+        auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {
+            Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+            for(const BasicTerm& bt : bts) {
+                Mata::Nfa::Nfa aut = *this->aut_ass.at(bt);
+                if(!Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(is_sigma_star(pr.second.get_side_vars(Predicate::EquationSideType::Left))) {
                     rem_ids.insert(pr.first);
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(is_sigma_star(pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
                     rem_ids.insert(pr.first);
-                }               
+                }             
             }
         }
         for(const size_t & i : rem_ids) {
