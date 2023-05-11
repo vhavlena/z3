@@ -289,17 +289,19 @@ namespace smt::noodler::util {
         }
 
         // Assign sigma start automata for all yet unassigned variables.
-        Mata::OnTheFlyAlphabet* mata_alphabet{ new Mata::OnTheFlyAlphabet{} };
+        Mata::OnTheFlyAlphabet mata_alphabet;
         std::string hex_symbol_string;
         for (const uint32_t symbol : noodler_alphabet) {
-            mata_alphabet->add_new_symbol(std::to_string(symbol), symbol);
+            mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
         }
 
-        const Nfa nfa_sigma_star{ Mata::Nfa::create_sigma_star_nfa(mata_alphabet) };
+        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::create_sigma_star_nfa(&mata_alphabet));
+        // remove the pointer to alphabet in the automaton, as it point to local variable (and we have the alphabet in aut_assignment)
+        nfa_sigma_star->alphabet = nullptr;
         for (const auto& variable : variables_in_formula) {
             if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
                 assert(aut_assignment.find(variable) == aut_assignment.end());
-                aut_assignment[variable] = std::make_shared<Nfa>(nfa_sigma_star);
+                aut_assignment[variable] = nfa_sigma_star;
             }
         }
 
