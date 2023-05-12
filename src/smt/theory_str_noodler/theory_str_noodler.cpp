@@ -700,10 +700,11 @@ namespace smt::noodler {
 
         for (const auto& we : this->m_membership_todo) {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
+            app_ref in_app_prev(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            if(ctx.is_relevant(in_app.get())) {
+            if(ctx.is_relevant(in_app.get()) || ctx.is_relevant(in_app_prev.get())) {
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
@@ -1818,13 +1819,14 @@ namespace smt::noodler {
         STRACE("str", tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
-            if(axiomatized_persist_terms.contains(cont))
-                return;
-            axiomatized_persist_terms.insert(cont);
+            // if(axiomatized_persist_terms.contains(cont))
+            //     return;
+            // axiomatized_persist_terms.insert(cont);
 
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
+          
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
             m_not_contains_todo.push_back({{x, m},{y, m}});
