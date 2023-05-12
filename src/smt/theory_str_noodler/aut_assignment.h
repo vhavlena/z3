@@ -184,6 +184,15 @@ namespace smt::noodler {
             return ret;
         }
 
+        std::string print() {
+            std::stringstream res;
+            for (const auto &key_val : *this) {
+                res << "Automaton for " << key_val.first.get_name() << ":" << std::endl;
+                key_val.second->print_to_DOT(res);
+            }
+            return res.str();
+        }
+
     };
 
 } // Namespace smt::noodler.

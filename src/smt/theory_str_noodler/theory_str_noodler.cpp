@@ -773,9 +773,8 @@ namespace smt::noodler {
 
         ast_manager &m = get_manager();
         for (const auto& we : this->m_membership_todo_rel) {
-            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
-                in_app = m.mk_not(in_app);
+                // similar to disequalities, we need dummy symbols for "not in"
                 new_symbs++;
             }
             STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);

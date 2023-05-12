@@ -815,6 +815,15 @@ namespace smt::noodler {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
+        STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
+        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
+        STRACE("str",
+            tout << "Disequation formulas after preprocessing:" << std::endl;
+            for (const auto &bla : prep_handler.get_diseq_len()) {
+                bla.first.first.get_name();
+                tout << "     " << bla.second.second << " || (" << bla.second.first << " && " << bla.first.first.get_name() << " != " << bla.first.second.get_name() << ")" << std::endl;
+            }  
+        );
         STRACE("str", tout << "preprocess-output:" << std::endl << this->formula.to_string() << std::endl; );
     }
 
