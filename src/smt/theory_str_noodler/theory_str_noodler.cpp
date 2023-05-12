@@ -452,7 +452,7 @@ namespace smt::noodler {
         enode *n1 = n;
         do {
             expr *o = n->get_expr();
-            if (!has_length(o)) {
+            if (!has_length(o) && !m.is_ite(o)) {
                 expr_ref len = mk_len(o);
                 add_length_axiom(len);
             }
@@ -549,6 +549,12 @@ namespace smt::noodler {
 
         app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
         app_ref neg(m.mk_not(l_eq_r), m);
+
+        // This is to handle the case containing ite inside disequations
+        if(!ctx.e_internalized(m.mk_eq(l, r))) {
+            STRACE("str", tout << "relevanting: " << mk_pp(neg, m) << '\n';);
+            ctx.mark_as_relevant(m.mk_not(m.mk_eq(l, r)));
+        }
         ctx.internalize(neg, false);
 
         /**
@@ -1806,16 +1812,16 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
         expr* cont = this->m.mk_not(e);
-        if(axiomatized_persist_terms.contains(cont))
-            return;
-
-        axiomatized_persist_terms.insert(cont);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
         STRACE("str", tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
+            if(axiomatized_persist_terms.contains(cont))
+                return;
+            axiomatized_persist_terms.insert(cont);
+
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
