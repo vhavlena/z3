@@ -27,8 +27,8 @@ class DecisionProcedureCUT : public DecisionProcedure {
 public:
     DecisionProcedureCUT(const Formula &equalities, AutAssignment init_aut_ass,
                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                         ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par
-    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s, m_util_a, par) {}
+                         ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const BasicTermEqiv& len_eq_vars, const theory_str_noodler_params& par
+    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s, m_util_a, len_eq_vars, par) {}
 
     using DecisionProcedure::compute_next_solution;
     using DecisionProcedure::get_lengths;
@@ -57,7 +57,7 @@ inline BasicTerm get_var(char var) {
 
 inline std::shared_ptr<Mata::Nfa::Nfa> regex_to_nfa(const std::string& regex) {
     Mata::Nfa::Nfa aut;
-    Mata::RE2Parser::create_nfa(&aut, regex);
+    Mata::Parser::create_nfa(&aut, regex);
     return std::make_shared<Mata::Nfa::Nfa>(aut);
 }
 

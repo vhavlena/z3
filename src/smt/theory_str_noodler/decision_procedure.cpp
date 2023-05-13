@@ -94,15 +94,6 @@ namespace smt::noodler {
         return result;
     }
 
-    DecisionProcedure::DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par) 
-        : prep_handler(Formula(), AutAssignment(), {}, par), m{ m }, m_util_s{ m_util_s },
-        m_util_a{ m_util_a },
-        init_length_sensitive_vars{ },
-        formula { },
-        init_aut_ass{ },
-        m_params(par) {
-    }
-
     bool DecisionProcedure::compute_next_solution() {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
@@ -855,20 +846,6 @@ namespace smt::noodler {
         return res;
     }
 
-    /**
-     * @brief Set new instance for the decision procedure.
-     * 
-     * @param equalities Equalities
-     * @param init_aut_ass Initial automata assignment
-     * @param init_length_sensitive_vars Length sensitive vars
-     */
-    void DecisionProcedure::set_instance(const Formula &equalities, AutAssignment &init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        this->init_length_sensitive_vars = init_length_sensitive_vars;
-        this->formula = equalities;
-        this->init_aut_ass = init_aut_ass;
-        this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars, m_params);
-    }
-
     void DecisionProcedure::conv_str_lits_to_fresh_lits() {
         size_t counter{ 0 };
         std::map<zstring, zstring> str_literals{};
@@ -902,20 +879,5 @@ namespace smt::noodler {
             }
         }
     }
-
-    DecisionProcedure::DecisionProcedure(
-             const Formula &equalities, AutAssignment init_aut_ass,
-             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
-             const BasicTermEqiv& len_eq_vars,
-             const theory_str_noodler_params& par
-     ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par), m{ m }, m_util_s{ m_util_s },
-     m_util_a{ m_util_a },
-     init_length_sensitive_vars{ init_length_sensitive_vars },
-         formula { equalities },
-         init_aut_ass{ init_aut_ass },
-         m_params(par),
-         len_eq_vars{ len_eq_vars } {
-         }
 
 } // Namespace smt::noodler.

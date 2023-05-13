@@ -10,7 +10,7 @@ using namespace smt::noodler;
 
 static Mata::Nfa::Nfa regex_to_nfa(const std::string& regex) {
     Mata::Nfa::Nfa aut;
-    Mata::RE2Parser::create_nfa(&aut, regex);
+    Mata::Parser::create_nfa(&aut, regex);
     return aut;
 }
 
