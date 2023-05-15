@@ -435,6 +435,13 @@ namespace smt::noodler {
             handle_replace(n);
         } else if (m_util_s.str.is_index(n)) {
             handle_index_of(n);
+        } 
+        else if(m_util_s.str.is_prefix(n)) {
+            handle_prefix(n);
+            handle_not_prefix(n);
+        } else if(m_util_s.str.is_suffix(n)) {
+            handle_suffix(n);
+            handle_not_suffix(n);
         }
 
         expr *arg;
@@ -468,17 +475,19 @@ namespace smt::noodler {
         expr *e = ctx.bool_var2expr(v);
         expr *e1 = nullptr, *e2 = nullptr;
         if (m_util_s.str.is_prefix(e, e1, e2)) {
-            if (is_true) {
-                handle_prefix(e);
-            } else {
-                handle_not_prefix(e);
-            }
+            // if (is_true) {
+            //     handle_prefix(e);
+            // } else {
+            //     util::throw_error("unsupported predicate");
+            //     //handle_not_prefix(e);
+            // }
         } else if (m_util_s.str.is_suffix(e, e1, e2)) {
-            if (is_true) {
-                handle_suffix(e);
-            } else {
-                handle_not_suffix(e);
-            }
+            // if (is_true) {
+            //     handle_suffix(e);
+            // } else {
+            //     util::throw_error("unsupported predicate");
+            //     // handle_not_suffix(e);
+            // }
         } else if (m_util_s.str.is_contains(e, e1, e2)) {
             if (is_true) {
                 handle_contains(e);
@@ -1630,8 +1639,8 @@ namespace smt::noodler {
         expr_ref fresh = mk_str_var("prefix");
         expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
         string_theory_propagation(xs);
-        literal not_e = mk_literal(mk_not({e, m}));
-        add_axiom({not_e, mk_eq(y, xs, false)});
+        literal not_e = mk_literal(e);
+        add_axiom({~not_e, mk_eq(y, xs, false)});
     }
 
     /**
@@ -1646,10 +1655,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
-        axiomatized_persist_terms.insert(e);
+        axiomatized_persist_terms.insert(m.mk_not(e));
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1673,7 +1682,7 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pmxqx,false);
         literal y_eq_pmq = mk_eq(y,pmyqy,false);
-        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
@@ -1714,8 +1723,8 @@ namespace smt::noodler {
         expr_ref fresh = mk_str_var("suffix");
         expr_ref px(m_util_s.str.mk_concat(fresh, x), m);
         string_theory_propagation(px);
-        literal not_e = mk_literal(mk_not({e, m}));
-        add_axiom({not_e, mk_eq(y, px, false)});
+        literal not_e = mk_literal(e);
+        add_axiom({~not_e, mk_eq(y, px, false)});
     }
 
     /**
@@ -1730,10 +1739,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
-        axiomatized_persist_terms.insert(e);
+        axiomatized_persist_terms.insert(m.mk_not(e));
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1757,7 +1766,7 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pxmxq,false);
         literal y_eq_pmq = mk_eq(y,pymyq,false);
-        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
         literal lit_e = mk_literal(e);
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
