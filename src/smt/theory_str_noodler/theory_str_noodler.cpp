@@ -207,14 +207,14 @@ namespace smt::noodler {
 
             expr *ex = ctx.get_asserted_formula(i);
             ctx.mark_as_relevant(ex);
-            string_theory_propagation(ex);
+            string_theory_propagation(ex, true);
             
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
 
-    void theory_str_noodler::string_theory_propagation(expr *expr) {
+    void theory_str_noodler::string_theory_propagation(expr *expr, bool init) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
@@ -227,6 +227,10 @@ namespace smt::noodler {
         //fresh SAT solution by the newly added theory axioms.
         // enode *n = ctx.get_enode(expr);
         // ctx.mark_as_relevant(n);
+
+        if(init && m.is_eq(expr)) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -244,7 +248,7 @@ namespace smt::noodler {
             app *term = to_app(expr);
             unsigned num_args = term->get_num_args();
             for (unsigned i = 0; i < num_args; i++) {
-                string_theory_propagation(term->get_arg(i));
+                string_theory_propagation(term->get_arg(i), init);
             }
         }
 
@@ -435,13 +439,15 @@ namespace smt::noodler {
             handle_replace(n);
         } else if (m_util_s.str.is_index(n)) {
             handle_index_of(n);
-        } 
-        else if(m_util_s.str.is_prefix(n)) {
+        } else if(m_util_s.str.is_prefix(n)) {
             handle_prefix(n);
             handle_not_prefix(n);
         } else if(m_util_s.str.is_suffix(n)) {
             handle_suffix(n);
             handle_not_suffix(n);
+        } else if(m_util_s.str.is_contains(n)) {
+            handle_contains(n);
+            handle_not_contains(n);
         }
 
         expr *arg;
