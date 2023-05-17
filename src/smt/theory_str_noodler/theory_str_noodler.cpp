@@ -453,6 +453,12 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_contains(n)) {
             handle_contains(n);
             handle_not_contains(n);
+        } else if(m_util_s.str.is_replace_all(n)) {
+            util::throw_error("unsupported predicate");
+        } else if(m_util_s.str.is_replace_re_all(n)) {
+            util::throw_error("unsupported predicate");
+        } else if(m_util_s.str.is_replace_re(n)) {
+            util::throw_error("unsupported predicate");
         }
 
         expr *arg;
