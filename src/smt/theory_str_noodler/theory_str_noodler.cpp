@@ -34,7 +34,8 @@ namespace smt::noodler {
         m_util_a(m),
         m_util_s(m),
         state_len(),
-        m_length(m) {
+        m_length(m),
+        axiomatized_instances(m) {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -838,6 +839,12 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
+        // infinite loop prevention -- not sure if it is correct
+        if(this->axiomatized_instances.contains(construct_refinement())) {
+            block_curr_assignment();
+            return FC_CONTINUE;
+        }
+
         // use underapproximation to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
@@ -874,7 +881,9 @@ namespace smt::noodler {
         }
 
         // all len solutions are unsat, we block the current assignment
-        block_curr_len(block_len);
+        if(!block_curr_len(block_len)) {
+            return FC_CONTINUE;
+        }
         //block_curr_assignment();
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
@@ -1959,13 +1968,46 @@ namespace smt::noodler {
         }
 
         if (refinement != nullptr) {
-            add_block_axiom(refinement);
+            add_axiom(refinement);
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
+    expr_ref theory_str_noodler::construct_refinement() {
+        context& ctx = get_context();
+
+        ast_manager& m = get_manager();
+        expr *refinement = nullptr;
+        STRACE("str", tout << "[Refinement]\nformulas:\n";);
+        for (const auto& we : this->m_word_eq_todo_rel) {
+            // we create the equation according to we
+            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+        }
+
+        literal_vector ls;
+        for (const auto& wi : this->m_word_diseq_todo_rel) {
+//            expr *const e = mk_eq_atom(wi.first, wi.second);
+            expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+            //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
+        }
+
+        for (const auto& in : this->m_membership_todo_rel) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
+            if(!std::get<2>(in)){
+                in_app = m.mk_not(in_app);
+            }
+            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
+            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+        }
+
+        return expr_ref(refinement, m);
+    }
+
+    bool theory_str_noodler::block_curr_len(expr_ref len_formula) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         bool on_screen=false;
@@ -1998,11 +2040,17 @@ namespace smt::noodler {
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
 
+        std::cout << axiomatized_instances.size() << std::endl;
+        if(axiomatized_instances.contains(refinement)) {
+            return false;
+        }
+        axiomatized_instances.push_back(refinement);
+        std::cout << "::" << axiomatized_instances.size() << std::endl;
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
-
+        return true;
     }
 
     void theory_str_noodler::block_curr_lang() {

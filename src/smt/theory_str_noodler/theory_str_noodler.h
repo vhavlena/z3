@@ -67,6 +67,7 @@ namespace smt::noodler {
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
+        expr_ref_vector axiomatized_instances;
 
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
         obj_map<expr, unsigned> bool_var_int;
@@ -193,7 +194,8 @@ namespace smt::noodler {
         void handle_in_re(expr *e, bool is_true);
         void set_conflict(const literal_vector& ls);
         void block_curr_assignment();
-        void block_curr_len(expr_ref len_formula);
+        bool block_curr_len(expr_ref len_formula);
+        expr_ref construct_refinement();
         void block_curr_lang();
         void dump_assignments() const;
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
