@@ -430,9 +430,9 @@ namespace smt::noodler {
         if (m_util_s.str.is_extract(n)) {
             handle_substr(n);
         } else if (m_util_s.str.is_itos(n)) {
-            //handle_itos(n);
+            util::throw_error("unsupported itos");
         } else if (m_util_s.str.is_stoi(n)) {
-            //handle_stoi(n);
+            util::throw_error("unsupported stoi");
         } else if (m_util_s.str.is_at(n)) {
             handle_char_at(n);
         } else if (m_util_s.str.is_replace(n)) {
