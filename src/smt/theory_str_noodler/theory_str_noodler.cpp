@@ -2040,12 +2040,10 @@ namespace smt::noodler {
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
 
-        std::cout << axiomatized_instances.size() << std::endl;
         if(axiomatized_instances.contains(refinement)) {
             return false;
         }
         axiomatized_instances.push_back(refinement);
-        std::cout << "::" << axiomatized_instances.size() << std::endl;
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
