@@ -859,7 +859,7 @@ namespace smt::noodler {
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths, mod) == l_true) {
+            if(dec_proc.get_init_length_vars().size() == 0 || check_len_sat(lengths, mod) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                 return FC_DONE;
             }
