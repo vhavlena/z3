@@ -196,7 +196,7 @@ namespace smt::noodler {
         void block_curr_len(expr_ref len_formula);
         void block_curr_lang();
         void dump_assignments() const;
-        void string_theory_propagation(expr * ex, bool init = false);
+        void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
         void propagate_concat_axiom(enode * cat);
         void propagate_basic_string_axioms(enode * str);
         void tightest_prefix(expr*,expr*);

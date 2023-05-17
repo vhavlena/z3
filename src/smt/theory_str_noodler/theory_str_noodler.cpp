@@ -207,14 +207,14 @@ namespace smt::noodler {
 
             expr *ex = ctx.get_asserted_formula(i);
             ctx.mark_as_relevant(ex);
-            string_theory_propagation(ex, true);
+            string_theory_propagation(ex, true, false);
             
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
 
-    void theory_str_noodler::string_theory_propagation(expr *expr, bool init) {
+    void theory_str_noodler::string_theory_propagation(expr *expr, bool init, bool neg) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
@@ -228,7 +228,11 @@ namespace smt::noodler {
         // enode *n = ctx.get_enode(expr);
         // ctx.mark_as_relevant(n);
 
-        if(init && m.is_eq(expr)) {
+        if(m.is_not(expr)) {
+            neg = !neg;
+        }
+
+        if(init && m.is_eq(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
 
@@ -248,7 +252,7 @@ namespace smt::noodler {
             app *term = to_app(expr);
             unsigned num_args = term->get_num_args();
             for (unsigned i = 0; i < num_args; i++) {
-                string_theory_propagation(term->get_arg(i), init);
+                string_theory_propagation(term->get_arg(i), init, neg);
             }
         }
 
