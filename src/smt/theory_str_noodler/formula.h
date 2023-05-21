@@ -105,13 +105,9 @@ namespace smt::noodler {
             }
         };
 
-
-        // if type == Literal, this zstring contains its value, but only if the value is not already in name
-        // FIXME: super ugly, we need to redesign this, this is just a quick fix so we can rename literals for decision procedure
-        zstring literal_value;
-
     private:
         BasicTermType type;
+        // name of the variable, or the given literal
         zstring name;
     }; // Class BasicTerm.
 

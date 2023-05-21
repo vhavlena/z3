@@ -757,9 +757,8 @@ namespace smt::noodler {
      * @brief Preprocessing.
      */
     void DecisionProcedure::preprocess(PreprocessType opt) {
-        // As a first preprocessing operation, convert string literals to fresh variables with automata assignment
-        //  representing their string literal.
-        conv_str_lits_to_fresh_lits();
+        // As a first add string literals to the automata assignment with automaton representing their string literal.
+        add_str_lits_to_init_aut_ass();
         this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
         // So-far just lightweight preprocessing
@@ -869,38 +868,24 @@ namespace smt::noodler {
         this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars, m_params);
     }
 
-    void DecisionProcedure::conv_str_lits_to_fresh_lits() {
+    void DecisionProcedure::add_str_lits_to_init_aut_ass() {
         size_t counter{ 0 };
         std::map<zstring, zstring> str_literals{};
         for (auto& predicate : formula.get_predicates()) {
             if (predicate.is_eq_or_ineq()) {
-                conv_str_lits_to_fresh_lits_for_side(predicate.get_left_side(), counter, str_literals);
-                conv_str_lits_to_fresh_lits_for_side(predicate.get_right_side(), counter, str_literals);
+                add_str_lits_to_init_aut_ass_for_side(predicate.get_left_side());
+                add_str_lits_to_init_aut_ass_for_side(predicate.get_right_side());
             }
         }
     }
 
-    void DecisionProcedure::conv_str_lits_to_fresh_lits_for_side(
-        std::vector<BasicTerm>& side, size_t& fresh_lits_counter, std::map<zstring, zstring>& converted_str_literals) {
-        constexpr char name_prefix[]{ "fresh_str_lit_" };
+    void DecisionProcedure::add_str_lits_to_init_aut_ass_for_side(std::vector<BasicTerm>& side) {
         for (auto& term : side) {
             if (term.is_literal()) { // Handle string literal.
-                BasicTerm fresh_literal{ BasicTermType::Literal };
-                auto fresh_literal_iter{ converted_str_literals.find(term.get_name()) };
-                // keep the value of literal, so that we can still use it
-                fresh_literal.literal_value = term.get_name();
-                if (fresh_literal_iter != converted_str_literals.end()) {
-                    fresh_literal.set_name(fresh_literal_iter->second);
-                } else {
-                    std::string fresh_name{ name_prefix + std::to_string(fresh_lits_counter) };
-                    fresh_literal.set_name(fresh_name);
-                    ++fresh_lits_counter;
+                if (init_aut_ass.find(term) == init_aut_ass.end()) {
                     Nfa nfa{ util::create_word_nfa(term.get_name()) };
-                    init_aut_ass.emplace(fresh_literal, std::make_shared<Nfa>(std::move(nfa)));
-                    converted_str_literals.emplace(term.get_name(), fresh_name);
+                    init_aut_ass.emplace(term, std::make_shared<Nfa>(std::move(nfa)));
                 }
-
-                term = fresh_literal;
             }
         }
     }
