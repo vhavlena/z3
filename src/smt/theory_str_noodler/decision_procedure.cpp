@@ -887,6 +887,8 @@ namespace smt::noodler {
             if (term.is_literal()) { // Handle string literal.
                 BasicTerm fresh_literal{ BasicTermType::Literal };
                 auto fresh_literal_iter{ converted_str_literals.find(term.get_name()) };
+                // keep the value of literal, so that we can still use it
+                fresh_literal.literal_value = term.get_name();
                 if (fresh_literal_iter != converted_str_literals.end()) {
                     fresh_literal.set_name(fresh_literal_iter->second);
                 } else {

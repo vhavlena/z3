@@ -255,7 +255,15 @@ namespace smt::noodler::util {
         case LenFormulaType::LEAF:
             if(node.atom_val.get_type() == BasicTermType::Length)
                 return expr_ref(m_util_a.mk_int(std::stoi(node.atom_val.get_name().encode())), m);
-            else {
+            else if (node.atom_val.get_type() == BasicTermType::Literal) {
+                // for literal, get the exact length of it
+                // the value of literal can be in literal_value, but also in name (if it is empty)
+                if (node.atom_val.literal_value.length() > 0) {
+                    return expr_ref(m_util_a.mk_int(node.atom_val.literal_value.length()), m);
+                } else {
+                    return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
+                }
+            } else {
                 auto it = variable_map.find(node.atom_val);
                 expr_ref var_expr(m);
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
