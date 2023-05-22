@@ -35,7 +35,7 @@ namespace smt::noodler {
         m_util_s(m),
         state_len(),
         m_length(m),
-        axiomatized_instances(m) {
+        axiomatized_instances() {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -848,8 +848,14 @@ namespace smt::noodler {
         // infinite loop prevention -- not sure if it is correct
         expr_ref refine = construct_refinement();
         if(this->axiomatized_instances.contains(refine)) {
-            block_curr_assignment();
-            return FC_CONTINUE;
+            if(this->axiomatized_instances[refine] > 1) {
+                block_curr_assignment();
+                return FC_CONTINUE;
+            } else {
+                this->axiomatized_instances[refine] += 1;
+            }
+        } else {
+            this->axiomatized_instances.insert(refine, 1);
         }
 
         // use underapproximation to solve
@@ -2053,10 +2059,10 @@ namespace smt::noodler {
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
 
-        if(axiomatized_instances.contains(refinement)) {
-            return false;
-        }
-        axiomatized_instances.push_back(refinement);
+        // if(axiomatized_instances.contains(refinement)) {
+        //     return false;
+        // }
+        // axiomatized_instances.push_back(refinement);
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
