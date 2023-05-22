@@ -1969,6 +1969,9 @@ namespace smt::noodler {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
             if(std::get<2>(in)){
                 in_app = m.mk_not(in_app);
+                if(!ctx.e_internalized(in_app)) {
+                    ctx.internalize(in_app, false);
+                }
             }
             refinement = refinement == nullptr ? in_app : m.mk_or(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
