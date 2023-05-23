@@ -21,6 +21,31 @@ reimplementation of the Python prototype presented in [Word Equations in Synergy
 process,
 similarly to the automata library Mata.
 
+### Core Algorithm
+
+The core of Z3-Noodler is the stabilisation algorithm that solves word equations combined with regular membership 
+constraints. In a nutshell, a word equation $`x_1...x_m = x_{m+1}...x_n`$ and a set of regular membership 
+constraints $`x \in L_x`$ are said to be stable if the concatenation of the languages on the left, $`L_{x_1}...L_{x_m}`$
+, is equal to the concatenation of the languages on the right, $`L_{x_{m+1}}...L_{x_n}`$. Such stable system has a 
+solution. The stabilisation algorithm uses extensions of classical nondeterministic automata constructions, 
+implemented in Mata, to refine the languages until stability is achieved or some of the languages becomes empty, indicating unsatisfiability. The strength of the stabilisation algorithm is that it makes a good use of symbolic automata representation of equations, it does not require equation splitting (enumerating alignments of the left and right hand side), and it eliminates much of redundant automata constructions needed for instance in [3] and derived approaches. It leverages the efficiency of Mata (efficiency of an early prototype of Mata has been measured in [4]). The core solver combines the stabilisation algorithm with the older equation alignment and automata splitting of [3] in order to derive LIA formulae characterising lengths of strings solutions. As alignment and splitting is more expensive, it is used only when it is necessary to isolate a string variable involved in length constraints from word equations. The algorithm is complete for the chain-free combinations of equations, regular constraints, and LIA over string lengths, a largest known decidable fragment of these types of constraints, introduced in [5].
+
+
+### High level architecture and differences from Z3
+
+The core string solving algorithm replaces the string theory solver of Z3. Z3-Noodler still uses the infrastructure 
+of Z3 and the theory rewriter. However, since the core string solver is quite different from the original Z3 string 
+solver, some of the rewritings are undesired and we disable them. For instance, we remove rules that rewrite regular 
+membership constraints to other types of constraints (as solving them in our approach is very efficient), and we 
+eliminate rewriting rules that produce if-then-else predicates, not supported by the core string solver. The 
+interaction of the core solver with Z3 is organized as follows. Upon receiving a satisfying assignment from the 
+SAT-solver (a conjunction of string literals), the core string solver reduces the string conjunction to a LIA constraint over string lengths, and returns it to Z3 as theory lemma, to be solved together with the rest of the input arithmetic constraints by the Z3’s internal LIA solver. As an optimization of this process, when the string constraint reduces into a disjunction of LIA length constraints, then each disjunct is passed to Z3 individually: the current solver context is cloned and queried about satisfiability of the LIA constraint conjoined with the disjunct. The disjuncts are generated lazily on demand.
+
+### Preprocessing
+The core string solver uses a set of simple rewriting rules that infer length constraints form equations (such as $`|x| = 0`$ when $`x`$ must be the empty string or $`|x| + |y| = |u| + |v|`$ for an equation $`xy = uv`$), eliminate trivial equations such as $`x = y`$, simplify equations when a string variables is known to equal the empty string, transform equations to regular membership constraint when possible ($`x = uv`$ becomes $`x \in L_u . L_v`$ if $`u`$, $`v`$ do not appear elsewhere and are constraint by the languages $`L_u`$ and $`L_v`$, respectively),
+and simplify equations such as $`xyz = xuz`$ into $`y = u`$.
+Besides the semantics preserving rewriting rules, we use one under-approximating rule that replaces a membership of a variable in a co-finite language by a length constraint that excludes all the lengths of words outside the language.
+
 ## Differences from Z3
 
 ## Supported features and limitations
