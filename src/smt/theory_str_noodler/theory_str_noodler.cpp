@@ -410,10 +410,10 @@ namespace smt::noodler {
                 rhs = m.mk_eq(a_str, empty_str);
                 ctx.internalize(rhs, false);
                 ctx.internalize(lhs, false);
-                ctx.mark_as_relevant(rhs.get());
+                // ctx.mark_as_relevant(rhs.get());
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
-                add_block_axiom(m.mk_or(m.mk_not(lhs), rhs));
+                add_axiom(m.mk_or(m.mk_not(lhs), rhs));
             }
 
         }
