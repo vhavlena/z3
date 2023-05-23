@@ -1,11 +1,8 @@
 # Z3-Noodler
 
-## Description
-
-Z3-Noodler is a string solver that targets string constraints such as those which occur at analysis of programs, 
-regular filters, policy escriptions, etc. Z3-Noodler is based on SMT solver [Z3](https://github.com/Z3Prover/z3) in which it replaces the solver 
+Z3-Noodler is an SMT solver for string constraints such as those which occur at symbolic execution and analysis of programs, 
+regular filters, policy description, etc. Z3-Noodler is based on the SMT solver [Z3](https://github.com/Z3Prover/z3), in which it replaces the solver 
 for the theory of strings. 
-Z3-Noodler utilises an automata library [Mata](https://github.com/VeriFIT/mata/). 
 The core of the string solver relies on equation stabilisation algorithm from article
 [Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).
 
@@ -13,9 +10,18 @@ For a brief overview of the algorithm, see [SMT-comp23 Z3-Noodler description](d
 
 [//]: # (TODO: Write the following paragraphs. ## Differences from Z3 ## Supported features and limitations)
 
-## Building and running Z3-Noodler
+## Building and running
 
-Z3-Noodler is a part of Z3. Henceforth, you need to build Z3 first. Afterward, you select Z3-Noodler string solver when running Z3.
+### Dependencies
+
+* The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata.
+
+```shell
+git clone 'https://github.com/VeriFIT/mata.git'
+cd mata
+make release
+make install
+```
 
 ### Building Z3-Noodler
 
