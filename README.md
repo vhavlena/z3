@@ -9,7 +9,7 @@ Z3-Noodler utilises an automata library [Mata](https://github.com/VeriFIT/mata/)
 The core of the string solver relies on equation stabilisation algorithm from article
 [Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).
 
-For a brief overview of the algorithm, see [SMT-comp23 Z3-Noodler description](#doc/noodler/z3-noodler_systems-description.pdf).
+For a brief overview of the algorithm, see [SMT-comp23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
 
 [//]: # (TODO: Write the following paragraphs. ## Differences from Z3 ## Supported features and limitations)
 
@@ -19,12 +19,11 @@ Z3-Noodler is a part of Z3. Henceforth, you need to build Z3 first. Afterward, y
 
 ### Building Z3-Noodler
 
-To build Z3-Noodler, simply build the whole Z3 following the instructions for [CMake][cmake] (preferred), or [make]
-[make].
+To build Z3-Noodler, simply build the whole Z3 following the instructions for [CMake][cmake] (preferred), or [make][make].
 
-[visual_studio]: #building-z3-on-windows-using-visual-studio-command-prompt
-[make]: #building-z3-using-make-and-gccclang
-[cmake]: #building-z3-using-cmake
+[visual_studio]: README-Z3.md#building-z3-on-windows-using-visual-studio-command-prompt
+[make]: README-Z3.md#building-z3-using-make-and-gccclang
+[cmake]: README-Z3.md#building-z3-using-cmake
 
 To build tests for Z3-Noodler, build Z3 as described above, only when executing `make` command, run the following 
 command instead.
