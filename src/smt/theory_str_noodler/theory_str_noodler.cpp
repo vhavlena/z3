@@ -411,6 +411,7 @@ namespace smt::noodler {
                 ctx.internalize(rhs, false);
                 ctx.internalize(lhs, false);
                 // ctx.mark_as_relevant(rhs.get());
+                // ctx.mark_as_relevant(lhs.get());
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
                 add_axiom(m.mk_or(m.mk_not(lhs), rhs));
@@ -850,8 +851,8 @@ namespace smt::noodler {
         expr_ref refine = construct_refinement();
         if(this->axiomatized_instances.contains(refine)) {
             if(this->axiomatized_instances[refine] > 1) {
-                block_curr_assignment();
-                return FC_CONTINUE;
+                // block_curr_assignment();
+                return FC_DONE;
             } else {
                 this->axiomatized_instances[refine] += 1;
             }
