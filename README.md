@@ -90,6 +90,13 @@ make
 /root/z3-noodler/build/z3 smt.string_solver="noodler" <path/to/instance.smt2>
 ```
 
+## Z3-Noodler source files
+
+String solver Z3-Noodler is implemented in [src/smt/theory_str_noodler](src/smt/theory_str_noodler) as a smt 
+theory for strings inside Z3.
+
+Tests for Z3-Noodler are located in [src/test/noodler](src/test/noodler).
+
 ## Authors
 
 - Yu-Fang Chen ([guluchen](https://github.com/guluchen))
