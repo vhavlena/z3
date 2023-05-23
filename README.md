@@ -21,11 +21,43 @@ reimplementation of the Python prototype presented in [Word Equations in Synergy
 process,
 similarly to the automata library Mata.
 
-## Building and Running Z3-Noodler
-### Building Z3-Noodler
-### Running Z3-Noodler
+## Differences from Z3
 
-### Building and Running Z3-Noodler on Starexec VM
+## Supported features and limitations
+
+
+## Building and running Z3-Noodler
+
+Z3-Noodler is a part of Z3. Henceforth, you need to build Z3 first. Afterward, you select Z3-Noodler string solver when running Z3.
+
+### Building Z3-Noodler
+
+To build Z3-Noodler, simply build the whole Z3 following the instructions for [CMake][3] (preferred), or [make][2].
+
+[1]: #building-z3-on-windows-using-visual-studio-command-prompt
+[2]: #building-z3-using-make-and-gccclang
+[3]: #building-z3-using-cmake
+
+To build tests for Z3-Noodler, build Z3 as described above, only when executing `make` command, run the following 
+command instead.
+```shell
+make test-noodler
+```
+
+### Running Z3-Noodler
+To run Z3-Noodler, select Z3-Noodler as the requested string solver for the current run.
+```shell
+cd build/
+./z3 smt.string_solver="noodler" <instance_file.smt2> 
+```
+
+To run tests for Z3-Noodler, execute
+```shell
+cd build/
+./test-noodler
+```
+
+### Building and running Z3-Noodler on Starexec VM
 
 1. The VM:
 ```
@@ -70,117 +102,15 @@ make
 /root/z3-noodler/build/z3 smt.string_solver="noodler" <path/to/instance.smt2>
 ```
 
-## changes from base z3
+## Authors
 
-## currently supported / limitations
-
-## authors
+- Yu-Fang Chen ([guluchen](https://github.com/guluchen))
+- David Chocholatý ([Adda0](https://github.com/Adda0)),
+- Vojtěch Havlena ([vhavlena](https://github.com/vhavlena/)),
+- Lukáš Holík ([kilohsakul](https://github.com/kilohsakul)),
+- Ondřej Lengál ([ondrik](https://github.com/ondrik)),
+- Juraj Síč ([jurajsic](https://github.com/jurajsic)).
 
 ## Original Z3 README
 
-For the original Z3 README see [README-Z3].
-
-[README-Z3]: #README-Z3.md
-
-Z3 can be built using [Visual Studio][1], a [Makefile][2] or using [CMake][3]. It provides
-[bindings for several programming languages][4].
-
-See the [release notes](RELEASE_NOTES.md) for notes on various stable releases of Z3.
-
-[1]: #building-z3-on-windows-using-visual-studio-command-prompt
-[2]: #building-z3-using-make-and-gccclang
-[3]: #building-z3-using-cmake
-[4]: #z3-bindings
-
-## Building Z3 on Windows using Visual Studio Command Prompt
-
-32-bit builds, start with:
-
-```bash
-python scripts/mk_make.py
-```
-
-or instead, for a 64-bit build:
-
-```bash
-python scripts/mk_make.py -x
-```
-
-then:
-
-```bash
-cd build
-nmake
-```
-
-Z3 uses C++17. The recommended version of Visual Studio is therefore VS2019.
-
-## Building Z3 using make and GCC/Clang
-
-Execute:
-
-```bash
-python scripts/mk_make.py
-cd build
-make
-sudo make install
-```
-
-Note by default ``g++`` is used as the C++ compiler if it is available. If you
-would prefer to use Clang change the ``mk_make.py`` invocation to:
-
-```bash
-CXX=clang++ CC=clang python scripts/mk_make.py
-```
-
-Note that Clang < 3.7 does not support OpenMP.
-
-You can also build Z3 for Windows using Cygwin and the Mingw-w64 cross-compiler.
-To configure that case correctly, make sure to use Cygwin's own python and not
-some Windows installation of Python.
-
-For a 64 bit build (from Cygwin64), configure Z3's sources with
-```bash
-CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar python scripts/mk_make.py
-```
-A 32 bit build should work similarly (but is untested); the same is true for 32/64 bit builds from within Cygwin32.
-
-By default, it will install z3 executable at ``PREFIX/bin``, libraries at
-``PREFIX/lib``, and include files at ``PREFIX/include``, where ``PREFIX``
-installation prefix is inferred by the ``mk_make.py`` script. It is usually
-``/usr`` for most Linux distros, and ``/usr/local`` for FreeBSD and macOS. Use
-the ``--prefix=`` command line option to change the install prefix. For example:
-
-```bash
-python scripts/mk_make.py --prefix=/home/leo
-cd build
-make
-make install
-```
-
-To uninstall Z3, use
-
-```bash
-sudo make uninstall
-```
-
-To clean Z3 you can delete the build directory and run the ``mk_make.py`` script again.
-
-## Building Z3 using CMake
-
-Z3 has a build system using CMake. Read the [README-CMake.md](README-CMake.md)
-file for details. It is recommended for most build tasks,
-except for building OCaml bindings.
-
-## Building Z3 using vcpkg
-
-vcpkg is a full platform package manager, you can easily install libzmq with vcpkg.
-
-Execute:
-
-```bash
-git clone https://github.com/microsoft/vcpkg.git
-./bootstrap-vcpkg.bat # For powershell
-./bootstrap-vcpkg.sh # For bash
-./vcpkg install z3
-```
+For the original Z3 README, see [README-Z3.md](README-Z3.md).
