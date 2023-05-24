@@ -38,7 +38,7 @@ See [instructions for building Z3][cmake] for more details.
 [make]: README-Z3.md#building-z3-using-make-and-gccclang
 [cmake]: README-Z3.md#building-z3-using-cmake
 
-To build tests for Z3-Noodler and run the following 
+To build tests for Z3-Noodler, run the following 
 command.
 ```shell
 make test-noodler
