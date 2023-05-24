@@ -1,12 +1,13 @@
 # Z3-Noodler
 
-Z3-Noodler is an SMT solver for string constraints such as those which occur at symbolic execution and analysis of programs, 
-regular filters, policy description, etc. Z3-Noodler is based on the SMT solver [Z3](https://github.com/Z3Prover/z3), in which it replaces the solver 
-for the theory of strings. 
-The core of the string solver relies on equation stabilisation algorithm from article
-[Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).
+Z3-Noodler is an SMT solver for string constraints such as those that occur in symbolic execution and analysis of programs, 
+reasoning about configuration files of cloud services and smart contracts, etc.
+Z3-Noodler is based on the SMT solver [Z3](https://github.com/Z3Prover/z3), in which it replaces the solver for the theory of strings. 
+The core of the string solver relies on the equation stabilization algorithm from the paper
 
-For a brief overview of the algorithm, see [SMT-comp23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
+> F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, Lübeck, Germany, volume 14000 of LNCS, pages 403–423, 2023. Springer-Verlag.
+
+For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
 
 [//]: # (TODO: Write the following paragraphs. ## Differences from Z3 ## Supported features and limitations)
 
