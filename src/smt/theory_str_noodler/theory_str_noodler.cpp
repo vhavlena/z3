@@ -849,15 +849,17 @@ namespace smt::noodler {
 
         // infinite loop prevention -- not sure if it is correct
         expr_ref refine = construct_refinement();
-        if(this->axiomatized_instances.contains(refine)) {
-            if(this->axiomatized_instances[refine] > 1) {
-                block_curr_assignment();
-                return FC_CONTINUE;
+        if(refine != nullptr) {
+            if(this->axiomatized_instances.contains(refine)) {
+                if(this->axiomatized_instances[refine] > 1) {
+                    block_curr_assignment();
+                    return FC_CONTINUE;
+                } else {
+                    this->axiomatized_instances[refine] += 1;
+                }
             } else {
-                this->axiomatized_instances[refine] += 1;
+                this->axiomatized_instances.insert(refine, 1);
             }
-        } else {
-            this->axiomatized_instances.insert(refine, 1);
         }
 
         // use underapproximation to solve
