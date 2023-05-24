@@ -57,7 +57,20 @@ cd build/
 ./test-noodler
 ```
 
-### Building and running on Starexec VM
+## Limitations
+The following functions/predicates of the SMTLIB theory `Strings` are not supported at the moment.
+```
+str.replace_all
+str.replace_re
+str.replace_re_all
+str.is_digit
+str.to_code
+str.from_code
+str.to_int
+str.from_int
+```
+
+## Building and running on Starexec VM
 
 1. The VM:
 ```
