@@ -9,7 +9,7 @@ The core of the string solver relies on the equation stabilization algorithm fro
 
 For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
 
-[//]: # (TODO: Write the following paragraphs. ## Differences from Z3 ## Supported features and limitations)
+[//]: # (TODO: Write the following paragraphs. ## Differences from Z3)
 
 ## Building and running
 
@@ -69,6 +69,8 @@ str.from_code
 str.to_int
 str.from_int
 ```
+
+We provide a full support for `str.contains`, but a limited support for its negated version.
 
 ## Building and running on Starexec VM
 
