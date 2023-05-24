@@ -16,7 +16,6 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
 ### Dependencies
 
 * The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata.
-
 ```shell
 git clone 'https://github.com/VeriFIT/mata.git'
 cd mata
