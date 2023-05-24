@@ -61,9 +61,9 @@ namespace smt::noodler {
             return r;
         }
 
-        void initialize(context& ctx) {
+        void initialize(context& ctx, bool include_ass = true) {
             bool on_screen =false;
-            bool include_ass = true;
+            // bool include_ass = true;
             if(!initialized){
                 initialized=true;
                 expr_ref_vector Assigns(m),Literals(m);

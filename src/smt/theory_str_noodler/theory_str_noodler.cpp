@@ -851,8 +851,8 @@ namespace smt::noodler {
         expr_ref refine = construct_refinement();
         if(this->axiomatized_instances.contains(refine)) {
             if(this->axiomatized_instances[refine] > 1) {
-                // block_curr_assignment();
-                return FC_DONE;
+                block_curr_assignment();
+                return FC_CONTINUE;
             } else {
                 this->axiomatized_instances[refine] += 1;
             }
@@ -2325,7 +2325,12 @@ namespace smt::noodler {
      */
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-        m_int_solver.initialize(get_context());
+        // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
+        bool include_ass = true;
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0) {
+            include_ass = false;
+        }
+        m_int_solver.initialize(get_context(), include_ass);
         auto ret = m_int_solver.check_sat(len_formula);
         return ret;
     }
