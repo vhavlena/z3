@@ -124,13 +124,12 @@ The string solver of Z3-Noodler is implemented in [src/smt/theory_str_noodler](s
 Tests for Z3-Noodler are located in [src/test/noodler](src/test/noodler).
 
 ## Authors
-
-- Yu-Fang Chen ([guluchen](https://github.com/guluchen))
-- David Chocholatý ([Adda0](https://github.com/Adda0)),
-- Vojtěch Havlena ([vhavlena](https://github.com/vhavlena/)),
-- Lukáš Holík ([kilohsakul](https://github.com/kilohsakul)),
-- Ondřej Lengál ([ondrik](https://github.com/ondrik)),
-- Juraj Síč ([jurajsic](https://github.com/jurajsic)).
+- [Yu-Fang Chen](mailto:yfc@iis.sinica.edu.tw?subject=[GitHub]%20Z3-Noodler),
+- [David Chocholatý](mailto:xchoch08@stud.fit.vutbr.cz?subject=[GitHub]%20Z3-Noodler),
+- [Vojtěch Havlena](mailto:ihavlena@fit.vut.cz?subject=[GitHub]%20Z3-Noodler),
+- [Lukáš Holík](mailto:holik@fit.vut.cz?subject=[GitHub]%20Z3-Noodler),
+- [Ondřej Lengál](mailto:lengal@fit.vut.cz?subject=[GitHub]%20Z3-Noodler),
+- [Juraj Síč](mailto:sicjuraj@fit.vut.cz?subject=[GitHub]%20Z3-Noodler).
 
 ## Original Z3 README
 
