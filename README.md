@@ -7,6 +7,8 @@ The core of the string solver relies on the equation stabilization algorithm fro
 
 > F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, Lübeck, Germany, volume 14000 of LNCS, pages 403–423, 2023. Springer-Verlag.
 
+Z3-Noodler utilizes the automata library [Mata](https://github.com/VeriFIT/mata/) for efficient representation of automata and their processing.
+
 For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
 
 [//]: # (TODO: Write the following paragraphs. ## Differences from Z3)
