@@ -15,7 +15,7 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
 
 ### Dependencies
 
-* The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata.
+1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata.
     ```shell
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
@@ -25,20 +25,27 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
 
 ### Building Z3-Noodler
 
-To build Z3-Noodler, simply build the whole Z3 following the instructions for [CMake][cmake] (preferred), or [make][make].
+```shell
+git clone 'https://github.com/VeriFIT/z3-noodler.git'
+mkdir z3-noodler/build
+cd z3-noodler/build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
+```
+See [instructions for building Z3][cmake] for more details.
 
 [visual_studio]: README-Z3.md#building-z3-on-windows-using-visual-studio-command-prompt
 [make]: README-Z3.md#building-z3-using-make-and-gccclang
 [cmake]: README-Z3.md#building-z3-using-cmake
 
-To build tests for Z3-Noodler, build Z3 as described above, only when executing `make` command, run the following 
-command instead.
+To build tests for Z3-Noodler and run the following 
+command.
 ```shell
 make test-noodler
 ```
 
 ### Running Z3-Noodler
-To run Z3-Noodler, select Z3-Noodler as the requested string solver for the current run.
+To run Z3-Noodler, select Z3-Noodler as Z3's string solver when executing Z3.
 ```shell
 cd build/
 ./z3 smt.string_solver="noodler" <instance_file.smt2> 
@@ -50,7 +57,7 @@ cd build/
 ./test-noodler
 ```
 
-### Building and running Z3-Noodler on Starexec VM
+### Building and running on Starexec VM
 
 1. The VM:
 ```
@@ -97,8 +104,7 @@ make
 
 ## Z3-Noodler source files
 
-String solver Z3-Noodler is implemented in [src/smt/theory_str_noodler](src/smt/theory_str_noodler) as a smt 
-theory for strings inside Z3.
+The string solver of Z3-Noodler is implemented in [src/smt/theory_str_noodler](src/smt/theory_str_noodler).
 
 Tests for Z3-Noodler are located in [src/test/noodler](src/test/noodler).
 
