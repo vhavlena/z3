@@ -518,10 +518,12 @@ namespace smt::noodler::util {
                 // if high is set, we repeat body_nfa another high-low times
                 body_nfa.unify_initial();
                 body_nfa = Mata::Nfa::reduce(body_nfa);
+                nfa.unify_initial();
+                nfa = Mata::Nfa::reduce(nfa);
                 for (unsigned i = 0; i < high - low; ++i) {
-                    nfa = Mata::Nfa::concatenate(nfa, body_nfa);
-                    nfa = Mata::Nfa::reduce(nfa);
+                    nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
                 }
+                nfa = Mata::Nfa::remove_epsilon(nfa);
             } else {
                 // if high is not set, we can repeat body_nfa unlimited more times
                 // so we do star operation on body_nfa and add it to end of nfa
