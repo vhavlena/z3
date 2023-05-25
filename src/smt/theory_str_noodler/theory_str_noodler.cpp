@@ -2062,6 +2062,9 @@ namespace smt::noodler {
             if(!std::get<2>(in)){
                 in_app = m.mk_not(in_app);
             }
+            if(!ctx.e_internalized(in_app)) {
+                ctx.internalize(in_app, false);
+            }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
