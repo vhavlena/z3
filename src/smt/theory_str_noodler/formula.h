@@ -151,8 +151,45 @@ namespace smt::noodler {
 
         LenNode(LenFormulaType tp, BasicTerm val, std::vector<struct LenNode> s) : type(tp), atom_val(val), succ(s) { };
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
-
     };
+
+    static std::ostream& operator<<(std::ostream& os, const LenNode& node) {
+        switch (node.type)
+        {
+        case LenFormulaType::PLUS:
+            os << "(+ " << node.succ[0] << " " << node.succ[1] << ")";
+            break;
+        case LenFormulaType::EQ:
+            os << "(= " << node.succ[0] << " " << node.succ[1] << ")";
+            break;
+        case LenFormulaType::NOT:
+            os << "(not " << node.succ[0] << ")";
+            break;
+        case LenFormulaType::LEQ:
+            os << "(<= " << node.succ[0] << " " << node.succ[1] << ")";
+            break;
+        case LenFormulaType::LEAF:
+            os << node.atom_val.get_name();
+            break;
+        case LenFormulaType::AND:
+            os << "(and";
+            for (const auto &succ_node : node.succ) {
+                os << " " << succ_node;
+            }
+            os << ")";
+            break;
+        case LenFormulaType::TRUE:
+            os << "true";
+            break;
+        case LenFormulaType::FALSE:
+            os << "false";
+            break;
+        
+        default:
+            break;
+        }
+        return os;
+    }
 
     //----------------------------------------------------------------------------------------------------------------------------------
 

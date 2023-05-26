@@ -29,7 +29,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('y')] = regex_to_nfa("a*");
         init_ass[get_var('z')] = regex_to_nfa("b");
         init_ass[get_var('u')] = regex_to_nfa("b*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -43,7 +43,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('y')] = regex_to_nfa("a*");
         init_ass[get_var('z')] = regex_to_nfa("a*");
         init_ass[get_var('u')] = regex_to_nfa("a*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(proc.compute_next_solution());
     }
@@ -56,7 +56,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('x')] = regex_to_nfa("a*");
         init_ass[get_var('y')] = regex_to_nfa("a+b+");
         init_ass[get_var('z')] = regex_to_nfa("b*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -70,7 +70,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('y')] = regex_to_nfa("a*");
         init_ass[get_var('z')] = regex_to_nfa("b");
         init_ass[get_var('u')] = regex_to_nfa("b*");
-        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -84,7 +84,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('y')] = regex_to_nfa("a*");
         init_ass[get_var('z')] = regex_to_nfa("a*");
         init_ass[get_var('u')] = regex_to_nfa("a*");
-        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(proc.compute_next_solution());
         CHECK(proc.compute_next_solution());
@@ -100,7 +100,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('y')] = regex_to_nfa("ab*");
         init_ass[get_var('z')] = regex_to_nfa("ab*");
         init_ass[get_var('u')] = regex_to_nfa("a*");
-        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
 
         REQUIRE(proc.compute_next_solution());
@@ -131,7 +131,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('z')] = regex_to_nfa("b");
         init_ass[get_var('u')] = regex_to_nfa("b*");
         init_ass[get_var('r')] = regex_to_nfa("a*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -146,7 +146,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('z')] = regex_to_nfa("a*");
         init_ass[get_var('u')] = regex_to_nfa("(a|b)*");
         init_ass[get_var('r')] = regex_to_nfa("aaa");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(proc.compute_next_solution());
     }
@@ -161,7 +161,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('z')] = regex_to_nfa("b");
         init_ass[get_var('u')] = regex_to_nfa("b*");
         init_ass[get_var('r')] = regex_to_nfa("a*");
-        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -178,7 +178,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         init_ass[get_var('r')] = regex_to_nfa("ab*a");
         DecisionProcedureCUT proc(equalities, init_ass, {
             BasicTerm(BasicTermType::Variable, "x"),
-            BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, noodler_params);
+            BasicTerm(BasicTermType::Variable, "z") }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
 
         REQUIRE(proc.compute_next_solution());
@@ -234,7 +234,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
                 BasicTerm(BasicTermType::Variable, "x"),
                 BasicTerm(BasicTermType::Variable, "z"),
                 BasicTerm(BasicTermType::Variable, "r") },
-            m, m_util_s, m_util_a, noodler_params);
+            m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
 
         REQUIRE(proc.compute_next_solution());
@@ -253,7 +253,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         // equalities.add_predicate(create_equality("yx", "r"));
         AutAssignment init_ass;
         init_ass[get_var('x')] = regex_to_nfa("aa?b*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(!proc.compute_next_solution());
     }
@@ -264,7 +264,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         // equalities.add_predicate(create_equality("yx", "r"));
         AutAssignment init_ass;
         init_ass[get_var('x')] = regex_to_nfa("a*b*");
-        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, noodler_params);
+        DecisionProcedureCUT proc(equalities, init_ass, { }, m, m_util_s, m_util_a, {}, noodler_params);
         proc.init_computation();
         CHECK(proc.compute_next_solution());
     }

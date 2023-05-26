@@ -94,15 +94,6 @@ namespace smt::noodler {
         return result;
     }
 
-    DecisionProcedure::DecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par) 
-        : prep_handler(Formula(), AutAssignment(), {}, par), m{ m }, m_util_s{ m_util_s },
-        m_util_a{ m_util_a },
-        init_length_sensitive_vars{ },
-        formula { },
-        init_aut_ass{ },
-        m_params(par) {
-    }
-
     bool DecisionProcedure::compute_next_solution() {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
@@ -814,6 +805,15 @@ namespace smt::noodler {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
+        STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
+        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
+        STRACE("str",
+            tout << "Disequation formulas after preprocessing:" << std::endl;
+            for (const auto &bla : prep_handler.get_diseq_len()) {
+                bla.first.first.get_name();
+                tout << "     " << bla.second.second << " || (" << bla.second.first << " && " << bla.first.first.get_name() << " != " << bla.first.second.get_name() << ")" << std::endl;
+            }  
+        );
         STRACE("str", tout << "preprocess-output:" << std::endl << this->formula.to_string() << std::endl; );
     }
 
@@ -889,20 +889,5 @@ namespace smt::noodler {
             }
         }
     }
-
-    DecisionProcedure::DecisionProcedure(
-             const Formula &equalities, AutAssignment init_aut_ass,
-             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
-             const BasicTermEqiv& len_eq_vars,
-             const theory_str_noodler_params& par
-     ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par), m{ m }, m_util_s{ m_util_s },
-     m_util_a{ m_util_a },
-     init_length_sensitive_vars{ init_length_sensitive_vars },
-         formula { equalities },
-         init_aut_ass{ init_aut_ass },
-         m_params(par),
-         len_eq_vars{ len_eq_vars } {
-         }
 
 } // Namespace smt::noodler.

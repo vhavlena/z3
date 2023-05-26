@@ -37,6 +37,7 @@ namespace smt::noodler {
     public:
         using std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>>::unordered_map;
 
+        // used for tests, do not use normally
         AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val) {
             for (const auto &key_value : val) {
                 this->operator[](key_value.first) = std::make_shared<Mata::Nfa::Nfa>(key_value.second);
@@ -182,6 +183,15 @@ namespace smt::noodler {
                 ret.insert(pr.first);
             }
             return ret;
+        }
+
+        std::string print() {
+            std::stringstream res;
+            for (const auto &key_val : *this) {
+                res << "Automaton for " << key_val.first.get_name() << ":" << std::endl;
+                key_val.second->print_to_DOT(res);
+            }
+            return res.str();
         }
 
     };
