@@ -1289,15 +1289,16 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
     }
     std::function<bool(expr*)> is_unit = [&](expr *e) { return str().is_unit(e); };
 
-    if (pos == 0 && as.forall(is_unit)) {
-        result = str().mk_empty(a->get_sort());
-        for (unsigned i = 1; i <= as.size(); ++i) {
-            result = m().mk_ite(m_autil.mk_ge(c, m_autil.mk_int(i)), 
-                                str().mk_concat(i, as.data(), a->get_sort()), 
-                                result);
-        }
-        return BR_REWRITE_FULL;
-    }
+    // not suitable for noodler: introduces nested ite in (dis)equations
+    // if (pos == 0 && as.forall(is_unit)) {
+    //     result = str().mk_empty(a->get_sort());
+    //     for (unsigned i = 1; i <= as.size(); ++i) {
+    //         result = m().mk_ite(m_autil.mk_ge(c, m_autil.mk_int(i)), 
+    //                             str().mk_concat(i, as.data(), a->get_sort()), 
+    //                             result);
+    //     }
+    //     return BR_REWRITE_FULL;
+    // }
     if (pos == 0 && !constantLen) {
         return BR_FAILED;
     }

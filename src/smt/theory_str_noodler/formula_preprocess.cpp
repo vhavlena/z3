@@ -408,7 +408,8 @@ namespace smt::noodler {
             STRACE("str", tout << "propagate_variables\n";);
         }
 
-        assert(!this->formula.contains_simple_eqs());
+        // Not true: you can have equation of two, literals which is not removed 
+        //assert(!this->formula.contains_simple_eqs());
     }
 
     /**

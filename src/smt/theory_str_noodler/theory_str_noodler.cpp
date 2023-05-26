@@ -34,7 +34,8 @@ namespace smt::noodler {
         m_util_a(m),
         m_util_s(m),
         state_len(),
-        m_length(m) {
+        m_length(m),
+        axiomatized_instances() {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -207,14 +208,14 @@ namespace smt::noodler {
 
             expr *ex = ctx.get_asserted_formula(i);
             ctx.mark_as_relevant(ex);
-            string_theory_propagation(ex);
+            string_theory_propagation(ex, true, false);
             
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
 
-    void theory_str_noodler::string_theory_propagation(expr *expr) {
+    void theory_str_noodler::string_theory_propagation(expr *expr, bool init, bool neg) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
@@ -227,6 +228,14 @@ namespace smt::noodler {
         //fresh SAT solution by the newly added theory axioms.
         // enode *n = ctx.get_enode(expr);
         // ctx.mark_as_relevant(n);
+
+        if(m.is_not(expr)) {
+            neg = !neg;
+        }
+
+        if(init && m.is_eq(expr) && neg) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -244,7 +253,7 @@ namespace smt::noodler {
             app *term = to_app(expr);
             unsigned num_args = term->get_num_args();
             for (unsigned i = 0; i < num_args; i++) {
-                string_theory_propagation(term->get_arg(i));
+                string_theory_propagation(term->get_arg(i), init, neg);
             }
         }
 
@@ -401,6 +410,8 @@ namespace smt::noodler {
                 rhs = m.mk_eq(a_str, empty_str);
                 ctx.internalize(rhs, false);
                 ctx.internalize(lhs, false);
+                // ctx.mark_as_relevant(rhs.get());
+                // ctx.mark_as_relevant(lhs.get());
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
                 add_axiom(m.mk_or(m.mk_not(lhs), rhs));
@@ -426,21 +437,30 @@ namespace smt::noodler {
         if (m_util_s.str.is_extract(n)) {
             handle_substr(n);
         } else if (m_util_s.str.is_itos(n)) {
-            util::throw_error("unsupported predicate: str.from_int");
+            util::throw_error("unsupported itos");
         } else if (m_util_s.str.is_stoi(n)) {
-            util::throw_error("unsupported predicate: str.to_int");
+            util::throw_error("unsupported stoi");
         } else if (m_util_s.str.is_at(n)) {
             handle_char_at(n);
         } else if (m_util_s.str.is_replace(n)) {
             handle_replace(n);
         } else if (m_util_s.str.is_index(n)) {
             handle_index_of(n);
+        } else if(m_util_s.str.is_prefix(n)) {
+            handle_prefix(n);
+            handle_not_prefix(n);
+        } else if(m_util_s.str.is_suffix(n)) {
+            handle_suffix(n);
+            handle_not_suffix(n);
+        } else if(m_util_s.str.is_contains(n)) {
+            handle_contains(n);
+            handle_not_contains(n);
         } else if(m_util_s.str.is_replace_all(n)) {
-            util::throw_error("unsupported predicate: str.replace_all");
+            util::throw_error("unsupported predicate");
         } else if(m_util_s.str.is_replace_re_all(n)) {
-            util::throw_error("unsupported predicate: str.replace_re_all");
+            util::throw_error("unsupported predicate");
         } else if(m_util_s.str.is_replace_re(n)) {
-            util::throw_error("unsupported predicate: str.replace_re");
+            util::throw_error("unsupported predicate");
         }
 
         expr *arg;
@@ -458,7 +478,7 @@ namespace smt::noodler {
         enode *n1 = n;
         do {
             expr *o = n->get_expr();
-            if (!has_length(o)) {
+            if (!has_length(o) && !m.is_ite(o)) {
                 expr_ref len = mk_len(o);
                 add_length_axiom(len);
             }
@@ -474,17 +494,19 @@ namespace smt::noodler {
         expr *e = ctx.bool_var2expr(v);
         expr *e1 = nullptr, *e2 = nullptr;
         if (m_util_s.str.is_prefix(e, e1, e2)) {
-            if (is_true) {
-                handle_prefix(e);
-            } else {
-                handle_not_prefix(e);
-            }
+            // if (is_true) {
+            //     handle_prefix(e);
+            // } else {
+            //     util::throw_error("unsupported predicate");
+            //     //handle_not_prefix(e);
+            // }
         } else if (m_util_s.str.is_suffix(e, e1, e2)) {
-            if (is_true) {
-                handle_suffix(e);
-            } else {
-                handle_not_suffix(e);
-            }
+            // if (is_true) {
+            //     handle_suffix(e);
+            // } else {
+            //     util::throw_error("unsupported predicate");
+            //     // handle_not_suffix(e);
+            // }
         } else if (m_util_s.str.is_contains(e, e1, e2)) {
             if (is_true) {
                 handle_contains(e);
@@ -555,6 +577,12 @@ namespace smt::noodler {
 
         app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
         app_ref neg(m.mk_not(l_eq_r), m);
+
+        // This is to handle the case containing ite inside disequations
+        if(!ctx.e_internalized(m.mk_eq(l, r))) {
+            STRACE("str", tout << "relevanting: " << mk_pp(neg, m) << '\n';);
+            ctx.mark_as_relevant(m.mk_not(m.mk_eq(l, r)));
+        }
         ctx.internalize(neg, false);
 
         /**
@@ -700,10 +728,11 @@ namespace smt::noodler {
 
         for (const auto& we : this->m_membership_todo) {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
+            app_ref in_app_prev(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
             if(!std::get<2>(we)){
                 in_app = m.mk_not(in_app);
             }
-            if(ctx.is_relevant(in_app.get())) {
+            if(ctx.is_relevant(in_app.get()) || ctx.is_relevant(in_app_prev.get())) {
                 if(!this->m_membership_todo_rel.contains(we)) {
                     this->m_membership_todo_rel.push_back(we);
                 }
@@ -817,6 +846,24 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
+        // infinite loop prevention -- not sure if it is correct
+        if(m_params.m_loop_protect) {
+            expr_ref refine = construct_refinement();
+            if(refine != nullptr) {
+                if(this->axiomatized_instances.contains(refine)) {
+                    if(this->axiomatized_instances[refine] > 1) {
+                        block_curr_assignment();
+                        return FC_CONTINUE;
+                    } else {
+                        this->axiomatized_instances[refine] += 1;
+                    }
+                } else {
+                    this->axiomatized_instances.insert(refine, 1);
+                }
+            }
+        }
+        
+
         // use underapproximation to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
@@ -842,7 +889,7 @@ namespace smt::noodler {
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
             lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths, mod) == l_true) {
+            if(dec_proc.get_init_length_vars().size() == 0 || check_len_sat(lengths, mod) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                 return FC_DONE;
             }
@@ -853,7 +900,9 @@ namespace smt::noodler {
         }
 
         // all len solutions are unsat, we block the current assignment
-        block_curr_len(block_len);
+        if(!block_curr_len(block_len)) {
+            return FC_CONTINUE;
+        }
         //block_curr_assignment();
         IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
@@ -1628,8 +1677,8 @@ namespace smt::noodler {
         expr_ref fresh = mk_str_var("prefix");
         expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
         string_theory_propagation(xs);
-        literal not_e = mk_literal(mk_not({e, m}));
-        add_axiom({not_e, mk_eq(y, xs, false)});
+        literal not_e = mk_literal(e);
+        add_axiom({~not_e, mk_eq(y, xs, false)});
     }
 
     /**
@@ -1644,10 +1693,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
-        axiomatized_persist_terms.insert(e);
+        axiomatized_persist_terms.insert(m.mk_not(e));
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
@@ -1671,7 +1720,7 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pmxqx,false);
         literal y_eq_pmq = mk_eq(y,pmyqy,false);
-        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
@@ -1712,8 +1761,8 @@ namespace smt::noodler {
         expr_ref fresh = mk_str_var("suffix");
         expr_ref px(m_util_s.str.mk_concat(fresh, x), m);
         string_theory_propagation(px);
-        literal not_e = mk_literal(mk_not({e, m}));
-        add_axiom({not_e, mk_eq(y, px, false)});
+        literal not_e = mk_literal(e);
+        add_axiom({~not_e, mk_eq(y, px, false)});
     }
 
     /**
@@ -1728,10 +1777,10 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
-        axiomatized_persist_terms.insert(e);
+        axiomatized_persist_terms.insert(m.mk_not(e));
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
@@ -1755,7 +1804,7 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pxmxq,false);
         literal y_eq_pmq = mk_eq(y,pymyq,false);
-        literal eq_mx_my = mk_literal(m.mk_not(m.mk_eq(mx,my)));
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
         literal lit_e = mk_literal(e);
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
@@ -1811,19 +1860,20 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
         expr* cont = this->m.mk_not(e);
-        if(axiomatized_persist_terms.contains(cont))
-            return;
-
-        axiomatized_persist_terms.insert(cont);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
         STRACE("str", tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
+            // if(axiomatized_persist_terms.contains(cont))
+            //     return;
+            // axiomatized_persist_terms.insert(cont);
+
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
+          
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
             m_not_contains_todo.push_back({{x, m},{y, m}});
@@ -1931,19 +1981,58 @@ namespace smt::noodler {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
             if(std::get<2>(in)){
                 in_app = m.mk_not(in_app);
+                if(!ctx.e_internalized(in_app)) {
+                    ctx.internalize(in_app, false);
+                }
             }
             refinement = refinement == nullptr ? in_app : m.mk_or(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
 
         if (refinement != nullptr) {
-            add_block_axiom(refinement);
+            add_axiom(refinement);
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
+    expr_ref theory_str_noodler::construct_refinement() {
+        context& ctx = get_context();
+
+        ast_manager& m = get_manager();
+        expr *refinement = nullptr;
+        STRACE("str", tout << "[Refinement]\nformulas:\n";);
+        for (const auto& we : this->m_word_eq_todo_rel) {
+            // we create the equation according to we
+            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
+            expr *const e = ctx.mk_eq_atom(we.first, we.second);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+        }
+
+        literal_vector ls;
+        for (const auto& wi : this->m_word_diseq_todo_rel) {
+//            expr *const e = mk_eq_atom(wi.first, wi.second);
+            expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
+            //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
+        }
+
+        for (const auto& in : this->m_membership_todo_rel) {
+            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
+            if(!std::get<2>(in)){
+                in_app = m.mk_not(in_app);
+                if(!ctx.e_internalized(in_app)) {
+                    ctx.internalize(in_app, false);
+                }
+            }
+            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
+            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+        }
+
+        return expr_ref(refinement, m);
+    }
+
+    bool theory_str_noodler::block_curr_len(expr_ref len_formula) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         bool on_screen=false;
@@ -1972,15 +2061,22 @@ namespace smt::noodler {
             if(!std::get<2>(in)){
                 in_app = m.mk_not(in_app);
             }
+            if(!ctx.e_internalized(in_app)) {
+                ctx.internalize(in_app, false);
+            }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
 
+        // if(axiomatized_instances.contains(refinement)) {
+        //     return false;
+        // }
+        // axiomatized_instances.push_back(refinement);
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
-
+        return true;
     }
 
     void theory_str_noodler::block_curr_lang() {
@@ -2236,7 +2332,12 @@ namespace smt::noodler {
      */
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-        m_int_solver.initialize(get_context());
+        // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
+        bool include_ass = true;
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0) {
+            include_ass = false;
+        }
+        m_int_solver.initialize(get_context(), include_ass);
         auto ret = m_int_solver.check_sat(len_formula);
         return ret;
     }

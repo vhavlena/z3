@@ -107,6 +107,7 @@ namespace smt::noodler {
 
     private:
         BasicTermType type;
+        // name of the variable, or the given literal
         zstring name;
     }; // Class BasicTerm.
 
