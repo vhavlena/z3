@@ -853,21 +853,7 @@ namespace smt::noodler {
         res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(var, this->m_util_a.mk_int(0))), this->m);
         return res;
     }
-
-    /**
-     * @brief Set new instance for the decision procedure.
-     * 
-     * @param equalities Equalities
-     * @param init_aut_ass Initial automata assignment
-     * @param init_length_sensitive_vars Length sensitive vars
-     */
-    void DecisionProcedure::set_instance(const Formula &equalities, AutAssignment &init_aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        this->init_length_sensitive_vars = init_length_sensitive_vars;
-        this->formula = equalities;
-        this->init_aut_ass = init_aut_ass;
-        this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars, m_params);
-    }
-
+    
     void DecisionProcedure::add_str_lits_to_init_aut_ass() {
         size_t counter{ 0 };
         std::map<zstring, zstring> str_literals{};

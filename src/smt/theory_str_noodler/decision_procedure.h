@@ -380,19 +380,6 @@ namespace smt::noodler {
             init_aut_ass(init_aut_ass),
             m_params(par),
             len_eq_vars(len_eq_vars) { }
-        /**
-         * @brief Set new instance for the decision procedure.
-         * 
-         * @param equalities Equalities
-         * @param init_aut_ass Initial automata assignment
-         * @param init_length_sensitive_vars Length sensitive vars
-         */
-        void set_instance(Formula equalities, AutAssignment init_aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars) {
-            this->init_length_sensitive_vars = init_length_sensitive_vars;
-            this->formula = equalities;
-            this->init_aut_ass = init_aut_ass;
-            this->prep_handler = FormulaPreprocess(equalities, init_aut_ass, init_length_sensitive_vars, m_params);
-        }
         
         bool compute_next_solution() override;
 
