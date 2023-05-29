@@ -1072,14 +1072,14 @@ namespace smt::noodler {
             if(!pr.second.is_equation())
                 continue;
 
-            if(this->formula.single_occurr(pr.second.get_left_set())) {
+            if(this->formula.single_occurr(pr.second.get_left_set()) && pr.second.get_right_side().size() == 1) {
                 Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
                 Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
                 if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
                     rem_ids.insert(pr.first);
                 }
             }
-            if(this->formula.single_occurr(pr.second.get_right_set())) {
+            if(this->formula.single_occurr(pr.second.get_right_set()) && pr.second.get_left_side().size() == 1) {
                 Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
                 Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
                 if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
