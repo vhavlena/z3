@@ -1166,7 +1166,7 @@ namespace smt::noodler {
 
             expr_ref y = mk_str_var("at_left");
 
-            for(int j = val; j > 0; j++) {
+            for(int j = val; j < 0; j++) {
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);
