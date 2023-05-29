@@ -1550,8 +1550,8 @@ namespace smt::noodler {
             // offset >= |t| && offset <= |t| && s = eps -> indexof = offset
             add_axiom({~offset_ge_len, ~offset_le_len, ~s_eq_empty, i_eq_offset});
 
-            expr_ref x = mk_str_var("index_left");
-            expr_ref y = mk_str_var("index_right");
+            expr_ref x = mk_str_var("index_left_off");
+            expr_ref y = mk_str_var("index_right_off");
             expr_ref xy(m_util_s.str.mk_concat(x, y), m);
             string_theory_propagation(xy);
 
