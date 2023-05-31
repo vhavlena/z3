@@ -1084,12 +1084,12 @@ namespace smt::noodler {
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                if(is_sigma_star(pr.second.get_side_vars(Predicate::EquationSideType::Left))) {
+                if(is_sigma_star(pr.second.get_left_set())) {
                     rem_ids.insert(pr.first);
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                if(is_sigma_star(pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
+                if(is_sigma_star(pr.second.get_right_set())) {
                     rem_ids.insert(pr.first);
                 }               
             }
