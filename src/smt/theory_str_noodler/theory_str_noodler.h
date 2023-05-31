@@ -129,7 +129,7 @@ namespace smt::noodler {
         expr_ref mk_len(expr* s) const { return expr_ref(m_util_s.str.mk_length(s), m); }
 
         void add_axiom(expr *e);
-        void add_block_axiom(expr *const e);
+        // void add_block_axiom(expr *const e);
         literal mk_eq_empty(expr* n, bool phase = true);
         expr_ref mk_last(expr* e);
         expr_ref mk_first(expr* e);
@@ -205,9 +205,6 @@ namespace smt::noodler {
         void tightest_prefix(expr*,expr*);
         void print_ast(expr *e);
         void print_ctx(context& ctx);
-
-        void block_len(int n_cnt);
-        void block_len_single(int n_cnt, const app_ref& bool_var, expr_ref& refine);
 
         void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
         void update_len_state_var(const obj_hashtable<expr>& conj, const app_ref& bool_var);

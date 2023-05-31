@@ -14,6 +14,7 @@ namespace {
 namespace smt::noodler::util {
 
     void throw_error(std::string errMsg) {
+        // TODO maybe for benchnarking throw_error in release should also really throw error
 #ifndef NDEBUG
         // for debugging, we use std::runtime_error, because that one is not caught by z3
         throw std::runtime_error(errMsg);

@@ -176,11 +176,7 @@ namespace smt::noodler {
     std::string BasicTerm::to_string() const {
         switch (type) {
             case BasicTermType::Literal: {
-                std::string result{};
-                if (!name.empty()) {
-                    result += "\"" + name.encode() + "\"";
-                }
-                return result;
+                return ("\"" + name.encode() + "\"");
             }
             case BasicTermType::Variable:
                 return name.encode();
