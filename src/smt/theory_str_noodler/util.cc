@@ -497,44 +497,50 @@ namespace smt::noodler::util {
             }
 
             Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet);
-            nfa = Mata::Nfa::create_empty_string_nfa();
-            // we need to repeat body_nfa at least low times
-            for (unsigned i = 0; i < low; ++i) {
-                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
-            }
 
-            // we will now either repeat body_nfa high-low times (if is_high_set) or
-            // unlimited times (if it is not set), but we have to accept after each loop,
-            // so we add an empty word into body_nfa by making some initial state final
-            if (body_nfa.initial.empty()) {
-                State new_state = body_nfa.add_state();
-                body_nfa.initial.insert(new_state);
-                body_nfa.final.insert(new_state);
+            if (Mata::Nfa::is_lang_empty(body_nfa)) {
+                // for the case that body of the loop represents empty language...
+                if (low == 0) {
+                    // ...we either return empty string if we have \emptyset{0,h}
+                    nfa = Mata::Nfa::create_empty_string_nfa();
+                } else {
+                    // ... or empty language
+                    nfa = std::move(body_nfa)
+                }
             } else {
-                body_nfa.final.insert(*(body_nfa.initial.begin()));
-            }
-
-            if (is_high_set) {
-                // if high is set, we repeat body_nfa another high-low times
+                body_nfa.unify_final();
                 body_nfa.unify_initial();
-                body_nfa = Mata::Nfa::reduce(body_nfa);
-                nfa.unify_initial();
-                nfa = Mata::Nfa::reduce(nfa);
-                for (unsigned i = 0; i < high - low; ++i) {
+
+                nfa = Mata::Nfa::create_empty_string_nfa();
+                // we need to repeat body_nfa at least low times
+                for (unsigned i = 0; i < low; ++i) {
+                    nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
+                }
+
+                // we will now either repeat body_nfa high-low times (if is_high_set) or
+                // unlimited times (if it is not set), but we have to accept after each loop,
+                // so we add an empty word into body_nfa by making the initial state final
+                body_nfa.final.add(*(body_nfa.initial.begin()));
+                Mata::Nfa::reduce(body_nfa);
+
+                if (is_high_set) {
+                    // if high is set, we repeat body_nfa another high-low times
+                    for (unsigned i = 0; i < high - low; ++i) {
+                        nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
+                    }
+                } else {
+                    // if high is not set, we can repeat body_nfa unlimited more times
+                    // so we do star operation on body_nfa and add it to end of nfa
+                    for (const auto& final : body_nfa.final) {
+                        for (const auto& initial : body_nfa.initial) {
+                            body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                        }
+                    }
                     nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
                 }
                 nfa = Mata::Nfa::remove_epsilon(nfa);
-            } else {
-                // if high is not set, we can repeat body_nfa unlimited more times
-                // so we do star operation on body_nfa and add it to end of nfa
-                for (const auto& final : body_nfa.final) {
-                    for (const auto& initial : body_nfa.initial) {
-                        body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
-                    }
-                }
-                body_nfa.remove_epsilon();
-                nfa = Mata::Nfa::concatenate(nfa, body_nfa);
             }
+
         } else if (m_util_s.re.is_of_pred(expression)) { // Handle of predicate.
             throw_error("of predicate is unsupported");
         } else if (m_util_s.re.is_opt(expression)) { // Handle optional.
@@ -622,7 +628,7 @@ namespace smt::noodler::util {
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
-            nfa = Mata::Nfa::complement(nfa, mata_alphabet);
+            nfa = Mata::Nfa::complement(nfa, mata_alphabet, { {"algorithm", "classical"}, {"minimize", "true"} });
         }
         return nfa;
     }
