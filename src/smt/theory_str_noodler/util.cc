@@ -505,7 +505,7 @@ namespace smt::noodler::util {
                     nfa = Mata::Nfa::create_empty_string_nfa();
                 } else {
                     // ... or empty language
-                    nfa = std::move(body_nfa)
+                    nfa = std::move(body_nfa);
                 }
             } else {
                 body_nfa.unify_final();
