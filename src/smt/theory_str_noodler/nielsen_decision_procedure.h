@@ -9,7 +9,6 @@
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
-#include "state_len.h"
 #include "formula_preprocess.h"
 #include "decision_procedure.h"
 
@@ -60,6 +59,7 @@ namespace smt::noodler {
 
         std::set<NielsenGraph::Label> get_rules_from_pred(const Predicate& pred) const;
         NielsenGraph generate_from_formula(const Formula& formula) const;
+        Formula trim_formula(const Formula& formula) const;
 
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);

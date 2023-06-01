@@ -82,6 +82,75 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Generate Nielsen graph from a formula.
+     * 
+     * @param init Initial node (formula)
+     * @return NielsenGraph 
+     */
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init) const {
+        NielsenGraph graph;
+        std::set<Formula> generated;
+        std::deque<std::pair<size_t, Formula>> worklist;
+        worklist.push_back({0, trim_formula(init)}); 
+
+        while(!worklist.empty()) {
+            std::pair<size_t, Formula> pr = worklist.front();
+            size_t index = pr.first;
+            generated.insert(pr.second);
+            worklist.pop_front();
+
+            std::vector<Predicate> predicates = pr.second.get_predicates();
+            if(is_pred_unsat(predicates[index])) {
+                return graph;
+            }
+            for(; index < predicates.size(); index++) {
+                if(!is_pred_sat(predicates[index])) {
+                    break;
+                }
+            }
+
+            std::set<NielsenGraph::Label> rules = get_rules_from_pred(predicates[index]);
+            for(const auto& label : rules) {
+                Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
+                graph.add_edge(pr.second, rpl, label);
+                if(generated.find(rpl) == generated.end()) {
+                    worklist.push_back({index, rpl});
+                }
+            }
+        }
+
+        return graph;
+    }
+
+    /**
+     * @brief Trim formula. Trim each predicate in the formula. A predicate is trimmed 
+     * if it does not contain the same BasicTerm at the beginning of sides.
+     * 
+     * @param formula Formula
+     * @return Formula Trimmed formula
+     */
+    Formula NielsenDecisionProcedure::trim_formula(const Formula& formula) const {
+        Formula ret;
+
+        for(const Predicate& pred : formula.get_predicates()) {
+            auto params = pred.get_params();
+            size_t len = std::min(params[0].size(), params[1].size());
+            size_t i = 0;
+            for(; i < len; i++) {
+                if(params[0][i] != params[1][i]) {
+                    break;
+                }
+            }
+            std::vector<Concat> sides({
+                Concat(params[0].begin()+i, params[0].end()),
+                Concat(params[1].begin()+i, params[1].end())
+            });
+            ret.add_predicate(Predicate(PredicateType::Equation, sides));
+        }
+        return ret;
+    }
+
+    /**
      * @brief Check if a predicate is trivially unsat.
      * 
      * @param pred Predicate
