@@ -519,8 +519,12 @@ namespace smt::noodler::util {
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
                 // unlimited times (if it is not set), but we have to accept after each loop,
-                // so we add an empty word into body_nfa by making the initial state final
-                body_nfa.final.add(*(body_nfa.initial.begin()));
+                // so we add an empty word into body_nfa
+                State new_state = nfa.add_state();
+                body_nfa.initial.add(new_state);
+                body_nfa.final.add(new_state);
+
+                body_nfa.unify_initial();
                 Mata::Nfa::reduce(body_nfa);
 
                 if (is_high_set) {
@@ -590,14 +594,11 @@ namespace smt::noodler::util {
             }
             nfa.remove_epsilon();
 
-            // Make one initial final in order to accept empty string as is required by kleene-star.
-            if (nfa.initial.empty()) {
-                State new_state = nfa.add_state();
-                nfa.initial.insert(new_state);
-                nfa.final.insert(new_state);
-            } else {
-                nfa.final.insert(*(nfa.initial.begin()));
-            }
+            // Make new initial final in order to accept empty string as is required by kleene-star.
+            State new_state = nfa.add_state();
+            nfa.initial.add(new_state);
+            nfa.final.add(new_state);
+
         } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
@@ -630,6 +631,10 @@ namespace smt::noodler::util {
             }
             nfa = Mata::Nfa::complement(nfa, mata_alphabet, { {"algorithm", "classical"}, {"minimize", "true"} });
         }
+        STRACE("str-create_nfa",
+            tout << "--------------NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
+            nfa.print_to_DOT(tout);
+        );
         return nfa;
     }
 
