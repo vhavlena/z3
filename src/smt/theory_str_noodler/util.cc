@@ -619,6 +619,10 @@ namespace smt::noodler::util {
             throw_error("unsupported operation in regex");
         }
 
+        STRACE("str-create_nfa",
+            tout << "--------------" << (make_complement ? "Complemented " : "") << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
+        );
+
         // intermediate automata reduction
         nfa = Mata::Nfa::reduce(nfa);
 
@@ -629,10 +633,12 @@ namespace smt::noodler::util {
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
-            nfa = Mata::Nfa::complement(nfa, mata_alphabet, { {"algorithm", "classical"}, {"minimize", "true"} });
+            nfa = Mata::Nfa::complement(nfa, mata_alphabet, { 
+                {"algorithm", "classical"}, 
+                //{"minimize", "true"} 
+                });
         }
         STRACE("str-create_nfa",
-            tout << "--------------NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
             nfa.print_to_DOT(tout);
         );
         return nfa;
