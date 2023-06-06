@@ -635,7 +635,7 @@ namespace smt::noodler::util {
             }
             nfa = Mata::Nfa::complement(nfa, mata_alphabet, { 
                 {"algorithm", "classical"}, 
-                //{"minimize", "true"} 
+                //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
         }
         STRACE("str-create_nfa",
