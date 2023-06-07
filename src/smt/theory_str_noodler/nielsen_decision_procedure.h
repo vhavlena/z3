@@ -14,6 +14,44 @@
 
 namespace smt::noodler {
 
+    static std::string concat_to_string_compact(const Concat& con) {
+        std::string ret;
+        for(const BasicTerm& t : con) {
+            if(t.is_literal()) {
+                ret += "\\\"" + t.get_name().encode() + "\\\" ";
+            } else {
+                ret += t.to_string() + " ";
+            }
+        }
+        if(ret.size() > 0) {
+            ret.pop_back();
+        }
+        return ret;
+    }
+
+    static std::string pred_to_string_compact(const Predicate& pred) {
+        if(!pred.is_equation()) {
+            util::throw_error("NielsenGraph: unsupported predicate type");
+        }
+
+        std::string ret;
+        ret = concat_to_string_compact(pred.get_left_side()) + " = " + 
+            concat_to_string_compact(pred.get_right_side());
+        return ret;
+    }
+
+    static std::string formula_to_string_compact(const Formula& f) {
+        std::string ret;
+        for(const Predicate& pred : f.get_predicates()) {
+            ret += pred_to_string_compact(pred) + " & ";
+        }
+        if(ret.size() > 0) {
+            return ret.substr(0, ret.size() - 3);
+        }
+        return ret;
+    }
+
+
     /**
      * @brief Nielsen proof graph
      */
@@ -34,6 +72,25 @@ namespace smt::noodler {
             this->nodes.insert(source);
             this->nodes.insert(target);
             this->edges[source].insert({target, lbl});
+        }
+
+        static std::string label_to_string(const Label& lab) {
+            std::string ret;
+            ret += lab.first.to_string() + " ↦";
+            ret += concat_to_string_compact(lab.second);
+            return ret;
+        } 
+
+        std::string to_graphwiz() const {
+            std::string ret = "digraph nielsen_graph {\nrankdir=LR;\nnode [shape=\"rectangle\" style=\"rounded\"]\n";
+            for(const auto& pr : this->edges) {
+                for(const auto& lab_st : pr.second) {
+                    ret += "\"" + formula_to_string_compact(pr.first) + "\" -> \"" + formula_to_string_compact(lab_st.first) + 
+                        "\" [label=\"" + label_to_string(lab_st.second) + "\"];\n";
+                }
+            }
+            ret += "}";
+            return ret;
         }
     };
 
