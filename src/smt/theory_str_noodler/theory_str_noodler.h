@@ -37,6 +37,7 @@ Eternal glory to Yu-Fang.
 #include "expr_solver.h"
 #include "util.h"
 #include "var_union_find.h"
+#include "nielsen_decision_procedure.h"
 
 namespace smt::noodler {
 

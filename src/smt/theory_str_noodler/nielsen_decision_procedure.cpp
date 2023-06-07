@@ -25,22 +25,104 @@ namespace smt::noodler {
      * @brief Initialize computation.
      */
     void NielsenDecisionProcedure::init_computation() {
+
     }
 
     /**
      * @brief Preprocessing.
      */
     void NielsenDecisionProcedure::preprocess(PreprocessType opt) {
-        // do notning for now
+        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
+
+        this->prep_handler.separate_eqs();
+
+        // Refresh the instance
+        this->init_aut_ass = this->prep_handler.get_aut_assignment();
+        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
+        this->formula = this->prep_handler.get_modified_formula();
+        this->formula = this->formula.split_literals();
     }
 
     /**
-     * @brief Compute next solution
+     * @brief Compute next solution. Generate all Nielsen graphs and perform the satifiability checking.
      * 
      * @return True -> satisfiable
      */
     bool NielsenDecisionProcedure::compute_next_solution() {
-        return false;
+        std::cout << this->formula.to_string() << std::endl;
+
+        bool sat = true;
+        if(this->graphs.size() == 0) {
+            std::vector<Formula> instances = divide_independent_formula(this->formula);
+            for(const Formula& fle : instances) {
+                bool is_sat;
+                NielsenGraph graph = generate_from_formula(fle, is_sat);
+                this->graphs.push_back(graph);
+                sat = sat && is_sat;
+                std::cout << "SAT: " << is_sat << std::endl;
+                std::cout << graph.to_graphwiz() << std::endl;
+            }
+            return sat;
+        } else {
+            // TODO: enumerate all length solutions; if there is no more, return false
+            return true;
+        }
+    }
+
+    /**
+     * @brief Divide the formula into a sequence of independent subformulae. A predicate is independent if its variables 
+     * are disjoint with the  variables of the remaining predicates. The sequence consists of singleton predicate or the 
+     * formula with the remaining ones.
+     * 
+     * @param formula Formula to be divided
+     * @return std::vector<Formula> Sequence of independent subformulae.
+     */
+    std::vector<Formula> NielsenDecisionProcedure::divide_independent_formula(const Formula& formula) const {
+        std::vector<Formula> ret;
+        auto preds = formula.get_predicates();
+        std::vector<std::set<BasicTerm>> vars_map(preds.size());
+        std::set<size_t> rem_ind;
+        std::set<size_t> all_ind;
+
+        for(size_t i = 0; i < preds.size(); i++) {
+            vars_map[i] = preds[i].get_vars();
+        }
+        
+        for(size_t i = 0; i < preds.size(); i++) {
+            all_ind.insert(i);
+            bool add = true;
+            for(size_t j = 0; j < preds.size(); j++) {
+                if(i == j) {
+                    continue;
+                }
+                std::vector<BasicTerm> inter;
+                std::set_intersection(vars_map[i].begin(), vars_map[i].end(), 
+                    vars_map[j].begin(), vars_map[j].end(), std::back_inserter(inter));
+                if(!inter.empty()) {
+                    add = false;
+                    break;
+                }
+            }
+            if(add) {
+                rem_ind.insert(i);
+                Formula split;
+                split.add_predicate(preds[i]);
+                ret.push_back(split);
+            }
+        }
+
+        Formula remaining;
+        std::vector<size_t> diff;
+        std::set_difference(all_ind.begin(), all_ind.end(), rem_ind.begin(), 
+            rem_ind.end(), std::back_inserter(diff));
+        for(size_t ind : diff) {
+            remaining.add_predicate(preds[ind]);
+        }
+        if(diff.size() > 0) {
+            ret.push_back(remaining);
+        }
+
+        return ret;
     }
 
     NielsenDecisionProcedure::NielsenDecisionProcedure(
@@ -51,6 +133,7 @@ namespace smt::noodler {
      ) :  m{ m }, m_util_s{ m_util_s }, m_util_a{ m_util_a }, init_length_sensitive_vars{ init_length_sensitive_vars },
          formula { equalities },
          init_aut_ass{ init_aut_ass },
+         prep_handler{ equalities, init_aut_ass, init_length_sensitive_vars, par },
          m_params(par) {
          }
 
@@ -85,14 +168,17 @@ namespace smt::noodler {
      * @brief Generate Nielsen graph from a formula.
      * 
      * @param init Initial node (formula)
+     * @param[out] is_sat Contains the Nielsen graph an accepting node?
      * @return NielsenGraph 
      */
-    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init) const {
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
         std::deque<std::pair<size_t, Formula>> worklist;
         worklist.push_back({0, trim_formula(init)}); 
+        graph.set_init(init);
 
+        is_sat = false;
         while(!worklist.empty()) {
             std::pair<size_t, Formula> pr = worklist.front();
             size_t index = pr.first;
@@ -101,12 +187,16 @@ namespace smt::noodler {
 
             std::vector<Predicate> predicates = pr.second.get_predicates();
             if(is_pred_unsat(predicates[index])) {
-                return graph;
+                continue;
             }
             for(; index < predicates.size(); index++) {
                 if(!is_pred_sat(predicates[index])) {
                     break;
                 }
+            }
+            if(index >= predicates.size()) {
+                is_sat = true;
+                continue;
             }
 
             std::set<NielsenGraph::Label> rules = get_rules_from_pred(predicates[index]);

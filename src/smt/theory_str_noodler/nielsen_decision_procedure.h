@@ -63,6 +63,7 @@ namespace smt::noodler {
     private:
         Nodes nodes;
         Edges edges;
+        Formula init;
 
     public:
 
@@ -74,6 +75,10 @@ namespace smt::noodler {
             this->edges[source].insert({target, lbl});
         }
 
+        void set_init(const Formula& in) {
+            this->init = in;
+        }
+
         static std::string label_to_string(const Label& lab) {
             std::string ret;
             ret += lab.first.to_string() + " ↦";
@@ -82,7 +87,7 @@ namespace smt::noodler {
         } 
 
         std::string to_graphwiz() const {
-            std::string ret = "digraph nielsen_graph {\nrankdir=LR;\nnode [shape=\"rectangle\" style=\"rounded\"]\n";
+            std::string ret = "digraph nielsen_graph {\nrankdir=LR;\nnode [shape=\"rectangle\" style=\"rounded\" color=\"#cc4b3d\"]\n\"" + formula_to_string_compact(this->init) + "\"\nnode [shape=\"rectangle\" style=\"rounded\" color=black]\n";
             for(const auto& pr : this->edges) {
                 for(const auto& lab_st : pr.second) {
                     ret += "\"" + formula_to_string_compact(pr.first) + "\" -> \"" + formula_to_string_compact(lab_st.first) + 
@@ -107,7 +112,10 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+        FormulaPreprocess prep_handler;
         const theory_str_noodler_params& m_params;
+
+        std::vector<NielsenGraph> graphs {};
 
         bool is_pred_unsat(const Predicate& pred) const;
         bool is_pred_sat(const Predicate& pred) const {
@@ -115,8 +123,10 @@ namespace smt::noodler {
         }
 
         std::set<NielsenGraph::Label> get_rules_from_pred(const Predicate& pred) const;
-        NielsenGraph generate_from_formula(const Formula& formula) const;
+        NielsenGraph generate_from_formula(const Formula& formula, bool & is_sat) const;
         Formula trim_formula(const Formula& formula) const;
+
+        std::vector<Formula> divide_independent_formula(const Formula& formula) const;
 
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);

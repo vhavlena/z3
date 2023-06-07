@@ -71,6 +71,29 @@ namespace smt::noodler {
         return false;
     }
 
+    Predicate Predicate::split_literals() const {
+        const auto& split_concat = [&](const std::vector<BasicTerm>& con) {
+            std::vector<BasicTerm> ret;
+            for(const BasicTerm& bt : con) {
+                if(bt.is_literal()) {
+                    zstring name = bt.get_name();
+                    for(size_t i = 0; i < name.length(); i++) {
+                        ret.push_back(BasicTerm(BasicTermType::Literal, zstring(name[i])));
+                    }
+                } else {
+                    ret.push_back(bt);
+                }
+            }
+            return ret;
+        };
+
+        std::vector<std::vector<BasicTerm>> new_pars;
+        for(const auto& par : this->params) {
+            new_pars.push_back(split_concat(par));
+        }
+        return Predicate(this->get_type(), new_pars);
+    }
+
     std::string Predicate::to_string() const {
         switch (type) {
             case PredicateType::Default: {

@@ -411,6 +411,13 @@ namespace smt::noodler {
             throw std::runtime_error("unimplemented");
         }
 
+        /**
+         * @brief Split literals into literals consisting of a single symbol.
+         * 
+         * @return Predicate Modified predicate where each literal is a symbol.
+         */
+        Predicate split_literals() const;
+
         [[nodiscard]] bool equals(const Predicate& other) const;
 
         [[nodiscard]] std::string to_string() const;
@@ -547,6 +554,19 @@ namespace smt::noodler {
                 ret.add_predicate(res);
             }
             return ret;
+        }
+
+        /**
+         * @brief Split literals into literals consisting of a single symbol.
+         * 
+         * @return Formula Modified formula where each literal is a symbol.
+         */
+        Formula split_literals() const {
+            Formula new_formula;
+            for(const Predicate& pred : this->predicates) {
+                new_formula.add_predicate(pred.split_literals());
+            }
+            return new_formula;
         }
 
     private:
