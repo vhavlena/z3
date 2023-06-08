@@ -1068,21 +1068,28 @@ namespace smt::noodler {
      */
     void FormulaPreprocess::skip_len_sat() {
         std::set<size_t> rem_ids;
+
+        auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {
+            Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+            for(const BasicTerm& bt : bts) {
+                if(!Mata::Nfa::are_equivalent(sigma_star, *this->aut_ass.at(bt))) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(is_sigma_star(pr.second.get_left_set())) {
                     rem_ids.insert(pr.first);
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                Mata::Nfa::Nfa aut = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-                Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
-                if(Mata::Nfa::are_equivalent(aut, sigma_star)) {
+                if(is_sigma_star(pr.second.get_right_set())) {
                     rem_ids.insert(pr.first);
                 }               
             }
