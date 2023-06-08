@@ -40,6 +40,9 @@ Revision History:
 #include "shell/lp_frontend.h"
 #include "shell/drat_frontend.h"
 
+// for git sha of mata
+#include "mata/util.hh"
+
 #if defined( _WINDOWS ) && defined( __MINGW32__ ) && ( defined( __GNUG__ ) || defined( __clang__ ) )
 #include <crtdbg.h>
 #endif
@@ -73,7 +76,8 @@ void display_usage() {
 #endif
     std::cout << " bit";
 #ifdef Z3GITHASH
-    std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH);
+    std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH)
+              << " - mata hashcode " << Mata::g_GIT_SHA1;
 #endif
     std::cout << "]. (C) Copyright 2006-2016 Microsoft Corp.\n";
     std::cout << "Usage: z3 [options] [-file:]file\n";
@@ -178,7 +182,8 @@ static void parse_cmd_line_args(std::string& input_file, int argc, char ** argv)
 #endif
                 std::cout << " bit";
 #ifdef Z3GITHASH
-                std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH);
+                std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH)
+                          << " - mata hashcode " << Mata::g_GIT_SHA1;
 #endif
                 std::cout << "\n";
                 exit(0);
