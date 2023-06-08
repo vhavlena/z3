@@ -64,6 +64,7 @@ namespace smt::noodler {
         Nodes nodes;
         Edges edges;
         Formula init;
+        std::set<Formula> fins {}; // zero or more final nodes
 
     public:
 
@@ -77,6 +78,10 @@ namespace smt::noodler {
 
         void set_init(const Formula& in) {
             this->init = in;
+        }
+
+        void add_fin(const Formula& fin) {
+            this->fins.insert(fin);
         }
 
         static std::string label_to_string(const Label& lab) {
@@ -96,6 +101,52 @@ namespace smt::noodler {
             }
             ret += "}";
             return ret;
+        }
+
+        /**
+         * @brief Reverse direction of edges in the Nielsen graph.
+         * 
+         * @return NielsenGraph Graph with the reversed edges.
+         */
+        NielsenGraph reverse() const {
+            NielsenGraph ret;
+            ret.set_init(this->init);
+
+            for(const auto& pr: this->edges) {
+                for(const auto& tgt_symb : pr.second) {
+                    ret.add_edge(tgt_symb.first, pr.first, tgt_symb.second);
+                }
+            }
+            return ret;
+        }
+
+        /**
+         * @brief Remove redundant nodes (that cannot reach a final node)
+         * 
+         * @return NielsenGraph Nielsen graph without redundant nodes
+         */
+        NielsenGraph trim() const {
+            NielsenGraph rev = this->reverse();
+            NielsenGraph ret;
+            std::set<Formula> generated;
+            std::deque<Formula> worklist(this->fins.begin(), this->fins.end());
+            ret.set_init(this->init);
+            
+            while(!worklist.empty()) {
+                Formula nd = worklist.front();
+                generated.insert(nd);
+                worklist.pop_front();
+
+                for(const auto& tgt_symb : rev.edges[nd]) {
+                    ret.add_edge(tgt_symb.first, nd, tgt_symb.second);
+                    if(generated.find(tgt_symb.first) == generated.end()) {
+                        worklist.push_back(tgt_symb.first);
+                    }
+                }
+            }
+
+            return ret;
+
         }
     };
 

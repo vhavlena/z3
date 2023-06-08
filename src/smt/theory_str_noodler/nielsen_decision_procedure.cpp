@@ -60,7 +60,7 @@ namespace smt::noodler {
                 this->graphs.push_back(graph);
                 sat = sat && is_sat;
                 std::cout << "SAT: " << is_sat << std::endl;
-                std::cout << graph.to_graphwiz() << std::endl;
+                std::cout << graph.trim().to_graphwiz() << std::endl;
             }
             return sat;
         } else {
@@ -196,6 +196,7 @@ namespace smt::noodler {
             }
             if(index >= predicates.size()) {
                 is_sat = true;
+                graph.add_fin(pr.second);
                 continue;
             }
 
