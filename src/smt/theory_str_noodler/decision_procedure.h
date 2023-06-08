@@ -61,59 +61,6 @@ namespace smt::noodler {
         virtual ~AbstractDecisionProcedure()=default;
     };
 
-    /**
-     * @brief Debug instance of the Decision procedure. Always says SAT and return some length
-     * constraints. Simulates the situation when each instance has exactly 10 noodles.
-     */
-    class DecisionProcedureDebug : public AbstractDecisionProcedure {
-    private:
-        StateLen<int> state;
-        ast_manager& m;
-        seq_util& m_util_s;
-        arith_util& m_util_a;
-        Instance inst{};
-        LengthConstr* solution{ nullptr };
-
-    public:
-        DecisionProcedureDebug(const Instance& inst, LengthConstr& len,
-                               ast_manager& mn, seq_util& util_s, arith_util& util_a
-        ) : state{}, m{ mn }, m_util_s{ util_s }, m_util_a{ util_a } {
-            this->inst = inst;
-            this->solution = &len;
-            this->state.add(inst, 0);
-        }
-
-        bool compute_next_solution() override {
-            int cnt = this->state.get_val(inst);
-            if(cnt >= 10) {
-                return false;
-            }
-
-            expr_ref refinement_len(m);
-            app* atom;
-            for (const auto& eq : inst) {
-                obj_hashtable<expr> vars;
-                util::get_str_variables(to_app(eq), this->m_util_s, this->m, vars);
-
-                for(expr * const var : vars) {
-                    expr_ref len_str_l(m_util_s.str.mk_length(var), m);
-                    SASSERT(len_str_l);
-                    expr_ref num(m);
-                    num = this->m_util_a.mk_numeral(rational(cnt), true);
-                    atom = this->m_util_a.mk_le(len_str_l, num);
-                    refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
-                }
-            }
-
-            this->state.update_val(inst, cnt+1);
-            *solution = refinement_len;
-            return true;
-        }
-
-        ~DecisionProcedureDebug() { }
-
-    };
-
     /// A state of decision procedure that can lead to a solution
     struct SolvingState {
         // aut_ass[x] assigns variable x to some automaton while substitution_map[x] maps variable x to

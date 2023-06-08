@@ -432,11 +432,17 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::relevant_eh(app *const n) {
-        STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << '\n';);
+        STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << std::endl;);
 
-        if (m_util_s.str.is_length(n)) {
-            STRACE("str", tout << "relevant-int: " << mk_pp(n, get_manager()) << '\n';);
+        expr *arg;
+        if (m_util_s.str.is_length(n, arg)) {
+            STRACE("str", tout << "relevant-int: " << mk_pp(n, get_manager()) << std::endl;);
             add_length_axiom(n);
+
+            // FIZME what is this? is it important? can we delete this?
+            if (!has_length(arg) && get_context().e_internalized(arg)) {
+                enforce_length(arg);
+            }
         }
         if (m_util_s.str.is_extract(n)) {
             handle_substr(n);
@@ -466,17 +472,7 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_replace_re(n)) {
             util::throw_error("unsupported predicate");
         } else {
-
-            expr *arg;
-            // FIZME remove has_length?? it is probably not used 
-            // TODO is this really used?
-            if (m_util_s.str.is_length(n, arg) && !has_length(arg) && get_context().e_internalized(arg)) {
-                enforce_length(arg);
-            } else {
-                // TODO check if it works
-                util::throw_error("relevant_eh() got something that cannot be processed");
-            }
-
+            // if we get here n is probably string variable or literal
         }
 
     }
@@ -755,80 +751,123 @@ namespace smt::noodler {
     Final check for an assignment of the underlying boolean skeleton.
     */
     final_check_status theory_str_noodler::final_check_eh() {
-        TRACE("str", tout << "final_check starts\n";);
+        TRACE("str", tout << "final_check starts" << std::endl;);
 
         remove_irrelevant_constr();
 
-        STRACE("str", tout << "eq: " << this->m_word_eq_todo_rel.size() << " diseq: " << this->m_word_diseq_todo_rel.size() << " res: " << this->m_membership_todo_rel.size() << std::endl);
+        STRACE("str",
+            tout << "Relevant predicates:" << std::endl;
+            tout << "  - eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
+            for (const auto &we: this->m_word_eq_todo_rel) {
+                tout << "    " << print_word_term(we.first) << std::flush << "=" << std::flush << print_word_term(we.second) << std::endl;
+            }
+            tout << "  - diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
+            for (const auto &we: this->m_word_diseq_todo_rel) {
+                tout << "    " << print_word_term(we.first) << std::flush << "!=" << std::flush << print_word_term(we.second) << std::endl;
+            }
+            tout << "  - membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
+            for (const auto &we: this->m_membership_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? "" : " not") << " in RE " << mk_pp(std::get<1>(we), m) << std::endl;
+            }
+            tout << "  - lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
+            for (const auto &we: this->m_lang_eq_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(we), m) << std::flush << (std::get<2>(we) ? " = " : " != ") << std::flush << mk_pp(std::get<1>(we), m) << std::endl;
+            }
+        );
 
         // difficult not(contains) predicates -> unknown
+        // TODO: should we check if any of those not contains are relevant? if we are not planning to check for relevancy, we can just throw error when we are processsing not contains in relevant_eh() and not here
         if(!this->m_not_contains_todo.empty()) {
             return FC_GIVEUP;
         }
 
-        expr* fls = nullptr; // false term
-        obj_hashtable<expr> conj;
-        obj_hashtable<app> conj_instance;
-        size_t new_symbs = this->m_word_diseq_todo_rel.size();
-        expr_ref eq_prop(m);
+
+
+        /********************* GATHER WORD (DIS)EQUATIONS ***********************/
+
+        // gathered (dis)eqs as z3 exprs
+        obj_hashtable<app> eqs_and_diseqs;
+        // gathered (dis)eqs that can be simplified into false (for example "aa" = "bbb")
+        std::vector<expr*> false_eqs_and_diseqs;
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
+            // mk_eq_atom can simplify to false/true (for example if we have "aa" = "bbb" it simplifies it into false)
             if(m.is_false(e)) {
-                fls = m.mk_eq(we.first, we.second);
+                false_eqs_and_diseqs.push_back(m.mk_eq(we.first, we.second));
+            } else if (!m.is_true(e)) {
+                eqs_and_diseqs.insert(e);
             }
-            conj.insert(e);
-            conj_instance.insert(e);
-            if(eq_prop == nullptr) {
-                eq_prop = e;
-            } else {
-                eq_prop = m.mk_and(eq_prop, e);
-            }
-
-            STRACE("str", tout << print_word_term(we.first) << std::flush);
-            STRACE("str", tout << "="<<std::flush);
-            STRACE("str", tout << print_word_term(we.second) << std::endl);
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
-
             app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
-            conj_instance.insert(e);
-
-            STRACE("str", tout << print_word_term(we.first) <<std::flush);
-            STRACE("str", tout << "!="<<std::flush);
-            STRACE("str", tout << print_word_term(we.second)<< std::endl);
-        }
-
-        ast_manager &m = get_manager();
-        for (const auto& we : this->m_membership_todo_rel) {
-            if(!std::get<2>(we)){
-                // similar to disequalities, we need dummy symbols for "not in"
-                new_symbs++;
+            // mk_eq_atom can simplify to false/true (for example if we have "aa" = "bbb" it simplifies it into false)
+            if(m.is_false(e)) {
+                false_eqs_and_diseqs.push_back(m.mk_not(m.mk_eq(we.first, we.second)));
+            } else if (!m.is_true(e)) {
+                eqs_and_diseqs.insert(e);
             }
-            STRACE("str", tout << mk_pp(std::get<0>(we), m) << " in RE" << std::endl);
         }
-
-        // if an equation is of the form "aa" = "bbb", we immediately quit
-        if(fls != nullptr) {
-            add_axiom(m.mk_not(fls));
+        
+        // if we have some (dis)eq that can be simplified into false, we immediately quit
+        if(!false_eqs_and_diseqs.empty()) {
+            for (const auto &e : false_eqs_and_diseqs) {
+                // we add that this (dis)eq cannot hold as axiom, so that sat solver does not return same assignment
+                add_axiom(m.mk_not(e));
+            }
             return FC_CONTINUE;
         }
 
+        // from z3 (dis)equations to ours
         Formula instance;
-        this->conj_instance(conj_instance, instance);
-        for(const auto& f : instance.get_predicates()) {
-            STRACE("str", tout << f.to_string() << std::endl);
-        }
+        this->conj_instance(eqs_and_diseqs, instance);
+        STRACE("str",
+            for(const auto& f : instance.get_predicates()) {
+                tout << f.to_string() << std::endl;
+            }
+        );
 
-        // Get symbols in the whole formula.
+        /***************** FINISH GATHERING WORD (DIS)EQUATIONS ******************/
+
+
+        /********************** GATHER SYMBOLS **********************/
+
+        // get symbols in the whole formula
         std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
                 m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_lang_eq_todo_rel, m_util_s, m
         )};
 
-        // Add dummy symbols for all disequations.
-        // FIXME: we can possibly create more dummy symbols than the size of alphabet (196607 - from string theory standard), but it is edge-case that is nearly impossible to happen
-        std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
+        /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
+         * We need some dummy symbols, to represent the symbols not occuring in predicates,
+         * otherwise, we might return unsat even though the formula is sat. For example if
+         * we had x != y and no other predicate, we would have no symbols and the formula
+         * would be unsat. With one dummy symbol, it becomes sat.
+         * We add new dummy symbols for each diseqation and 'x not in RE' predicate, as we
+         * could be in situation where we have for example x != y, y != z, z != x, and
+         * |x| = |y| = |z|. If we added only one dummy symbol, then this would be unsat,
+         * but if we have three symbols, it becomes sat (which this formula is). We add
+         * dummy symbols also for 'x not in RE' because they basically represent
+         * disequations too (for example 'x not in "aaa"' and |x| = 3 should be sat, but
+         * with only symbol "a" it becomes unsat).
+         * 
+         * FIXME: We can possibly create more dummy symbols than the size of alphabet
+         * (from the string theory standard, the size of the alphabet is 196607), but
+         * it is an edge-case that probably cannot happen.
+         */
+        size_t number_of_dummy_symbs = this->m_word_diseq_todo_rel.size();
+        for (const auto& we : this->m_membership_todo_rel) {
+            if(!std::get<2>(we)){
+                number_of_dummy_symbs++;
+            }
+        }
+        // to be safe, we set the minimum number of dummy symbols as 3
+        number_of_dummy_symbs = std::max(number_of_dummy_symbs, size_t(3));
+
+        // add needed number of dummy symbols to symbols_in_formula
+        util::get_dummy_symbols(number_of_dummy_symbs, symbols_in_formula);
+
+        /***************** END OF GATHERING SYMBOLS ******************/
 
         // satisfiability checking via universality checking
         // this heuristics is applied only to the case when there is a single regular constraint x notin RE.
@@ -1929,6 +1968,7 @@ namespace smt::noodler {
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
+            // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for rellevancy
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
     }

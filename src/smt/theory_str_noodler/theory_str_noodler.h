@@ -79,6 +79,7 @@ namespace smt::noodler {
         using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
         using tvar_pair = std::pair<theory_var , theory_var >;
 
+        // FIXME: seems useless, they contain the theory_vars of the sides of (dis)eqautions and the only usage is in (disabled) printing to cout in block_curr_assignment, we probably want to delete them
         scoped_vector<tvar_pair> m_word_eq_var_todo;
         scoped_vector<tvar_pair> m_word_diseq_var_todo;
 
