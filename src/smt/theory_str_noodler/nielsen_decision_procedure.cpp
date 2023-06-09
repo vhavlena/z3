@@ -57,10 +57,15 @@ namespace smt::noodler {
             for(const Formula& fle : instances) {
                 bool is_sat;
                 NielsenGraph graph = generate_from_formula(fle, is_sat);
+                graph = graph.trim();
                 this->graphs.push_back(graph);
                 sat = sat && is_sat;
                 std::cout << "SAT: " << is_sat << std::endl;
-                std::cout << graph.trim().to_graphwiz(nielsen_label_to_string) << std::endl;
+                std::cout << graph.to_graphwiz(nielsen_label_to_string) << std::endl;
+
+                CounterSystem counter_system = create_counter_system(graph);
+                std::cout << counter_system.to_graphwiz(counter_label_to_string);
+
             }
             return sat;
         } else {
@@ -261,6 +266,40 @@ namespace smt::noodler {
             return true;
         }
         return false;
+    }
+
+    /**
+     * @brief Create a counter system from the Nielsen graph.
+     * 
+     * @param graph Graph to be converted to the counter system.
+     * @return CounterSystem
+     */
+    CounterSystem NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph) const {
+        CounterSystem ret;
+
+        // conversion of a nielsen label to the counter label
+        auto conv_fnc = [&](const NielsenLabel& lab) {
+            if(lab.second.size() == 0) {
+                return CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}};
+            } else if(lab.second.size() == 2 && lab.second[0].is_literal()) {
+                return CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}};
+            } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
+                return CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
+            } else {
+                util::throw_error("create_counter_system: unsupported label type");
+            }
+        };
+
+        ret.set_init(graph.get_init());
+        for(const Formula& fin : graph.get_fins()) {
+            ret.add_fin(fin);
+        }
+        for(const auto& pr : graph.edges) {
+            for(const auto& trans : pr.second) {
+                ret.add_edge(pr.first, trans.first, conv_fnc(trans.second));
+            }
+        }
+        return ret;
     }
 
 } // Namespace smt::noodler.

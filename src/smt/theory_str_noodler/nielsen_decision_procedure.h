@@ -23,7 +23,7 @@ namespace smt::noodler {
         using Nodes = std::set<Formula>;
         // using Label = std::pair<BasicTerm, Concat>;
         using Edges = std::map<Formula, std::set<std::pair<Formula, Label>>>;
-    private:
+    
         Nodes nodes;
         Edges edges;
         Formula init;
@@ -39,14 +39,32 @@ namespace smt::noodler {
             this->edges[source].insert({target, lbl});
         }
 
+        const Edges& get_edges() {
+            return this->edges;
+        }
+
         void set_init(const Formula& in) {
             this->init = in;
+        }
+
+        const Formula& get_init() const {
+            return this->init;
         }
 
         void add_fin(const Formula& fin) {
             this->fins.insert(fin);
         }
 
+        const std::set<Formula>& get_fins() const {
+            return this->fins;
+        }
+
+        /**
+         * @brief Convert graph to graphwiz.
+         * 
+         * @param lab_print Function for printing a label
+         * @return std::string Transition graph in graphwiz
+         */
         std::string to_graphwiz(const std::function<std::string(const Label&)>& lab_print) const {
             std::string ret = "digraph nielsen_graph {\nrankdir=LR;\nnode [shape=\"rectangle\" style=\"rounded\" color=\"#cc4b3d\"]\n\"" + formula_to_string_compact(this->init) + "\"\nnode [shape=\"rectangle\" style=\"rounded\" color=black]\n";
             for(const auto& pr : this->edges) {
@@ -106,8 +124,24 @@ namespace smt::noodler {
         }
     };
 
+    /**
+     * @brief Transition label for a counter system. In the form of left := sum[0] + sum[1] + ...
+     */
+    struct CounterLabel {
+        BasicTerm left;
+        std::vector<BasicTerm> sum;
+    };
+
+    inline bool operator<(const CounterLabel& lhs, const CounterLabel& rhs) {
+        if(lhs.left < rhs.left) {
+            return true;
+        } else if(lhs.left == rhs.left) {
+            return lhs.sum < rhs.sum;
+        }
+        return false;
+    }
+
     using NielsenLabel = std::pair<BasicTerm, Concat>;
-    using CounterLabel = std::pair<BasicTerm, LenNode>;
     using NielsenGraph = TransitionGraph<NielsenLabel>;
     using CounterSystem = TransitionGraph<CounterLabel>;
 
@@ -139,6 +173,7 @@ namespace smt::noodler {
         Formula trim_formula(const Formula& formula) const;
 
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
+        CounterSystem create_counter_system(const NielsenGraph& graph) const;
 
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
@@ -208,13 +243,25 @@ namespace smt::noodler {
         return ret;
     }
 
-    
-
     static std::string nielsen_label_to_string(const NielsenLabel& lab) {
         std::string ret;
         ret += lab.first.to_string() + " ↦";
         ret += concat_to_string_compact(lab.second);
         return ret;
+    }
+
+    static std::string counter_label_to_string(const CounterLabel& lab) {
+        std::string ret, sum;
+        ret += lab.left.to_string() + " := ";
+
+        for(const BasicTerm& bt : lab.sum) {
+            sum += bt.get_name().encode() + "+";
+        }
+        if(sum.size() > 0) {
+            sum.pop_back();
+        }
+
+        return ret + sum;
     }
 }
 
