@@ -84,16 +84,26 @@ namespace smt::noodler {
         scoped_vector<tvar_pair> m_word_diseq_var_todo;
 
 
-        scoped_vector<expr_pair> m_lang_eq_todo;
+        // constraints that are (possibly) to be processed in final_check_eh (added either in relevant_eh or ?assign_eh?)
+        // they also need to be popped and pushed in pop_scope_eh and push_scope_eh)
+        // TODO explain what is saved into the pairs
         scoped_vector<expr_pair> m_word_eq_todo;
         scoped_vector<expr_pair> m_word_diseq_todo;
+        scoped_vector<expr_pair> m_lang_eq_todo;
         scoped_vector<expr_pair> m_lang_diseq_todo;
         scoped_vector<expr_pair> m_not_contains_todo;
+        scoped_vector<expr_pair> m_stoi_todo;
         scoped_vector<expr_pair_flag> m_membership_todo;
+
+        // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
+        // todo constraints and check if they are relevant for current SAT assignment => if they are
+        // they are added to one of these sets
         vector<expr_pair> m_word_eq_todo_rel;
         vector<expr_pair> m_word_diseq_todo_rel;
-        vector<expr_pair_flag> m_lang_eq_todo_rel;
+        vector<expr_pair_flag> m_lang_eq_todo_rel; // also keeps lang diseqs, based on flag
+        // no m_not_contains_todo_rel, as we cannot solve that, we return unknown
         vector<expr_pair_flag> m_membership_todo_rel;
+        vector<expr_pair> m_stoi_todo_rel;
 
     public:
         char const * get_name() const override { return "noodler"; }
