@@ -60,7 +60,7 @@ namespace smt::noodler {
                 this->graphs.push_back(graph);
                 sat = sat && is_sat;
                 std::cout << "SAT: " << is_sat << std::endl;
-                std::cout << graph.trim().to_graphwiz() << std::endl;
+                std::cout << graph.trim().to_graphwiz(nielsen_label_to_string) << std::endl;
             }
             return sat;
         } else {
@@ -141,12 +141,12 @@ namespace smt::noodler {
      * @brief Get all possible applicable rewriting rules from a predicate
      * 
      * @param pred Equation
-     * @return std::set<NielsenGraph::Label> All possible Nielsen rewriting rules
+     * @return std::set<NielsenLabel> All possible Nielsen rewriting rules
      */
-    std::set<NielsenGraph::Label> NielsenDecisionProcedure::get_rules_from_pred(const Predicate& pred) const {
+    std::set<NielsenLabel> NielsenDecisionProcedure::get_rules_from_pred(const Predicate& pred) const {
         Concat left = pred.get_left_side();
         Concat right = pred.get_right_side();
-        std::set<NielsenGraph::Label> ret;
+        std::set<NielsenLabel> ret;
 
         if(left.size() > 0 && left[0].is_variable() && right.size() > 0) {
             ret.insert({left[0], Concat({right[0], left[0]})});
@@ -200,7 +200,7 @@ namespace smt::noodler {
                 continue;
             }
 
-            std::set<NielsenGraph::Label> rules = get_rules_from_pred(predicates[index]);
+            std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
                 graph.add_edge(pr.second, rpl, label);
