@@ -136,17 +136,6 @@ namespace smt::noodler::util {
     );
 
     /**
-     * Convert expression @p expr to regex in hexadecimal format accepted by RE2.
-     * @param[in] expr Expression to be converted to regex.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
-     * @return The resulting regex.
-     */
-    [[nodiscard]] std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
-                                                const std::set<uint32_t>& alphabet);
-
-    /**
      * Convert expression @p expr to NFA using hexadecimal values as symbols.
      * @param[in] expression Expression to be converted to regex.
      * @param[in] m_util_s Seq util for AST.

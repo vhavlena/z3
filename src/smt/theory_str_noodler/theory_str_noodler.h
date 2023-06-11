@@ -33,7 +33,6 @@ Eternal glory to Yu-Fang.
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "decision_procedure.h"
-#include "lang_decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
 #include "var_union_find.h"
@@ -146,6 +145,12 @@ namespace smt::noodler {
         expr_ref mk_first(expr* e);
         expr_ref mk_concat(expr* e1, expr* e2);
 
+        /**
+         * @brief Check if the length formula @p len_formula is satisfiable.
+         * 
+         * @param len_formula Formula to be check
+         * @return lbool Sat
+         */
         lbool check_len_sat(expr_ref len_formula, model_ref &mod);
 
 
@@ -188,7 +193,25 @@ namespace smt::noodler {
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
+        /**
+         * @brief Create fresh string variable
+         *
+         * @param name Static part of the name (will be concatenated with other parts
+         *  distinguishing the name)
+         * @return expr_ref Fresh string variable
+         * 
+         * FIXME same function is in util, we should keep one
+         */
         expr_ref mk_str_var(const std::string& name);
+        /**
+         * @brief Create fresh int variable
+         *
+         * @param name Static part of the name (will be concatenated with other parts
+         *  distinguishing the name)
+         * @return expr_ref Fresh int variable
+         * 
+         * FIXME same function is in util, we should keep one
+         */
         expr_ref mk_int_var(const std::string& name);
 
         void add_axiom(std::initializer_list<literal> ls);
@@ -223,8 +246,19 @@ namespace smt::noodler {
 
         void remove_irrelevant_constr();
 
+        /**
+        Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
+        variables (BasicTerm) to the corresponding z3 expr.
+        @param ex Z3 expression to be converted to Predicate.
+        @return Instance of predicate
+        */
         Predicate conv_eq_pred(app* expr);
 
+        /**
+        Convert conjunction of equations/disequations to the instance of @c Formula.
+        @param conj Conjunction in the form of a set of (dis)equations
+        @param[out] res Resulting formula
+        */
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
         Formula conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out);
 

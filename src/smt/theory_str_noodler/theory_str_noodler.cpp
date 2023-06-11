@@ -420,7 +420,7 @@ namespace smt::noodler {
             }
 
         } else {
-            // TODO do nothing if ite, because this function is called only in string_theory_propagation where ite is processed
+            // INFO do nothing if ite, because this function is called only in string_theory_propagation where ite is processed
         }
     }
 
@@ -434,45 +434,64 @@ namespace smt::noodler {
     void theory_str_noodler::relevant_eh(app *const n) {
         STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << std::endl;);
 
-        expr *arg;
-        if (m_util_s.str.is_length(n, arg)) {
-            STRACE("str", tout << "relevant-int: " << mk_pp(n, get_manager()) << std::endl;);
+        if (m_util_s.str.is_length(n)) { // str.len
             add_length_axiom(n);
 
-            // FIZME what is this? is it important? can we delete this?
-            if (!has_length(arg) && get_context().e_internalized(arg)) {
+            // FIXME what is this? is it important? can we delete this?
+            expr *arg;
+            if (m_util_s.str.is_length(n, arg) && !has_length(arg) && get_context().e_internalized(arg)) {
                 enforce_length(arg);
             }
-        }
-        if (m_util_s.str.is_extract(n)) {
-            handle_substr(n);
-        } else if (m_util_s.str.is_itos(n)) {
-            util::throw_error("unsupported itos");
-        } else if (m_util_s.str.is_stoi(n)) {
-            util::throw_error("unsupported stoi");
-        } else if (m_util_s.str.is_at(n)) {
+        } else if(m_util_s.str.is_lt(n)) { // str.<
+            util::throw_error("str.< is not supported");
+        } else if(m_util_s.str.is_le(n)) { // str.<=
+            util::throw_error("str.<= is not supported");
+        } else if (m_util_s.str.is_at(n)) { // str.at
             handle_char_at(n);
-        } else if (m_util_s.str.is_replace(n)) {
-            handle_replace(n);
-        } else if (m_util_s.str.is_index(n)) {
-            handle_index_of(n);
-        } else if(m_util_s.str.is_prefix(n)) {
+        } else if (m_util_s.str.is_extract(n)) { // str.substr
+            handle_substr(n);
+        } else if(m_util_s.str.is_prefix(n)) { // str.prefixof
             handle_prefix(n);
             handle_not_prefix(n);
-        } else if(m_util_s.str.is_suffix(n)) {
+        } else if(m_util_s.str.is_suffix(n)) { // str.suffixof
             handle_suffix(n);
             handle_not_suffix(n);
-        } else if(m_util_s.str.is_contains(n)) {
+        } else if(m_util_s.str.is_contains(n)) { // str.contains
             handle_contains(n);
             handle_not_contains(n);
-        } else if(m_util_s.str.is_replace_all(n)) {
-            util::throw_error("unsupported predicate");
-        } else if(m_util_s.str.is_replace_re_all(n)) {
-            util::throw_error("unsupported predicate");
-        } else if(m_util_s.str.is_replace_re(n)) {
-            util::throw_error("unsupported predicate");
+        } else if (m_util_s.str.is_index(n)) { // str.indexof
+            handle_index_of(n);
+        } else if (m_util_s.str.is_replace(n)) { // str.replace
+            handle_replace(n);
+        } else if(m_util_s.str.is_replace_all(n)) { // str.replace_all
+            util::throw_error("str.replace_all is not supported");
+        } else if(m_util_s.str.is_replace_re(n)) { // str.replace_re
+            util::throw_error("str.replace_re is not supported");
+        } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
+            util::throw_error("str.replace_re_all is not supported");
+        } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
+            util::throw_error("str.is_digit is not supported");
+        } else if (m_util_s.str.is_to_code(n)) { // str.to_code
+            util::throw_error("str.to_code is not supported");
+        } else if (m_util_s.str.is_from_code(n)) { // str.from_code
+            util::throw_error("str.from_code is not supported");
+        } else if (m_util_s.str.is_stoi(n)) { // str.to_int
+            util::throw_error("str.to_int is not supported");
+        } else if (m_util_s.str.is_itos(n)) { // str.from_int
+            util::throw_error("str.from_int is not supported");
+        } else if (
+            m_util_s.str.is_concat(n) || // str.++
+            m_util_s.re.is_to_re(n) || // str.to_re
+            m_util_s.str.is_in_re(n) || // str.in_re
+            m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...)
+            is_str_variable(n) || // string variable
+            // language variables should never occur here, they are always eliminated by rewriter I think
+            m_util_s.str.is_string(n) // string literal
+        ) {
+            // we do not need to handle these, concatenation is handled differently (TODO: explain better?)
+            // and everything else will be handled during final_check_eh
         } else {
-            // if we get here n is probably string variable or literal
+            util::throw_error("Unknown predicate/function from string theory (this should not happen)");
         }
 
     }
@@ -759,28 +778,53 @@ namespace smt::noodler {
             tout << "Relevant predicates:" << std::endl;
             tout << "  - eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_eq_todo_rel) {
-                tout << "    " << print_word_term(we.first) << std::flush << "=" << std::flush << print_word_term(we.second) << std::endl;
+                tout << "    " << mk_pp(we.first, m) << std::flush << " == " << std::flush << mk_pp(we.second, m) << std::endl;
             }
             tout << "  - diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_diseq_todo_rel) {
-                tout << "    " << print_word_term(we.first) << std::flush << "!=" << std::flush << print_word_term(we.second) << std::endl;
+                tout << "    " << mk_pp(we.first, m) << std::flush << " != " << std::flush << mk_pp(we.second, m) << std::endl;
             }
             tout << "  - membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_membership_todo_rel) {
-                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? "" : " not") << " in RE " << mk_pp(std::get<1>(we), m) << std::endl;
+                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? "" : " not") << " in " << mk_pp(std::get<1>(we), m) << std::endl;
             }
             tout << "  - lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_lang_eq_todo_rel) {
-                tout << "    " << mk_pp(std::get<0>(we), m) << std::flush << (std::get<2>(we) ? " = " : " != ") << std::flush << mk_pp(std::get<1>(we), m) << std::endl;
+                tout << "    " << mk_pp(std::get<0>(we), m) << std::flush << (std::get<2>(we) ? " == " : " != ") << std::flush << mk_pp(std::get<1>(we), m) << std::endl;
             }
         );
 
         // difficult not(contains) predicates -> unknown
         // TODO: should we check if any of those not contains are relevant? if we are not planning to check for relevancy, we can just throw error when we are processsing not contains in relevant_eh() and not here
         if(!this->m_not_contains_todo.empty()) {
+            STRACE("str", tout << "giving up, there is not contains" << std::endl);
             return FC_GIVEUP;
         }
 
+
+        // handle language (dis)equations first 
+        for(const auto& item : this->m_lang_eq_todo_rel) {
+            // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
+            // so both sides of the (dis)equations should be terms representing reg. languages
+
+            // get symbols from both sides
+            std::set<uint32_t> alphabet;
+            util::extract_symbols(std::get<0>(item), m_util_s, m, alphabet);
+            util::extract_symbols(std::get<1>(item), m_util_s, m, alphabet);
+
+            // construct NFAs for both sides
+            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false );
+
+            // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
+            bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
+            bool is_equation = std::get<2>(item);
+            if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
+                // TODO block_curr_lang is a bit weird, maybe we should just block the (dis)equation that does not hold
+                block_curr_lang();
+                return FC_DONE;
+            }
+        }
 
 
         /********************* GATHER WORD (DIS)EQUATIONS ***********************/
@@ -833,6 +877,7 @@ namespace smt::noodler {
 
         /********************** GATHER SYMBOLS **********************/
 
+        // TODO rewrite this, get symbols for each todo_rel on its own, do not get symbols from lang. (dis)eqs (as they were checked before this)
         // get symbols in the whole formula
         std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
                 m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_lang_eq_todo_rel, m_util_s, m
@@ -899,14 +944,6 @@ namespace smt::noodler {
         expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
-        AutAssignment lang_aut_ass;
-        Formula lang_instance = conv_lang_instance(symbols_in_formula, lang_aut_ass);
-        LangDecisionProcedure lang_proc{ lang_instance, lang_aut_ass, init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
-        lang_proc.init_computation();
-        if(!lang_proc.compute_next_solution()) {
-            block_curr_lang();
-            return FC_DONE;
-        }
 
         // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
         // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
@@ -2208,26 +2245,12 @@ namespace smt::noodler {
         );
     }
 
-    /**
-     * @brief Create fresh string variable
-     *
-     * @param name Static part of the name (will be concatenated with other parts
-     *  distinguishing the name)
-     * @return expr_ref Fresh string variable
-     */
     expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
         expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
             nullptr, this->m_util_s.mk_string_sort()), m);
         return var;
     }
 
-    /**
-     * @brief Create fresh int variable
-     *
-     * @param name Static part of the name (will be concatenated with other parts
-     *  distinguishing the name)
-     * @return expr_ref Fresh int variable
-     */
     expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
         sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
         expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
@@ -2235,12 +2258,6 @@ namespace smt::noodler {
         return var;
     }
 
-    /**
-    Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
-    variables (BasicTerm) to the corresponding z3 expr.
-    @param ex Z3 expression to be converted to Predicate.
-    @return Instance of predicate
-    */
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
@@ -2289,11 +2306,6 @@ namespace smt::noodler {
         return res;
     }
 
-    /**
-    Convert conjunction of equations/disequations to the instance of @c Formula.
-    @param conj Conjunction in the form of a set of (dis)equations
-    @param[out] res Resulting formula
-    */
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
         for(app *const pred : conj) {
             //print_ast(pred);
@@ -2313,12 +2325,6 @@ namespace smt::noodler {
         return init_lengths;
     }
 
-    /**
-     * @brief Check if the length formula @p len_formula is satisfiable.
-     * 
-     * @param len_formula Formula to be check
-     * @return lbool Sat
-     */
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
