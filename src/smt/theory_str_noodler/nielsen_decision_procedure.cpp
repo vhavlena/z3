@@ -290,13 +290,15 @@ namespace smt::noodler {
             }
         };
 
-        ret.set_init(graph.get_init());
+        // switch initial and final nodes
         for(const Formula& fin : graph.get_fins()) {
-            ret.add_fin(fin);
+            ret.set_init(fin);
         }
+        ret.add_fin(graph.get_init());
+        // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                ret.add_edge(pr.first, trans.first, conv_fnc(trans.second));
+                ret.add_edge(trans.first, pr.first, conv_fnc(trans.second));
             }
         }
         return ret;

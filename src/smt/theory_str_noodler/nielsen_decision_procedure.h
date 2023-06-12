@@ -105,6 +105,9 @@ namespace smt::noodler {
             std::set<Formula> generated;
             std::deque<Formula> worklist(this->fins.begin(), this->fins.end());
             ret.set_init(this->init);
+            for(const Formula& fin : this->get_fins()) {
+                ret.add_fin(fin);
+            }
             
             while(!worklist.empty()) {
                 Formula nd = worklist.front();
