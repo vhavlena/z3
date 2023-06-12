@@ -48,14 +48,6 @@ namespace {
                 result += right_side;
                 break;
             }
-            case PredicateType::Default: {
-                result = "default predicate type";
-                break;
-            }
-            case PredicateType::Contains: {
-                result = "contains predicate type";
-                break;
-            }
         }
         return result;
     }

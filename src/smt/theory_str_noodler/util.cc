@@ -216,36 +216,6 @@ namespace smt::noodler::util {
         return dummy_symbols;
     }
 
-    std::set<uint32_t> get_symbols_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
-            const vector<expr_pair_flag>& regexes,
-            const vector<expr_pair_flag>& lang_regexes,
-            const seq_util& m_util_s,
-            const ast_manager& m
-    ) {
-        std::set<uint32_t> symbols_in_formula{};
-        for (const auto &word_equation: equations) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: disequations) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: regexes) {
-            util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &lang_eq: lang_regexes) {
-            util::extract_symbols(std::get<0>(lang_eq), m_util_s, m, symbols_in_formula);
-            util::extract_symbols(std::get<1>(lang_eq), m_util_s, m, symbols_in_formula);
-        }
-        return symbols_in_formula;
-    }
-
     AutAssignment create_aut_assignment_for_formula(
             const Formula& instance,
             const vector<expr_pair_flag>& regexes,

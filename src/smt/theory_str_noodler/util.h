@@ -95,26 +95,6 @@ namespace smt::noodler::util {
     std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to);
 
     /**
-     * Get symbols for formula.
-     * @param[in] equations Vector of equations in formula to get symbols from.
-     * @param[in] disequations Vector of disequations in formula to get symbols from.
-     * @param[in] regexes Vector of regexes in formula to get symbols from.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @return Set of symbols in the whole formula.
-     *
-     * TODO: Test.
-     */
-    [[nodiscard]] std::set<uint32_t> get_symbols_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
-            const vector<expr_pair_flag>& regexes,
-            const vector<expr_pair_flag>& lang_regexes,
-            const seq_util& m_util_s,
-            const ast_manager& m
-    );
-
-    /**
      * Get automata assignment for formula.
      * @param[in] equations Vector of equations in formula to get symbols from.
      * @param[in] disequations Vector of disequations in formula to get symbols from.

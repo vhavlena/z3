@@ -96,9 +96,6 @@ namespace smt::noodler {
 
     std::string Predicate::to_string() const {
         switch (type) {
-            case PredicateType::Default: {
-                return "Default (missing type and data)";
-            }
             case PredicateType::Equation: {
                 std::string result{ "Equation:" };
                 for (const auto& item: get_left_side()) {
@@ -121,12 +118,6 @@ namespace smt::noodler {
                     result += " " + item.to_string();
                 }
                 return result;
-            }
-
-                // TODO: Implement prints for other predicates.
-
-            case PredicateType::Contains: {
-                break;
             }
         }
 
@@ -181,9 +172,6 @@ namespace smt::noodler {
             case BasicTermType::Variable:
                 return name.encode();
             case BasicTermType::Length:
-            case BasicTermType::Substring:
-            case BasicTermType::IndexOf:
-            case BasicTermType::Lang:
                 return name.encode() + " (" + noodler::to_string(type) + ")";
                 // TODO: Decide what will have names and when to use them.
         }

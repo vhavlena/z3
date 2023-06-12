@@ -877,11 +877,20 @@ namespace smt::noodler {
 
         /********************** GATHER SYMBOLS **********************/
 
-        // TODO rewrite this, get symbols for each todo_rel on its own, do not get symbols from lang. (dis)eqs (as they were checked before this)
-        // get symbols in the whole formula
-        std::set<uint32_t> symbols_in_formula{ util::get_symbols_for_formula(
-                m_word_eq_todo_rel, m_word_diseq_todo_rel, m_membership_todo_rel, m_lang_eq_todo_rel, m_util_s, m
-        )};
+        std::set<uint32_t> symbols_in_formula{};
+        for (const auto &word_equation: m_word_eq_todo_rel) {
+            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto &word_equation: m_word_diseq_todo_rel) {
+            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+        }
+
+        for (const auto &word_equation: m_membership_todo_rel) {
+            util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
+        }
 
         /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
          * We need some dummy symbols, to represent the symbols not occuring in predicates,
@@ -2284,26 +2293,6 @@ namespace smt::noodler {
         util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
-    }
-
-    Formula theory_str_noodler::conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out) {
-        Formula res;
-        int cnt = 0;
-
-        for(const auto& item : this->m_lang_eq_todo_rel) {
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false, false );
-            PredicateType tp = std::get<2>(item) ? PredicateType::Equation : PredicateType::Inequation;
-
-            BasicTerm t1(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
-            BasicTerm t2(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
-
-            out[t1] = std::make_shared<Mata::Nfa::Nfa>(nfa1);
-            out[t2] = std::make_shared<Mata::Nfa::Nfa>(nfa2);
-            res.add_predicate(Predicate(tp, {Concat({t1}), Concat({t2})}));
-        }
-
-        return res;
     }
 
     void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {

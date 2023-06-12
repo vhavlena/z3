@@ -28,23 +28,16 @@
 
 namespace smt::noodler {
     enum struct PredicateType {
-        Default,
         Equation,
         Inequation,
-        Contains,
-        // TODO: Add additional predicate types.
     };
 
     [[nodiscard]] static std::string to_string(PredicateType predicate_type) {
         switch (predicate_type) {
-            case PredicateType::Default:
-                return "Default";
             case PredicateType::Equation:
                 return "Equation";
             case PredicateType::Inequation:
                 return "Inequation";
-            case PredicateType::Contains:
-                return "Contains";
         }
 
         throw std::runtime_error("Unhandled predicate type passed to to_string().");
@@ -54,10 +47,6 @@ namespace smt::noodler {
         Variable,
         Literal,
         Length,
-        Substring,
-        IndexOf,
-        Lang,
-        // TODO: Add additional basic term types.
     };
 
     [[nodiscard]] static std::string to_string(BasicTermType term_type) {
@@ -68,12 +57,6 @@ namespace smt::noodler {
                 return "Literal";
             case BasicTermType::Length:
                 return "Length";
-            case BasicTermType::Substring:
-                return "Substring";
-            case BasicTermType::IndexOf:
-                return "IndexOf";
-            case BasicTermType::Lang:
-                return "Lang";
         }
 
         throw std::runtime_error("Unhandled basic term type passed to to_string().");
@@ -201,7 +184,7 @@ namespace smt::noodler {
             Right,
         };
 
-        Predicate() : type(PredicateType::Default) {}
+        Predicate() : type(PredicateType::Equation) {}
         explicit Predicate(const PredicateType type): type(type) {
             if (is_equation() || is_inequation()) {
                 params.resize(2);

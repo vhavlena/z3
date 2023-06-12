@@ -260,7 +260,6 @@ namespace smt::noodler {
         @param[out] res Resulting formula
         */
         void conj_instance(const obj_hashtable<app>& conj, Formula &res);
-        Formula conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out);
 
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
