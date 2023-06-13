@@ -178,6 +178,9 @@ namespace smt::noodler {
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
         CounterSystem create_counter_system(const NielsenGraph& graph) const;
 
+        static void condensate_counter_system(CounterSystem& cs);
+        static bool join_counter_label(const CounterLabel& l1, const CounterLabel& l2, CounterLabel & res);
+
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
 

@@ -64,6 +64,7 @@ namespace smt::noodler {
                 std::cout << graph.to_graphwiz(nielsen_label_to_string) << std::endl;
 
                 CounterSystem counter_system = create_counter_system(graph);
+                condensate_counter_system(counter_system);
                 std::cout << counter_system.to_graphwiz(counter_label_to_string);
 
             }
@@ -302,6 +303,66 @@ namespace smt::noodler {
             }
         }
         return ret;
+    }
+
+    /**
+     * @brief Checks if two counter labels are compatible and if yes, join them. Two counter labels are 
+     * compatible if they are of the form x := x + k and x := x + l. The resulting label will be 
+     * x := x + (k + l).
+     * 
+     * @param l1 First counter label
+     * @param l2 Second counter label
+     * @param res Potential result
+     * @return Compatible.
+     */
+    bool NielsenDecisionProcedure::join_counter_label(const CounterLabel& l1, const CounterLabel& l2, CounterLabel & res) {
+        if(l1.left == l2.left && l2.sum.size() == l1.sum.size() && l2.sum.size() == 2 && 
+            l1.sum[1].get_type() == BasicTermType::Length && l2.sum[1].get_type() == BasicTermType::Length) {
+            
+            zstring sm = std::to_string(std::stoi(l1.sum[1].get_name().encode()) + std::stoi(l2.sum[1].get_name().encode()));
+            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)}};
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @brief Condensate the counter system-
+     * 
+     * @param cs Counter system.
+     */
+    void NielsenDecisionProcedure::condensate_counter_system(CounterSystem& cs) {
+
+        // the reverse counter system
+        CounterSystem rev = cs.reverse();
+
+        // find edges of the form fl --> mid --> last with compatible labels and mid has no 
+        // incomming edges and just one outcomming.
+        // Compatible labels: labels of the form x := x + 1; x := x + 1 which can be 
+        // simplified to x := x + 2.
+        for(const Formula& fl : cs.get_nodes()) {
+            std::set<std::pair<Formula, CounterLabel>> rem_edges;
+            for(const auto& pr : cs.edges[fl]) {
+                Formula mid = pr.first;
+                CounterLabel mid_lab = pr.second;
+                auto it_last = cs.edges.find(mid);
+                if(it_last != cs.edges.end() && it_last->second.size() == 1 && rev.edges[mid].size() == 1) {
+                    Formula last = it_last->second.begin()->first;
+                    CounterLabel last_lab = it_last->second.begin()->second;
+                    // sum of two compatible labels  
+                    CounterLabel res{BasicTerm(BasicTermType::Length)};
+                    if(join_counter_label(mid_lab, last_lab, res)) {
+                        rem_edges.insert(pr);
+                        cs.edges[fl].insert({last, res});
+                        cs.edges.erase(mid);
+                    }
+                }
+            }
+            // remove the original edge from fl
+            for(const auto& pr : rem_edges) {
+                cs.edges[fl].erase(pr);
+            }
+        }
     }
 
 } // Namespace smt::noodler.
