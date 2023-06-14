@@ -65,7 +65,15 @@ namespace smt::noodler {
 
                 CounterSystem counter_system = create_counter_system(graph);
                 condensate_counter_system(counter_system);
-                std::cout << counter_system.to_graphwiz(counter_label_to_string);
+                std::cout << counter_system.to_graphwiz(counter_label_to_string) << std::endl;
+
+                for(const auto& c : find_self_loops(counter_system)) {
+                    auto path = get_length_path(counter_system, c);
+                    for(const auto& c : path.labels) {
+                        std::cout << counter_label_to_string(c) << " ";
+                    }
+                    std::cout << std::endl;
+                }
 
             }
             return sat;
@@ -327,7 +335,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Condensate the counter system-
+     * @brief Condensate the counter system.
      * 
      * @param cs Counter system.
      */
@@ -363,6 +371,44 @@ namespace smt::noodler {
                 cs.edges[fl].erase(pr);
             }
         }
+    }
+
+    /**
+     * @brief Find self-loops suitable for length formula conversion. Self-loops of the form x := x + k,
+     * where x is a lenght sensitive variable.
+     * 
+     * @param cs Counter system
+     * @return std::set<Formula> Set of nodes containing a suitable self-loop. 
+     */
+    std::set<Formula> NielsenDecisionProcedure::find_self_loops(const CounterSystem& cs) const {
+        std::set<Formula> self_loops;
+        for(const Formula& node : cs.get_nodes()) {
+            auto it = cs.edges.find(node);
+            if(it != cs.edges.end()) {
+                for(const auto& pr : it->second) {
+                    auto lab_it = this->init_length_sensitive_vars.find(pr.second.left);
+                    if(pr.first == node && pr.second.sum[1].get_type() == BasicTermType::Length && 
+                        lab_it != this->init_length_sensitive_vars.end()) {
+                        self_loops.insert(node);
+                    }
+                }
+            }
+        }
+        return self_loops;
+    }
+
+    /**
+     * @brief Get path containing a node @p sl, which is expected to have a suitable self-loop.
+     * 
+     * @param cs Counter system
+     * @param sl Node with a suitable self-loop
+     * @return Path<CounterLabel> Shortest path containing the node @p sl.
+     */
+    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const Formula& sl) {
+        Path<CounterLabel> first = cs.shortest_path_edge(cs.get_init(), sl);
+        Path<CounterLabel> last = cs.shortest_path_edge(sl, *cs.get_fins().begin());
+        first.append(last);
+        return first;
     }
 
 } // Namespace smt::noodler.
