@@ -595,7 +595,7 @@ namespace smt::noodler {
 
             // check whether disequalities are satisfiable
             // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
-            // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+            // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocessor::replace_disequalities()
             lengths = this->m.mk_and(lengths, len_diseqs(variable_map, solution));
             
         }
@@ -744,78 +744,6 @@ namespace smt::noodler {
         worklist.push_back(initialWlEl);
     }
 
-    /**
-     * @brief Preprocessing.
-     */
-    void DecisionProcedure::preprocess(PreprocessType opt) {
-        // As a first add string literals to the automata assignment with automaton representing their string literal.
-        add_str_lits_to_init_aut_ass();
-        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
-
-        // So-far just lightweight preprocessing
-        this->prep_handler.reduce_diseqalities();
-        if (opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
-        }
-        this->prep_handler.propagate_variables();
-        this->prep_handler.propagate_eps();
-        this->prep_handler.remove_regular();
-        this->prep_handler.skip_len_sat();
-        this->prep_handler.generate_identities();
-        this->prep_handler.propagate_variables();
-        this->prep_handler.refine_languages();
-        this->prep_handler.reduce_diseqalities();
-        this->prep_handler.remove_trivial();
-        this->prep_handler.reduce_regular_sequence(3);
-        this->prep_handler.remove_regular();
-
-        // the following should help with Leetcode
-        /// TODO: should be simplyfied? So many preprocessing steps now
-        STRACE("str",
-            tout << "Variable equivalence classes: " << std::endl;
-            for(const auto& t : len_eq_vars) {
-                for (const auto& s : t) {
-                    tout << s.to_string() << " ";
-                }
-                tout << std::endl;
-            }   
-        );
-        this->prep_handler.generate_equiv(this->len_eq_vars);
-        this->prep_handler.propagate_variables();
-        this->prep_handler.generate_identities();
-        this->prep_handler.remove_regular();
-        this->prep_handler.propagate_variables();
-        // underapproximation
-        if(opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
-            this->prep_handler.skip_len_sat();
-            this->prep_handler.reduce_regular_sequence(3);
-            this->prep_handler.remove_regular();
-            this->prep_handler.skip_len_sat();
-        }
-        // replace disequalities
-        this->prep_handler.replace_disequalities();
-
-        // Refresh the instance
-        this->init_aut_ass = this->prep_handler.get_aut_assignment();
-        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
-        this->formula = this->prep_handler.get_modified_formula();
-
-        if(this->formula.get_predicates().size() > 0) {
-            this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
-        }
-
-        STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
-        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
-        STRACE("str",
-            tout << "Disequation formulas after preprocessing:" << std::endl;
-            for (const auto &bla : prep_handler.get_diseq_len()) {
-                bla.first.first.get_name();
-                tout << "     " << bla.second.second << " || (" << bla.second.first << " && " << bla.first.first.get_name() << " != " << bla.first.second.get_name() << ")" << std::endl;
-            }  
-        );
-        STRACE("str", tout << "preprocess-output:" << std::endl << this->formula.to_string() << std::endl; );
-    }
 
     /**
      * @brief Make a length constraint for a single NFA loop, handle
@@ -852,28 +780,6 @@ namespace smt::noodler {
         }
         res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(var, this->m_util_a.mk_int(0))), this->m);
         return res;
-    }
-    
-    void DecisionProcedure::add_str_lits_to_init_aut_ass() {
-        size_t counter{ 0 };
-        std::map<zstring, zstring> str_literals{};
-        for (auto& predicate : formula.get_predicates()) {
-            if (predicate.is_eq_or_ineq()) {
-                add_str_lits_to_init_aut_ass_for_side(predicate.get_left_side());
-                add_str_lits_to_init_aut_ass_for_side(predicate.get_right_side());
-            }
-        }
-    }
-
-    void DecisionProcedure::add_str_lits_to_init_aut_ass_for_side(std::vector<BasicTerm>& side) {
-        for (auto& term : side) {
-            if (term.is_literal()) { // Handle string literal.
-                if (init_aut_ass.find(term) == init_aut_ass.end()) {
-                    Nfa nfa{ util::create_word_nfa(term.get_name()) };
-                    init_aut_ass.emplace(term, std::make_shared<Nfa>(std::move(nfa)));
-                }
-            }
-        }
     }
 
 } // Namespace smt::noodler.

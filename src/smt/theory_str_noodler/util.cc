@@ -216,6 +216,7 @@ namespace smt::noodler::util {
         return dummy_symbols;
     }
 
+    // TODO move this to theory_str_noodler as part of get_formula_with_aut_assignemnt_and_len_vars or something
     AutAssignment create_aut_assignment_for_formula(
             const Formula& instance,
             const vector<expr_pair_flag>& regexes,
@@ -224,25 +225,15 @@ namespace smt::noodler::util {
             const ast_manager& m,
             const std::set<uint32_t>& noodler_alphabet
     ) {
-        // Find all variables in the whole formula.
-        std::unordered_set<BasicTerm> variables_in_formula{};
-
-        for (const auto &pred: instance.get_predicates()) {
-            auto vars = pred.get_vars();
-            variables_in_formula.insert(vars.begin(), vars.end());
-        }
-
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
-        // Create automata from their corresponding regexes.
-        std::unordered_set<std::string> variables_with_regex{};
         for (const auto &word_equation: regexes) {
             const auto& variable{ std::get<0>(word_equation) };
             assert(is_app(variable));
             const auto& variable_app{ to_app(variable) };
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
-            variables_with_regex.insert(variable_name);
+            // TODO are we sure that variable is really variable and not string literal? i.e. can Z3 give us `string literal in RE`?
             const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
@@ -256,24 +247,35 @@ namespace smt::noodler::util {
 
             } else { // We create a regular constraint for the current variable for the first time.
                 aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+                // TODO explain after this function is moved to theory_str_noodler, we do this because var_name contains only variables occuring in instance and not those that occur only in str.in_re
                 var_name.insert({variable_term, variable});
             }
         }
 
-        // Assign sigma start automata for all yet unassigned variables.
+        // create sigma star automaton for our alphabet
         Mata::OnTheFlyAlphabet mata_alphabet;
         std::string hex_symbol_string;
         for (const uint32_t symbol : noodler_alphabet) {
             mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
         }
-
         auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::create_sigma_star_nfa(&mata_alphabet));
-        // remove the pointer to alphabet in the automaton, as it point to local variable (and we have the alphabet in aut_assignment)
+        // remove the pointer to alphabet in the automaton, as it points to local variable (and we have the alphabet in aut_assignment)
         nfa_sigma_star->alphabet = nullptr;
-        for (const auto& variable : variables_in_formula) {
-            if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
-                assert(aut_assignment.find(variable) == aut_assignment.end());
-                aut_assignment[variable] = nfa_sigma_star;
+
+        // some variables/literals are not assigned to anything yet, we need to fix that
+        for (const auto &pred : instance.get_predicates()) {
+            for (const auto &side : pred.get_params()) {
+                for (const auto &var_or_literal : side) {
+                    if (var_or_literal.is_variable() && aut_assignment.find(var_or_literal) == aut_assignment.end()) {
+                        // assign sigma star automaton for all yet unassigned variables
+                        aut_assignment[var_or_literal] = nfa_sigma_star;
+                    } else if (var_or_literal.is_literal()) {
+                        // to string literals. assign automaton accepting the word denoted by the literal
+                        // TODO if Z3 can give us `string literal in RE` then we should check if aut_assignment does not contain this literal already (if yes, do intersection)
+                        Nfa nfa{ util::create_word_nfa(var_or_literal.get_name()) };
+                        aut_assignment.emplace(var_or_literal, std::make_shared<Nfa>(std::move(nfa)));
+                    }
+                }
             }
         }
 

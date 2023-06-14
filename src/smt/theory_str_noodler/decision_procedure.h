@@ -15,14 +15,6 @@
 namespace smt::noodler {
 
     /**
-     * @brief Preprocess options
-     */
-    enum PreprocessType {
-        PLAIN,
-        UNDERAPPROX
-    };
-
-    /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
      */
@@ -34,10 +26,6 @@ namespace smt::noodler {
          */
         virtual void init_computation() {
             throw std::runtime_error("Unimplemented");
-        }
-
-        virtual void preprocess(PreprocessType opt) {
-            throw std::runtime_error("preprocess unimplemented");
         }
 
         /**
@@ -217,8 +205,6 @@ namespace smt::noodler {
         // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
         unsigned noodlification_no = 0;
 
-        FormulaPreprocess prep_handler;
-
         // a deque containing states of decision procedure, each of them can lead to a solution
         std::deque<SolvingState> worklist;
 
@@ -233,19 +219,11 @@ namespace smt::noodler {
         Formula formula;
         AutAssignment init_aut_ass;
         const theory_str_noodler_params& m_params;
-        // equivalence class holding variables with the same length
-        BasicTermEqiv len_eq_vars;
 
-        /**
-         * @brief Add all string literals in @c formula to initial automata assignment.
-         */
-        void add_str_lits_to_init_aut_ass();
 
-        /**
-         * Adds string literals to initial automata assignment.
-         * @param side Side for which to add literals.
-         */
-        void add_str_lits_to_init_aut_ass_for_side(std::vector<BasicTerm>& side);
+        // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
+        std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
+
 
 
         expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
@@ -269,7 +247,7 @@ namespace smt::noodler {
          * decision procedure returns SAT. Creates length constraint representing the conjunct:
          * "a1 equals one of its chars" and "a2 equals one of its chars" and "a1 != a2"
          * 
-         * See also len_diseqs and FormulaPreprocess::replace_disequalities().
+         * See also len_diseqs and FormulaPreprocessor::replace_disequalities().
          * 
          * @param state the solving state whose automata assignment and substitution map will be used
          * @param pr pair (a1, a2) of the variables whose disequality we are checking
@@ -279,7 +257,7 @@ namespace smt::noodler {
         /**
          * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint
          * (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
-         * where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
+         * where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocessor::replace_disequalities()
          * 
          * @param variable_map Mapping of BasicTerm variables to Z3 expressions
          * @param state Solving state from which the lengths are created
@@ -288,13 +266,6 @@ namespace smt::noodler {
         expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
 
     public:
-
-        DecisionProcedure(ast_manager &m, seq_util &m_util_s, arith_util &m_util_a, const theory_str_noodler_params &par) 
-          : prep_handler(Formula(), AutAssignment(), {}, par),
-            m(m),
-            m_util_s(m_util_s),
-            m_util_a(m_util_a),
-            m_params(par) { }
         
         /**
          * Initialize a new decision procedure that can solve word equations
@@ -304,7 +275,7 @@ namespace smt::noodler {
          * occur in some length constraint in the rest of the formula).
          * 
          * @param equalities encodes the word equations
-         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
+         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
          * @param m Z3 AST manager
          * @param m_util_s Z3 string manager
@@ -316,17 +287,14 @@ namespace smt::noodler {
              Formula equalities, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
              ast_manager &m, seq_util &m_util_s, arith_util &m_util_a,
-             BasicTermEqiv len_eq_vars,
              const theory_str_noodler_params &par
-        ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par),
-            m{m},
+        ) : m{m},
             m_util_s{m_util_s},
             m_util_a{m_util_a},
             init_length_sensitive_vars(init_length_sensitive_vars),
             formula(equalities),
             init_aut_ass(init_aut_ass),
-            m_params(par),
-            len_eq_vars(len_eq_vars) { }
+            m_params(par) { }
         
         bool compute_next_solution() override;
 
@@ -339,8 +307,6 @@ namespace smt::noodler {
          */
         expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
-
-        void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 
