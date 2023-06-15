@@ -690,6 +690,7 @@ namespace smt::noodler {
     regular constraints that are not relevant for SAT checking.
     */
     void theory_str_noodler::remove_irrelevant_constr() {
+        STRACE("str", tout << "Remove irrevelant" << std::endl);
 
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
@@ -700,62 +701,67 @@ namespace smt::noodler {
             app_ref eq(m.mk_eq(we.first, we.second), m);
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
 
-            if(!ctx.is_relevant(eq.get()) && !ctx.is_relevant(eq_rev.get())) {
-                STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
-                ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
-
-                continue;
-            }
-
-            // if(ctx.is_relevant(eq_rev.get())) {
-                if(!this->m_word_eq_todo_rel.contains({we.second, we.first})) {
-                    this->m_word_eq_todo_rel.push_back({we.second, we.first});
-                }
-                continue;
-            // }
-            // if(ctx.is_relevant(eq.get())) {
-                if(!this->m_word_eq_todo_rel.contains(we)) {
-                    this->m_word_eq_todo_rel.push_back(we);
-                }
-                continue;
-           //  }
-
-            STRACE("str", tout << "remove_irrelevant_eqs: " << mk_pp(eq.get(), m) << " relevant: " <<
-                ctx.is_relevant(eq.get()) << " assign: " << ctx.find_assignment(eq.get()) << " " << ctx.is_relevant(eq_rev.get()) << '\n';);
-        }
-
-        for (const auto& we : m_word_diseq_todo) {
-            app_ref eq(m.mk_eq(we.first, we.second), m);
-            app_ref dis(m.mk_not(eq), m);
-            if(!ctx.is_relevant(dis.get())) {
-                STRACE("str", tout << "remove_irrelevant NEQ: " << mk_pp(dis.get(), m) << " relevant: " <<
-                    ctx.is_relevant(dis.get()) << " assign: " << ctx.find_assignment(dis.get()) << '\n';);
-                continue;
-            }
-
-            // Sometimes we have both L != R and R != L; we keep only one of them
-            if(!this->m_word_diseq_todo_rel.contains(we) && !this->m_word_diseq_todo_rel.contains({we.second, we.first})) {
-                this->m_word_diseq_todo_rel.push_back(we);
+            STRACE("str",
+                tout << "  Eq " << mk_pp(eq.get(), m) << " is " << ctx.is_relevant(eq.get()) ? "" : "not " << "relevant"
+                     << " with assignment " << ctx.find_assignment(eq.get())
+                     << " and its reverse is " << ctx.is_relevant(eq_rev.get()) ? "" : "not " << "relevant" << std::endl;
+            );
+            
+            // check if equation or its reverse are relevant (we check reverse to be safe) and...
+            if((ctx.is_relevant(eq.get()) || ctx.is_relevant(eq_rev.get())) &&
+               // ...neither equation nor its reverse are saved as relevant yet
+               !this->m_word_eq_todo_rel.contains(we) && !this->m_word_eq_todo_rel.contains({we.second, we.first})
+               ) {
+                // save it as relevant
+                this->m_word_eq_todo_rel.push_back(we);
             }
         }
 
-        for (const auto& we : this->m_membership_todo) {
-            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
-            app_ref in_app_prev(m_util_s.re.mk_in_re(std::get<0>(we), std::get<1>(we)), m);
-            if(!std::get<2>(we)){
-                in_app = m.mk_not(in_app);
-            }
-            if(ctx.is_relevant(in_app.get()) || ctx.is_relevant(in_app_prev.get())) {
-                if(!this->m_membership_todo_rel.contains(we)) {
-                    this->m_membership_todo_rel.push_back(we);
-                }
-                continue;
-            } else {
-                 STRACE("str", tout << "remove_irrelevant RE: " << mk_pp(in_app.get(), m) << " relevant: " <<
-                    ctx.is_relevant(in_app.get()) << " assign: " << ctx.find_assignment(in_app.get()) << '\n';);
+        for (const auto& wd : m_word_diseq_todo) {
+            app_ref dis(m.mk_not(m.mk_eq(wd.first, wd.second)), m);
+            app_ref dis_rev(m.mk_not(m.mk_eq(wd.second, wd.first)), m);
+
+            STRACE("str",
+                tout << "  Diseq " << mk_pp(dis.get(), m) << " is " << ctx.is_relevant(dis.get()) ? "" : "not " << "relevant"
+                     << " with assignment " << ctx.find_assignment(dis.get())
+                     << " and its reverse is " << ctx.is_relevant(dis_rev.get()) ? "" : "not " << "relevant" << std::endl;
+            );
+            
+            // check if disequation or its reverse are relevant (we check reverse to be safe) and...
+            if((ctx.is_relevant(dis.get()) || ctx.is_relevant(dis_rev.get())) &&
+               // ...neither disequation nor its reverse are saved as relevant yet
+               !this->m_word_diseq_todo_rel.contains(wd) && !this->m_word_diseq_todo_rel.contains({wd.second, wd.first})
+               ) {
+                // save it as relevant
+                this->m_word_diseq_todo_rel.push_back(wd);
             }
         }
 
+        for (const auto& memb : this->m_membership_todo) {
+            app_ref memb_app(m_util_s.re.mk_in_re(std::get<0>(memb), std::get<1>(memb)), m);
+            app_ref memb_app_orig(m_util_s.re.mk_in_re(std::get<0>(memb), std::get<1>(memb)), m);
+            if(!std::get<2>(memb)){
+                memb_app = m.mk_not(memb_app);
+
+            }
+            
+            STRACE("str",
+                tout << "  " << mk_pp(memb_app.get(), m) << " is " << ctx.is_relevant(memb_app.get()) ? "" : "not " << "relevant"
+                     << " with assignment " << ctx.find_assignment(memb_app.get())
+                     << ", " << mk_pp(memb_app_orig.get(), m) << " is " << ctx.is_relevant(memb_app_orig.get()) ? "" : "not " << "relevant"
+                     << std::endl;
+            );
+
+            // check if membership (or if we have negation, its negated form) is relevant and...
+            if(ctx.is_relevant(memb_app.get()) || ctx.is_relevant(memb_app_orig.get()) &&
+               // this membership constraint is not added to relevant yet
+               !this->m_membership_todo_rel.contains(memb)
+               ) {
+                this->m_membership_todo_rel.push_back(memb);
+            }
+        }
+
+        // TODO check for relevancy of language (dis)equations, right now we assume everything is relevant
         for(const auto& we : m_lang_eq_todo) {
             this->m_lang_eq_todo_rel.push_back({we.first, we.second, true});
         }

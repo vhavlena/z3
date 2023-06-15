@@ -241,6 +241,9 @@ namespace smt::noodler {
         void update_len_state_var(const obj_hashtable<expr>& conj, const app_ref& bool_var);
         std::vector<app_ref> find_state_var(const obj_hashtable<expr>& conj);
 
+        /**
+         * @brief Adds string constraints from ..._todo that are relevant for SAT checking to ..._todo_rel.
+         */
         void remove_irrelevant_constr();
 
         /**
