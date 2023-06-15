@@ -44,7 +44,6 @@ namespace smt::noodler {
     protected:
 
         int m_scope_level = 0;
-        static bool is_over_approximation;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
         arith_util m_util_a;
@@ -91,7 +90,6 @@ namespace smt::noodler {
         scoped_vector<expr_pair> m_lang_eq_todo;
         scoped_vector<expr_pair> m_lang_diseq_todo;
         scoped_vector<expr_pair> m_not_contains_todo;
-        scoped_vector<expr_pair> m_stoi_todo;
         scoped_vector<expr_pair_flag> m_membership_todo;
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
@@ -102,7 +100,6 @@ namespace smt::noodler {
         vector<expr_pair_flag> m_lang_eq_todo_rel; // also keeps lang diseqs, based on flag
         // no m_not_contains_todo_rel, as we cannot solve that, we return unknown
         vector<expr_pair_flag> m_membership_todo_rel;
-        vector<expr_pair> m_stoi_todo_rel;
 
     public:
         char const * get_name() const override { return "noodler"; }

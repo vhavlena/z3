@@ -21,7 +21,6 @@ Eternal glory to Yu-Fang.
 
 
 namespace smt::noodler {
-    bool theory_str_noodler::is_over_approximation = false;
 
     namespace {
         bool IN_CHECK_FINAL = false;
@@ -48,7 +47,6 @@ namespace smt::noodler {
     }
 
     enode *theory_str_noodler::ensure_enode(expr *e) {
-        context &ctx = get_context();
         if (!ctx.e_internalized(e)) {
             ctx.internalize(e, false);
         }
