@@ -778,11 +778,11 @@ namespace smt::noodler {
             tout << "Relevant predicates:" << std::endl;
             tout << "  - eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_eq_todo_rel) {
-                tout << "    " << mk_pp(we.first, m) << std::flush << " == " << std::flush << mk_pp(we.second, m) << std::endl;
+                tout << "    " << mk_pp(we.first, m) << " == " << mk_pp(we.second, m) << std::endl;
             }
             tout << "  - diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_diseq_todo_rel) {
-                tout << "    " << mk_pp(we.first, m) << std::flush << " != " << std::flush << mk_pp(we.second, m) << std::endl;
+                tout << "    " << mk_pp(we.first, m) << " != " << mk_pp(we.second, m) << std::endl;
             }
             tout << "  - membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_membership_todo_rel) {
@@ -790,7 +790,7 @@ namespace smt::noodler {
             }
             tout << "  - lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_lang_eq_todo_rel) {
-                tout << "    " << mk_pp(std::get<0>(we), m) << std::flush << (std::get<2>(we) ? " == " : " != ") << std::flush << mk_pp(std::get<1>(we), m) << std::endl;
+                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? " == " : " != ") << mk_pp(std::get<1>(we), m) << std::endl;
             }
         );
 
@@ -802,29 +802,41 @@ namespace smt::noodler {
         }
 
 
-        // handle language (dis)equations first 
+        /********************************* LANGAGUGE (DIS)EQUATIONS **************************/
         for(const auto& item : this->m_lang_eq_todo_rel) {
             // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
             // so both sides of the (dis)equations should be terms representing reg. languages
+            auto left_side = std::get<0>(item);
+            auto right_side = std::get<1>(item);
+            bool is_equation = std::get<2>(item);
+
+            STRACE("str",
+                tout << "Checking lang (dis)eq: " << mk_pp(left_side, m) << (is_equation ? " == " : " != ") << mk_pp(right_side, m) << std::endl;
+            );
 
             // get symbols from both sides
             std::set<uint32_t> alphabet;
-            util::extract_symbols(std::get<0>(item), m_util_s, m, alphabet);
-            util::extract_symbols(std::get<1>(item), m_util_s, m, alphabet);
+            util::extract_symbols(left_side, m_util_s, m, alphabet);
+            util::extract_symbols(right_side, m_util_s, m, alphabet);
 
             // construct NFAs for both sides
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
-            bool is_equation = std::get<2>(item);
             if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
-                // TODO block_curr_lang is a bit weird, maybe we should just block the (dis)equation that does not hold
-                block_curr_lang();
+                // the language (dis)equation does not hold => block it and return
+                app_ref lang_eq(ctx.mk_eq_atom(left_side, right_side), m);
+                if(is_equation){
+                    add_axiom(m.mk_not(lang_eq));
+                } else {
+                    add_axiom(lang_eq);
+                }
                 return FC_DONE;
             }
         }
+        /**************************************************************************************/
 
 
         /********************* GATHER WORD (DIS)EQUATIONS ***********************/
@@ -2219,23 +2231,6 @@ namespace smt::noodler {
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
         return true;
-    }
-
-    void theory_str_noodler::block_curr_lang() {
-        context& ctx = get_context();
-        expr *refinement = nullptr;
-
-        for (const auto& in : this->m_lang_eq_todo_rel) {
-            app_ref in_app(ctx.mk_eq_atom(std::get<0>(in), std::get<1>(in)), m);
-            if(!std::get<2>(in)){
-                in_app = m.mk_not(in_app);
-            }
-            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
-        }
-
-        if (refinement != nullptr) {
-            add_axiom(m.mk_not(refinement));
-        }
     }
 
     void theory_str_noodler::dump_assignments() const {

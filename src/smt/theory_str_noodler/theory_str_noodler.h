@@ -228,7 +228,6 @@ namespace smt::noodler {
         void block_curr_assignment();
         bool block_curr_len(expr_ref len_formula);
         expr_ref construct_refinement();
-        void block_curr_lang();
         void dump_assignments() const;
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
         void propagate_concat_axiom(enode * cat);
