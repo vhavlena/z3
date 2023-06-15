@@ -685,10 +685,6 @@ namespace smt::noodler {
 
     }
 
-    /**
-    Remove irrelevant string constraints. In particular remove equations, disequations, and
-    regular constraints that are not relevant for SAT checking.
-    */
     void theory_str_noodler::remove_irrelevant_constr() {
         STRACE("str", tout << "Remove irrevelant" << std::endl);
 
