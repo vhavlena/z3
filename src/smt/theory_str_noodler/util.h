@@ -220,77 +220,7 @@ namespace smt::noodler::util {
      * @param m_util_a arith ast util
      * @return expr_ref
      */
-    static expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
-        switch(node.type) {
-        case LenFormulaType::LEAF:
-            if(node.atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(std::stoi(node.atom_val.get_name().encode())), m);
-            else if (node.atom_val.get_type() == BasicTermType::Literal) {
-                // for literal, get the exact length of it
-                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
-            } else {
-                auto it = variable_map.find(node.atom_val);
-                expr_ref var_expr(m);
-                if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
-                } else {
-                    var_expr = expr_ref(mk_int_var(node.atom_val.get_name().encode(), m, m_util_s, m_util_a), m);
-                }
-                return var_expr;
-            }
-
-        case LenFormulaType::PLUS: {
-            assert(node.succ.size() >= 2);
-            expr_ref plus = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                plus = m_util_a.mk_add(plus, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
-            }
-            return plus;
-        }
-
-        case LenFormulaType::EQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m_util_a.mk_eq(left, right), m);
-        }
-
-        case LenFormulaType::LEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m_util_a.mk_le(left, right), m);
-        }
-
-        case LenFormulaType::NOT: {
-            assert(node.succ.size() == 1);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m.mk_not(left), m);
-        }
-
-        case LenFormulaType::AND: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_true(), m);
-            expr_ref andref = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                andref = m.mk_and(andref, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
-            }
-            return andref;
-        }
-
-        case LenFormulaType::TRUE: {
-            return expr_ref(m.mk_true(), m);
-        }
-
-        case LenFormulaType::FALSE: {
-            return expr_ref(m.mk_false(), m);
-        }
-
-        }
-
-        assert(false);
-        return {{}, m};
-    }
+    expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a);
 }
 
 #endif
