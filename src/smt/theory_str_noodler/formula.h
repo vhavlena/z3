@@ -99,6 +99,12 @@ namespace smt::noodler {
         return basic_term.to_string();
     }
 
+
+    static std::ostream& operator<<(std::ostream& os, const BasicTerm& basic_term) {
+        os << basic_term.to_string();
+        return os;
+    }
+
     static bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
     static bool operator!=(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs == rhs); }
     static bool operator<(const BasicTerm& lhs, const BasicTerm& rhs) {

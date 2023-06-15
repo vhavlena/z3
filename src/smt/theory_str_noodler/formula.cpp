@@ -8,14 +8,7 @@ namespace smt::noodler {
         for (const auto& side: params) {
             for (const auto &term: side) {
                 if (term.is_variable()) {
-                    bool found{false};
-                    for (const auto &var: vars) {
-                        if (var == term) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) { vars.insert(term); }
+                    vars.insert(term);
                 }
             }
         }
