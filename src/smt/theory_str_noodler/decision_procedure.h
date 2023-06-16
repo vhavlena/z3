@@ -15,6 +15,14 @@
 namespace smt::noodler {
 
     /**
+     * @brief Preprocess options
+     */
+    enum PreprocessType {
+        PLAIN,
+        UNDERAPPROX
+    };
+
+    /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
      */
@@ -26,6 +34,16 @@ namespace smt::noodler {
          */
         virtual void init_computation() {
             throw std::runtime_error("Unimplemented");
+        }
+
+        /**
+         * @brief Do some preprocessing (can be called only before init_computation)
+         * 
+         * @param opt The type of preprocessing
+         * @param len_eq_vars Equivalence class holding variables with the same length
+         */
+        virtual void preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) {
+            throw std::runtime_error("preprocess unimplemented");
         }
 
         /**
@@ -215,9 +233,12 @@ namespace smt::noodler {
         ast_manager& m;
         seq_util& m_util_s;
         arith_util& m_util_a;
+
+        // initial length, formula and automata assignment which can be updated by preprocessing as is used for initializing the decision procedure
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+
         const theory_str_noodler_params& m_params;
 
 
@@ -307,6 +328,8 @@ namespace smt::noodler {
          */
         expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
         void init_computation() override;
+
+        void preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) override;
 
         expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
 

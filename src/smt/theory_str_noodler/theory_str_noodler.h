@@ -50,6 +50,7 @@ namespace smt::noodler {
         seq_util m_util_s;
         //ast_manager& m;
 
+        // equivalence of z3 terms based on their length (terms are equiv if their length is for sure the same)
         var_union_find var_eqs;
 
         StateLen<bool> state_len;

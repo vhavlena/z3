@@ -17,8 +17,6 @@
 
 namespace smt::noodler {
 
-    typedef std::string Var;
-
     //----------------------------------------------------------------------------------------------------------------------------------
 
     /**
@@ -305,7 +303,6 @@ namespace smt::noodler {
         // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
         std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
         std::unordered_set<BasicTerm> len_variables;
-        theory_str_noodler_params m_params;
 
         Dependency dependency;
 
@@ -332,7 +329,6 @@ namespace smt::noodler {
             aut_ass(ass),
             len_formula(LenFormulaType::AND, { } ),
             len_variables(lv),
-            m_params(par),
             dependency() { };
 
         const FormulaVar& get_formula() const { return this->formula; };

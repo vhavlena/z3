@@ -1020,9 +1020,8 @@ namespace smt::noodler {
         }
 
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
-            init_length_sensitive_vars, m, m_util_s, m_util_a, 
-            this->var_eqs.get_equivalence_bt(), m_params };
-        dec_proc.preprocess();
+            init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
+        dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         
         model_ref mod;
         if(init_length_sensitive_vars.size() > 0) {
@@ -1068,8 +1067,7 @@ namespace smt::noodler {
      */
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
-            init_length_sensitive_vars, m, m_util_s, m_util_a, 
-            this->var_eqs.get_equivalence_bt(), m_params };
+            init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
         dec_proc.preprocess(PreprocessType::UNDERAPPROX);
         
         expr_ref lengths(m);

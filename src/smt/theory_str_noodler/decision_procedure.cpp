@@ -744,6 +744,71 @@ namespace smt::noodler {
         worklist.push_back(initialWlEl);
     }
 
+    void DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
+        this->prep_handler = FormulaPreprocess(std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars));
+
+        // So-far just lightweight preprocessing
+        this->prep_handler.reduce_diseqalities();
+        if (opt == PreprocessType::UNDERAPPROX) {
+            this->prep_handler.underapprox_languages();
+        }
+        this->prep_handler.propagate_variables();
+        this->prep_handler.propagate_eps();
+        this->prep_handler.remove_regular();
+        this->prep_handler.skip_len_sat();
+        this->prep_handler.generate_identities();
+        this->prep_handler.propagate_variables();
+        this->prep_handler.refine_languages();
+        this->prep_handler.reduce_diseqalities();
+        this->prep_handler.remove_trivial();
+        this->prep_handler.reduce_regular_sequence(3);
+        this->prep_handler.remove_regular();
+
+        // the following should help with Leetcode
+        /// TODO: should be simplyfied? So many preprocessing steps now
+        STRACE("str",
+            tout << "Variable equivalence classes: " << std::endl;
+            for(const auto& t : len_eq_vars) {
+                for (const auto& s : t) {
+                    tout << s.to_string() << " ";
+                }
+                tout << std::endl;
+            }   
+        );
+        this->prep_handler.generate_equiv(len_eq_vars);
+        this->prep_handler.propagate_variables();
+        this->prep_handler.generate_identities();
+        this->prep_handler.remove_regular();
+        this->prep_handler.propagate_variables();
+        // underapproximation
+        if(opt == PreprocessType::UNDERAPPROX) {
+            this->prep_handler.underapprox_languages();
+            this->prep_handler.skip_len_sat();
+            this->prep_handler.reduce_regular_sequence(3);
+            this->prep_handler.remove_regular();
+            this->prep_handler.skip_len_sat();
+        }
+
+        // Refresh the instance
+        this->formula = this->prep_handler.get_modified_formula();
+        this->init_aut_ass = this->prep_handler.get_aut_assignment();
+        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
+
+        if(this->formula.get_predicates().size() > 0) {
+            this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
+        }
+
+        STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
+        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
+        STRACE("str",
+            tout << "Length variables after preprocesssing:";
+            for (const auto &len_var : init_length_sensitive_vars) {
+                tout << " " << len_var;
+            }
+            tout << std::endl);
+        STRACE("str", tout << "Formula after preprocessing:" << std::endl << this->formula.to_string() << std::endl; );
+    }
+
 
     /**
      * @brief Make a length constraint for a single NFA loop, handle
