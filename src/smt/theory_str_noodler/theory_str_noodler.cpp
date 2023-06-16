@@ -863,13 +863,27 @@ namespace smt::noodler {
             }
         }
 
-        // TODO: this needs to be finished
+        /// TODO: this needs to be finished
         if(instance.is_quadratic()) {
+            model_ref mod;
             NielsenDecisionProcedure nproc(instance, aut_assignment, 
                 init_length_sensitive_vars, m, m_util_s, m_util_a, m_params);
             nproc.preprocess();
+            expr_ref block_len(m.mk_false(), m);
             nproc.init_computation();
-            nproc.compute_next_solution();
+            while(nproc.compute_next_solution()) {
+                lengths = nproc.get_lengths(this->var_name);
+                if(check_len_sat(lengths, mod) == l_true) {
+                    STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
+                    return FC_DONE;
+                }
+                block_len = m.mk_or(block_len, lengths);
+                STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
+            }
+            if(!block_curr_len(block_len)) {
+                return FC_CONTINUE;
+            }
+            return FC_CONTINUE;
         }
         
 

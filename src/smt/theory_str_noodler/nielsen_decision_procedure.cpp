@@ -17,8 +17,17 @@ namespace smt::noodler {
      * @return expr_ref Length formula describing all solutions (currently true)
      */
     expr_ref NielsenDecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        expr_ref res(m.mk_true(), m);
-        return res;
+        if(this->init_length_sensitive_vars.size() == 0) {
+            return expr_ref(m.mk_true(), m);
+        }
+
+        if(this->length_paths_index >= this->length_paths.size()) {
+            util::throw_error("nielsen: index out of range");
+        }
+
+        expr_ref formula = length_formula_path(this->length_paths[this->length_paths_index], variable_map);
+        this->length_paths_index++;
+        return formula;
     }
 
     /**
@@ -49,37 +58,42 @@ namespace smt::noodler {
      * @return True -> satisfiable
      */
     bool NielsenDecisionProcedure::compute_next_solution() {
-        std::cout << this->formula.to_string() << std::endl;
-
         bool sat = true;
+        // if the compute_next_solution was called for the first time
         if(this->graphs.size() == 0) {
             std::vector<Formula> instances = divide_independent_formula(this->formula);
             for(const Formula& fle : instances) {
                 bool is_sat;
+                // create Nielsen graph and trim it
                 NielsenGraph graph = generate_from_formula(fle, is_sat);
                 graph = graph.trim();
                 this->graphs.push_back(graph);
                 sat = sat && is_sat;
-                std::cout << "SAT: " << is_sat << std::endl;
-                std::cout << graph.to_graphwiz(nielsen_label_to_string) << std::endl;
 
-                CounterSystem counter_system = create_counter_system(graph);
-                condensate_counter_system(counter_system);
-                std::cout << counter_system.to_graphwiz(counter_label_to_string) << std::endl;
-
-                for(const auto& c : find_self_loops(counter_system)) {
-                    auto path = get_length_path(counter_system, c);
-                    for(const auto& c : path.labels) {
-                        std::cout << counter_label_to_string(c) << " ";
-                    }
-                    std::cout << std::endl;
+                // if some Nielsen graph is unsat --> unsat
+                if(!sat) {
+                    return false;
                 }
 
+                /// TODO: generate counter system only if it contains length variables 
+                // create a counter system from the Nielsen graph a condensate it
+                CounterSystem counter_system = create_counter_system(graph);
+                condensate_counter_system(counter_system);
+                // create paths with self-loops containing the desired length variables
+                for(const auto& c : find_self_loops(counter_system)) {
+                    Path<CounterLabel> path = get_length_path(counter_system, c);
+                    this->length_paths.push_back(path);
+                }
             }
             return sat;
         } else {
-            // TODO: enumerate all length solutions; if there is no more, return false
-            return true;
+            // enumerate all length paths
+            if(this->length_paths_index < this->length_paths.size()) {
+                return true;
+            }
+
+            // incomplete procedure
+            util::throw_error("nielsen: incomplete procedure");
         }
     }
 
@@ -380,8 +394,8 @@ namespace smt::noodler {
      * @param cs Counter system
      * @return std::set<Formula> Set of nodes containing a suitable self-loop. 
      */
-    std::set<Formula> NielsenDecisionProcedure::find_self_loops(const CounterSystem& cs) const {
-        std::set<Formula> self_loops;
+    std::set<SelfLoop<CounterLabel>> NielsenDecisionProcedure::find_self_loops(const CounterSystem& cs) const {
+        std::set<SelfLoop<CounterLabel>> self_loops;
         for(const Formula& node : cs.get_nodes()) {
             auto it = cs.edges.find(node);
             if(it != cs.edges.end()) {
@@ -389,7 +403,7 @@ namespace smt::noodler {
                     auto lab_it = this->init_length_sensitive_vars.find(pr.second.left);
                     if(pr.first == node && pr.second.sum[1].get_type() == BasicTermType::Length && 
                         lab_it != this->init_length_sensitive_vars.end()) {
-                        self_loops.insert(node);
+                        self_loops.insert({node, pr.second});
                     }
                 }
             }
@@ -404,11 +418,112 @@ namespace smt::noodler {
      * @param sl Node with a suitable self-loop
      * @return Path<CounterLabel> Shortest path containing the node @p sl.
      */
-    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const Formula& sl) {
-        Path<CounterLabel> first = cs.shortest_path_edge(cs.get_init(), sl);
-        Path<CounterLabel> last = cs.shortest_path_edge(sl, *cs.get_fins().begin());
+    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl) {
+        Path<CounterLabel> first = cs.shortest_path(cs.get_init(), sl.first);
+        Path<CounterLabel> last = cs.shortest_path(sl.first, *cs.get_fins().begin());
         first.append(last);
+        first.self_loops.insert(sl);
         return first;
+    }
+
+    /**
+     * @brief Get length formula for a single counter label.
+     * 
+     * @param lab Counter label
+     * @param in_vars Current length variables for each BasicTerm
+     * @param out_var Length variable where the result is stored
+     * @return expr_ref Length formula
+     */
+    expr_ref NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
+        // fresh output variable
+        out_var = util::mk_int_var_fresh(lab.left.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        expr_ref formula(this->m);
+
+        // label of the form x := 0 --> out_var = 0
+        if(lab.sum.size() == 1) {
+            int val = std::stoi(lab.sum[0].get_name().encode());
+            formula = this->m.mk_eq(out_var, this->m_util_a.mk_int(val));
+        } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
+            int val = std::stoi(lab.sum[1].get_name().encode());
+            formula = this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_int(val)));
+        } else {
+            formula = this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), in_vars.at(lab.sum[1])));
+        }
+
+        return formula;
+    }
+
+    /**
+     * @brief Get length formula for a label occurring in the self-loop
+     * 
+     * @param lab Counter label in self-loop
+     * @param in_vars Current length variables for each BasicTerm
+     * @param out_var Length variable where the result is stored
+     * @return expr_ref Length formula
+     */
+    expr_ref NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
+        out_var = util::mk_int_var_fresh(lab.left.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        expr_ref formula(this->m);
+
+        if(lab.sum.size() == 1) {
+            util::throw_error("nielsen: incomplete");
+        } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
+            int val = std::stoi(lab.sum[1].get_name().encode());
+            // fresh variable j
+            expr_ref fresh = util::mk_int_var_fresh("j", this->m, this->m_util_s, this->m_util_a);
+            // x1 = x0 + j*k
+            expr_ref update(this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_mul(fresh, this->m_util_a.mk_int(val)))), this->m);
+            // j >= 0
+            expr_ref restr(this->m_util_a.mk_ge(fresh, this->m_util_a.mk_int(0)), this->m);
+            formula = this->m.mk_and(update, restr);
+        } else {
+            util::throw_error("nielsen: incomplete");
+        }
+
+        return formula;
+    }
+
+    /**
+     * @brief Get length formula for a path with self-loops.
+     * 
+     * @param path Part of the counter system contining only self-loops.
+     * @param variable_map Mapping of each BasicTerm to the current length variable
+     * @return expr_ref Length formula
+     */
+    expr_ref NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map) {
+        std::map<BasicTerm, expr_ref> actual_var_map{};
+        expr_ref formula(this->m.mk_true(), this->m);
+
+        // path of length 0 = true
+        if(path.labels.size() == 0) {
+            return expr_ref(this->m.mk_true(), this->m);
+        }
+
+        // there is less edges than vertices; the first one has not self-loop (the rule is of the form x := 0)
+        for(size_t i = 1; i < path.nodes.size(); i++) {
+            auto it = path.self_loops.find(path.nodes[i]);
+            CounterLabel lab = path.labels[i-1];
+
+            expr_ref out_var(this->m);
+            formula = this->m.mk_and(formula, get_label_formula(lab, actual_var_map, out_var));
+            actual_var_map.insert_or_assign(lab.left, out_var);
+
+            // there is a self-loop
+            if(it != path.self_loops.end()) {
+                expr_ref sl_var(this->m);
+                formula = this->m.mk_and(formula, get_label_sl_formula(it->second, actual_var_map, sl_var));
+                actual_var_map.insert_or_assign(it->second.left, sl_var);
+            } 
+        }
+
+        // map the original string variable to their lengths.
+        // i.e., str.len(x) = x_n (x_n is the last length variable of x)
+        for(const BasicTerm& lterm : this->init_length_sensitive_vars) {
+            expr_ref prev_var = actual_var_map.at(lterm);
+            formula = formula = this->m.mk_and(formula, this->m.mk_eq(this->m_util_s.str.mk_length(variable_map.at(lterm)), prev_var));
+        }
+
+        return formula;
     }
 
 } // Namespace smt::noodler.

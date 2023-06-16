@@ -15,7 +15,8 @@
 namespace smt::noodler {
 
     /**
-     * @brief Path in the transition graph
+     * @brief Path with self-loops in the transition graph. 
+     * Represents part of a transition graph.
      * 
      * @tparam Label Label type
      */
@@ -23,6 +24,8 @@ namespace smt::noodler {
     struct Path {
         std::vector<Formula> nodes;
         std::vector<Label> labels;
+        // self-loops
+        std::map<Formula, Label> self_loops;
 
         /**
          * @brief Append path @p path to the current path.
@@ -30,8 +33,10 @@ namespace smt::noodler {
          * @param path 
          */
         void append(const Path& path) {
-            nodes.insert(nodes.end(), path.nodes.begin(), path.nodes.end());
+            /// we assume that the path ends with the same node as it begins in @p path
+            nodes.insert(nodes.end(), path.nodes.begin() + 1, path.nodes.end());
             labels.insert(labels.end(), path.labels.begin(), path.labels.end());
+            self_loops.insert(path.self_loops.begin(), path.self_loops.end());
         }
     };
 
@@ -153,13 +158,16 @@ namespace smt::noodler {
          * @param end Second node
          * @return Path<Label> Visited nodes and labels on the shortest path.
          */
-        Path<Label> shortest_path_edge(const Formula& start, const Formula& end) const {
+        Path<Label> shortest_path(const Formula& start, const Formula& end) const {
             std::set<Formula> visited;
             std::deque<std::pair<Formula, Path<Label>>> worklist;
-            worklist.push_back({start, {{},{}}});
+            worklist.push_back({start, {{start},{}}});
 
             while(!worklist.empty()) {
                 auto elem = worklist.front();
+                if(visited.find(elem.first) != visited.end()) {
+                    continue;
+                }
                 visited.insert(elem.first);
                 worklist.pop_front();
                 if(elem.first == end) {
@@ -172,7 +180,9 @@ namespace smt::noodler {
                     if(visited.find(tgt_symb.first) == visited.end()) {
                         std::vector<Label> path(elem.second.labels.begin(), elem.second.labels.end());
                         path.push_back(tgt_symb.second);
-                        worklist.push_back({tgt_symb.first, {{}, path}});
+                        std::vector<Formula> nodes(elem.second.nodes.begin(), elem.second.nodes.end());
+                        nodes.push_back(tgt_symb.first);
+                        worklist.push_back({tgt_symb.first, {nodes, path}});
                     }
                 }
             }
@@ -201,13 +211,15 @@ namespace smt::noodler {
     using NielsenGraph = TransitionGraph<NielsenLabel>;
     using CounterSystem = TransitionGraph<CounterLabel>;
 
+    template<typename Label>
+    using SelfLoop = typename std::pair<Formula, Label>;
+
     /**
      * @brief Decision procedure for quadratic equations using the Nielsen transformation.
      * 
      */
     class NielsenDecisionProcedure : public AbstractDecisionProcedure {
-    protected:
-
+    private:
         ast_manager& m;
         seq_util& m_util_s;
         arith_util& m_util_a;
@@ -218,7 +230,10 @@ namespace smt::noodler {
         const theory_str_noodler_params& m_params;
 
         std::vector<NielsenGraph> graphs {};
+        std::vector<Path<CounterLabel>> length_paths;
+        size_t length_paths_index = 0;
 
+    protected:
         // functions for the construction of a Nielsen graph
         bool is_pred_unsat(const Predicate& pred) const;
         bool is_pred_sat(const Predicate& pred) const {
@@ -237,8 +252,13 @@ namespace smt::noodler {
         static bool join_counter_label(const CounterLabel& l1, const CounterLabel& l2, CounterLabel & res);
 
         // extraction of a promising part of the condensated counter graph
-        std::set<Formula> find_self_loops(const CounterSystem& cs) const;
-        Path<CounterLabel> get_length_path(const CounterSystem& cs, const Formula& sl);
+        std::set<SelfLoop<CounterLabel>> find_self_loops(const CounterSystem& cs) const;
+        Path<CounterLabel> get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl);
+
+        // construct length formula
+        expr_ref length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map);
+        expr_ref get_label_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
+        expr_ref get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
 
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
