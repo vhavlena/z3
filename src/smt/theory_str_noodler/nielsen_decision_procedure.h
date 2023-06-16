@@ -14,6 +14,43 @@
 
 namespace smt::noodler {
 
+    static std::string concat_to_string_compact(const Concat& con) {
+        std::string ret;
+        for(const BasicTerm& t : con) {
+            if(t.is_literal()) {
+                ret += "\\\"" + t.get_name().encode() + "\\\" ";
+            } else {
+                ret += t.to_string() + " ";
+            }
+        }
+        if(ret.size() > 0) {
+            ret.pop_back();
+        }
+        return ret;
+    }
+
+    static std::string pred_to_string_compact(const Predicate& pred) {
+        if(!pred.is_equation()) {
+            util::throw_error("NielsenGraph: unsupported predicate type");
+        }
+
+        std::string ret;
+        ret = concat_to_string_compact(pred.get_left_side()) + " = " + 
+            concat_to_string_compact(pred.get_right_side());
+        return ret;
+    }
+
+    static std::string formula_to_string_compact(const Formula& f) {
+        std::string ret;
+        for(const Predicate& pred : f.get_predicates()) {
+            ret += pred_to_string_compact(pred) + " & ";
+        }
+        if(ret.size() > 0) {
+            return ret.substr(0, ret.size() - 3);
+        }
+        return ret;
+    }
+
     /**
      * @brief Path with self-loops in the transition graph. 
      * Represents part of a transition graph.
@@ -289,44 +326,6 @@ namespace smt::noodler {
         void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
 
     };
-
-
-    static std::string concat_to_string_compact(const Concat& con) {
-        std::string ret;
-        for(const BasicTerm& t : con) {
-            if(t.is_literal()) {
-                ret += "\\\"" + t.get_name().encode() + "\\\" ";
-            } else {
-                ret += t.to_string() + " ";
-            }
-        }
-        if(ret.size() > 0) {
-            ret.pop_back();
-        }
-        return ret;
-    }
-
-    static std::string pred_to_string_compact(const Predicate& pred) {
-        if(!pred.is_equation()) {
-            util::throw_error("NielsenGraph: unsupported predicate type");
-        }
-
-        std::string ret;
-        ret = concat_to_string_compact(pred.get_left_side()) + " = " + 
-            concat_to_string_compact(pred.get_right_side());
-        return ret;
-    }
-
-    static std::string formula_to_string_compact(const Formula& f) {
-        std::string ret;
-        for(const Predicate& pred : f.get_predicates()) {
-            ret += pred_to_string_compact(pred) + " & ";
-        }
-        if(ret.size() > 0) {
-            return ret.substr(0, ret.size() - 3);
-        }
-        return ret;
-    }
 
     static std::string nielsen_label_to_string(const NielsenLabel& lab) {
         std::string ret;
