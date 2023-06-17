@@ -293,7 +293,7 @@ namespace smt::noodler {
     /**
      * @brief Class for formula preprocessing.
      */
-    class FormulaPreprocess {
+    class FormulaPreprocessor {
 
     private:
         FormulaVar formula;
@@ -303,6 +303,8 @@ namespace smt::noodler {
         // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
         std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
         std::unordered_set<BasicTerm> len_variables;
+
+        const theory_str_noodler_params& m_params;
 
         Dependency dependency;
 
@@ -323,12 +325,13 @@ namespace smt::noodler {
         bool same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const;
 
     public:
-        FormulaPreprocess(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
+        FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
             formula(conj),
             fresh_var_cnt(0),
             aut_ass(ass),
             len_formula(LenFormulaType::AND, { } ),
             len_variables(lv),
+            m_params(par),
             dependency() { };
 
         const FormulaVar& get_formula() const { return this->formula; };

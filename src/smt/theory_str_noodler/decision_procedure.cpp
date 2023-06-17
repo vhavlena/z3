@@ -745,7 +745,7 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
-        this->prep_handler = FormulaPreprocess(std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars));
+        this->prep_handler = FormulaPreprocessor(std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params);
 
         // So-far just lightweight preprocessing
         this->prep_handler.reduce_diseqalities();

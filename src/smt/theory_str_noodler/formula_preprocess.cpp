@@ -283,7 +283,7 @@ namespace smt::noodler {
      * @param var Basic term to be updated
      * @param upd Concatenation of terms for updating @p var.
      */
-    void FormulaPreprocess::update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {
+    void FormulaPreprocessor::update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {
         Mata::Nfa::Nfa concat = this->aut_ass.get_automaton_concat(upd);
         auto iter = this->aut_ass.find(var);
         if(iter != this->aut_ass.end()) {
@@ -305,7 +305,7 @@ namespace smt::noodler {
      * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system
      * provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X) is the automaton assigned to variable X.
      */
-    void FormulaPreprocess::remove_regular() {
+    void FormulaPreprocessor::remove_regular() {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
         std::deque<std::pair<size_t, Predicate>> worklist(regs.begin(), regs.end());
@@ -354,7 +354,7 @@ namespace smt::noodler {
      * @brief Propagate variables. Propagate all equations of the form X=Y
      * (find all Y in the formula and replace with X).
      */
-    void FormulaPreprocess::propagate_variables() {
+    void FormulaPreprocessor::propagate_variables() {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_simple_eqs(regs);
         std::deque<size_t> worklist;
@@ -421,7 +421,7 @@ namespace smt::noodler {
      * @param cat2 Second concatenation
      * @return Symmetrical difference
      */
-    VarNodeSymDiff FormulaPreprocess::get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const {
+    VarNodeSymDiff FormulaPreprocessor::get_eq_sym_diff(const Concat& cat1, const Concat& cat2) const {
         std::set<VarNode> p1, p2;
         this->formula.update_var_positions_side(cat1, p1, 0, true); // include positions of literals, set equation index to 0
         this->formula.update_var_positions_side(cat2, p2, 0, true);
@@ -437,7 +437,7 @@ namespace smt::noodler {
      * @param new_pred[out] Newly created equation
      * @return True -> it is possible to create a new equation
      */
-    bool FormulaPreprocess::propagate_regular_eqs(const std::set<VarNode>& diff1, const std::set<VarNode>& diff2, Predicate& new_pred) const {
+    bool FormulaPreprocessor::propagate_regular_eqs(const std::set<VarNode>& diff1, const std::set<VarNode>& diff2, Predicate& new_pred) const {
         VarNode val1 = *diff1.begin();
         std::set<int> pos1, pos2;
         std::map<int, BasicTerm> sorted_map;
@@ -467,7 +467,7 @@ namespace smt::noodler {
      * @param[out] new_pred Newly created identity
      * @return Is it suitable for gen identity (was some identity created?)
      */
-    bool FormulaPreprocess::generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const {
+    bool FormulaPreprocessor::generate_identities_suit(const VarNodeSymDiff& diff, Predicate& new_pred) const {
         if(diff.first.size() == 1 && diff.second.size() == 1) {
             VarNode val1 = *diff.first.begin();
             VarNode val2 = *diff.second.begin();
@@ -490,7 +490,7 @@ namespace smt::noodler {
      * @brief Generate indentities. It covers two cases (a) X1 X X2 = X1 Y X2 => X = Y
      * (b) X1 X X2 = Z and Z = X1 Y X2 => X = Y. Where each term can be both literal and variable.
      */
-    void FormulaPreprocess::generate_identities() {
+    void FormulaPreprocessor::generate_identities() {
         std::set<std::pair<size_t, Predicate>> new_preds;
         std::set<size_t> rem_ids;
         size_t index = this->formula.get_max_index() + 1;
@@ -550,7 +550,7 @@ namespace smt::noodler {
      *
      * @return ConcatGraph of the formula.
      */
-    ConcatGraph FormulaPreprocess::get_concat_graph() const {
+    ConcatGraph FormulaPreprocessor::get_concat_graph() const {
         ConcatGraph graph;
 
         for(const Predicate& pr : this->formula.get_predicates_set()) {
@@ -579,7 +579,7 @@ namespace smt::noodler {
      *
      * @param res Regular sublists with the number of their occurrences.
      */
-    void FormulaPreprocess::get_regular_sublists(std::map<Concat, unsigned>& res) const {
+    void FormulaPreprocessor::get_regular_sublists(std::map<Concat, unsigned>& res) const {
         ConcatGraph graph = get_concat_graph();
 
         for(const BasicTerm& t : graph.get_init_vars()) {
@@ -632,7 +632,7 @@ namespace smt::noodler {
      *
      * @param mn Minimum number of occurrences of a regular sequence to be replaced with a fresh variable.
      */
-    void FormulaPreprocess::reduce_regular_sequence(unsigned mn) {
+    void FormulaPreprocessor::reduce_regular_sequence(unsigned mn) {
         std::map<Concat, unsigned> regs;
         std::set<Predicate> new_eqs;
         get_regular_sublists(regs);
@@ -657,7 +657,7 @@ namespace smt::noodler {
      *
      * @param res All terms with epsilon semantics.
      */
-    void FormulaPreprocess::get_eps_terms(std::set<BasicTerm>& res) const {
+    void FormulaPreprocessor::get_eps_terms(std::set<BasicTerm>& res) const {
         for(const auto& pr : get_formula().get_varmap()) {
             if(pr.first.is_variable() && is_var_eps(pr.first)) {
                 res.insert(pr.first);
@@ -676,7 +676,7 @@ namespace smt::noodler {
      * @brief Transitively ropagate epsilon variables. The epsilon variables and the epsilon
      * literal remove from the formula and set the corresponding languages appropriately.
      */
-    void FormulaPreprocess::propagate_eps() {
+    void FormulaPreprocessor::propagate_eps() {
         std::set<BasicTerm> eps_set;
         get_eps_terms(eps_set);
         std::deque<size_t> worklist;
@@ -745,7 +745,7 @@ namespace smt::noodler {
      * @param res vector where i-th position contains a pair (S,n) where S is a set of variables
      *  preceeding position i in @p concat and n is a length of all literals preceeding @p concat.
      */
-    void FormulaPreprocess::get_concat_gather(const Concat& concat, SepEqsGather& res) const {
+    void FormulaPreprocessor::get_concat_gather(const Concat& concat, SepEqsGather& res) const {
         std::pair<std::set<BasicTerm>, unsigned> prev = { std::set<BasicTerm>(), 0 };
         for(const BasicTerm& t : concat) {
             std::pair<std::set<BasicTerm>, unsigned> new_val(prev);
@@ -769,7 +769,7 @@ namespace smt::noodler {
      * @param gather_right Gathered informaiton about right side
      * @param res Set of new equations
      */
-    void FormulaPreprocess::separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const {
+    void FormulaPreprocessor::separate_eq(const Predicate& eq, const SepEqsGather& gather_left, SepEqsGather& gather_right, std::set<Predicate>& res) const {
         Concat left = eq.get_left_side();
         Concat right = eq.get_right_side();
         auto it_left = left.begin();
@@ -806,7 +806,7 @@ namespace smt::noodler {
     /**
      * @brief Separate equations.
      */
-    void FormulaPreprocess::separate_eqs() {
+    void FormulaPreprocessor::separate_eqs() {
         std::set<Predicate> add_eqs;
         std::set<size_t> rem_ids;
         std::map<Predicate, std::set<size_t>> deps; // local dependencies
@@ -849,7 +849,7 @@ namespace smt::noodler {
      * @param side Left/right extension
      * @param res Extensible variables
      */
-    void FormulaPreprocess::gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res) {
+    void FormulaPreprocessor::gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res) {
         Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
         for(const auto& pr : this->formula.get_varmap()) {
             if(pr.second.size() > 0) {
@@ -872,7 +872,7 @@ namespace smt::noodler {
      * Y2 is left extensible. We can remove Y1 (similarly the right extensibility and removing from
      * the end of the equation).
      */
-    void FormulaPreprocess::remove_extension() {
+    void FormulaPreprocessor::remove_extension() {
         std::set<BasicTerm> begin_star, end_star;
         gather_extended_vars(Predicate::EquationSideType::Left, begin_star);
         gather_extended_vars(Predicate::EquationSideType::Right, end_star);
@@ -960,7 +960,7 @@ namespace smt::noodler {
     /**
      * @brief Remove trivial equations of the form X = X
      */
-    void FormulaPreprocess::remove_trivial() {
+    void FormulaPreprocessor::remove_trivial() {
         std::set<size_t> rem_ids;
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
@@ -981,7 +981,7 @@ namespace smt::noodler {
      *
      * @return Transitive closure of the Dependency
      */
-    Dependency FormulaPreprocess::get_flat_dependency() const {
+    Dependency FormulaPreprocessor::get_flat_dependency() const {
         Dependency flat = get_dependency();
         std::set<size_t> keys;
         for(const auto& pr : flat) {
@@ -1012,7 +1012,7 @@ namespace smt::noodler {
      *
      * @return Result of the preprocessing.
      */
-    Formula FormulaPreprocess::get_modified_formula() const {
+    Formula FormulaPreprocessor::get_modified_formula() const {
         Formula ret;
         for(const Predicate& p: this->formula.get_predicates_set()) {
             ret.add_predicate(p);
@@ -1023,7 +1023,7 @@ namespace smt::noodler {
     /**
      * @brief Refine languages for equations of the form X = R (|X|=1) to the L(X) = L(X) \cap L(R).
      */
-    void FormulaPreprocess::refine_languages() {
+    void FormulaPreprocessor::refine_languages() {
         std::set<BasicTerm> ineq_vars;
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_inequation())
@@ -1058,7 +1058,7 @@ namespace smt::noodler {
      * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
      * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
      */
-    void FormulaPreprocess::skip_len_sat() {
+    void FormulaPreprocessor::skip_len_sat() {
         std::set<size_t> rem_ids;
 
         auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {
@@ -1097,7 +1097,7 @@ namespace smt::noodler {
      * 
      * @param ec Equivalence class containing length-equivalent variables.
      */
-    void FormulaPreprocess::generate_equiv(const BasicTermEqiv& ec) {
+    void FormulaPreprocessor::generate_equiv(const BasicTermEqiv& ec) {
         std::set<Predicate> new_preds;
         size_t index = this->formula.get_max_index() + 1;
 
@@ -1152,7 +1152,7 @@ namespace smt::noodler {
      * @param t2 Term2
      * @return Equal length -> true
      */
-    bool FormulaPreprocess::same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const {
+    bool FormulaPreprocessor::same_length(const BasicTermEqiv& ec, const BasicTerm&t1, const BasicTerm& t2) const {
         if(ec_are_equal(ec, t1, t2)) {
             return true;
         }
@@ -1167,7 +1167,7 @@ namespace smt::noodler {
      * @brief Underapproximates the languages. Replace co-finite languages with length constraints while 
      * setting their languages to \Sigma^*.
      */
-    void FormulaPreprocess::underapprox_languages() {
+    void FormulaPreprocessor::underapprox_languages() {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 int ln = 0;
@@ -1185,7 +1185,7 @@ namespace smt::noodler {
     /**
      * @brief Reduce the number of diseqalities.
      */
-    void FormulaPreprocess::reduce_diseqalities() {
+    void FormulaPreprocessor::reduce_diseqalities() {
         std::set<size_t> rem_ids;
 
         for(const auto& pr : this->formula.get_predicates()) {
