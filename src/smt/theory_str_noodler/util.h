@@ -226,8 +226,11 @@ namespace smt::noodler::util {
      * @param m ast manager
      * @return Fresh noodler variable 
      */
-    static BasicTerm mk_fresh_noodler_var(const std::string& name, ast_manager& m) {
-        return BasicTerm{BasicTermType::Variable, m.mk_fresh_var_name(name.c_str()).bare_str()};
+    inline BasicTerm mk_fresh_noodler_var(const std::string& name) {
+        // TODO kinda ugly, function is defined in header and have static variable
+        // so it needs to be inline, maybe we should define some variable handler class
+        static std::map<std::string,unsigned> next_id_of_name;
+        return BasicTerm{BasicTermType::Variable, name + std::to_string((next_id_of_name[name])++)};
     }
 
     /**

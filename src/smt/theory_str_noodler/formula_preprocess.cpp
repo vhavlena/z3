@@ -1,6 +1,7 @@
 
 #include "formula_preprocess.h"
 #include <mata/nfa.hh>
+#include "util.h"
 
 namespace smt::noodler {
 
@@ -624,15 +625,6 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Create a fresh variable.
-     *
-     * @return BasicTerm Corresponding to a fresh variable.
-     */
-    BasicTerm FormulaPreprocess::create_fresh_var() {
-        return BasicTerm(BasicTermType::Variable, "__tmp__var_" + std::to_string(this->fresh_var_cnt++));
-    }
-
-    /**
      * @brief Replace regular sequences with a fresh variables. The regular sequence is a concatenations X1...Xk
      * such that each Xi occurrs (if it is a variable) in the
      * formula only in  X1...Xk. In other words, if we replace X1...Xk by a fresh variable V, then
@@ -647,7 +639,7 @@ namespace smt::noodler {
 
         for(const auto& pr : regs) {
             if(pr.second >= mn) {
-                BasicTerm fresh_var = create_fresh_var();
+                BasicTerm fresh_var = util::mk_fresh_noodler_var("regular_seq");
                 this->formula.replace(pr.first, Concat({fresh_var}));
                 update_reg_constr(fresh_var, pr.first);
                 new_eqs.insert(Predicate(PredicateType::Equation, std::vector<Concat>({Concat({fresh_var}), pr.first})));

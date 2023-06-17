@@ -386,7 +386,7 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < noodle.size(); ++i) {
                     // TODO do not make a new_var if we can replace it with one left or right var (i.e. new_var is exactly left or right var)
                     // TODO also if we can substitute with epsilon, we should do that first? or generally process epsilon substitutions better, in some sort of 'preprocessing'
-                    BasicTerm new_var(BasicTermType::Variable, VAR_PREFIX + std::string("_") + std::to_string(noodlification_no) + std::string("_") + std::to_string(i));
+                    BasicTerm new_var = util::mk_fresh_noodler_var(std::string("align_") + std::to_string(noodlification_no));
                     left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
                     right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
                     new_element.aut_ass[new_var] = noodle[i].first; // we assign the automaton to new_var
