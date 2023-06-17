@@ -235,6 +235,9 @@ namespace smt::noodler {
         Formula formula;
         AutAssignment init_aut_ass;
 
+        // the legnth formula from preprocessing
+        LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
+
         const theory_str_noodler_params& m_params;
 
 
@@ -288,7 +291,7 @@ namespace smt::noodler {
          * @param diseq Disequality to replace
          * @return Formula with equalities
          */
-        Formula DecisionProcedure::replace_disequality(Predicate diseq);
+        Formula replace_disequality(Predicate diseq);
 
     public:
         

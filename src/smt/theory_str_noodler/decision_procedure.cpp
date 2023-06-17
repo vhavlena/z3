@@ -577,7 +577,7 @@ namespace smt::noodler {
 
         // collect lengths introduced by the preprocessing
         expr_ref prep_formula = util::len_to_expr(
-                this->prep_handler.get_len_formula(),
+                preprocessing_len_formula,
                 variable_map,
                 this->m, this->m_util_s, this->m_util_a );
         lengths = this->m.mk_and(lengths, prep_formula);
@@ -698,7 +698,7 @@ namespace smt::noodler {
 
     expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
         expr_ref ret(this->m.mk_true(), this->m);
-        for(const auto& pr: this->prep_handler.get_diseq_len()) {
+        for(const auto& pr: dis_len) {
             expr_ref f1 = util::len_to_expr(
                 pr.second.first,
                 variable_map,
@@ -770,24 +770,24 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
-        this->prep_handler = FormulaPreprocessor(std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params);
+        FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
         // So-far just lightweight preprocessing
-        this->prep_handler.reduce_diseqalities();
+        prep_handler.reduce_diseqalities();
         if (opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
+            prep_handler.underapprox_languages();
         }
-        this->prep_handler.propagate_variables();
-        this->prep_handler.propagate_eps();
-        this->prep_handler.remove_regular();
-        this->prep_handler.skip_len_sat();
-        this->prep_handler.generate_identities();
-        this->prep_handler.propagate_variables();
-        this->prep_handler.refine_languages();
-        this->prep_handler.reduce_diseqalities();
-        this->prep_handler.remove_trivial();
-        this->prep_handler.reduce_regular_sequence(3);
-        this->prep_handler.remove_regular();
+        prep_handler.propagate_variables();
+        prep_handler.propagate_eps();
+        prep_handler.remove_regular();
+        prep_handler.skip_len_sat();
+        prep_handler.generate_identities();
+        prep_handler.propagate_variables();
+        prep_handler.refine_languages();
+        prep_handler.reduce_diseqalities();
+        prep_handler.remove_trivial();
+        prep_handler.reduce_regular_sequence(3);
+        prep_handler.remove_regular();
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -800,31 +800,32 @@ namespace smt::noodler {
                 tout << std::endl;
             }   
         );
-        this->prep_handler.generate_equiv(len_eq_vars);
-        this->prep_handler.propagate_variables();
-        this->prep_handler.generate_identities();
-        this->prep_handler.remove_regular();
-        this->prep_handler.propagate_variables();
+        prep_handler.generate_equiv(len_eq_vars);
+        prep_handler.propagate_variables();
+        prep_handler.generate_identities();
+        prep_handler.remove_regular();
+        prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
-            this->prep_handler.skip_len_sat();
-            this->prep_handler.reduce_regular_sequence(3);
-            this->prep_handler.remove_regular();
-            this->prep_handler.skip_len_sat();
+            prep_handler.underapprox_languages();
+            prep_handler.skip_len_sat();
+            prep_handler.reduce_regular_sequence(3);
+            prep_handler.remove_regular();
+            prep_handler.skip_len_sat();
         }
 
         // Refresh the instance
-        this->formula = this->prep_handler.get_modified_formula();
-        this->init_aut_ass = this->prep_handler.get_aut_assignment();
-        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
+        this->formula = prep_handler.get_modified_formula();
+        this->init_aut_ass = prep_handler.get_aut_assignment();
+        this->init_length_sensitive_vars = prep_handler.get_len_variables();
+        this->preprocessing_len_formula = prep_handler.get_len_formula();
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
         STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
-        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
+        STRACE("str", tout << "Lenght formula from preprocessing:" << preprocessing_len_formula << std::endl);
         STRACE("str",
             tout << "Length variables after preprocesssing:";
             for (const auto &len_var : init_length_sensitive_vars) {
@@ -890,7 +891,7 @@ namespace smt::noodler {
             BasicTerm a2 = diseq.get_right_side()[0];
             auto autl = init_aut_ass.at(a1);
             auto autr = init_aut_ass.at(a2);
-            Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
+            Mata::Nfa::Nfa sigma = init_aut_ass.sigma_automaton();
 
             if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
                 // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
@@ -906,18 +907,23 @@ namespace smt::noodler {
             }
         }
 
+        // automaton accepting everything
+        std::shared_ptr<Mata::Nfa::Nfa> sigma_star_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_star_automaton());
+        // automaton accepting empty word or exactly one symbol
+        std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
+
         BasicTerm x1 = util::mk_fresh_noodler_var("diseq_start");
-        this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        init_aut_ass[x1] = sigma_star_automaton;
         BasicTerm a1 = util::mk_fresh_noodler_var("diseq_char");
-        this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
+        init_aut_ass[a1] = sigma_eps_automaton;
         BasicTerm y1 = util::mk_fresh_noodler_var("diseq_end");
-        this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        init_aut_ass[y1] = sigma_star_automaton;
         BasicTerm x2 = util::mk_fresh_noodler_var("diseq_start");
-        this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        init_aut_ass[x2] = sigma_star_automaton;
         BasicTerm a2 = util::mk_fresh_noodler_var("diseq_char");
-        this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
+        init_aut_ass[a2] = sigma_eps_automaton;
         BasicTerm y2 = util::mk_fresh_noodler_var("diseq_end");
-        this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        init_aut_ass[y2] = sigma_star_automaton;
 
         // L = x1a1y1
         new_eqs.add_predicate(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
