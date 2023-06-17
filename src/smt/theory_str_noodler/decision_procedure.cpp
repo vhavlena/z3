@@ -716,6 +716,31 @@ namespace smt::noodler {
      * @brief Creates initial inclusion graph according to the preprocessed instance.
      */
     void DecisionProcedure::init_computation() {
+        Formula equations;
+        for (auto const &dis_or_eq : formula.get_predicates()) {
+            if (dis_or_eq.is_equation()) {
+                equations.add_predicate(dis_or_eq);
+            } else if (dis_or_eq.is_inequation()) {
+                for (auto const &eq_from_diseq : replace_disequality(dis_or_eq).get_predicates()) {
+                    equations.add_predicate(eq_from_diseq);
+                }
+            } else {
+                util::throw_error("Decision procedure can handle only equations and disequations");
+            }
+        }
+        this->formula = std::move(equations);
+
+        STRACE("str",
+            tout << "Disequation to equation formulas:" << std::endl;
+            for (const auto &dis_formula : dis_len) {
+                tout << "     " << dis_formula.second.second
+                     << " || (" << dis_formula.second.first
+                     << " && " << dis_formula.first.first.get_name()
+                     << " != " << dis_formula.first.second.get_name()
+                     << ")" << std::endl;
+            }  
+        );
+
         SolvingState initialWlEl;
         initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
         initialWlEl.aut_ass = std::move(this->init_aut_ass);
@@ -845,6 +870,81 @@ namespace smt::noodler {
         }
         res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(var, this->m_util_a.mk_int(0))), this->m);
         return res;
+    }
+
+    /**
+     * @brief Replace disequalities with equalities
+     */
+    Formula DecisionProcedure::replace_disequality(Predicate diseq) {
+        // From inequality L != P we create equalities L = x1a1y1 and R = x2a2y2
+        // where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
+        // we will check if (|L| != |P| || (|x1| == |x2| and a1 != a2)) after finding sat solution
+        // from decision procedure.
+
+        Formula new_eqs;
+
+        // This optimization represents the situation where L = a1 and R = a2
+        // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
+        if(diseq.get_left_side().size() == 1 && diseq.get_right_side().size() == 1) {
+            BasicTerm a1 = diseq.get_left_side()[0];
+            BasicTerm a2 = diseq.get_right_side()[0];
+            auto autl = init_aut_ass.at(a1);
+            auto autr = init_aut_ass.at(a2);
+            Mata::Nfa::Nfa sigma = this->aut_ass.sigma_automaton();
+
+            if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
+                // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+                init_length_sensitive_vars.insert(a1);
+                init_length_sensitive_vars.insert(a2);
+                // we add to dis_len the pair ((a1, a2), (|a1| == |a2|, |a1| != |a2|)) representing the formula (|a1| != |a2| || (|a1| == |a2| && a1 != a2))
+                dis_len.insert({
+                    {a1, a2},
+                    // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
+                    {LenNode(LenFormulaType::TRUE, {}), LenNode(LenFormulaType::FALSE, {})} 
+                });
+                return Formula();
+            }
+        }
+
+        BasicTerm x1 = util::mk_fresh_noodler_var("diseq_start");
+        this->aut_ass[x1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        BasicTerm a1 = util::mk_fresh_noodler_var("diseq_char");
+        this->aut_ass[a1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
+        BasicTerm y1 = util::mk_fresh_noodler_var("diseq_end");
+        this->aut_ass[y1] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        BasicTerm x2 = util::mk_fresh_noodler_var("diseq_start");
+        this->aut_ass[x2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        BasicTerm a2 = util::mk_fresh_noodler_var("diseq_char");
+        this->aut_ass[a2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_eps_automaton());
+        BasicTerm y2 = util::mk_fresh_noodler_var("diseq_end");
+        this->aut_ass[y2] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+
+        // L = x1a1y1
+        new_eqs.add_predicate(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
+        // R = x2a2y2
+        new_eqs.add_predicate(Predicate(PredicateType::Equation, {diseq.get_right_side(), Concat{x2, a2, y2}}));
+
+        // we create |L| != |P|, so we need to make all variables in both sides length ones
+        // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
+        // for example by taking L = x1y1, P = x2y2 and checking (|x1| = |y2| and some first symbol of y1,y2 differ)
+        for(const auto& t : diseq.get_vars()) {
+            init_length_sensitive_vars.insert(t);
+        }
+        auto len2 = diseq.get_formula_eq();
+
+        // we want |x1| == |x2|, making x1 and x2 length ones
+        init_length_sensitive_vars.insert(x1);
+        init_length_sensitive_vars.insert(x2);
+        auto len1 = Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq();
+
+        // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+        init_length_sensitive_vars.insert(a1);
+        init_length_sensitive_vars.insert(a2);
+
+        // we will create (len2 || (len1 && a1 != a2)) from this
+        this->dis_len.insert({{a1, a2}, {len1, len2}});
+
+        return new_eqs;
     }
 
 } // Namespace smt::noodler.

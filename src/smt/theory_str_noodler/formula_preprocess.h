@@ -300,8 +300,6 @@ namespace smt::noodler {
         unsigned fresh_var_cnt;
         AutAssignment aut_ass;
         LenNode len_formula;
-        // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
-        std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
         std::unordered_set<BasicTerm> len_variables;
 
         const theory_str_noodler_params& m_params;
@@ -344,7 +342,6 @@ namespace smt::noodler {
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
         const LenNode& get_len_formula() const { return this->len_formula; }
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
-        const std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>>& get_diseq_len() const {return this->dis_len;} 
 
         Formula get_modified_formula() const;
 
@@ -362,7 +359,6 @@ namespace smt::noodler {
 
         void refine_languages();
         void reduce_diseqalities();
-        void replace_disequalities();
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.

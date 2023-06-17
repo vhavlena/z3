@@ -282,6 +282,14 @@ namespace smt::noodler {
          */
         expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
 
+        /**
+         * @brief Replace disequality L != R with equalities and a length constraint saved in dis_len.
+         * 
+         * @param diseq Disequality to replace
+         * @return Formula with equalities
+         */
+        Formula DecisionProcedure::replace_disequality(Predicate diseq);
+
     public:
         
         /**
