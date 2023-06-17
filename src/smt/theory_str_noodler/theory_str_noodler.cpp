@@ -698,9 +698,9 @@ namespace smt::noodler {
             app_ref eq_rev(m.mk_eq(we.second, we.first), m);
 
             STRACE("str",
-                tout << "  Eq " << mk_pp(eq.get(), m) << " is " << ctx.is_relevant(eq.get()) ? "" : "not " << "relevant"
+                tout << "  Eq " << mk_pp(eq.get(), m) << " is " << (ctx.is_relevant(eq.get()) ? "" : "not ") << "relevant"
                      << " with assignment " << ctx.find_assignment(eq.get())
-                     << " and its reverse is " << ctx.is_relevant(eq_rev.get()) ? "" : "not " << "relevant" << std::endl;
+                     << " and its reverse is " << (ctx.is_relevant(eq_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
             
             // check if equation or its reverse are relevant (we check reverse to be safe) and...
@@ -718,9 +718,9 @@ namespace smt::noodler {
             app_ref dis_rev(m.mk_not(m.mk_eq(wd.second, wd.first)), m);
 
             STRACE("str",
-                tout << "  Diseq " << mk_pp(dis.get(), m) << " is " << ctx.is_relevant(dis.get()) ? "" : "not " << "relevant"
+                tout << "  Diseq " << mk_pp(dis.get(), m) << " is " << (ctx.is_relevant(dis.get()) ? "" : "not ") << "relevant"
                      << " with assignment " << ctx.find_assignment(dis.get())
-                     << " and its reverse is " << ctx.is_relevant(dis_rev.get()) ? "" : "not " << "relevant" << std::endl;
+                     << " and its reverse is " << (ctx.is_relevant(dis_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
             
             // check if disequation or its reverse are relevant (we check reverse to be safe) and...
@@ -742,14 +742,14 @@ namespace smt::noodler {
             }
             
             STRACE("str",
-                tout << "  " << mk_pp(memb_app.get(), m) << " is " << ctx.is_relevant(memb_app.get()) ? "" : "not " << "relevant"
+                tout << "  " << mk_pp(memb_app.get(), m) << " is " << (ctx.is_relevant(memb_app.get()) ? "" : "not ") << "relevant"
                      << " with assignment " << ctx.find_assignment(memb_app.get())
-                     << ", " << mk_pp(memb_app_orig.get(), m) << " is " << ctx.is_relevant(memb_app_orig.get()) ? "" : "not " << "relevant"
+                     << ", " << mk_pp(memb_app_orig.get(), m) << " is " << (ctx.is_relevant(memb_app_orig.get()) ? "" : "not ") << "relevant"
                      << std::endl;
             );
 
             // check if membership (or if we have negation, its negated form) is relevant and...
-            if(ctx.is_relevant(memb_app.get()) || ctx.is_relevant(memb_app_orig.get()) &&
+            if((ctx.is_relevant(memb_app.get()) || ctx.is_relevant(memb_app_orig.get())) &&
                // this membership constraint is not added to relevant yet
                !this->m_membership_todo_rel.contains(memb)
                ) {
