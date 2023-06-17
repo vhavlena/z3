@@ -230,7 +230,7 @@ namespace smt::noodler::util {
         // TODO kinda ugly, function is defined in header and have static variable
         // so it needs to be inline, maybe we should define some variable handler class
         static std::map<std::string,unsigned> next_id_of_name;
-        return BasicTerm{BasicTermType::Variable, name + std::to_string((next_id_of_name[name])++)};
+        return BasicTerm{BasicTermType::Variable, name + std::string("!n") + std::to_string((next_id_of_name[name])++)};
     }
 
     /**
