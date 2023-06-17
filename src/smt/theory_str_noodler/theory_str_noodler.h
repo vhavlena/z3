@@ -130,10 +130,7 @@ namespace smt::noodler {
 
         void add_length_axiom(expr* n);
 
-        expr_ref mk_str_var(symbol const&);
         enode* ensure_enode(expr* a);
-        expr_ref mk_skolem(symbol const& s, expr *e1, expr *e2 = nullptr, expr *e3 = nullptr,
-                           expr *e4 = nullptr, sort *sort = nullptr);
         expr_ref mk_len(expr* s) const { return expr_ref(m_util_s.str.mk_length(s), m); }
 
         void add_axiom(expr *e);
@@ -213,6 +210,7 @@ namespace smt::noodler {
         expr_ref mk_int_var(const std::string& name);
 
         void add_axiom(std::initializer_list<literal> ls);
+
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
         void handle_substr_int(expr *e);
@@ -225,9 +223,12 @@ namespace smt::noodler {
         void handle_contains(expr *e);
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
+
         void set_conflict(const literal_vector& ls);
+
         void block_curr_assignment();
         bool block_curr_len(expr_ref len_formula);
+
         expr_ref construct_refinement();
         void dump_assignments() const;
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
@@ -265,6 +266,8 @@ namespace smt::noodler {
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+
+        void prepare_for_procedure();
     };
 }
 

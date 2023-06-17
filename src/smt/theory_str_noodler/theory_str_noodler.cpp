@@ -1134,37 +1134,6 @@ namespace smt::noodler {
         return result;
     }
 
-
-    expr_ref theory_str_noodler::mk_skolem(symbol const &name, expr *e1, expr *e2, expr *e3, expr *e4, sort *sort) {
-        ast_manager &m = get_manager();
-        expr *es[4] = {e1, e2, e3, e4};
-        unsigned len = e4 ? 4 : (e3 ? 3 : (e2 ? 2 : 1));
-
-        if (!sort) {
-            sort = e1->get_sort();
-        }
-        app *a = m_util_s.mk_skolem(name, len, es, sort);
-
-//        ctx.internalize(a, false);
-//        mk_var(ctx.get_enode(a));
-//        propagate_basic_string_axioms(ctx.get_enode(a));
-//
-//        enode* n = ctx.get_enode(a);
-//
-//        if (!is_attached_to_var(n)) {
-//            const theory_var v = theory::mk_var(n);
-//            ctx.attach_th_var(n, this, v);
-//            ctx.mark_as_relevant(n);
-//            STRACE("str", tout << "new theory_var #" << v << '\n';);
-//        }
-
-        expr_ref ret(a, m);
-        string_theory_propagation(ret);
-
-        return expr_ref(a, m);
-
-    }
-
     literal theory_str_noodler::mk_literal(expr *const e) {
         ast_manager &m = get_manager();
         context &ctx = get_context();
@@ -2248,16 +2217,13 @@ namespace smt::noodler {
     }
 
     expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
-        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, this->m_util_s.mk_string_sort()), m);
-        return var;
+        // TODO remove this function probably
+        return util::mk_str_var_fresh(name, m, m_util_s);
     }
 
     expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(this->m_util_s.mk_skolem(this->m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, int_sort), m);
-        return var;
+        // TODO remove this function probably
+        return util::mk_int_var_fresh(name, m, m_util_s, m_util_a);
     }
 
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {

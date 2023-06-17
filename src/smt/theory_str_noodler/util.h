@@ -161,22 +161,44 @@ namespace smt::noodler::util {
     void get_len_exprs(app* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res);
 
     /**
-     * @brief Create a fresh int variable.
+     * @brief Create a fresh Z3 int variable.
      *
      * @param name Infix of the name (rest is added to get a unique name)
      * @param m ast manager
      * @param m_util_s string ast util
      * @param m_util_a arith ast util
-     * @return expr_ref Fresh variable
+     * @return Fresh int variable
      */
-    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { 
         sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
         expr_ref var(m_util_s.mk_skolem(m.mk_fresh_var_name(name.c_str()), 0,
             nullptr, int_sort), m);
         return var;
     }
+    
+    /**
+     * @brief Create a fresh Z3 str variable.
+     *
+     * @param name Infix of the name (rest is added to get a unique name)
+     * @param m ast manager
+     * @param m_util_s string ast util
+     * @return Fresh str variable
+     */
+    static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) { 
+        expr_ref var(m_util_s.mk_skolem(m.mk_fresh_var_name(name.c_str()), 0,
+            nullptr, m_util_s.mk_string_sort()), m);
+        return var;
+    }
 
-    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
+    /**
+     * @brief Get Z3 int var with a given name
+     *
+     * @param name Name of the var
+     * @param m ast manager
+     * @param m_util_s string ast util
+     * @return The needed int var
+     */
+    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) {
         sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
         expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
             nullptr, int_sort), m);
@@ -184,17 +206,28 @@ namespace smt::noodler::util {
     }
 
     /**
-     * @brief Create a fresh int variable.
+     * @brief Get Z3 string var with a given name
      *
-     * @param name Infix of the name (rest is added to get a unique name)
+     * @param name Name of the var
      * @param m ast manager
      * @param m_util_s string ast util
-     * @return expr_ref Fresh variable
+     * @return The needed str var
      */
     static expr_ref mk_str_var(const std::string& name, ast_manager& m, seq_util& m_util_s) {
         expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
             nullptr, m_util_s.mk_string_sort()), m);
         return var;
+    }
+
+    /**
+     * @brief Create a fresh noodler variable
+     * 
+     * @param name Infix of the name (rest is added to get a unique name)
+     * @param m ast manager
+     * @return Fresh noodler variable 
+     */
+    static BasicTerm mk_fresh_noodler_var(const std::string& name, ast_manager& m) {
+        return BasicTerm{BasicTermType::Variable, m.mk_fresh_var_name(name.c_str()).bare_str()};
     }
 
     /**
