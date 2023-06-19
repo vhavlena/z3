@@ -436,17 +436,18 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Get length formula for a single counter label.
+     * @brief Get length formula for a single counter label. If a variable x is not present in @p in_vars, 
+     * an additional formula x = 0 is generated and @p in_vars is updated.
      * 
      * @param lab Counter label
      * @param in_vars Current length variables for each BasicTerm
      * @param out_var Length variable where the result is stored
      * @return expr_ref Length formula
      */
-    expr_ref NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
+    expr_ref NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
         // fresh output variable
         out_var = util::mk_int_var_fresh(lab.left.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        expr_ref formula(this->m);
+        expr_ref formula(this->m.mk_true(), this->m);
 
         // label of the form x := 0 --> out_var = 0
         if(lab.sum.size() == 1) {
@@ -454,9 +455,21 @@ namespace smt::noodler {
             formula = this->m.mk_eq(out_var, this->m_util_a.mk_int(val));
         } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
             int val = std::stoi(lab.sum[1].get_name().encode());
-            formula = this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_int(val)));
+            // variable from the label is not found --> generrate var = 0 first
+            if(in_vars.find(lab.left) == in_vars.end()) {
+                expr_ref tmp_var(this->m);
+                formula = this->m.mk_and(formula, get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var));
+                in_vars.insert_or_assign(lab.left, tmp_var);
+            }
+            formula = this->m.mk_and(formula, this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_int(val))));
         } else {
-            formula = this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), in_vars.at(lab.sum[1])));
+            // variable from the label is not found --> generrate var = 0 first
+            if(in_vars.find(lab.sum[1]) == in_vars.end()) {
+                expr_ref tmp_var(this->m);
+                formula = this->m.mk_and(formula, get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var));
+                in_vars.insert_or_assign(lab.sum[1], tmp_var);
+            }
+            formula = this->m.mk_and(formula, this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), in_vars.at(lab.sum[1]))));
         }
 
         return formula;

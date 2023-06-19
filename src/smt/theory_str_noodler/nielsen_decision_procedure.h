@@ -294,7 +294,7 @@ namespace smt::noodler {
 
         // construct length formula
         expr_ref length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map, std::map<BasicTerm, expr_ref>& actual_var_map);
-        expr_ref get_label_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
+        expr_ref get_label_formula(const CounterLabel& lab, std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
         expr_ref get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
         expr_ref generate_len_connection(const std::map<BasicTerm, expr_ref>& variable_map, const std::map<BasicTerm, expr_ref>& actual_var_map);
 
