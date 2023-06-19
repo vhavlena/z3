@@ -169,11 +169,11 @@ namespace smt::noodler::util {
      * @param m_util_a arith ast util
      * @return Fresh int variable
      */
-    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { 
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(m_util_s.mk_skolem(m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, int_sort), m);
-        return var;
+    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, arith_util& m_util_a) {
+        // TODO should we call with skolem=true?
+        app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), false);
+        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
+        return expr_ref(fresh_var, m);
     }
     
     /**
@@ -184,10 +184,10 @@ namespace smt::noodler::util {
      * @param m_util_s string ast util
      * @return Fresh str variable
      */
-    static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) { 
-        expr_ref var(m_util_s.mk_skolem(m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, m_util_s.mk_string_sort()), m);
-        return var;
+    static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) {
+        // TODO should we call with skolem=true?
+        app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), false);
+        return expr_ref(fresh_var, m);
     }
 
     /**
@@ -198,11 +198,11 @@ namespace smt::noodler::util {
      * @param m_util_s string ast util
      * @return The needed int var
      */
-    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) {
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
-            nullptr, int_sort), m);
-        return var;
+    static expr_ref mk_int_var(const std::string& name, ast_manager& m, arith_util& m_util_a) {
+        // TODO should we use mk_skolem_const() instead?
+        app* var = m.mk_const(name, m_util_a.mk_int());
+        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
+        return expr_ref(var, m);
     }
 
     /**
@@ -214,9 +214,9 @@ namespace smt::noodler::util {
      * @return The needed str var
      */
     static expr_ref mk_str_var(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
-            nullptr, m_util_s.mk_string_sort()), m);
-        return var;
+        // TODO should we use mk_skolem_const() instead?
+        app* var = m.mk_const(name, m_util_s.mk_string_sort());
+        return expr_ref(var, m);
     }
 
     /**

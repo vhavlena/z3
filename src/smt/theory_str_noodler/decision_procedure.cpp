@@ -531,7 +531,7 @@ namespace smt::noodler {
             } else {
                 // if the variable is not found, it was introduced during preprocessing or decision procedure
                 // we therefore create a z3 variable using the name of var
-                z3_var = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+                z3_var = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_a);
             }
 
             // add |z3_var| >= 0, important probably only for the case that var was introduced during preprocessing
@@ -557,7 +557,7 @@ namespace smt::noodler {
                     } else {
                         // if the variable is not found, it was introduced during preprocessing or decision procedure
                         // we therefore create a z3 variable using the name of x_i
-                        z3_x_i = util::mk_int_var(x_i.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+                        z3_x_i = util::mk_int_var(x_i.get_name().encode(), this->m, this->m_util_a);
                     }
 
                     sum = m_util_a.mk_add(sum, z3_x_i);
@@ -673,8 +673,8 @@ namespace smt::noodler {
         };
 
         // new int variables representing the char values of a1 and a2
-        expr_ref a1_z3_char = util::mk_int_var(subst_a1.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
-        expr_ref a2_z3_char = util::mk_int_var(subst_a2.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
+        expr_ref a1_z3_char = util::mk_int_var(subst_a1.get_name().encode() + "_char", this->m, this->m_util_a);
+        expr_ref a2_z3_char = util::mk_int_var(subst_a2.get_name().encode() + "_char", this->m, this->m_util_a);
 
         expr_ref res(this->m.mk_true(), this->m);
         // char disjunct for a1
@@ -685,8 +685,8 @@ namespace smt::noodler {
         expr_ref a1_a2_eq(this->m_util_a.mk_eq(a1_z3_char, a2_z3_char), this->m);
         res = this->m.mk_and(res, this->m.mk_not(a1_a2_eq));
         // just to be sure, we also want |a1| == 1 and |a2| == 1
-        expr_ref a1_z3 = util::mk_int_var(subst_a1.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        expr_ref a2_z3 = util::mk_int_var(subst_a2.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
+        expr_ref a1_z3 = util::mk_int_var(subst_a1.get_name().encode(), this->m, this->m_util_a);
+        expr_ref a2_z3 = util::mk_int_var(subst_a2.get_name().encode(), this->m, this->m_util_a);
         res = this->m.mk_and(
             res,
             this->m_util_a.mk_eq(a1_z3, this->m_util_a.mk_int(1)),
@@ -846,7 +846,7 @@ namespace smt::noodler {
      */
     expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
         expr_ref len_x(var, this->m);
-        expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_s, this->m_util_a);
+        expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_a);
         expr_ref c1(this->m_util_a.mk_int(v1), this->m);
         expr_ref c2(this->m_util_a.mk_int(v2), this->m);
 

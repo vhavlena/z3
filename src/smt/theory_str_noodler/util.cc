@@ -615,7 +615,7 @@ namespace smt::noodler::util {
                 if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
                 } else {
-                    var_expr = expr_ref(mk_int_var(node.atom_val.get_name().encode(), m, m_util_s, m_util_a), m);
+                    var_expr = mk_int_var(node.atom_val.get_name().encode(), m, m_util_a);
                 }
                 return var_expr;
             }

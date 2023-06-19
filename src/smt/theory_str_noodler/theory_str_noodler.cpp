@@ -430,7 +430,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::relevant_eh(app *const n) {
-        STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << std::endl;);
+        STRACE("str", tout << "relevant: " << mk_pp(n, get_manager()) << " with family id " << n->get_family_id() << ", sort " << n->get_sort()->get_name() << " and decl kind " << n->get_decl_kind() << std::endl;);
 
         if (m_util_s.str.is_length(n)) { // str.len
             add_length_axiom(n);
@@ -483,7 +483,7 @@ namespace smt::noodler {
             m_util_s.str.is_in_re(n) || // str.in_re
             m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...)
             is_str_variable(n) || // string variable
-            // language variables should never occur here, they are always eliminated by rewriter I think
+            // RegLan variables should never occur here, they are always eliminated by rewriter I think
             m_util_s.str.is_string(n) // string literal
         ) {
             // we do not need to handle these, concatenation is handled differently (TODO: explain better?)
@@ -2217,13 +2217,13 @@ namespace smt::noodler {
     }
 
     expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
-        // TODO remove this function probably
+        // TODO remove this function probably and just use the one from util
         return util::mk_str_var_fresh(name, m, m_util_s);
     }
 
     expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
-        // TODO remove this function probably
-        return util::mk_int_var_fresh(name, m, m_util_s, m_util_a);
+        // TODO remove this function probably and just use the one from util
+        return util::mk_int_var_fresh(name, m, m_util_a);
     }
 
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
