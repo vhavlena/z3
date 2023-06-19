@@ -519,7 +519,8 @@ namespace smt::noodler {
         expr *e = ctx.bool_var2expr(v);
         expr *e1 = nullptr, *e2 = nullptr;
         if (m_util_s.str.is_prefix(e, e1, e2)) {
-            // INFO done in relevant_eh, because there was a problem with getting the same model from SAT again
+            // INFO done in relevant_eh, because there was some problem with adding axioms, Z3 added wrong axiom if it was done here and not in relevant_eh for some reason
+            // INFO in seq_theory they do similar stuff, and they do it here and not in relevant_eh, they also use skolem functions to handle it, might be worth to investigate
 
             // if (is_true) {
             //     handle_prefix(e);
@@ -528,7 +529,8 @@ namespace smt::noodler {
             //     //handle_not_prefix(e);
             // }
         } else if (m_util_s.str.is_suffix(e, e1, e2)) {
-            // INFO done in relevant_eh, because there was a problem with getting the same model from SAT again
+            // INFO done in relevant_eh, because there was some problem with adding axioms, Z3 added wrong axiom if it was done here and not in relevant_eh for some reason
+            // INFO in seq_theory they do similar stuff, and they do it here and not in relevant_eh, they also use skolem functions to handle it, might be worth to investigate
 
             // if (is_true) {
             //     handle_suffix(e);
