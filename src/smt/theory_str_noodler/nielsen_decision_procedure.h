@@ -202,11 +202,11 @@ namespace smt::noodler {
 
             while(!worklist.empty()) {
                 auto elem = worklist.front();
+                worklist.pop_front();
                 if(visited.find(elem.first) != visited.end()) {
                     continue;
                 }
                 visited.insert(elem.first);
-                worklist.pop_front();
                 if(elem.first == end) {
                     return elem.second;
                 }
@@ -267,7 +267,7 @@ namespace smt::noodler {
         const theory_str_noodler_params& m_params;
 
         std::vector<NielsenGraph> graphs {};
-        std::vector<Path<CounterLabel>> length_paths;
+        std::vector<std::vector<Path<CounterLabel>>> length_paths;
         size_t length_paths_index = 0;
 
     protected:
@@ -293,9 +293,10 @@ namespace smt::noodler {
         Path<CounterLabel> get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl);
 
         // construct length formula
-        expr_ref length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map);
+        expr_ref length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map, std::map<BasicTerm, expr_ref>& actual_var_map);
         expr_ref get_label_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
         expr_ref get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
+        expr_ref generate_len_connection(const std::map<BasicTerm, expr_ref>& variable_map, const std::map<BasicTerm, expr_ref>& actual_var_map);
 
     public:
         NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);

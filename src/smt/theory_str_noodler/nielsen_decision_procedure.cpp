@@ -21,11 +21,18 @@ namespace smt::noodler {
             return expr_ref(m.mk_true(), m);
         }
 
-        if(this->length_paths_index >= this->length_paths.size()) {
-            util::throw_error("nielsen: index out of range");
+        std::map<BasicTerm, expr_ref> actual_var_map{};
+        expr_ref formula(this->m.mk_true(), this->m);
+        for(size_t i = 0; i < this->length_paths.size(); i++) {
+            if(this->length_paths_index >= this->length_paths[i].size()) {
+                continue;
+            }
+            expr_ref part_fle = length_formula_path(this->length_paths[i][this->length_paths_index], variable_map, actual_var_map);
+            formula = this->m.mk_and(formula, part_fle);
         }
+        formula = this->m.mk_and(formula, generate_len_connection(variable_map, actual_var_map));
 
-        expr_ref formula = length_formula_path(this->length_paths[this->length_paths_index], variable_map);
+        STRACE("str", tout << "Nielsen lengths: " << mk_pp(formula, this->m) << std::endl;);
         this->length_paths_index++;
         return formula;
     }
@@ -79,10 +86,12 @@ namespace smt::noodler {
                 // create a counter system from the Nielsen graph a condensate it
                 CounterSystem counter_system = create_counter_system(graph);
                 condensate_counter_system(counter_system);
+                condensate_counter_system(counter_system);
+                this->length_paths.push_back({});
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
                     Path<CounterLabel> path = get_length_path(counter_system, c);
-                    this->length_paths.push_back(path);
+                    this->length_paths[this->length_paths.size() - 1].push_back(path);
                 }
             }
             return sat;
@@ -354,36 +363,36 @@ namespace smt::noodler {
      * @param cs Counter system.
      */
     void NielsenDecisionProcedure::condensate_counter_system(CounterSystem& cs) {
-
         // the reverse counter system
         CounterSystem rev = cs.reverse();
+        std::set<std::tuple<Formula, Formula, CounterLabel>> add_edges;
 
-        // find edges of the form fl --> mid --> last with compatible labels and mid has no 
-        // incomming edges and just one outcomming.
+        // find edges of the form fl --> mid --> last with compatible labels.
         // Compatible labels: labels of the form x := x + 1; x := x + 1 which can be 
-        // simplified to x := x + 2.
+        // simplified to x := x + 2. This edge is added to fl --> last
         for(const Formula& fl : cs.get_nodes()) {
-            std::set<std::pair<Formula, CounterLabel>> rem_edges;
+            // std::set<std::pair<Formula, CounterLabel>> add_edges;
             for(const auto& pr : cs.edges[fl]) {
                 Formula mid = pr.first;
                 CounterLabel mid_lab = pr.second;
                 auto it_last = cs.edges.find(mid);
-                if(it_last != cs.edges.end() && it_last->second.size() == 1 && rev.edges[mid].size() == 1) {
-                    Formula last = it_last->second.begin()->first;
-                    CounterLabel last_lab = it_last->second.begin()->second;
-                    // sum of two compatible labels  
-                    CounterLabel res{BasicTerm(BasicTermType::Length)};
-                    if(join_counter_label(mid_lab, last_lab, res)) {
-                        rem_edges.insert(pr);
-                        cs.edges[fl].insert({last, res});
-                        cs.edges.erase(mid);
+                if(it_last != cs.edges.end()) {
+                    for(const auto& dest_pr : it_last->second) {
+                        Formula last = dest_pr.first;
+                        CounterLabel last_lab = dest_pr.second;
+
+                        CounterLabel res{BasicTerm(BasicTermType::Length)};
+                        if(join_counter_label(mid_lab, last_lab, res)) {
+                            add_edges.insert({fl, last, res});
+                        }
                     }
                 }
             }
-            // remove the original edge from fl
-            for(const auto& pr : rem_edges) {
-                cs.edges[fl].erase(pr);
-            }
+        }
+
+        // add saturated edges
+        for(const auto& item : add_edges) {
+            cs.add_edge(std::get<0>(item), std::get<1>(item), std::get<2>(item));
         }
     }
 
@@ -488,10 +497,10 @@ namespace smt::noodler {
      * 
      * @param path Part of the counter system contining only self-loops.
      * @param variable_map Mapping of each BasicTerm to the current length variable
+     * @param actual_var_map Var map assigning temporary int variables to the original string variables
      * @return expr_ref Length formula
      */
-    expr_ref NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map) {
-        std::map<BasicTerm, expr_ref> actual_var_map{};
+    expr_ref NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map, std::map<BasicTerm, expr_ref>& actual_var_map) {
         expr_ref formula(this->m.mk_true(), this->m);
 
         // path of length 0 = true
@@ -516,13 +525,29 @@ namespace smt::noodler {
             } 
         }
 
+        return formula;
+    }
+
+    /**
+     * @brief Generate connection of temporary int variables with the original string lengths terms. 
+     * For instance x!1 = str.len(x) where x!1 is temporary int variable for x in @p actual_var_map.
+     * 
+     * @param variable_map Mapping of original variables to z3 terms.
+     * @param actual_var_map Actual var map of temporary int variables.
+     * @return expr_ref x!1 = str.len(x) for each variable x
+     */
+    expr_ref NielsenDecisionProcedure::generate_len_connection(const std::map<BasicTerm, expr_ref>& variable_map, const std::map<BasicTerm, expr_ref>& actual_var_map) {
+        expr_ref formula(this->m.mk_true(), this->m);
         // map the original string variable to their lengths.
         // i.e., str.len(x) = x_n (x_n is the last length variable of x)
         for(const BasicTerm& lterm : this->init_length_sensitive_vars) {
-            expr_ref prev_var = actual_var_map.at(lterm);
+            auto it = actual_var_map.find(lterm);
+            if(it == actual_var_map.end()) {
+                util::throw_error("nielsen: incomplete procedure");
+            }
+            expr_ref prev_var = it->second;
             formula = formula = this->m.mk_and(formula, this->m.mk_eq(this->m_util_s.str.mk_length(variable_map.at(lterm)), prev_var));
         }
-
         return formula;
     }
 
