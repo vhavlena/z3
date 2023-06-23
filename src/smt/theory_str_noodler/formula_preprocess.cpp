@@ -71,7 +71,7 @@ namespace smt::noodler {
     void FormulaVar::update_var_positions_side(const std::vector<BasicTerm>& side, std::set<VarNode>& res, size_t index, bool incl_lit, int mult) const {
         for(size_t i = 0; i < side.size(); i++) {
             if(incl_lit || side[i].is_variable()) {
-                VarNode new_item = {.term = side[i], .eq_index = index, .position = mult*int(i+1) };
+                VarNode new_item = { side[i], index, mult*int(i+1) };
                     res.insert(new_item);
                 }
             }
@@ -595,9 +595,9 @@ namespace smt::noodler {
                 // Construct the set of supposed occurences of the symbol side[i]
                 for(const VarNode& vn : occurrs) {
                     vns.insert({
-                        .term = side[i],
-                        .eq_index = vn.eq_index,
-                        .position = FormulaVar::increment_side_index(vn.position, i-start)
+                        side[i],
+                        vn.eq_index,
+                        FormulaVar::increment_side_index(vn.position, i-start)
                     });
                 }
                 // Compare the supposed occurrences with real occurrences.

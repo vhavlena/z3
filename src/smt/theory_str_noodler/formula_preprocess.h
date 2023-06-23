@@ -191,6 +191,7 @@ namespace smt::noodler {
         size_t eq_index;
         int position;
 
+        VarNode(BasicTerm term, const size_t eq_index, const int position): term{ std::move(term) }, eq_index{ eq_index }, position{ position } {}
         VarNode(const VarNode& other) = default;
         VarNode(VarNode &&) = default;
 
