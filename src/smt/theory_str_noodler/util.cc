@@ -456,8 +456,8 @@ namespace smt::noodler::util {
         } else if (m_util_s.re.is_diff(expression)) { // Handle diff.
             throw_error("regex difference is unsupported");
         } else if (m_util_s.re.is_dot_plus(expression)) { // Handle dot plus.
-            nfa.initial.add(0);
-            nfa.final.add(1);
+            nfa.initial.insert(0);
+            nfa.final.insert(1);
             for (const auto& symbol : alphabet) {
                 nfa.delta.add(0, symbol, 1);
                 nfa.delta.add(1, symbol, 1);
@@ -467,14 +467,14 @@ namespace smt::noodler::util {
         } else if (m_util_s.re.is_epsilon(expression)) { // Handle epsilon.
             nfa = Mata::Nfa::create_empty_string_nfa();
         } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
-            nfa.initial.add(0);
-            nfa.final.add(1);
+            nfa.initial.insert(0);
+            nfa.final.insert(1);
             for (const auto& symbol : alphabet) {
                 nfa.delta.add(0, symbol, 1);
             }
         } else if (m_util_s.re.is_full_seq(expression)) {
-            nfa.initial.add(0);
-            nfa.final.add(0);
+            nfa.initial.insert(0);
+            nfa.final.insert(0);
             for (const auto& symbol : alphabet) {
                 nfa.delta.add(0, symbol, 0);
             }
@@ -508,10 +508,10 @@ namespace smt::noodler::util {
             // so we add an empty word into body_nfa by making some initial state final
             if (body_nfa.initial.empty()) {
                 State new_state = body_nfa.add_state();
-                body_nfa.initial.add(new_state);
-                body_nfa.final.add(new_state);
+                body_nfa.initial.insert(new_state);
+                body_nfa.final.insert(new_state);
             } else {
-                body_nfa.final.add(*(body_nfa.initial.begin()));
+                body_nfa.final.insert(*(body_nfa.initial.begin()));
             }
 
             if (is_high_set) {
@@ -539,7 +539,7 @@ namespace smt::noodler::util {
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             nfa.unify_initial();
             for (const auto& initial : nfa.initial) {
-                nfa.final.add(initial);
+                nfa.final.insert(initial);
             }
         } else if (m_util_s.re.is_range(expression)) { // Handle range.
             SASSERT(expression->get_num_args() == 2);
@@ -550,8 +550,8 @@ namespace smt::noodler::util {
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
             const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
 
-            nfa.initial.add(0);
-            nfa.final.add(1);
+            nfa.initial.insert(0);
+            nfa.final.insert(1);
             auto current_value{ range_begin_value };
             while (current_value <= range_end_value) {
                 nfa.delta.add(0, current_value, 1);
@@ -582,10 +582,10 @@ namespace smt::noodler::util {
             // Make one initial final in order to accept empty string as is required by kleene-star.
             if (nfa.initial.empty()) {
                 State new_state = nfa.add_state();
-                nfa.initial.add(new_state);
-                nfa.final.add(new_state);
+                nfa.initial.insert(new_state);
+                nfa.final.insert(new_state);
             } else {
-                nfa.final.add(*(nfa.initial.begin()));
+                nfa.final.insert(*(nfa.initial.begin()));
             }
         } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
             SASSERT(expression->get_num_args() == 1);
@@ -622,12 +622,12 @@ namespace smt::noodler::util {
     Nfa create_word_nfa(const zstring& word) {
         const size_t word_length{ word.length() };
         Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length } };
-        nfa.initial.add(0);
+        nfa.initial.insert(0);
         size_t state{ 0 };
         for (; state < word.length(); ++state) {
             nfa.delta.add(state, word[state], state + 1);
         }
-        nfa.final.add(state);
+        nfa.final.insert(state);
         return nfa;
     }
 
