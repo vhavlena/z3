@@ -264,8 +264,6 @@ namespace smt::noodler {
     void theory_str_noodler::propagate_concat_axiom(enode *cat) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
-        bool on_screen = false;
-
 
         app *a_cat = cat->get_expr();
         SASSERT(m_util_s.str.is_concat(a_cat));
@@ -293,9 +291,10 @@ namespace smt::noodler {
         len_x_plus_len_y = m_util_a.mk_add(len_x, len_y);
         SASSERT(len_x_plus_len_y);
 
-        if (on_screen)
-            std::cout << "[Concat Axiom] " << mk_pp(len_xy, m) << " = " << mk_pp(len_x, m) << " + " << mk_pp(len_y, m)
-                      << std::endl;
+        STRACE("str-concat",
+            tout << "[Concat Axiom] " << mk_pp(len_xy, m) << " = " << mk_pp(len_x, m) << " + " << mk_pp(len_y, m)
+                 << std::endl;
+        );
 
         // finally assert equality between the two subexpressions
         app_ref eq(m.mk_eq(len_xy, len_x_plus_len_y), m);
@@ -309,10 +308,6 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::propagate_basic_string_axioms(enode *str) {
-        bool on_screen = false;
-
-        // return;
-
         context &ctx = get_context();
         ast_manager &m = get_manager();
 
@@ -337,7 +332,7 @@ namespace smt::noodler {
         app_ref a_str(str->get_expr(), m);
 
         if (m_util_s.str.is_string(a_str)) {
-            if (on_screen) std::cout << "[ConstStr Axiom] " << mk_pp(a_str, m) << std::endl;
+            STRACE("str-axiom", tout << "[ConstStr Axiom] " << mk_pp(a_str, m) << std::endl);
 
             expr_ref len_str(m_util_s.str.mk_length(a_str), m);
             SASSERT(len_str);
@@ -360,7 +355,7 @@ namespace smt::noodler {
                  * properly relevancy propagated...)
                  */
                 //return; 
-                if (on_screen) std::cout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl;
+                STRACE("str-axiom", tout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl);
 
                 // build LHS
                 expr_ref len_str(m);
@@ -390,7 +385,7 @@ namespace smt::noodler {
             // build axiom 2: Length(a_str) == 0 <=> a_str == ""
             {
                 // return;
-                if (on_screen) std::cout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl;
+                STRACE("str-axiom", tout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl);
 
                 // build LHS of iff
                 expr_ref len_str(m);
@@ -559,7 +554,6 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::new_eq_eh(theory_var x, theory_var y) {
-        m_word_eq_var_todo.push_back({x, y});
 
         expr_ref l{get_enode(x)->get_expr(), m};
         expr_ref r{get_enode(y)->get_expr(), m};
@@ -594,7 +588,6 @@ namespace smt::noodler {
         if(m_util_s.is_re(l) && m_util_s.is_re(r)) {
             this->m_lang_diseq_todo.push_back({l, r});
         } else {
-            m_word_diseq_var_todo.push_back({x, y});
             m_word_diseq_todo.push_back({l, r});
         }
 
@@ -1178,11 +1171,7 @@ namespace smt::noodler {
     // }
 
     void theory_str_noodler::add_axiom(expr *const e) {
-        bool on_screen = true;
         STRACE("str_axiom", tout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
-
-        if (on_screen) STRACE("str_axiom",
-                              std::cout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
 
 
         if (!axiomatized_terms.contains(e)) {
@@ -1205,8 +1194,6 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::add_axiom(std::initializer_list<literal> ls) {
-        bool on_screen = true;
-
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         context &ctx = get_context();
         literal_vector lv;
@@ -1217,8 +1204,6 @@ namespace smt::noodler {
             }
         }
         ctx.mk_th_axiom(get_id(), lv, lv.size());
-        if (on_screen) STRACE("str_axiom", std::cout << __LINE__ << " " << __FUNCTION__;);
-        if (on_screen) STRACE("str_axiom", ctx.display_literals_verbose(std::cout, lv) << std::endl;);
         STRACE("str_axiom", ctx.display_literals_verbose(tout << "[Assert_c]\n", lv) << '\n';);
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
     }
