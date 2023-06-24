@@ -73,7 +73,6 @@ namespace smt::noodler {
         obj_map<expr, unsigned> bool_var_int;
         obj_hashtable<expr> bool_var_state;
 
-        std::set<std::pair<int,int>> axiomatized_eq_vars;
         using expr_pair = std::pair<expr_ref, expr_ref>;
         using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
         using tvar_pair = std::pair<theory_var , theory_var >;

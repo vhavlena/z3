@@ -554,55 +554,73 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::new_eq_eh(theory_var x, theory_var y) {
-
+        // get the expressions for left and right side of equation
         expr_ref l{get_enode(x)->get_expr(), m};
         expr_ref r{get_enode(y)->get_expr(), m};
 
-        if (axiomatized_eq_vars.count(std::make_pair(x, y)) == 0) {
-            axiomatized_eq_vars.insert(std::make_pair(x, y));
+        app* equation = m.mk_eq(l, r);
 
-            if(!ctx.e_internalized(m.mk_eq(l, r))) {
-                ctx.mark_as_relevant(m.mk_eq(l, r));
+        // TODO explain what is happening here
+        if(!ctx.e_internalized(equation)) {
+            ctx.mark_as_relevant(equation);
+        }
+
+        if(m_util_s.is_re(l) && m_util_s.is_re(r)) { // language equation
+            m_lang_eq_todo.push_back({l, r});
+        } else { // word equation
+            m_word_eq_todo.push_back({l, r});
+
+            // mk_eq_atom can check if both sides are not trivially false
+            // by being two distinct string literals
+            if (m.is_false(ctx.mk_eq_atom(l, r))) {
+                // if we have two distinct literals, we immediately stop by not allowing this equation
+                add_axiom({mk_literal(m.mk_not(equation))});
             }
 
-            if(m_util_s.is_re(l) && m_util_s.is_re(r)) {
-                this->m_lang_eq_todo.push_back({l, r});
-                return;
-            }
-
-            if(ctx.is_relevant(m.mk_eq(l, r)) || ctx.is_relevant(m.mk_eq(r, l))) {
-                literal l_eq_r = mk_literal(m.mk_eq(l, r));    //mk_eq(l, r, false);
+            // Optimization: If equation holds, then the lengths of both sides must be the same.
+            // We do this only if the equation (or its inverse) is already for sure relevant,
+            // otherwise adding the axiom might make the equation relevant (even though it is not).
+            // Used for quick check for arith solver, to immediately realise that sides cannot be
+            // ever equal based on lengths.
+            // This does NOT add the variables from the equation to len_vars.
+            if (ctx.is_relevant(equation) || ctx.is_relevant(m.mk_eq(r, l))) {
+                literal l_eq_r = mk_literal(equation);    //mk_eq(l, r, false);
                 literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
                 add_axiom({~l_eq_r, len_l_eq_len_r});
             }
         }
-        m_word_eq_todo.push_back({l, r});
-        STRACE("str", tout << "new_eq: " << l <<  " = " << r << '\n';);
+
+        STRACE("str", tout << "new_eq: " << l <<  " = " << r << std::endl;);
     }
 
     void theory_str_noodler::new_diseq_eh(theory_var x, theory_var y) {
-        ast_manager &m = get_manager();
+        // get the expressions for left and right side of disequation
         const expr_ref l{get_enode(x)->get_expr(), m};
         const expr_ref r{get_enode(y)->get_expr(), m};
 
-        if(m_util_s.is_re(l) && m_util_s.is_re(r)) {
-            this->m_lang_diseq_todo.push_back({l, r});
-        } else {
+        app* equation = m.mk_eq(l, r);
+        app* diseqation = m.mk_not(equation);
+
+        // This is to handle the case containing ite inside disequations
+        // TODO explain better
+        if(!ctx.e_internalized(equation)) {
+            STRACE("str", tout << "relevanting: " << mk_pp(neg, m) << '\n';);
+            ctx.mark_as_relevant(diseqation);
+        }
+        ctx.internalize(disequation, false);
+
+        if(m_util_s.is_re(l) && m_util_s.is_re(r)) { // language disequation
+            m_lang_diseq_todo.push_back({l, r});
+        } else { // word disequation
             m_word_diseq_todo.push_back({l, r});
         }
 
-        app_ref l_eq_r(ctx.mk_eq_atom(l.get(), r.get()), m);
-        app_ref neg(m.mk_not(l_eq_r), m);
-
-        // This is to handle the case containing ite inside disequations
-        if(!ctx.e_internalized(m.mk_eq(l, r))) {
-            STRACE("str", tout << "relevanting: " << mk_pp(neg, m) << '\n';);
-            ctx.mark_as_relevant(m.mk_not(m.mk_eq(l, r)));
-        }
-        ctx.internalize(neg, false);
-
-        STRACE("str", tout << ctx.find_assignment(l_eq_r.get()) << " " << ctx.find_assignment(neg.get()) << '\n';);
-        STRACE("str", tout << "new_diseq: " << l << " != " << r << " @" << m_scope_level<< " " << ctx.get_bool_var(l_eq_r.get()) << " " << ctx.is_relevant(neg.get()) << ":" << ctx.is_relevant(l_eq_r.get()) << '\n';);
+        STRACE("str",
+            tout << ctx.find_assignment(equation) << " " << ctx.find_assignment(diseqation) << std::endl
+                 << "new_diseq: " << l << " != " << r
+                 << " @" << m_scope_level<< " " << ctx.get_bool_var(equation) << " "
+                 << ctx.is_relevant(diseqation) << ":" << ctx.is_relevant(equation) << std::endl;
+        );
     }
 
     bool theory_str_noodler::can_propagate() {
