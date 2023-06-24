@@ -629,8 +629,6 @@ namespace smt::noodler {
         m_lang_eq_todo.push_scope();
         m_lang_diseq_todo.push_scope();
         m_word_diseq_todo.push_scope();
-        m_word_eq_var_todo.push_scope();
-        m_word_diseq_var_todo.push_scope();
         m_membership_todo.push_scope();
         m_not_contains_todo.push_scope();
         STRACE("str", if (!IN_CHECK_FINAL) tout << "push_scope: " << m_scope_level << '\n';);
@@ -644,8 +642,6 @@ namespace smt::noodler {
         m_lang_eq_todo.pop_scope(num_scopes);
         m_lang_diseq_todo.pop_scope(num_scopes);
         m_word_diseq_todo.pop_scope(num_scopes);
-        m_word_eq_var_todo.pop_scope(num_scopes);
-        m_word_diseq_var_todo.pop_scope(num_scopes);
         m_membership_todo.pop_scope(num_scopes);
         m_not_contains_todo.pop_scope(num_scopes);
         m_rewrite.reset();
@@ -2066,17 +2062,7 @@ namespace smt::noodler {
     void theory_str_noodler::block_curr_assignment() {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
-        bool on_screen=false;
         context& ctx = get_context();
-
-        if(on_screen) std::cout<<"[block] ";
-        for (const auto& we : m_word_eq_var_todo) {
-            if(on_screen) std::cout<<"("<<we.first<<"="<<we.second<<")";
-        }
-        for (const auto& we : m_word_diseq_var_todo) {
-            if(on_screen) std::cout<<"("<<we.first<<"!="<<we.second<<")";
-        }
-        if(on_screen) std::cout<<std::endl;
 
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
@@ -2155,7 +2141,6 @@ namespace smt::noodler {
     bool theory_str_noodler::block_curr_len(expr_ref len_formula) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
-        bool on_screen=false;
         context& ctx = get_context();
 
         ast_manager& m = get_manager();
