@@ -568,25 +568,28 @@ namespace smt::noodler {
         if(m_util_s.is_re(l) && m_util_s.is_re(r)) { // language equation
             m_lang_eq_todo.push_back({l, r});
         } else { // word equation
-            m_word_eq_todo.push_back({l, r});
-
-            // mk_eq_atom can check if both sides are not trivially false
-            // by being two distinct string literals
-            if (m.is_false(ctx.mk_eq_atom(l, r))) {
+            // mk_eq_atom can check if equation trivially holds (by having the
+            // same thing on both sides) or not (by having two distintict
+            // string literals)
+            app* equation_atom = ctx.mk_eq_atom(l, r);
+            if (m.is_false(equation_atom)) {
                 // if we have two distinct literals, we immediately stop by not allowing this equation
                 add_axiom({mk_literal(m.mk_not(equation))});
-            }
+            } else if (!m.is_true(equation_atom)) {
+                // if equation is not trivially true, we add it for later check
+                m_word_eq_todo.push_back({l, r});
 
-            // Optimization: If equation holds, then the lengths of both sides must be the same.
-            // We do this only if the equation (or its inverse) is already for sure relevant,
-            // otherwise adding the axiom might make the equation relevant (even though it is not).
-            // Used for quick check for arith solver, to immediately realise that sides cannot be
-            // ever equal based on lengths.
-            // This does NOT add the variables from the equation to len_vars.
-            if (ctx.is_relevant(equation) || ctx.is_relevant(m.mk_eq(r, l))) {
-                literal l_eq_r = mk_literal(equation);    //mk_eq(l, r, false);
-                literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
-                add_axiom({~l_eq_r, len_l_eq_len_r});
+                // Optimization: If equation holds, then the lengths of both sides must be the same.
+                // We do this only if the equation (or its inverse) is already for sure relevant,
+                // otherwise adding the axiom might make the equation relevant (even though it is not).
+                // Used for quick check for arith solver, to immediately realise that sides cannot be
+                // ever equal based on lengths.
+                // This does NOT add the variables from the equation to len_vars.
+                if (ctx.is_relevant(equation) || ctx.is_relevant(m.mk_eq(r, l))) {
+                    literal l_eq_r = mk_literal(equation);    //mk_eq(l, r, false);
+                    literal len_l_eq_len_r = mk_eq(m_util_s.str.mk_length(l), m_util_s.str.mk_length(r), false);
+                    add_axiom({~l_eq_r, len_l_eq_len_r});
+                }
             }
         }
 
@@ -599,27 +602,38 @@ namespace smt::noodler {
         const expr_ref r{get_enode(y)->get_expr(), m};
 
         app* equation = m.mk_eq(l, r);
-        app* diseqation = m.mk_not(equation);
+        app* disequation = m.mk_not(equation);
 
         // This is to handle the case containing ite inside disequations
         // TODO explain better
         if(!ctx.e_internalized(equation)) {
-            STRACE("str", tout << "relevanting: " << mk_pp(neg, m) << '\n';);
-            ctx.mark_as_relevant(diseqation);
+            STRACE("str", tout << "relevanting: " << mk_pp(disequation, m) << std::endl;);
+            ctx.mark_as_relevant(disequation);
         }
         ctx.internalize(disequation, false);
 
         if(m_util_s.is_re(l) && m_util_s.is_re(r)) { // language disequation
             m_lang_diseq_todo.push_back({l, r});
         } else { // word disequation
-            m_word_diseq_todo.push_back({l, r});
+            // mk_eq_atom can check if equation trivially holds (by having the
+            // same thing on both sides) or not (by having two distintict
+            // string literals)
+            app* equation_atom = ctx.mk_eq_atom(l, r);
+            if (m.is_true(equation_atom)) {
+                // if equation trivially holds (i.e. this disequation does not),
+                // we immediately stop by always forcing it
+                add_axiom({mk_literal(equation)});
+            } else if (!m.is_false(equation_atom)) {
+                // if equation is not trivially false, we add it for later check
+                m_word_diseq_todo.push_back({l, r});
+            }
         }
 
         STRACE("str",
-            tout << ctx.find_assignment(equation) << " " << ctx.find_assignment(diseqation) << std::endl
+            tout << ctx.find_assignment(equation) << " " << ctx.find_assignment(disequation) << std::endl
                  << "new_diseq: " << l << " != " << r
                  << " @" << m_scope_level<< " " << ctx.get_bool_var(equation) << " "
-                 << ctx.is_relevant(diseqation) << ":" << ctx.is_relevant(equation) << std::endl;
+                 << ctx.is_relevant(disequation) << ":" << ctx.is_relevant(equation) << std::endl;
         );
     }
 
