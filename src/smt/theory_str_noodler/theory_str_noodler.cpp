@@ -127,72 +127,6 @@ namespace smt::noodler {
         mk_var(n);
     }
 
-    void theory_str_noodler::print_ctx(context &ctx) {  // test_hlin
-        ast_manager m = get_manager();
-        expr_ref_vector dis(m);
-        expr_ref_vector vars(m);
-        expr_ref_vector cons(m);
-        expr_ref_vector unfixed(m);
-
-        expr_ref_vector con(get_manager());
-        expr_ref_vector un(get_manager());
-
-        ctx.get_assignments(con);
-        std::cout << "Assignment :" << con.size() << " " << un.size() << std::endl;
-        for(expr* e : con) {
-            std::cout << "OOO " << mk_pp(e, m) << " " << ctx.is_relevant(e) << " " << ctx.b_internalized(e) << " " << ctx.find_assignment(e);
-            if(ctx.b_internalized(e)) {
-                std::cout << ctx.get_bool_var(e);
-            }
-            std::cout << std::endl;
-        }
-
-        return;
-
-        std::cout << ctx.get_unsat_core_size() << std::endl;
-        std::cout << "~~~~~ print ctx start ~~~~~~~\n";
-//        context& ctx = get_context();
-        unsigned nFormulas = ctx.get_num_asserted_formulas();
-        expr_ref_vector Literals(get_manager()), Assigns(get_manager());
-        ctx.get_guessed_literals(Literals);
-        ctx.get_assignments(Assigns);
-        std::cout << "~~~~~~ from get_asserted_formulas ~~~~~~\n";
-        for (unsigned i = 0; i < nFormulas; ++i) {
-            expr *ex = ctx.get_asserted_formula(i);
-            std::cout << mk_pp(ex, get_manager()) << " relevant? " << ctx.is_relevant(ex) << std::endl;
-        }
-        std::cout << "~~~~~~ from get_guessed_literals ~~~~~~\n";
-        for (auto &e : Literals) {
-            std::cout << mk_pp(e, get_manager()) << " relevant? " << ctx.is_relevant(e) << std::endl;
-        }
-        std::cout << "~~~~~~ from get_assignments ~~~~~~\n";
-        for (auto &e : Assigns) {
-//            print_ast(e);
-            std::cout << mk_pp(e, get_manager()) << " relevant? " << ctx.is_relevant(e) << std::endl;
-        }
-        std::cout << "~~~~~ print ctx end ~~~~~~~~~\n";
-    }
-
-    void theory_str_noodler::print_ast(expr *e) {  // test_hlin
-        ast_manager m = get_manager();
-        unsigned int id = e->get_id();
-        ast_kind ast = e->get_kind();
-        sort *e_sort = e->get_sort();
-        sort *bool_sort = m.mk_bool_sort();
-        sort *str_sort = m_util_s.str.mk_string_sort();
-        std::cout << "#e.id = " << id << std::endl;
-        std::cout << "#e.kind = " << get_ast_kind_name(ast) << std::endl;
-        std::cout << std::boolalpha << " sort? " << (e_sort == bool_sort) << std::endl;
-        std::cout << std::boolalpha << "#is string sort? " << (e_sort == str_sort) << std::endl;
-        std::cout << std::boolalpha << "#is string term? " << m_util_s.str.is_string(e) << std::endl;
-        std::cout << std::boolalpha << "#is_numeral? " << m_util_a.is_numeral(e) << std::endl;
-        std::cout << std::boolalpha << "#is_to_int? " << m_util_a.is_to_int(e) << std::endl;
-        std::cout << std::boolalpha << "#is_int_expr? " << m_util_a.is_int_expr(e) << std::endl;
-        std::cout << std::boolalpha << "#is_le? " << m_util_a.is_le(e) << std::endl;
-        std::cout << std::boolalpha << "#is_ge? " << m_util_a.is_ge(e) << std::endl;
-    }
-
-
     void theory_str_noodler::init_search_eh() {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         context &ctx = get_context();
@@ -477,7 +411,7 @@ namespace smt::noodler {
             m_util_s.re.is_to_re(n) || // str.to_re
             m_util_s.str.is_in_re(n) || // str.in_re
             m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...)
-            is_str_variable(n) || // string variable
+            util::is_str_variable(n) || // string variable
             // RegLan variables should never occur here, they are always eliminated by rewriter I think
             m_util_s.str.is_string(n) // string literal
         ) {
@@ -499,7 +433,7 @@ namespace smt::noodler {
             expr *o = n->get_expr();
             // TODO is this needed? what happens if we get ite, it does not do anything
             if (!has_length(o) && !m.is_ite(o)) {
-                expr_ref len = mk_len(o);
+                expr_ref len = expr_ref(m_util_s.str.mk_length(o), m);
                 add_length_axiom(len);
             }
             n = n->get_next();
@@ -677,35 +611,6 @@ namespace smt::noodler {
     void theory_str_noodler::reset_eh() {
         // FIXME should here be something?
         STRACE("str", tout << "reset" << '\n';);
-    }
-
-
-
-    zstring theory_str_noodler::print_word_term(expr * e) const{
-        zstring s;
-        if (m_util_s.str.is_string(e, s)) {
-            return s;
-        }
-        if (m_util_s.str.is_concat(e)) {
-            //e is a concat of some elements
-            for (unsigned i = 0; i < to_app(e)->get_num_args(); i++) {
-                s = s+ print_word_term(to_app(e)->get_arg(i));
-            }
-            return s;
-        }
-        if (m_util_s.str.is_stoi(e)){
-            return zstring("stoi");
-        }
-        if (m_util_s.str.is_itos(e)){
-            return zstring("itos");
-        }
-
-        // e is a string variable
-        std::stringstream ss;
-        ss << "V("<<mk_pp(e, get_manager())<<")";
-        s = zstring(ss.str().data());
-        return s;
-
     }
 
     void theory_str_noodler::remove_irrelevant_constr() {
@@ -1125,30 +1030,6 @@ namespace smt::noodler {
         return l_undef;
     }
 
-    bool theory_str_noodler::is_of_this_theory(expr *const e) const {
-        return is_app(e) && to_app(e)->get_family_id() == get_family_id();
-    }
-
-    bool theory_str_noodler::is_string_sort(expr *const e) const {
-        return m_util_s.str.is_string_term(e);
-    }
-
-    bool theory_str_noodler::is_regex_sort(expr *const e) const {
-        return m_util_s.is_re(e);
-    }
-
-    bool theory_str_noodler::is_const_fun(expr *const e) const {
-        return is_app(e) && to_app(e)->get_decl()->get_arity() == 0;
-    }
-
-    bool theory_str_noodler::is_str_variable(const expr* expression) const {
-        return util::is_str_variable(expression, m_util_s);
-    }
-
-    bool theory_str_noodler::is_variable(const expr* expression) const {
-        return util::is_variable(expression, m_util_s);
-    }
-
     expr_ref theory_str_noodler::mk_sub(expr *a, expr *b) {
         ast_manager &m = get_manager();
 
@@ -1183,24 +1064,6 @@ namespace smt::noodler {
         ctx.set_enode_flag(bv, true);
         return bv;
     }
-
-    // probably deprecated
-    // void theory_str_noodler::add_block_axiom(expr *const e) {
-    //     STRACE("str", tout <<  __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
-
-    //     if (!axiomatized_terms.contains(e) || false) {
-    //         axiomatized_terms.insert(e);
-    //         if (e == nullptr || get_manager().is_true(e)) return;
-    //         context &ctx = get_context();
-    //         if (!ctx.b_internalized(e)) {
-    //             ctx.internalize(e, false);
-    //         }
-    //         ctx.internalize(e, false);
-    //         literal l{ctx.get_literal(e)};
-    //         ctx.mk_th_axiom(get_id(), 1, &l);
-    //         STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e] block: \n", l) << '\n';);
-    //     }
-    // }
 
     void theory_str_noodler::add_axiom(expr *const e) {
         STRACE("str_axiom", tout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
@@ -1730,12 +1593,6 @@ namespace smt::noodler {
         add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s))});
     }
 
-    /**
-     * @brief Get string term representing first |s| - 1 characters of @p s.
-     *
-     * @param s String term
-     * @return expr_ref String term
-     */
     expr_ref theory_str_noodler::mk_first(expr* s) {
         zstring str;
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
@@ -1744,12 +1601,6 @@ namespace smt::noodler {
         return mk_str_var("index_first");
     }
 
-    /**
-     * @brief Get string term representing last character of @p s.
-     *
-     * @param s String term
-     * @return expr_ref String term
-     */
     expr_ref theory_str_noodler::mk_last(expr* s) {
         zstring str;
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
@@ -1762,11 +1613,10 @@ namespace smt::noodler {
         return expr_ref(m_util_s.str.mk_concat(e1, e2), m);
     }
 
-    literal theory_str_noodler::mk_eq_empty(expr* _e, bool phase) {
+    literal theory_str_noodler::mk_eq_empty(expr* _e) {
         context& ctx = get_context();
         expr_ref e(_e, m);
         SASSERT(m_util_s.is_seq(e));
-        expr_ref emp(m);
         zstring s;
         if (m_util_s.str.is_empty(e)) {
             return true_literal;
@@ -1781,10 +1631,8 @@ namespace smt::noodler {
                 return false_literal;
             }
         }
-        emp = m_util_s.str.mk_empty(e->get_sort());
 
-        literal lit = mk_eq(e, emp, false);
-        ctx.force_phase(phase?lit:~lit);
+        literal lit = mk_eq(e, m_util_s.str.mk_empty(e->get_sort()), false);
         ctx.mark_as_relevant(lit);
         return lit;
     }

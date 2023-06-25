@@ -54,6 +54,8 @@ namespace smt::noodler {
         var_union_find var_eqs;
 
         StateLen<bool> state_len;
+
+        // variables whose lengths are important
         obj_hashtable<expr> len_vars;
 
         std::map<BasicTerm, expr_ref> var_name;
@@ -122,17 +124,29 @@ namespace smt::noodler {
         void finalize_model(model_generator& mg) override;
         lbool validate_unsat_core(expr_ref_vector& unsat_core) override;
 
+        // FIXME ensure_enode is non-virtual function of theory, why are we redegfining it?
+        enode* ensure_enode(expr* e);
+
         void add_length_axiom(expr* n);
 
-        enode* ensure_enode(expr* a);
-        expr_ref mk_len(expr* s) const { return expr_ref(m_util_s.str.mk_length(s), m); }
-
         void add_axiom(expr *e);
-        // void add_block_axiom(expr *const e);
-        literal mk_eq_empty(expr* n, bool phase = true);
-        expr_ref mk_last(expr* e);
+        
+        /**
+         * @brief Get string literal representing the string literal @p s without the last character.
+         */
         expr_ref mk_first(expr* e);
+        /**
+         * @brief Get string literal representing the last character of string literal @p s.
+         */
+        expr_ref mk_last(expr* e);
+        /**
+         * @brief Get concatenation of e1 and e2
+         */
         expr_ref mk_concat(expr* e1, expr* e2);
+        /**
+         * @brief Creates literal representing that n is empty string
+         */
+        literal mk_eq_empty(expr* n);
 
         /**
          * @brief Check if the length formula @p len_formula is satisfiable.
@@ -144,40 +158,14 @@ namespace smt::noodler {
 
 
         bool has_length(expr *e) const { return m_has_length.contains(e); }
-        void add_length(expr* e);
         void enforce_length(expr* n);
 
         ~theory_str_noodler() {}
 
     protected:
-        bool is_of_this_theory(expr *e) const;
-        bool is_string_sort(expr *e) const;
-        bool is_regex_sort(expr *e) const;
-        bool is_const_fun(expr *e) const;
-
-        /**
-         * Check whether an @p expression is a string variable.
-         *
-         * Function checks only the top-level expression and is not recursive.
-         * Regex variables do not count as string variables.
-         * @param expression Expression to check.
-         * @return True if @p expression is a variable, false otherwise.
-         */
-        bool is_str_variable(const expr* expression) const;
-
-        /**
-         * Check whether an @p expression is any kind of variable (string, regex, integer).
-         *
-         * Function checks only the top-level expression and is not recursive.
-         * @param expression Expression to check.
-         * @return True if @p expression is a variable, false otherwise.
-         */
-        bool is_variable(const expr* expression) const;
-
         lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
         expr_ref mk_sub(expr *a, expr *b);
-        zstring print_word_term(expr * a) const;
 
 
         literal mk_literal(expr *e);
@@ -229,15 +217,11 @@ namespace smt::noodler {
         void propagate_concat_axiom(enode * cat);
         void propagate_basic_string_axioms(enode * str);
         void tightest_prefix(expr*,expr*);
-        void print_ast(expr *e);
-        void print_ctx(context& ctx);
 
         void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
-        void update_len_state_var(const obj_hashtable<expr>& conj, const app_ref& bool_var);
-        std::vector<app_ref> find_state_var(const obj_hashtable<expr>& conj);
 
         /**
-         * @brief Adds string constraints from ..._todo that are relevant for SAT checking to ..._todo_rel.
+         * @brief Adds string constraints from *_todo that are relevant for SAT checking to *_todo_rel.
          */
         void remove_irrelevant_constr();
 
