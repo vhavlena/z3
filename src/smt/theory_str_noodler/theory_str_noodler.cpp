@@ -411,7 +411,7 @@ namespace smt::noodler {
             m_util_s.re.is_to_re(n) || // str.to_re
             m_util_s.str.is_in_re(n) || // str.in_re
             m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...)
-            util::is_str_variable(n) || // string variable
+            util::is_str_variable(n, m_util_s) || // string variable
             // RegLan variables should never occur here, they are always eliminated by rewriter I think
             m_util_s.str.is_string(n) // string literal
         ) {
@@ -694,9 +694,22 @@ namespace smt::noodler {
         }
     }
 
-    /*
-    Final check for an assignment of the underlying boolean skeleton.
-    */
+    /**
+     * @brief Checks satisfiability of constraints in _todo member variables (e.g. m_word_eq_todo, m_membership_todo,...)
+     * 
+     * It follows these steps:
+     *   1) Remove constraints that are not relevant for the solution, adding all relevant constraints to *_todo_rel, ending with
+     *        - language equations and diseqations (m_lang_eq_todo_rel)
+     *        - word equations and diseqations (m_word_eq_todo_rel and m_word_diseq_todo_rel)
+     *        - membership constraints (m_membership_todo_rel)
+     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown) 
+     *   2) Check if all language eqations and disequations are true (the sides are given as regexes)
+     *   3) Create the formula instance and automata assignment from word (dis)eqautions and membership constraints
+     *   4) Check if it is satisfiable which consists of
+     *        - preprocessing the formula (simplifying (dis)equations, reducing the number of variables etc.)
+     *        - iteratively running the decision procedure until a satisfiable solution and length constraint is found or until
+     *          it finishes wihtout result
+     */
     final_check_status theory_str_noodler::final_check_eh() {
         TRACE("str", tout << "final_check starts" << std::endl;);
 
@@ -704,19 +717,19 @@ namespace smt::noodler {
 
         STRACE("str",
             tout << "Relevant predicates:" << std::endl;
-            tout << "  - eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
+            tout << "  eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_eq_todo_rel) {
                 tout << "    " << mk_pp(we.first, m) << " == " << mk_pp(we.second, m) << std::endl;
             }
-            tout << "  - diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
+            tout << "  diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_word_diseq_todo_rel) {
                 tout << "    " << mk_pp(we.first, m) << " != " << mk_pp(we.second, m) << std::endl;
             }
-            tout << "  - membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
+            tout << "  membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_membership_todo_rel) {
                 tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? "" : " not") << " in " << mk_pp(std::get<1>(we), m) << std::endl;
             }
-            tout << "  - lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
+            tout << "  lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
             for (const auto &we: this->m_lang_eq_todo_rel) {
                 tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? " == " : " != ") << mk_pp(std::get<1>(we), m) << std::endl;
             }
@@ -757,9 +770,9 @@ namespace smt::noodler {
                 // the language (dis)equation does not hold => block it and return
                 app_ref lang_eq(ctx.mk_eq_atom(left_side, right_side), m);
                 if(is_equation){
-                    add_axiom(m.mk_not(lang_eq));
+                    add_axiom({mk_literal(m.mk_not(lang_eq))});
                 } else {
-                    add_axiom(lang_eq);
+                    add_axiom({mk_literal(lang_eq)});
                 }
                 return FC_DONE;
             }
@@ -771,8 +784,6 @@ namespace smt::noodler {
 
         // gathered (dis)eqs as z3 exprs
         obj_hashtable<app> eqs_and_diseqs;
-        // gathered (dis)eqs that can be simplified into false (for example "aa" = "bbb")
-        std::vector<expr*> false_eqs_and_diseqs;
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             app *const e = ctx.mk_eq_atom(we.first, we.second);
@@ -890,7 +901,6 @@ namespace smt::noodler {
                 instance, m_membership_todo_rel, this->var_name, m_util_s, m, symbols_in_formula
         ) };
 
-        expr_ref lengths(m);
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
 
@@ -954,7 +964,7 @@ namespace smt::noodler {
         model_ref mod;
         if(init_length_sensitive_vars.size() > 0) {
             // check if the initial assignment is len unsat
-            lengths = dec_proc.get_lengths(this->var_name);
+            expr_ref lengths = dec_proc.get_lengths(this->var_name);
             if(check_len_sat(lengths, mod) == l_false) {
                 block_curr_len(lengths);
                 return FC_DONE;
@@ -964,7 +974,7 @@ namespace smt::noodler {
         expr_ref block_len(m.mk_false(), m);
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution()) {
-            lengths = dec_proc.get_lengths(this->var_name);
+            expr_ref lengths = dec_proc.get_lengths(this->var_name);
             if(dec_proc.get_init_length_vars().size() == 0 || check_len_sat(lengths, mod) == l_true) {
                 STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                 return FC_DONE;
@@ -2104,15 +2114,6 @@ namespace smt::noodler {
         util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
-    }
-
-    void theory_str_noodler::conj_instance(const obj_hashtable<app>& conj, Formula &res) {
-        for(app *const pred : conj) {
-            //print_ast(pred);
-            Predicate inst = this->conv_eq_pred(pred);
-            STRACE("str", tout  << "instance conversion " << inst.to_string() << std::endl;);
-            res.add_predicate(inst);
-        }
     }
 
     std::unordered_set<BasicTerm> theory_str_noodler::get_init_length_vars(AutAssignment& ass) {

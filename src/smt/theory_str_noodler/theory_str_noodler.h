@@ -234,13 +234,6 @@ namespace smt::noodler {
         Predicate conv_eq_pred(app* expr);
 
         /**
-        Convert conjunction of equations/disequations to the instance of @c Formula.
-        @param conj Conjunction in the form of a set of (dis)equations
-        @param[out] res Resulting formula
-        */
-        void conj_instance(const obj_hashtable<app>& conj, Formula &res);
-
-        /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
