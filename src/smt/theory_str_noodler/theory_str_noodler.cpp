@@ -786,37 +786,20 @@ namespace smt::noodler {
         obj_hashtable<app> eqs_and_diseqs;
 
         for (const auto &we: this->m_word_eq_todo_rel) {
-            app *const e = ctx.mk_eq_atom(we.first, we.second);
-            // mk_eq_atom can simplify to false/true (for example if we have "aa" = "bbb" it simplifies it into false)
-            if(m.is_false(e)) {
-                false_eqs_and_diseqs.push_back(m.mk_eq(we.first, we.second));
-            } else if (!m.is_true(e)) {
-                eqs_and_diseqs.insert(e);
-            }
+            eqs_and_diseqs.insert(ctx.mk_eq_atom(we.first, we.second));
         }
 
         for (const auto& we : this->m_word_diseq_todo_rel) {
-            app *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
-            // mk_eq_atom can simplify to false/true (for example if we have "aa" = "bbb" it simplifies it into false)
-            if(m.is_false(e)) {
-                false_eqs_and_diseqs.push_back(m.mk_not(m.mk_eq(we.first, we.second)));
-            } else if (!m.is_true(e)) {
-                eqs_and_diseqs.insert(e);
-            }
-        }
-        
-        // if we have some (dis)eq that can be simplified into false, we immediately quit
-        if(!false_eqs_and_diseqs.empty()) {
-            for (const auto &e : false_eqs_and_diseqs) {
-                // we add that this (dis)eq cannot hold as axiom, so that sat solver does not return same assignment
-                add_axiom(m.mk_not(e));
-            }
-            return FC_CONTINUE;
+            eqs_and_diseqs.insert(m.mk_not(ctx.mk_eq_atom(we.first, we.second)));
         }
 
         // from z3 (dis)equations to ours
         Formula instance;
-        this->conj_instance(eqs_and_diseqs, instance);
+        for(app *const pred : eqs_and_diseqs) {
+            Predicate inst = this->conv_eq_pred(pred);
+            instance.add_predicate(inst);
+        }
+
         STRACE("str",
             for(const auto& f : instance.get_predicates()) {
                 tout << f.to_string() << std::endl;
@@ -857,7 +840,7 @@ namespace smt::noodler {
          * with only symbol "a" it becomes unsat).
          * 
          * FIXME: We can possibly create more dummy symbols than the size of alphabet
-         * (from the string theory standard, the size of the alphabet is 196607), but
+         * (from the string theory standard the size of the alphabet is 196607), but
          * it is an edge-case that probably cannot happen.
          */
         size_t number_of_dummy_symbs = this->m_word_diseq_todo_rel.size();
