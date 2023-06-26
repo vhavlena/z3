@@ -106,6 +106,7 @@ namespace smt::noodler {
 
             // incomplete procedure
             util::throw_error("nielsen: incomplete procedure");
+            return false;
         }
     }
 
@@ -322,6 +323,7 @@ namespace smt::noodler {
                 return CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
             } else {
                 util::throw_error("create_counter_system: unsupported label type");
+                return CounterLabel{lab.first, {}};
             }
         };
 
