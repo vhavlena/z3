@@ -61,7 +61,6 @@ namespace smt::noodler {
     struct Path {
         std::vector<Formula> nodes;
         std::vector<Label> labels;
-        // self-loops
         std::map<Formula, Label> self_loops;
 
         /**
@@ -84,7 +83,6 @@ namespace smt::noodler {
     class TransitionGraph {
     public:
         using Nodes = std::set<Formula>;
-        // using Label = std::pair<BasicTerm, Concat>;
         using Edges = std::map<Formula, std::set<std::pair<Formula, Label>>>;
     
         Nodes nodes;
@@ -99,7 +97,7 @@ namespace smt::noodler {
         void add_edge(const Formula& source, const Formula& target, const Label& lbl) {
             this->nodes.insert(source);
             this->nodes.insert(target);
-            this->edges[source].insert({target, lbl});
+            this->edges[source].emplace(target, lbl);
         }
 
         const Edges& get_edges() {
@@ -147,7 +145,11 @@ namespace smt::noodler {
          */
         TransitionGraph reverse() const {
             TransitionGraph ret;
-            ret.set_init(this->init);
+            // there is at most one final
+            if(this->fins.size() != 0) {
+                ret.set_init(*this->fins.begin());
+            }
+            ret.fins = {this->init};
 
             for(const auto& pr: this->edges) {
                 for(const auto& tgt_symb : pr.second) {
@@ -193,12 +195,12 @@ namespace smt::noodler {
          * 
          * @param start First node
          * @param end Second node
-         * @return Path<Label> Visited nodes and labels on the shortest path.
+         * @return std::optional<Path<Label>> Visited nodes and labels on the shortest path.
          */
-        Path<Label> shortest_path(const Formula& start, const Formula& end) const {
+        std::optional<Path<Label>> shortest_path(const Formula& start, const Formula& end) const {
             std::set<Formula> visited;
             std::deque<std::pair<Formula, Path<Label>>> worklist;
-            worklist.push_back({start, {{start},{}}});
+            worklist.emplace_back(std::pair<Formula, Path<Label>>(start, {{start},{}}));
 
             while(!worklist.empty()) {
                 auto elem = worklist.front();
@@ -219,11 +221,12 @@ namespace smt::noodler {
                         path.push_back(tgt_symb.second);
                         std::vector<Formula> nodes(elem.second.nodes.begin(), elem.second.nodes.end());
                         nodes.push_back(tgt_symb.first);
-                        worklist.push_back({tgt_symb.first, {nodes, path}});
+                        worklist.emplace_back(std::pair<Formula, Path<Label>>(tgt_symb.first, {nodes, path}));
                     }
                 }
             }
-            util::throw_error("no shortest path");
+
+            return std::nullopt;
         }
     };
 

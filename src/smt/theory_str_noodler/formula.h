@@ -509,7 +509,7 @@ namespace smt::noodler {
         /**
          * @brief Check whether a formula is quadratic.
          * 
-         * @return true -> quadratic
+         * @return true <-> quadratic
          */
         bool is_quadratic() const {
             std::map<BasicTerm, unsigned> occur_map;
@@ -521,7 +521,7 @@ namespace smt::noodler {
                     if(it != occur_map.end()) {
                         it->second++;
                     } else {
-                        occur_map.insert({bt, 1});
+                        occur_map.emplace(bt, 1);
                     }
                 }
             };

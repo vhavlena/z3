@@ -77,8 +77,8 @@ namespace smt::noodler {
             for(const BasicTerm& bt : con) {
                 if(bt.is_literal()) {
                     zstring name = bt.get_name();
-                    for(size_t i = 0; i < name.length(); i++) {
-                        ret.push_back(BasicTerm(BasicTermType::Literal, zstring(name[i])));
+                    for(size_t i = 0; i < name.length(); ++i) {
+                        ret.emplace_back(BasicTerm(BasicTermType::Literal, zstring(name[i])));
                     }
                 } else {
                     ret.push_back(bt);

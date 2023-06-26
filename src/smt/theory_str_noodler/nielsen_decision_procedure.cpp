@@ -41,7 +41,7 @@ namespace smt::noodler {
      * @brief Initialize computation.
      */
     void NielsenDecisionProcedure::init_computation() {
-
+        // do nothing for now
     }
 
     /**
@@ -82,7 +82,10 @@ namespace smt::noodler {
                     return false;
                 }
 
-                /// TODO: generate counter system only if it contains length variables 
+                // if there are no length variables --> do not construct the counter system
+                if(this->init_length_sensitive_vars.size() == 0) {
+                    continue;
+                }
                 // create a counter system from the Nielsen graph a condensate it
                 CounterSystem counter_system = create_counter_system(graph);
                 condensate_counter_system(counter_system);
@@ -428,8 +431,14 @@ namespace smt::noodler {
      * @return Path<CounterLabel> Shortest path containing the node @p sl.
      */
     Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl) {
-        Path<CounterLabel> first = cs.shortest_path(cs.get_init(), sl.first);
-        Path<CounterLabel> last = cs.shortest_path(sl.first, *cs.get_fins().begin());
+        std::optional<Path<CounterLabel>> first_opt = cs.shortest_path(cs.get_init(), sl.first);
+        std::optional<Path<CounterLabel>> last_opt = cs.shortest_path(sl.first, *cs.get_fins().begin());
+
+        if(!first_opt.has_value() || !last_opt.has_value()) {
+            util::throw_error("no shortest path");
+        }
+        Path<CounterLabel> first = first_opt.value();
+        Path<CounterLabel> last = last_opt.value();
         first.append(last);
         first.self_loops.insert(sl);
         return first;
