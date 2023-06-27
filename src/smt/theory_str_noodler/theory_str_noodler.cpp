@@ -1081,7 +1081,7 @@ namespace smt::noodler {
         }
     }
 
-    void theory_str_noodler::add_axiom(std::initializer_list<literal> ls) {
+    void theory_str_noodler::add_axiom(std::vector<literal> ls) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         context &ctx = get_context();
         literal_vector lv;
@@ -1411,7 +1411,7 @@ namespace smt::noodler {
      * s = eps -> v = t.a
      * contains(a,s) && a != eps && s != eps -> a = x.s.y
      * contains(a,s) && a != eps && s != eps -> v = x.t.y
-     * tighttestprefix(s,t)
+     * tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
      *
      * @param r replace term
      */
@@ -1430,8 +1430,8 @@ namespace smt::noodler {
         expr_ref y = mk_str_var("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
-        literal a_emp = mk_eq_empty(a, true);
-        literal s_emp = mk_eq_empty(s, true);
+        literal a_emp = mk_eq_empty(a);
+        literal s_emp = mk_eq_empty(s);
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
         // replace(a,s,t) = v
@@ -1447,8 +1447,8 @@ namespace smt::noodler {
         // contains(a,s) && a != eps && s != eps -> v = x.t.y
         add_axiom({~cnt, a_emp, s_emp, mk_eq(v, xty,false)});
         ctx.force_phase(cnt);
-        // tighttestprefix(s,t)
-        tightest_prefix(s, x);
+        // tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
+        tightest_prefix(s, x, {~cnt, a_emp, s_emp});
 
         predicate_replace.insert(r, v.get());
     }
@@ -1460,10 +1460,10 @@ namespace smt::noodler {
      * not(contains(t,s)) -> indexof = -1
      * t = eps && s != eps -> indexof = -1
      * s = eps -> indexof = 0
+     * contains(t, s) -> indexof >= 0
      * contains(t, s) && s != eps -> t = x.s.y
      * contains(t, s) && s != eps -> indexof = |x|
-     * contains(t, s) -> indexof >= 0
-     * tightestprefix(s,x)
+     * tightestprefix(s, x, not(contains(t, s) && s != eps))
      *
      * The case of offset > 0
      * not(contains(t,s)) -> indexof = -1
@@ -1492,13 +1492,12 @@ namespace smt::noodler {
 
         expr_ref minus_one(m_util_a.mk_int(-1), m);
         expr_ref zero(m_util_a.mk_int(0), m);
-        expr_ref emp(m_util_s.str.mk_empty(t->get_sort()), m);
         literal cnt = mk_literal(m_util_s.str.mk_contains(t, s));
 
         literal i_eq_m1 = mk_eq(i, minus_one, false);
         literal i_eq_0 = mk_eq(i, zero, false);
-        literal s_eq_empty = mk_eq(s, emp, false);
-        literal t_eq_empty = mk_eq(t, emp, false);
+        literal s_eq_empty = mk_eq_empty(s);
+        literal t_eq_empty = mk_eq_empty(t);
 
         // not(contains(t,s)) -> indexof = -1
         add_axiom({cnt, i_eq_m1});
@@ -1514,13 +1513,14 @@ namespace smt::noodler {
             expr_ref lenx(m_util_s.str.mk_length(x), m);
             // s = eps -> indexof = 0
             add_axiom({~s_eq_empty, i_eq_0});
+            // contains(t, s) -> indexof >= 0
+            add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
             // contains(t, s) && s != eps -> t = x.s.y
             add_axiom({~cnt, s_eq_empty, mk_eq(t, xsy, false)});
             // contains(t, s) && s != eps -> indexof = |x|
             add_axiom({~cnt, s_eq_empty, mk_eq(i, lenx, false)});
-            // contains(t, s) -> indexof >= 0
-            add_axiom({~cnt, mk_literal(m_util_a.mk_ge(i, zero))});
-            tightest_prefix(s, x);
+            // tightestprefix(s, x, not(contains(t, s) && s != eps))
+            tightest_prefix(s, x, {~cnt, s_eq_empty});
 
             // update length variables
             this->len_vars.insert(x);
@@ -1564,26 +1564,52 @@ namespace smt::noodler {
         }
     }
 
-    /**
-     * @brief String term @p x does not contain @p s as a substring.
-     * Translates to the following theory axioms:
-     * not(s = eps) -> s = s1.s2 where s1 = s[0,-2], s2 = s[-1] in the case of @p s being a string
-     * not(s = eps) -> not(contains(x.s1, s))
-     * not(s = eps) -> s2 in re.allchar (is a single character)
-     *
-     * @param s Substring that should not be present
-     * @param x String term
-     */
-    void theory_str_noodler::tightest_prefix(expr* s, expr* x) {
-        expr_ref s1 = mk_first(s);
-        expr_ref c  = mk_last(s);
-        expr_ref s1c = mk_concat(s1, c);
-        literal s_eq_emp = mk_eq_empty(s);
-        expr_ref re(m_util_s.re.mk_in_re(c, m_util_s.re.mk_full_char(nullptr)), m);
+    void theory_str_noodler::tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions) {
+        literal x_eq_emp = mk_eq_empty(x);
 
-        add_axiom({s_eq_emp, mk_literal(re) });
-        add_axiom({s_eq_emp, mk_literal(m.mk_eq(s, s1c))});
-        add_axiom({s_eq_emp, ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s))});
+        zstring str;
+        if (m_util_s.str.is_string(s, str)) {
+            if (str.length() == 0) {
+                // s == epsilon, i.e. we only need to add '(s = eps) && (x != eps) -> neg_assumptions'
+                // where we know that (s = eps) is true
+                neg_assumptions.push_back(x_eq_emp);
+                add_axiom(neg_assumptions);
+            } else {
+                // s != epsilon, we only need 'not(s = eps) -> neg_assumptions || not(contains(x.s1, s))'
+                // where s1=s[0:-2] and we know that not(s = eps) is true
+                expr_ref s1(m_util_s.str.mk_string(str.extract(0, str.length()-1)), m);
+                neg_assumptions.push_back(~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s)));
+                add_axiom(neg_assumptions);
+            }
+        } else {
+            // s is not string literal, we need to add all 4 theory axioms
+
+            // we set (s = eps) for the first 3 theory axioms
+            literal s_eq_emp = mk_eq_empty(s);
+            neg_assumptions.push_back(s_eq_emp);
+
+            // not(s = eps) -> neg_assumptions || s = s1.s2
+            expr_ref s1 = mk_str_var("tightest_prefix_first");
+            expr_ref s2 = mk_str_var("tightest_prefix_last");
+            expr_ref s1s2 = mk_concat(s1, s2);
+            neg_assumptions.push_back(mk_literal(m.mk_eq(s, s1s2)));
+            add_axiom(neg_assumptions);
+
+            // not(s = eps) -> neg_assumptions || s2 in re.allchar (is a single character)
+            expr_ref re(m_util_s.re.mk_in_re(s2, m_util_s.re.mk_full_char(nullptr)), m);
+            neg_assumptions.back() = mk_literal(re);
+            add_axiom(neg_assumptions);
+
+            // not(s = eps) -> neg_assumptions || not(contains(x.s1, s))
+            neg_assumptions.back() = ~mk_literal(m_util_s.str.mk_contains(mk_concat(x, s1), s));
+            add_axiom(neg_assumptions);
+
+            // (s = eps) && (x != eps) -> neg_assumptions
+            // we need to change (s = eps) to not(s = eps)
+            neg_assumptions[neg_assumptions.size() - 2] = ~s_eq_emp;
+            neg_assumptions.back() = x_eq_emp;
+            add_axiom(neg_assumptions);
+        }
     }
 
     expr_ref theory_str_noodler::mk_first(expr* s) {

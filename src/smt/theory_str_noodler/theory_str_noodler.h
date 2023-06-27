@@ -63,6 +63,7 @@ namespace smt::noodler {
         // mapping predicates and function to variables that they substitute to
         obj_map<expr, expr*> predicate_replace;
 
+        // TODO what are these?
         std::vector<app_ref> axiomatized_len_axioms;
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> axiomatized_persist_terms;
@@ -129,8 +130,6 @@ namespace smt::noodler {
 
         void add_length_axiom(expr* n);
 
-        void add_axiom(expr *e);
-        
         /**
          * @brief Get string literal representing the string literal @p s without the last character.
          */
@@ -191,7 +190,20 @@ namespace smt::noodler {
          */
         expr_ref mk_int_var(const std::string& name);
 
-        void add_axiom(std::initializer_list<literal> ls);
+        /**
+         * @brief Adds @p e as a theory axiom (i.e. to SAT solver).
+         * 
+         * @param e Axiom to add, probably should be a predicate.
+         * 
+         * TODO Nobody probably knows what happens in here.
+         */
+        void add_axiom(expr *e);
+        /**
+         * @brief Adds a new clause of literals from @p ls.
+         * 
+         * TODO Nobody probably knows what happens in here, and it is a bit different than the other add_axiom
+         */
+        void add_axiom(std::vector<literal> ls);
 
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
@@ -216,7 +228,25 @@ namespace smt::noodler {
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
         void propagate_concat_axiom(enode * cat);
         void propagate_basic_string_axioms(enode * str);
-        void tightest_prefix(expr*,expr*);
+
+        /**
+         * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,
+         * or string term @p s does not occur in @p x@p s other than at the end. I.e. we are checking
+         * assumptions -> string term @p s does not occur in @p x@p s other than at the end.
+         * 
+         * It does it by checking that s does not occur anywhere in xs reduced by one character (i.e. xs[0:-2])
+         * 
+         * Translates to the following theory axioms:
+         * not(s = eps) -> neg_assumptions || s = s1.s2
+         * not(s = eps) -> neg_assumptions || s2 in re.allchar (is a single character)
+         * not(s = eps) -> neg_assumptions || not(contains(x.s1, s))
+         * (s = eps) && (x != eps) -> neg_assumptions
+         * 
+         * For the case that s is a string literal, we do not add the two first axioms and we take s1 = s[0:-2].
+         * 
+         * @param neg_assumptions Negated assumptions that have to hold for checking tightest prefix
+         */
+        void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
         void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
 
