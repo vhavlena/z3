@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <set>
+#include <map>
 #include <unordered_set>
 #include <iostream>
 #include "util/zstring.h"
@@ -410,6 +411,13 @@ namespace smt::noodler {
             throw std::runtime_error("unimplemented");
         }
 
+        /**
+         * @brief Split literals into literals consisting of a single symbol.
+         * 
+         * @return Predicate Modified predicate where each literal is a symbol.
+         */
+        Predicate split_literals() const;
+
         [[nodiscard]] bool equals(const Predicate& other) const;
 
         [[nodiscard]] std::string to_string() const;
@@ -498,9 +506,74 @@ namespace smt::noodler {
             return ret;
         }
 
+        /**
+         * @brief Check whether a formula is quadratic.
+         * 
+         * @return true <-> quadratic
+         */
+        bool is_quadratic() const {
+            std::map<BasicTerm, unsigned> occur_map;
+
+            auto upd = [&occur_map] (const std::vector<BasicTerm>& vc) {
+                for(const BasicTerm& bt : vc) {
+                    if(!bt.is_variable()) continue;
+                    occur_map[bt]++;
+                }
+            };
+            for(const Predicate& pred : this->predicates) {
+                if(!pred.is_equation()) {
+                    return false;
+                }
+                upd(pred.get_right_side());
+                upd(pred.get_left_side());
+            }
+            for(const auto& pr : occur_map) {
+                if(pr.second > 2)
+                    return false;
+            }
+            return true;
+        }
+
+        /**
+         * @brief Replace in all predicates
+         * 
+         * @param find What to find
+         * @param replace What to replace
+         * @return Formula Modified formula according to the replace
+         */
+        Formula replace(const std::vector<BasicTerm>& find, const std::vector<BasicTerm>& replace) const {
+            Formula ret;
+            for(const Predicate& pred : this->predicates) {
+                Predicate res;
+                pred.replace(find, replace, res);
+                ret.add_predicate(res);
+            }
+            return ret;
+        }
+
+        /**
+         * @brief Split literals into literals consisting of a single symbol.
+         * 
+         * @return Formula Modified formula where each literal is a symbol.
+         */
+        Formula split_literals() const {
+            Formula new_formula;
+            for(const Predicate& pred : this->predicates) {
+                new_formula.add_predicate(pred.split_literals());
+            }
+            return new_formula;
+        }
+
     private:
         std::vector<Predicate> predicates;
     }; // Class Formula.
+
+    static bool operator==(const Formula& lhs, const Formula& rhs) { return lhs.get_predicates() == rhs.get_predicates(); }
+    static bool operator!=(const Formula& lhs, const Formula& rhs) { return !(lhs == rhs); }
+    static bool operator<(const Formula& lhs, const Formula& rhs) {
+       return lhs.get_predicates() < rhs.get_predicates();
+    }
+    static bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
 
 } // Namespace smt::noodler.
 
