@@ -517,12 +517,7 @@ namespace smt::noodler {
             auto upd = [&occur_map] (const std::vector<BasicTerm>& vc) {
                 for(const BasicTerm& bt : vc) {
                     if(!bt.is_variable()) continue;
-                    auto it = occur_map.find(bt);
-                    if(it != occur_map.end()) {
-                        it->second++;
-                    } else {
-                        occur_map.emplace(bt, 1);
-                    }
+                    occur_map[bt]++;
                 }
             };
             for(const Predicate& pred : this->predicates) {
