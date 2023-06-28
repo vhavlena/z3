@@ -521,8 +521,8 @@ namespace smt::noodler::util {
                 // unlimited times (if it is not set), but we have to accept after each loop,
                 // so we add an empty word into body_nfa
                 State new_state = nfa.add_state();
-                body_nfa.initial.add(new_state);
-                body_nfa.final.add(new_state);
+                body_nfa.initial.insert(new_state);
+                body_nfa.final.insert(new_state);
 
                 body_nfa.unify_initial();
                 Mata::Nfa::reduce(body_nfa);
@@ -596,8 +596,8 @@ namespace smt::noodler::util {
 
             // Make new initial final in order to accept empty string as is required by kleene-star.
             State new_state = nfa.add_state();
-            nfa.initial.add(new_state);
-            nfa.final.add(new_state);
+            nfa.initial.insert(new_state);
+            nfa.final.insert(new_state);
 
         } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
             SASSERT(expression->get_num_args() == 1);
