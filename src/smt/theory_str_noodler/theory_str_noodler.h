@@ -221,7 +221,16 @@ namespace smt::noodler {
 
         void set_conflict(const literal_vector& ls);
 
+        // FIXME should this be deleted?
         void block_curr_assignment();
+
+        /**
+         * @brief Blocks 
+         * 
+         * @param len_formula 
+         * @return true 
+         * @return false 
+         */
         bool block_curr_len(expr_ref len_formula);
 
         expr_ref construct_refinement();
@@ -233,7 +242,7 @@ namespace smt::noodler {
         /**
          * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,
          * or string term @p s does not occur in @p x@p s other than at the end. I.e. we are checking
-         * assumptions -> string term @p s does not occur in @p x@p s other than at the end.
+         * (not-negated assumptions) -> (string term @p s does not occur in @p x@p s other than at the end)
          * 
          * It does it by checking that s does not occur anywhere in xs reduced by one character (i.e. xs[0:-2])
          * 
