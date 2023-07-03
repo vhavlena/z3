@@ -1121,7 +1121,7 @@ namespace smt::noodler {
         expr *s = nullptr, *i = nullptr, *res = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
 
-        expr_ref fresh = mk_str_var("at");
+        expr_ref fresh = mk_str_var_fresh("at");
         expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref zero(m_util_a.mk_int(0), m);
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
@@ -1132,7 +1132,7 @@ namespace smt::noodler {
         if(m_util_a.is_numeral(i, r)) {
             int val = r.get_int32();
 
-            expr_ref y = mk_str_var("at_right");
+            expr_ref y = mk_str_var_fresh("at_right");
 
             for(int j = val; j >= 0; j--) {
                 y = m_util_s.str.mk_concat(m_util_s.str.mk_at(s, m_util_a.mk_int(j)), y);
@@ -1152,7 +1152,7 @@ namespace smt::noodler {
         if(util::is_len_sub(i, s, m, m_util_s, m_util_a, res) && m_util_a.is_numeral(res, r)) {
             int val = r.get_int32();
 
-            expr_ref y = mk_str_var("at_left");
+            expr_ref y = mk_str_var_fresh("at_left");
 
             for(int j = val; j < 0; j++) {
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
@@ -1170,8 +1170,8 @@ namespace smt::noodler {
         }
 
         expr_ref one(m_util_a.mk_int(1), m);
-        expr_ref x = mk_str_var("at_left");
-        expr_ref y = mk_str_var("at_right");
+        expr_ref x = mk_str_var_fresh("at_left");
+        expr_ref y = mk_str_var_fresh("at_right");
         expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(fresh, y)), m);
         string_theory_propagation(xey);
 
@@ -1213,18 +1213,18 @@ namespace smt::noodler {
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
         expr_ref x(m_util_s.str.mk_string(""), m);
-        expr_ref v = mk_str_var("substr");
+        expr_ref v = mk_str_var_fresh("substr");
 
         int val = r.get_int32();
         for(int i = 0; i < val; i++) {
-            expr_ref var = mk_str_var("pre_substr");
+            expr_ref var = mk_str_var_fresh("pre_substr");
             expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
             x = m_util_s.str.mk_concat(x, var);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);
-        expr_ref y = mk_str_var("post_substr");
+        expr_ref y = mk_str_var_fresh("post_substr");
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
         
@@ -1325,10 +1325,10 @@ namespace smt::noodler {
         expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
         m_rewrite(post_bound); // simplify
 
-        expr_ref v = mk_str_var("substr");
-        expr_ref xvar = mk_str_var("pre_substr");
+        expr_ref v = mk_str_var_fresh("substr");
+        expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
-        expr_ref y = mk_str_var("post_substr");
+        expr_ref y = mk_str_var_fresh("post_substr");
 
         // if i + l >= |s|, we can set post_substr to eps
         if(m.is_true(post_bound)) {
@@ -1338,7 +1338,7 @@ namespace smt::noodler {
         // if i is of the form i = n + ...., create pre_substr . in_substr1 ... in_substrn to be x
         if(m_util_a.is_add(i, num, pred) && m_util_a.is_numeral(num, r)) {
             for(int i = 0; i < r.get_int32(); i++) {
-                expr_ref fv = mk_str_var("in_substr");
+                expr_ref fv = mk_str_var_fresh("in_substr");
                 x = m_util_s.str.mk_concat(x, fv);
                 vars.push_back(fv);
             }    
@@ -1425,9 +1425,9 @@ namespace smt::noodler {
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
-        expr_ref v = mk_str_var("replace");
-        expr_ref x = mk_str_var("replace_left");
-        expr_ref y = mk_str_var("replace_right");
+        expr_ref v = mk_str_var_fresh("replace");
+        expr_ref x = mk_str_var_fresh("replace_left");
+        expr_ref y = mk_str_var_fresh("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
         literal a_emp = mk_eq_empty(a);
@@ -1505,8 +1505,8 @@ namespace smt::noodler {
         add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
 
         if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
-            expr_ref x = mk_str_var("index_left");
-            expr_ref y = mk_str_var("index_right");
+            expr_ref x = mk_str_var_fresh("index_left");
+            expr_ref y = mk_str_var_fresh("index_right");
             expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);
             string_theory_propagation(xsy);
 
@@ -1538,8 +1538,8 @@ namespace smt::noodler {
             // offset >= |t| && offset <= |t| && s = eps -> indexof = offset
             add_axiom({~offset_ge_len, ~offset_le_len, ~s_eq_empty, i_eq_offset});
 
-            expr_ref x = mk_str_var("index_left_off");
-            expr_ref y = mk_str_var("index_right_off");
+            expr_ref x = mk_str_var_fresh("index_left_off");
+            expr_ref y = mk_str_var_fresh("index_right_off");
             expr_ref xy(m_util_s.str.mk_concat(x, y), m);
             string_theory_propagation(xy);
 
@@ -1589,8 +1589,8 @@ namespace smt::noodler {
             neg_assumptions.push_back(s_eq_emp);
 
             // not(s = eps) -> neg_assumptions || s = s1.s2
-            expr_ref s1 = mk_str_var("tightest_prefix_first");
-            expr_ref s2 = mk_str_var("tightest_prefix_last");
+            expr_ref s1 = mk_str_var_fresh("tightest_prefix_first");
+            expr_ref s2 = mk_str_var_fresh("tightest_prefix_last");
             expr_ref s1s2 = mk_concat(s1, s2);
             neg_assumptions.push_back(mk_literal(m.mk_eq(s, s1s2)));
             add_axiom(neg_assumptions);
@@ -1617,7 +1617,7 @@ namespace smt::noodler {
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
             return expr_ref(m_util_s.str.mk_string(str.extract(0, str.length()-1)), m);
         }
-        return mk_str_var("index_first");
+        return mk_str_var_fresh("index_first");
     }
 
     expr_ref theory_str_noodler::mk_last(expr* s) {
@@ -1625,7 +1625,7 @@ namespace smt::noodler {
         if (m_util_s.str.is_string(s, str) && str.length() > 0) {
             return expr_ref(m_util_s.str.mk_string(str.extract(str.length()-1, 1)), m);
         }
-        return mk_str_var("index_last");
+        return mk_str_var_fresh("index_last");
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {
@@ -1673,7 +1673,7 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
-        expr_ref fresh = mk_str_var("prefix");
+        expr_ref fresh = mk_str_var_fresh("prefix");
         expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
         string_theory_propagation(xs);
         literal not_e = mk_literal(e);
@@ -1700,11 +1700,11 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
-        expr_ref p = mk_str_var("nprefix_left");
-        expr_ref mx = mk_str_var("nprefix_midx");
-        expr_ref my = mk_str_var("nprefix_midy");
-        expr_ref qx = mk_str_var("nprefix_rightx");
-        expr_ref qy = mk_str_var("nprefix_righty");
+        expr_ref p = mk_str_var_fresh("nprefix_left");
+        expr_ref mx = mk_str_var_fresh("nprefix_midx");
+        expr_ref my = mk_str_var_fresh("nprefix_midy");
+        expr_ref qx = mk_str_var_fresh("nprefix_rightx");
+        expr_ref qy = mk_str_var_fresh("nprefix_righty");
 
         expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
         literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
@@ -1757,7 +1757,7 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
-        expr_ref fresh = mk_str_var("suffix");
+        expr_ref fresh = mk_str_var_fresh("suffix");
         expr_ref px(m_util_s.str.mk_concat(fresh, x), m);
         string_theory_propagation(px);
         literal not_e = mk_literal(e);
@@ -1784,11 +1784,11 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
-        expr_ref q = mk_str_var("nsuffix_right");
-        expr_ref mx = mk_str_var("nsuffix_midx");
-        expr_ref my = mk_str_var("nsuffix_midy");
-        expr_ref px = mk_str_var("nsuffix_leftx");
-        expr_ref py = mk_str_var("nsuffix_lefty");
+        expr_ref q = mk_str_var_fresh("nsuffix_right");
+        expr_ref mx = mk_str_var_fresh("nsuffix_midx");
+        expr_ref my = mk_str_var_fresh("nsuffix_midy");
+        expr_ref px = mk_str_var_fresh("nsuffix_leftx");
+        expr_ref py = mk_str_var_fresh("nsuffix_lefty");
 
         expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
         literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
@@ -1841,8 +1841,8 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
-        expr_ref p = mk_str_var("contains_left");
-        expr_ref s = mk_str_var("contains_right");
+        expr_ref p = mk_str_var_fresh("contains_left");
+        expr_ref s = mk_str_var_fresh("contains_right");
         expr_ref pys(m_util_s.str.mk_concat(m_util_s.str.mk_concat(p, y), s), m);
 
         string_theory_propagation(pys);
@@ -1895,7 +1895,7 @@ namespace smt::noodler {
             if(this->predicate_replace.contains(re_constr)) {
                 var = expr_ref(this->predicate_replace[re_constr], m);
             } else {
-                var = mk_str_var("revar");
+                var = mk_str_var_fresh("revar");
                 this->predicate_replace.insert(re_constr.get(), var.get());
             }
             
@@ -2087,12 +2087,12 @@ namespace smt::noodler {
         );
     }
 
-    expr_ref theory_str_noodler::mk_str_var(const std::string& name) {
+    expr_ref theory_str_noodler::mk_str_var_fresh(const std::string& name) {
         // TODO remove this function probably and just use the one from util
         return util::mk_str_var_fresh(name, m, m_util_s);
     }
 
-    expr_ref theory_str_noodler::mk_int_var(const std::string& name) {
+    expr_ref theory_str_noodler::mk_int_var_fresh(const std::string& name) {
         // TODO remove this function probably and just use the one from util
         return util::mk_int_var_fresh(name, m, m_util_a);
     }

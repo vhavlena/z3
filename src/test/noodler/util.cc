@@ -55,7 +55,7 @@ TEST_CASE("theory_str_noodler::util") {
     }
 
     SECTION("util::is_str_variable()") {
-        expr_ref str_variable{ noodler.mk_str_var("var1"), m };
+        expr_ref str_variable{ noodler.mk_str_var_fresh("var1"), m };
         CHECK(util::is_str_variable(str_variable, m_util_s));
         expr_ref str_literal{m_util_s.str.mk_string("var1"), m };
         CHECK(!util::is_str_variable(str_literal, m_util_s));
@@ -69,9 +69,9 @@ TEST_CASE("theory_str_noodler::util") {
         obj_hashtable<expr> res;
 
         SECTION("String variables") {
-            auto var1{ noodler.mk_str_var("var1") };
-            auto var2{ noodler.mk_str_var("var2") };
-            auto var3{ noodler.mk_str_var("var3") };
+            auto var1{ noodler.mk_str_var_fresh("var1") };
+            auto var2{ noodler.mk_str_var_fresh("var2") };
+            auto var3{ noodler.mk_str_var_fresh("var3") };
             auto concat1{ m_util_s.str.mk_concat(var1, var2) };
             auto concat2{ m_util_s.str.mk_concat(concat1, var3) };
 
@@ -104,9 +104,9 @@ TEST_CASE("theory_str_noodler::util") {
         //}
 
         SECTION("String constructs") {
-            expr_ref var1{ noodler.mk_str_var("var1"), m };
-            expr_ref var2{ noodler.mk_str_var("var2"), m };
-            expr_ref var3{ noodler.mk_str_var("var3"), m };
+            expr_ref var1{ noodler.mk_str_var_fresh("var1"), m };
+            expr_ref var2{ noodler.mk_str_var_fresh("var2"), m };
+            expr_ref var3{ noodler.mk_str_var_fresh("var3"), m };
             expr_ref re1{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re1")), m };
             expr_ref re2{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re2")), m };
             expr_ref re_eq{ m.mk_eq(re1, re2), m };
@@ -128,9 +128,9 @@ TEST_CASE("theory_str_noodler::util") {
         std::unordered_set<std::string> res{};
 
         SECTION("String variables") {
-            auto var1{ noodler.mk_str_var("var1") };
-            auto var2{ noodler.mk_str_var("var2") };
-            auto var3{ noodler.mk_str_var("var3") };
+            auto var1{ noodler.mk_str_var_fresh("var1") };
+            auto var2{ noodler.mk_str_var_fresh("var2") };
+            auto var3{ noodler.mk_str_var_fresh("var3") };
             auto lit1{ m_util_s.str.mk_string("lit1") };
             auto lit2{ m_util_s.str.mk_string("lit2") };
             auto concat1{ m_util_s.str.mk_concat(var1, lit1) };
@@ -145,9 +145,9 @@ TEST_CASE("theory_str_noodler::util") {
         }
 
         SECTION("String constructs") {
-            expr_ref var1{ noodler.mk_str_var("var1"), m };
-            expr_ref var2{ noodler.mk_str_var("var2"), m };
-            expr_ref var3{ noodler.mk_str_var("var3"), m };
+            expr_ref var1{ noodler.mk_str_var_fresh("var1"), m };
+            expr_ref var2{ noodler.mk_str_var_fresh("var2"), m };
+            expr_ref var3{ noodler.mk_str_var_fresh("var3"), m };
             expr_ref re1{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re1")), m };
             expr_ref re2{ noodler.m_util_s.re.mk_to_re(m_util_s.str.mk_string("re2")), m };
             expr_ref re_eq{ m.mk_eq(re1, re2), m };

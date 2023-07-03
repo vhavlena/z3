@@ -40,6 +40,7 @@ Eternal glory to Yu-Fang.
 
 namespace smt::noodler {
 
+    // TODO add high level explanation of how this works (length vars are got from init_search_eh, predicates are translated in relevant_eh, final_check_eh does this and that etc)
     class theory_str_noodler : public theory {
     protected:
 
@@ -178,7 +179,7 @@ namespace smt::noodler {
          * 
          * FIXME same function is in util, we should keep one
          */
-        expr_ref mk_str_var(const std::string& name);
+        expr_ref mk_str_var_fresh(const std::string& name);
         /**
          * @brief Create fresh int variable
          *
@@ -188,7 +189,7 @@ namespace smt::noodler {
          * 
          * FIXME same function is in util, we should keep one
          */
-        expr_ref mk_int_var(const std::string& name);
+        expr_ref mk_int_var_fresh(const std::string& name);
 
         /**
          * @brief Adds @p e as a theory axiom (i.e. to SAT solver).
