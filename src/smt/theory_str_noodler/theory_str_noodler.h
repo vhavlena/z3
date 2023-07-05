@@ -163,8 +163,6 @@ namespace smt::noodler {
         ~theory_str_noodler() {}
 
     protected:
-        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
-
         expr_ref mk_sub(expr *a, expr *b);
 
 
@@ -221,18 +219,6 @@ namespace smt::noodler {
 
         void set_conflict(const literal_vector& ls);
 
-        // FIXME should this be deleted?
-        void block_curr_assignment();
-
-        /**
-         * @brief Blocks 
-         * 
-         * @param len_formula 
-         * @return true 
-         * @return false 
-         */
-        bool block_curr_len(expr_ref len_formula);
-
         expr_ref construct_refinement();
         void dump_assignments() const;
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
@@ -260,6 +246,8 @@ namespace smt::noodler {
 
         void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
 
+        /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
+
         /**
          * @brief Adds string constraints from *_todo that are relevant for SAT checking to *_todo_rel.
          */
@@ -272,11 +260,33 @@ namespace smt::noodler {
         @return Instance of predicate
         */
         Predicate conv_eq_pred(app* expr);
-
+        /**
+         * @brief Creates noodler formula containing relevant word equations and disequations
+         */
+        Formula get_word_formula_from_relevant();
+        /**
+         * @brief Get all symbols used in relevant word (dis)equations and memberships
+         */
+        std::set<uint32_t> get_symbols_from_relevant();
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+
+        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+
+        // FIXME should this be deleted?
+        void block_curr_assignment();
+        /**
+         * @brief Blocks current TODO finish
+         * 
+         * @param len_formula 
+         * @return true 
+         * @return false 
+         */
+        bool block_curr_len(expr_ref len_formula);
+
+        /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
 

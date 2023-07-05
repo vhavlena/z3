@@ -69,6 +69,7 @@ z3_add_component(smt
     theory_special_relations.cpp
     theory_str.cpp
     theory_str_noodler/theory_str_noodler.cpp
+    theory_str_noodler/theory_str_noodler_final_check.cpp
     theory_str_noodler/formula_preprocess.cpp
     theory_str_noodler/inclusion_graph.cc
     theory_str_noodler/decision_procedure.cpp

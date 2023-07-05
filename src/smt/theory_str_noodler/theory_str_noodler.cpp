@@ -743,12 +743,12 @@ namespace smt::noodler {
         }
 
 
-        /********************************* LANGAGUGE (DIS)EQUATIONS **************************/
+        /**************************** SOLVE LANGAGUGE (DIS)EQUATIONS **************************/
         for(const auto& item : this->m_lang_eq_todo_rel) {
             // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
             // so both sides of the (dis)equations should be terms representing reg. languages
-            auto left_side = std::get<0>(item);
-            auto right_side = std::get<1>(item);
+            expr_ref left_side = std::get<0>(item);
+            expr_ref right_side = std::get<1>(item);
             bool is_equation = std::get<2>(item);
 
             STRACE("str",
@@ -768,7 +768,7 @@ namespace smt::noodler {
             bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
             if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
                 // the language (dis)equation does not hold => block it and return
-                app_ref lang_eq(ctx.mk_eq_atom(left_side, right_side), m);
+                app_ref lang_eq(m.mk_eq(left_side, right_side), m);
                 if(is_equation){
                     add_axiom({mk_literal(m.mk_not(lang_eq))});
                 } else {
@@ -777,85 +777,19 @@ namespace smt::noodler {
                 return FC_DONE;
             }
         }
-        /**************************************************************************************/
 
+        /***************************** SOLVE WORD (DIS)EQUATIONS ******************************/
 
-        /********************* GATHER WORD (DIS)EQUATIONS ***********************/
-
-        // gathered (dis)eqs as z3 exprs
-        obj_hashtable<app> eqs_and_diseqs;
-
-        for (const auto &we: this->m_word_eq_todo_rel) {
-            eqs_and_diseqs.insert(ctx.mk_eq_atom(we.first, we.second));
-        }
-
-        for (const auto& we : this->m_word_diseq_todo_rel) {
-            eqs_and_diseqs.insert(m.mk_not(ctx.mk_eq_atom(we.first, we.second)));
-        }
-
-        // from z3 (dis)equations to ours
-        Formula instance;
-        for(app *const pred : eqs_and_diseqs) {
-            Predicate inst = this->conv_eq_pred(pred);
-            instance.add_predicate(inst);
-        }
-
+        // Gather word (dis)equations 
+        Formula instance = get_word_formula_from_relevant();
         STRACE("str",
             for(const auto& f : instance.get_predicates()) {
                 tout << f.to_string() << std::endl;
             }
         );
 
-        /***************** FINISH GATHERING WORD (DIS)EQUATIONS ******************/
-
-
-        /********************** GATHER SYMBOLS **********************/
-
-        std::set<uint32_t> symbols_in_formula{};
-        for (const auto &word_equation: m_word_eq_todo_rel) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: m_word_diseq_todo_rel) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: m_membership_todo_rel) {
-            util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
-        }
-
-        /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
-         * We need some dummy symbols, to represent the symbols not occuring in predicates,
-         * otherwise, we might return unsat even though the formula is sat. For example if
-         * we had x != y and no other predicate, we would have no symbols and the formula
-         * would be unsat. With one dummy symbol, it becomes sat.
-         * We add new dummy symbols for each diseqation and 'x not in RE' predicate, as we
-         * could be in situation where we have for example x != y, y != z, z != x, and
-         * |x| = |y| = |z|. If we added only one dummy symbol, then this would be unsat,
-         * but if we have three symbols, it becomes sat (which this formula is). We add
-         * dummy symbols also for 'x not in RE' because they basically represent
-         * disequations too (for example 'x not in "aaa"' and |x| = 3 should be sat, but
-         * with only symbol "a" it becomes unsat).
-         * 
-         * FIXME: We can possibly create more dummy symbols than the size of alphabet
-         * (from the string theory standard the size of the alphabet is 196607), but
-         * it is an edge-case that probably cannot happen.
-         */
-        size_t number_of_dummy_symbs = this->m_word_diseq_todo_rel.size();
-        for (const auto& we : this->m_membership_todo_rel) {
-            if(!std::get<2>(we)){
-                number_of_dummy_symbs++;
-            }
-        }
-        // to be safe, we set the minimum number of dummy symbols as 3
-        number_of_dummy_symbs = std::max(number_of_dummy_symbs, size_t(3));
-
-        // add needed number of dummy symbols to symbols_in_formula
-        util::get_dummy_symbols(number_of_dummy_symbs, symbols_in_formula);
-
-        /***************** END OF GATHERING SYMBOLS ******************/
+        // Gather symbols
+        std::set<uint32_t> symbols_in_formula = get_symbols_from_relevant();
 
         // satisfiability checking via universality checking
         // this heuristics is applied only to the case when there is a single regular constraint x notin RE.
