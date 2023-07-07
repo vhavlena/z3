@@ -281,7 +281,8 @@ namespace smt::noodler::util {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
                 aut_ass_it->second = std::make_shared<Nfa>(
-                        Mata::Nfa::intersection(nfa, *aut_ass_it->second));
+                        Mata::Nfa::reduce(Mata::Nfa::intersection(nfa, *aut_ass_it->second)));
+
             } else { // We create a regular constraint for the current variable for the first time.
                 aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
                 var_name.insert({variable_term, variable});
