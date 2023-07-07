@@ -275,7 +275,7 @@ namespace smt::noodler::util {
             const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement) };
+            Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
             auto aut_ass_it{ aut_assignment.find(variable_term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
@@ -425,7 +425,7 @@ namespace smt::noodler::util {
     }
 
     [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                  const std::set<uint32_t>& alphabet, bool make_complement) {
+                                  const std::set<uint32_t>& alphabet, bool determinize, bool make_complement) {
         Nfa nfa{};
 
         if (m_util_s.re.is_to_re(expression)) { // Handle conversion of to regex function call.
@@ -435,12 +435,12 @@ namespace smt::noodler::util {
             if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
                 throw_error("we support only string literals in str.to_re");
             }
-            nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet, determinize);
         } else if (m_util_s.re.is_concat(expression)) { // Handle regex concatenation.
             SASSERT(expression->get_num_args() > 0);
             nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa = Mata::Nfa::concatenate(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet));
+                nfa = Mata::Nfa::concatenate(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
             }
         } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
             throw_error("antimirov union is unsupported");
@@ -448,7 +448,7 @@ namespace smt::noodler::util {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             // According to make_complement, we do complement at the end, so we just invert it
             make_complement = !make_complement;
         } else if (m_util_s.re.is_derivative(expression)) { // Handle derivative.
@@ -480,9 +480,9 @@ namespace smt::noodler::util {
             }
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
             SASSERT(expression->get_num_args() > 0);
-            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet, determinize);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa = Mata::Nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet));
+                nfa = Mata::Nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
             }
         } else if (m_util_s.re.is_loop(expression)) { // Handle loop.
             unsigned low, high;
@@ -496,7 +496,7 @@ namespace smt::noodler::util {
                 throw_error("loop should contain at least lower bound");
             }
 
-            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet);
+            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet, determinize);
 
             if (Mata::Nfa::is_lang_empty(body_nfa)) {
                 // for the case that body of the loop represents empty language...
@@ -551,7 +551,7 @@ namespace smt::noodler::util {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             nfa.unify_initial();
             for (const auto& initial : nfa.initial) {
                 nfa.final.insert(initial);
@@ -580,13 +580,13 @@ namespace smt::noodler::util {
             const auto right{ expression->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            nfa = Mata::Nfa::uni(conv_to_nfa(to_app(left), m_util_s, m, alphabet),
-                                 conv_to_nfa(to_app(right), m_util_s, m, alphabet));
+            nfa = Mata::Nfa::uni(conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize),
+                                 conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize));
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
                     nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
@@ -625,6 +625,9 @@ namespace smt::noodler::util {
 
         // intermediate automata reduction
         nfa = Mata::Nfa::reduce(nfa);
+        if(determinize) {
+            nfa = Mata::Nfa::minimize(nfa);
+        }
 
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first

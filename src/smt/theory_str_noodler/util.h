@@ -152,11 +152,12 @@ namespace smt::noodler::util {
      * @param[in] m_util_s Seq util for AST.
      * @param[in] m AST manager.
      * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
+     * @param[in] determinize Determinize intermediate automata
      * @param[in] make_complement Whether to make complement of the passed @p expr instead.
      * @return The resulting regex.
      */
     [[nodiscard]] Mata::Nfa::Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                             const std::set<uint32_t>& alphabet, bool make_complement = false);
+                                             const std::set<uint32_t>& alphabet, bool determinize = false, bool make_complement = false);
 
     /**
      * Create NFA accepting a word in Z3 zstring representation.

@@ -2309,8 +2309,8 @@ namespace smt::noodler {
         int cnt = 0;
 
         for(const auto& item : this->m_lang_eq_todo_rel) {
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false, false );
+            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false, false );
             PredicateType tp = std::get<2>(item) ? PredicateType::Equation : PredicateType::Inequation;
 
             BasicTerm t1(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
