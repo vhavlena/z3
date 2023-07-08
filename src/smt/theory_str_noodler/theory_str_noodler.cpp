@@ -39,7 +39,7 @@ namespace smt::noodler {
 
     void theory_str_noodler::init() {
         theory::init();
-        STRACE("str", if (!IN_CHECK_FINAL) tout << "init\n";);
+        STRACE("str", tout << "init" << std::endl;);
     }
 
     enode *theory_str_noodler::ensure_enode(expr *e) {
@@ -572,7 +572,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::propagate() {
-        // STRACE("str", if (!IN_CHECK_FINAL) tout << "o propagate" << '\n';);
+        // STRACE("str", out << "o propagate" << '\n';);
 
         // for(const expr_ref& ex : this->len_state_axioms)
         //     add_axiom(ex);
@@ -586,7 +586,7 @@ namespace smt::noodler {
         m_word_diseq_todo.push_scope();
         m_membership_todo.push_scope();
         m_not_contains_todo.push_scope();
-        STRACE("str", if (!IN_CHECK_FINAL) tout << "push_scope: " << m_scope_level << '\n';);
+        STRACE("str", tout << "push_scope: " << m_scope_level << '\n';);
     }
 
     void theory_str_noodler::pop_scope_eh(const unsigned num_scopes) {
@@ -600,7 +600,7 @@ namespace smt::noodler {
         m_membership_todo.pop_scope(num_scopes);
         m_not_contains_todo.pop_scope(num_scopes);
         m_rewrite.reset();
-        STRACE("str", if (!IN_CHECK_FINAL)
+        STRACE("str",
             tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
     }
 
@@ -903,7 +903,6 @@ namespace smt::noodler {
             return FC_CONTINUE;
         }
         //block_curr_assignment();
-        IN_CHECK_FINAL = false;
         TRACE("str", tout << "final_check ends\n";);
         return FC_CONTINUE;
     }
@@ -942,11 +941,11 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {
-        STRACE("str", if (!IN_CHECK_FINAL) tout << "init_model\n";);
+        STRACE("str", tout << "init_model\n";);
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {
-        STRACE("str", if (!IN_CHECK_FINAL) tout << "finalize_model\n";);
+        STRACE("str", tout << "finalize_model\n";);
     }
 
     lbool theory_str_noodler::validate_unsat_core(expr_ref_vector &unsat_core) {
