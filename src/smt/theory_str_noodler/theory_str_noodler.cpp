@@ -22,10 +22,6 @@ Eternal glory to Yu-Fang.
 
 namespace smt::noodler {
 
-    namespace {
-        bool IN_CHECK_FINAL = false;
-    }
-
     theory_str_noodler::theory_str_noodler(context& ctx, ast_manager & m, theory_str_noodler_params const & params):
         theory(ctx, ctx.get_manager().mk_family_id("seq")),
         m_params(params),
