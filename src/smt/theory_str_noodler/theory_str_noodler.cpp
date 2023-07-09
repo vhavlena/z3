@@ -850,15 +850,18 @@ namespace smt::noodler {
         if(m_params.m_loop_protect) {
             expr_ref refine = construct_refinement();
             if(refine != nullptr) {
-                if(this->axiomatized_instances.contains(refine)) {
-                    if(this->axiomatized_instances[refine] > 1) {
-                        block_curr_assignment();
-                        return FC_CONTINUE;
-                    } else {
-                        this->axiomatized_instances[refine] += 1;
+                bool found = false;
+                expr_ref len_formula(this->m);
+                for(const auto& pr : this->axiomatized_instances) {
+                    if(pr.first == refine) {
+                        len_formula = pr.second;
+                        found = true;
+                        break;
                     }
-                } else {
-                    this->axiomatized_instances.insert(refine, 1);
+                }
+                if(found) {
+                    block_curr_len(len_formula);
+                    return FC_CONTINUE;
                 }
             }
         }
@@ -2096,6 +2099,9 @@ namespace smt::noodler {
         //     return false;
         // }
         // axiomatized_instances.push_back(refinement);
+        if(m_params.m_loop_protect) {
+            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), len_formula});
+        }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }

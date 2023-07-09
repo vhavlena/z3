@@ -68,7 +68,7 @@ namespace smt::noodler {
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
-        obj_map<expr, unsigned> axiomatized_instances;
+        std::vector<std::pair<expr_ref, expr_ref>> axiomatized_instances;
 
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
         obj_map<expr, unsigned> bool_var_int;
