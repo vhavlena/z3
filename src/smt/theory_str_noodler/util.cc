@@ -621,12 +621,23 @@ namespace smt::noodler::util {
             }
 
         case LenFormulaType::PLUS: {
-            assert(node.succ.size() >= 2);
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(0), m);
             expr_ref plus = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
             for(size_t i = 1; i < node.succ.size(); i++) {
                 plus = m_util_a.mk_add(plus, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
             }
             return plus;
+        }
+
+        case LenFormulaType::TIMES: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(1), m);
+            expr_ref times = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                times = m_util_a.mk_mul(times, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return times;
         }
 
         case LenFormulaType::EQ: {
@@ -659,6 +670,16 @@ namespace smt::noodler::util {
             return andref;
         }
 
+        case LenFormulaType::OR: {
+            if(node.succ.size() == 0)
+                return expr_ref(m.mk_false(), m);
+            expr_ref orref = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                orref = m.mk_or(orref, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return orref;
+        }
+
         case LenFormulaType::TRUE: {
             return expr_ref(m.mk_true(), m);
         }
@@ -667,9 +688,9 @@ namespace smt::noodler::util {
             return expr_ref(m.mk_false(), m);
         }
 
+        default:
+            throw_error("Unexpected length formula type");
+            return {{}, m};
         }
-
-        assert(false);
-        return {{}, m};
     }
 }

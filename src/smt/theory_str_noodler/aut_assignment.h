@@ -194,6 +194,11 @@ namespace smt::noodler {
             return res.str();
         }
 
+        /**
+         * @brief Get the length formula representing all possible lengths of the automaton for @p var
+         */
+        LenNode get_lengths(const BasicTerm& var) const;
+
     };
 
 } // Namespace smt::noodler.

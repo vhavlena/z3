@@ -1172,8 +1172,8 @@ namespace smt::noodler {
             for(const BasicTerm& var : pred.get_vars()) {
                 int ln = 0;
                 if(this->aut_ass.is_co_finite(var, ln) && ln >= 0) {
-                    LenNode right = LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, std::to_string(ln)), {});
-                    LenNode left = LenNode(LenFormulaType::LEAF, var, {});
+                    LenNode right = LenNode(BasicTerm(BasicTermType::Length, std::to_string(ln)));
+                    LenNode left = LenNode(var);
                     LenNode eq = LenNode(LenFormulaType::EQ, {left, right});
                     this->add_to_len_formula(LenNode(LenFormulaType::NOT, {eq}));
                     this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());

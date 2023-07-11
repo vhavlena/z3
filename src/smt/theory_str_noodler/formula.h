@@ -125,11 +125,13 @@ namespace smt::noodler {
 
     enum struct LenFormulaType {
         PLUS,
+        TIMES,
         EQ,
         NOT,
         LEQ,
         LEAF,
         AND,
+        OR,
         TRUE,
         FALSE,
     };
@@ -139,8 +141,9 @@ namespace smt::noodler {
         BasicTerm atom_val;
         std::vector<struct LenNode> succ;
 
-        LenNode(LenFormulaType tp, BasicTerm val, std::vector<struct LenNode> s) : type(tp), atom_val(val), succ(s) { };
-        LenNode(LenFormulaType tp, std::vector<struct LenNode> s) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
+        LenNode(int k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, std::to_string(k)), succ() { };
+        LenNode(BasicTerm val) : type(LenFormulaType::LEAF), atom_val(val), succ() { };
+        LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };
 
     static std::ostream& operator<<(std::ostream& os, const LenNode& node) {
@@ -148,6 +151,9 @@ namespace smt::noodler {
         {
         case LenFormulaType::PLUS:
             os << "(+ " << node.succ[0] << " " << node.succ[1] << ")";
+            break;
+        case LenFormulaType::TIMES:
+            os << "(* " << node.succ[0] << " " << node.succ[1] << ")";
             break;
         case LenFormulaType::EQ:
             os << "(= " << node.succ[0] << " " << node.succ[1] << ")";
@@ -163,6 +169,13 @@ namespace smt::noodler {
             break;
         case LenFormulaType::AND:
             os << "(and";
+            for (const auto &succ_node : node.succ) {
+                os << " " << succ_node;
+            }
+            os << ")";
+            break;
+        case LenFormulaType::OR:
+            os << "(or";
             for (const auto &succ_node : node.succ) {
                 os << " " << succ_node;
             }
@@ -289,13 +302,13 @@ namespace smt::noodler {
             auto plus_chain = [&](const std::vector<BasicTerm>& side) {
                 std::vector<LenNode> ops;
                 if(side.size() == 0) {
-                    return LenNode(LenFormulaType::LEAF, BasicTerm(BasicTermType::Length, "0"), {});
+                    return LenNode(BasicTerm(BasicTermType::Length, "0"));
                 }
                 if(side.size() == 1) {
-                    return LenNode(LenFormulaType::LEAF, side[0], {});
+                    return LenNode(side[0]);
                 }
                 for(const BasicTerm& t : side) {
-                    LenNode n = LenNode(LenFormulaType::LEAF, t, {});
+                    LenNode n = LenNode(t);
                     ops.push_back(n);
                 }
                 return LenNode(LenFormulaType::PLUS, ops);

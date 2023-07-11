@@ -814,6 +814,7 @@ namespace smt::noodler {
                 instance, m_membership_todo_rel, this->var_name, m_util_s, m, symbols_in_formula
         ) };
 
+        // get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
 
@@ -864,47 +865,52 @@ namespace smt::noodler {
         }
         
 
-        // use underapproximation to solve
+        // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
             return FC_DONE;
         }
 
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
-            init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
-        dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
-        
-        model_ref mod;
-        if(init_length_sensitive_vars.size() > 0) {
-            // check if the initial assignment is len unsat
-            expr_ref lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths, mod) == l_false) {
-                block_curr_len(lengths);
-                return FC_DONE;
-            }
+            init_length_sensitive_vars, m_params };
+
+        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
+        if (result == l_false) {
+            block_curr_len(expr_ref(m.mk_false(), m));
+            return FC_DONE;
+        } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
+
+        // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
+        // length constraints from initial assignment
+        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
+        if(check_len_sat(lengths) == l_false) {
+            block_curr_len(lengths);
+            return FC_DONE;
         }
+
+        dec_proc.init_computation();
 
         expr_ref block_len(m.mk_false(), m);
-        dec_proc.init_computation();
-        while(dec_proc.compute_next_solution()) {
-            expr_ref lengths = dec_proc.get_lengths(this->var_name);
-            if(dec_proc.get_init_length_vars().size() == 0 || check_len_sat(lengths, mod) == l_true) {
-                STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
-                return FC_DONE;
+        while (true) {
+            result = dec_proc.compute_next_solution();
+            if (result == l_true) {
+                lengths = len_node_to_z3_formula(dec_proc.get_lengths());
+                if (check_len_sat(lengths) == l_true) {
+                    return FC_DONE;
+                } else {
+                    STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
+                    block_len = m.mk_or(block_len, lengths);
+                }
+            } else if (result == l_false) {
+                // we did not find a solution (with satisfiable length constraints)
+                // we need to block current assignment
+                block_curr_len(block_len);
+                return FC_CONTINUE;
+            } else {
+                // we could not decide if there is solution, let's just give up
+                return FC_GIVEUP;
             }
-            if(dec_proc.get_init_length_vars().size() > 0) {
-                block_len = m.mk_or(block_len, lengths);
-            }
-            STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
         }
-
-        // all len solutions are unsat, we block the current assignment
-        if(!block_curr_len(block_len)) {
-            return FC_CONTINUE;
-        }
-        //block_curr_assignment();
-        TRACE("str", tout << "final_check ends\n";);
-        return FC_CONTINUE;
     }
 
     /**
@@ -916,16 +922,15 @@ namespace smt::noodler {
      * @return lbool SAT
      */
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
-            init_length_sensitive_vars, m, m_util_s, m_util_a, m_params };
-        dec_proc.preprocess(PreprocessType::UNDERAPPROX);
-        
-        expr_ref lengths(m);
-        model_ref mod;
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
+        if (dec_proc.preprocess(PreprocessType::UNDERAPPROX) == l_false) {
+            return l_false;
+        }
+
         dec_proc.init_computation();
-        while(dec_proc.compute_next_solution()) {
-            lengths = dec_proc.get_lengths(this->var_name);
-            if(check_len_sat(lengths, mod) == l_true) {
+        while(dec_proc.compute_next_solution() == l_true) {
+            expr_ref lengths = len_node_to_z3_formula(dec_proc.get_lengths());
+            if(check_len_sat(lengths) == l_true) {
                 return l_true;
             }
         }
@@ -1541,22 +1546,6 @@ namespace smt::noodler {
         }
     }
 
-    expr_ref theory_str_noodler::mk_first(expr* s) {
-        zstring str;
-        if (m_util_s.str.is_string(s, str) && str.length() > 0) {
-            return expr_ref(m_util_s.str.mk_string(str.extract(0, str.length()-1)), m);
-        }
-        return mk_str_var_fresh("index_first");
-    }
-
-    expr_ref theory_str_noodler::mk_last(expr* s) {
-        zstring str;
-        if (m_util_s.str.is_string(s, str) && str.length() > 0) {
-            return expr_ref(m_util_s.str.mk_string(str.extract(str.length()-1, 1)), m);
-        }
-        return mk_str_var_fresh("index_last");
-    }
-
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {
         return expr_ref(m_util_s.str.mk_concat(e1, e2), m);
     }
@@ -1844,22 +1833,8 @@ namespace smt::noodler {
             
             re_constr = to_app(var); 
             re_atom = n_re;
-        } 
+        }
 
-        // generate length formula for the regular expression
-        // if(ctx.is_relevant(e) && is_true && false) { // turn it off for now
-        //     std::set<uint32_t> alphabet;
-        //     util::extract_symbols(re, this->m_util_s, this->m, alphabet);
-        //     util::get_dummy_symbols(2, alphabet);
-        //     Mata::Nfa::Nfa aut = util::conv_to_nfa(to_app(re), this->m_util_s, this->m, alphabet, !is_true);
-        //     auto aut_lens = Mata::Strings::get_word_lengths(aut);
-
-        //     expr_ref len_re(m_util_s.str.mk_length(re_constr), m);
-        //     expr_ref len_formula = this->dec_proc.mk_len_aut(len_re, aut_lens);
-        //     add_axiom({~mk_literal(re_atom), mk_literal(len_formula)});
-        //     STRACE("str", tout << "re-axiom: " << mk_pp(len_formula, m) << "\n"; );
-        // }
-        
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
     }
@@ -1958,7 +1933,7 @@ namespace smt::noodler {
 
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
-        STRACE("str", tout << "[Refinement]\nformulas:\n";);
+        STRACE("str", tout << "[Refinement]" << std::endl << "formulas:" << std::endl;);
         for (const auto& we : this->m_word_eq_todo_rel) {
             // we create the equation according to we
             //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
@@ -2026,6 +2001,13 @@ namespace smt::noodler {
         return util::mk_int_var_fresh(name, m, m_util_a);
     }
 
+    expr_ref theory_str_noodler::len_node_to_z3_formula(const LenNode& len_formula) {
+        return util::len_to_expr(
+                len_formula,
+                this->var_name,
+                this->m, this->m_util_s, this->m_util_a );
+    }
+
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
@@ -2064,7 +2046,12 @@ namespace smt::noodler {
         return init_lengths;
     }
 
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, model_ref &mod) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+        if (len_formula == m.mk_true()) {
+            // we assume here that existing length constraints are satisfiable, so adding true will do nothing
+            return l_true;
+        }
+
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;

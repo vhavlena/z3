@@ -40,7 +40,8 @@ Eternal glory to Yu-Fang.
 
 namespace smt::noodler {
 
-    // TODO add high level explanation of how this works (length vars are got from init_search_eh, predicates are translated in relevant_eh, final_check_eh does this and that etc)
+    // FIXME add high level explanation of how this works (length vars are got from init_search_eh, predicates are translated in relevant_eh, final_check_eh does this and that etc)
+    // FIXME a lot of stuff in this class comes from trau/z3str3 we still need to finish cleaning
     class theory_str_noodler : public theory {
     protected:
 
@@ -132,30 +133,14 @@ namespace smt::noodler {
         void add_length_axiom(expr* n);
 
         /**
-         * @brief Get string literal representing the string literal @p s without the last character.
-         */
-        expr_ref mk_first(expr* e);
-        /**
-         * @brief Get string literal representing the last character of string literal @p s.
-         */
-        expr_ref mk_last(expr* e);
-        /**
          * @brief Get concatenation of e1 and e2
          */
         expr_ref mk_concat(expr* e1, expr* e2);
+
         /**
          * @brief Creates literal representing that n is empty string
          */
         literal mk_eq_empty(expr* n);
-
-        /**
-         * @brief Check if the length formula @p len_formula is satisfiable.
-         * 
-         * @param len_formula Formula to be check
-         * @return lbool Sat
-         */
-        lbool check_len_sat(expr_ref len_formula, model_ref &mod);
-
 
         bool has_length(expr *e) const { return m_has_length.contains(e); }
         void enforce_length(expr* n);
@@ -164,7 +149,6 @@ namespace smt::noodler {
 
     protected:
         expr_ref mk_sub(expr *a, expr *b);
-
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
@@ -188,6 +172,15 @@ namespace smt::noodler {
          * FIXME same function is in util, we should keep one
          */
         expr_ref mk_int_var_fresh(const std::string& name);
+
+        /**
+         * @brief Transforms LenNode to the z3 formula
+         * 
+         * Uses mapping var_name, those variables v that are mapped are assumed to be string variables
+         * and will be transformed into (str.len v) while other variables (which are probably created
+         * during preprocessing/decision procedure) are taken as int variables.
+         */
+        expr_ref len_node_to_z3_formula(const LenNode& len_formula);
 
         /**
          * @brief Adds @p e as a theory axiom (i.e. to SAT solver).
@@ -275,14 +268,18 @@ namespace smt::noodler {
 
         lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
-        // FIXME should this be deleted?
-        void block_curr_assignment();
         /**
-         * @brief Blocks current TODO finish
+         * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
+         */
+        lbool check_len_sat(expr_ref len_formula);
+
+        // FIXME should this function be deleted?
+        void block_curr_assignment();
+
+        /**
+         * @brief Blocks current SAT assignment for given @p len_formula
          * 
-         * @param len_formula 
-         * @return true 
-         * @return false 
+         * TODO explain better
          */
         bool block_curr_len(expr_ref len_formula);
 
