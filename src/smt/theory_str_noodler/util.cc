@@ -629,6 +629,7 @@ namespace smt::noodler::util {
         );
 
         // intermediate automata reduction
+        // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.size() < 1000) {
             nfa = Mata::Nfa::reduce(nfa);
         }

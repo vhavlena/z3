@@ -831,6 +831,7 @@ namespace smt::noodler {
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
 
         // satisfiability checking via universality checking
+        // this heuristics is applied only to the case when there is a single regular constraint x notin RE.
         if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->len_vars.size() == 0) {
             const auto& reg_data = this->m_membership_todo_rel[0];
             if(!std::get<2>(reg_data)) {
@@ -868,7 +869,9 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
-        // infinite loop prevention -- not sure if it is correct
+        // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
+        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
+        // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
             expr_ref refine = construct_refinement();
             if(refine != nullptr) {
