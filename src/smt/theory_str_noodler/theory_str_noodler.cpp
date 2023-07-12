@@ -829,6 +829,29 @@ namespace smt::noodler {
         // Add dummy symbols for all disequations.
         // FIXME: we can possibly create more dummy symbols than the size of alphabet (196607 - from string theory standard), but it is edge-case that is nearly impossible to happen
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
+
+        // satisfiability checking via universality checking
+        // this heuristics is applied only to the case when there is a single regular constraint x notin RE.
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->len_vars.size() == 0) {
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            if(!std::get<2>(reg_data)) {
+                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_formula, false, false) };
+                Mata::Nfa::Nfa sigma_star;
+                sigma_star.initial.insert(0);
+                sigma_star.final.insert(0);
+                for (const auto& symbol : symbols_in_formula) {
+                    sigma_star.delta.add(0, symbol, 0);
+                }
+
+                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return FC_CONTINUE;
+                } else {
+                    return FC_DONE;
+                }
+            }
+        }
+
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
                 instance, m_membership_todo_rel, this->var_name, m_util_s, m, symbols_in_formula
@@ -846,19 +869,24 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
-        // infinite loop prevention -- not sure if it is correct
+        // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
+        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
+        // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
             expr_ref refine = construct_refinement();
             if(refine != nullptr) {
-                if(this->axiomatized_instances.contains(refine)) {
-                    if(this->axiomatized_instances[refine] > 1) {
-                        block_curr_assignment();
-                        return FC_CONTINUE;
-                    } else {
-                        this->axiomatized_instances[refine] += 1;
+                bool found = false;
+                expr_ref len_formula(this->m);
+                for(const auto& pr : this->axiomatized_instances) {
+                    if(pr.first == refine) {
+                        len_formula = pr.second;
+                        found = true;
+                        break;
                     }
-                } else {
-                    this->axiomatized_instances.insert(refine, 1);
+                }
+                if(found) {
+                    block_curr_len(len_formula);
+                    return FC_CONTINUE;
                 }
             }
         }
@@ -2096,6 +2124,9 @@ namespace smt::noodler {
         //     return false;
         // }
         // axiomatized_instances.push_back(refinement);
+        if(m_params.m_loop_protect) {
+            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), len_formula});
+        }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
@@ -2309,8 +2340,8 @@ namespace smt::noodler {
         int cnt = 0;
 
         for(const auto& item : this->m_lang_eq_todo_rel) {
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(std::get<0>(item)), m_util_s, m, alphabet, false, false );
+            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(std::get<1>(item)), m_util_s, m, alphabet, false, false );
             PredicateType tp = std::get<2>(item) ? PredicateType::Equation : PredicateType::Inequation;
 
             BasicTerm t1(BasicTermType::Lang, "__lang__tmp" + std::to_string(cnt++));
