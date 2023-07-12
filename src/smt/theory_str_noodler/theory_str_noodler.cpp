@@ -829,6 +829,28 @@ namespace smt::noodler {
         // Add dummy symbols for all disequations.
         // FIXME: we can possibly create more dummy symbols than the size of alphabet (196607 - from string theory standard), but it is edge-case that is nearly impossible to happen
         std::set<uint32_t> dummy_symbols{ util::get_dummy_symbols(std::max(new_symbs, size_t(3)), symbols_in_formula) };
+
+        // satisfiability checking via universality checking
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->len_vars.size() == 0) {
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            if(!std::get<2>(reg_data)) {
+                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_formula, false, false) };
+                Mata::Nfa::Nfa sigma_star;
+                sigma_star.initial.insert(0);
+                sigma_star.final.insert(0);
+                for (const auto& symbol : symbols_in_formula) {
+                    sigma_star.delta.add(0, symbol, 0);
+                }
+
+                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return FC_CONTINUE;
+                } else {
+                    return FC_DONE;
+                }
+            }
+        }
+
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
                 instance, m_membership_todo_rel, this->var_name, m_util_s, m, symbols_in_formula

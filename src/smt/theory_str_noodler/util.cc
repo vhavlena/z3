@@ -441,7 +441,7 @@ namespace smt::noodler::util {
             SASSERT(expression->get_num_args() > 0);
             nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa = Mata::Nfa::concatenate(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
+                nfa.concatenate(conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
             }
         } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
             throw_error("antimirov union is unsupported");
@@ -512,10 +512,11 @@ namespace smt::noodler::util {
                 body_nfa.unify_final();
                 body_nfa.unify_initial();
 
+                body_nfa = Mata::Nfa::reduce(body_nfa);
                 nfa = Mata::Nfa::create_empty_string_nfa();
                 // we need to repeat body_nfa at least low times
                 for (unsigned i = 0; i < low; ++i) {
-                    nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
+                    nfa.concatenate(body_nfa);
                 }
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
@@ -531,7 +532,7 @@ namespace smt::noodler::util {
                 if (is_high_set) {
                     // if high is set, we repeat body_nfa another high-low times
                     for (unsigned i = 0; i < high - low; ++i) {
-                        nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
+                        nfa.concatenate(body_nfa);
                     }
                 } else {
                     // if high is not set, we can repeat body_nfa unlimited more times
@@ -541,9 +542,9 @@ namespace smt::noodler::util {
                             body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
                         }
                     }
-                    nfa = Mata::Nfa::concatenate(nfa, body_nfa, true);
+                    nfa.concatenate(body_nfa);
+                    nfa = Mata::Nfa::remove_epsilon(nfa);
                 }
-                nfa = Mata::Nfa::remove_epsilon(nfa);
             }
 
         } else if (m_util_s.re.is_of_pred(expression)) { // Handle of predicate.
@@ -581,8 +582,11 @@ namespace smt::noodler::util {
             const auto right{ expression->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            nfa = Mata::Nfa::uni(conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize),
-                                 conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize));
+            
+            Mata::Nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
+            Mata::Nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
+            nfa = Mata::Nfa::uni(aut1, aut2);
+            
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
@@ -625,7 +629,9 @@ namespace smt::noodler::util {
         );
 
         // intermediate automata reduction
-        nfa = Mata::Nfa::reduce(nfa);
+        if(nfa.size() < 1000) {
+            nfa = Mata::Nfa::reduce(nfa);
+        }
         if(determinize) {
             nfa = Mata::Nfa::minimize(nfa);
         }
