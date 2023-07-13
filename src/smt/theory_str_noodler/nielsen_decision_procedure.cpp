@@ -9,32 +9,9 @@
 
 namespace smt::noodler {
 
-
-    /**
-     * @brief Get length constraints of the solution
-     *
-     * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-     * @return expr_ref Length formula describing all solutions (currently true)
-     */
-    expr_ref NielsenDecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        if(this->init_length_sensitive_vars.size() == 0) {
-            return expr_ref(m.mk_true(), m);
-        }
-
-        std::map<BasicTerm, expr_ref> actual_var_map{};
-        expr_ref formula(this->m.mk_true(), this->m);
-        for(size_t i = 0; i < this->length_paths.size(); i++) {
-            if(this->length_paths_index >= this->length_paths[i].size()) {
-                continue;
-            }
-            expr_ref part_fle = length_formula_path(this->length_paths[i][this->length_paths_index], variable_map, actual_var_map);
-            formula = this->m.mk_and(formula, part_fle);
-        }
-        formula = this->m.mk_and(formula, generate_len_connection(variable_map, actual_var_map));
-
-        STRACE("str", tout << "Nielsen lengths: " << mk_pp(formula, this->m) << std::endl;);
-        this->length_paths_index++;
-        return formula;
+    LenNode NielsenDecisionProcedure::get_lengths() {
+        STRACE("str", tout << "Nielsen lengths: " << length_formula_for_solution << std::endl;);
+        return std::move(length_formula_for_solution);
     }
 
     /**
@@ -47,16 +24,18 @@ namespace smt::noodler {
     /**
      * @brief Preprocessing.
      */
-    void NielsenDecisionProcedure::preprocess(PreprocessType opt) {
-        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
+    lbool NielsenDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
+        FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
-        this->prep_handler.separate_eqs();
+        prep_handler.separate_eqs();
 
         // Refresh the instance
-        this->init_aut_ass = this->prep_handler.get_aut_assignment();
-        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
-        this->formula = this->prep_handler.get_modified_formula();
+        this->init_aut_ass = prep_handler.get_aut_assignment();
+        this->init_length_sensitive_vars = prep_handler.get_len_variables();
+        this->formula = prep_handler.get_modified_formula();
         this->formula = this->formula.split_literals();
+
+        return l_undef;
     }
 
     /**
@@ -64,8 +43,7 @@ namespace smt::noodler {
      * 
      * @return True -> satisfiable
      */
-    bool NielsenDecisionProcedure::compute_next_solution() {
-        bool sat = true;
+    lbool NielsenDecisionProcedure::compute_next_solution() {
         // if the compute_next_solution was called for the first time
         if(this->graphs.size() == 0) {
             std::vector<Formula> instances = divide_independent_formula(this->formula);
@@ -73,41 +51,68 @@ namespace smt::noodler {
                 bool is_sat;
                 // create Nielsen graph and trim it
                 NielsenGraph graph = generate_from_formula(fle, is_sat);
+                if (!is_sat) {
+                    // if some Nielsen graph is unsat --> unsat
+                    return l_false;
+                }
                 graph = graph.trim();
                 this->graphs.push_back(graph);
-                sat = sat && is_sat;
-
-                // if some Nielsen graph is unsat --> unsat
-                if(!sat) {
-                    return false;
-                }
 
                 // if there are no length variables --> do not construct the counter system
                 if(this->init_length_sensitive_vars.size() == 0) {
                     continue;
                 }
                 // create a counter system from the Nielsen graph a condensate it
-                CounterSystem counter_system = create_counter_system(graph);
+                bool counter_system_created = false;
+                CounterSystem counter_system = create_counter_system(graph, counter_system_created);
+                if (!counter_system_created) {
+                    return l_undef;
+                }
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
-                    Path<CounterLabel> path = get_length_path(counter_system, c);
+                    bool path_exists = false;
+                    Path<CounterLabel> path = get_length_path(counter_system, c, path_exists);
+                    if (!path_exists) {
+                        return l_undef;
+                    }
                     this->length_paths[this->length_paths.size() - 1].push_back(path);
                 }
             }
-            return sat;
         } else {
-            // enumerate all length paths
-            if(this->length_paths_index < this->length_paths.size()) {
-                return true;
+            // otherwise we are enumerating all length paths
+            if(this->length_paths_index >= this->length_paths.size()) {
+                // incomplete procedure
+                return l_undef;
+            }
+        }
+
+        // we compute the lengths here already instead of in get_lengths(), so that we can return unknown if there is a problem
+        bool length_exists = false;
+        if(this->init_length_sensitive_vars.size() == 0) {
+            length_formula_for_solution = LenNode(LenFormulaType::TRUE);
+        } else {
+            std::map<BasicTerm, BasicTerm> actual_var_map{};
+            std::vector<LenNode> conjuncts;
+            for(size_t i = 0; i < this->length_paths.size(); i++) {
+                if(this->length_paths_index >= this->length_paths[i].size()) {
+                    continue;
+                }
+                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts)) {
+                    return l_undef;
+                }
+            }
+            if(!generate_len_connection(actual_var_map, conjuncts)) {
+                return l_undef;
             }
 
-            // incomplete procedure
-            util::throw_error("nielsen: incomplete procedure");
-            return false;
+            length_formula_for_solution = LenNode(LenFormulaType::AND, conjuncts);
+            this->length_paths_index++;
         }
+
+        return l_true;
     }
 
     /**
@@ -165,18 +170,6 @@ namespace smt::noodler {
 
         return ret;
     }
-
-    NielsenDecisionProcedure::NielsenDecisionProcedure(
-             const Formula &equalities, AutAssignment init_aut_ass,
-             const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-             ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
-             const theory_str_noodler_params& par
-     ) :  m{ m }, m_util_s{ m_util_s }, m_util_a{ m_util_a }, init_length_sensitive_vars{ init_length_sensitive_vars },
-         formula { equalities },
-         init_aut_ass{ init_aut_ass },
-         prep_handler{ equalities, init_aut_ass, init_length_sensitive_vars, par },
-         m_params(par) {
-         }
 
     /**
      * @brief Get all possible applicable rewriting rules from a predicate
@@ -304,14 +297,9 @@ namespace smt::noodler {
         return false;
     }
 
-    /**
-     * @brief Create a counter system from the Nielsen graph.
-     * 
-     * @param graph Graph to be converted to the counter system.
-     * @return CounterSystem
-     */
-    CounterSystem NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph) const {
+    CounterSystem NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, bool& counter_system_created) const {
         CounterSystem ret;
+        counter_system_created = true;
 
         // conversion of a nielsen label to the counter label
         auto conv_fnc = [&](const NielsenLabel& lab) {
@@ -322,7 +310,7 @@ namespace smt::noodler {
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
                 return CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
             } else {
-                util::throw_error("create_counter_system: unsupported label type");
+                counter_system_created = false;
                 return CounterLabel{lab.first, {}};
             }
         };
@@ -335,7 +323,11 @@ namespace smt::noodler {
         // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                ret.add_edge(trans.first, pr.first, conv_fnc(trans.second));
+                CounterLabel target{conv_fnc(trans.second)};
+                if (!counter_system_created) {
+                    return ret;
+                }
+                ret.add_edge(trans.first, pr.first, target);
             }
         }
         return ret;
@@ -432,17 +424,20 @@ namespace smt::noodler {
      * @param sl Node with a suitable self-loop
      * @return Path<CounterLabel> Shortest path containing the node @p sl.
      */
-    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl) {
+    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, bool& path_exists) {
         std::optional<Path<CounterLabel>> first_opt = cs.shortest_path(cs.get_init(), sl.first);
         std::optional<Path<CounterLabel>> last_opt = cs.shortest_path(sl.first, *cs.get_fins().begin());
 
         if(!first_opt.has_value() || !last_opt.has_value()) {
-            util::throw_error("no shortest path");
+            // no shortest path
+            path_exists = false;
+            return Path<CounterLabel>();
         }
         Path<CounterLabel> first = first_opt.value();
         Path<CounterLabel> last = last_opt.value();
         first.append(last);
         first.self_loops.insert(sl);
+        path_exists = true;
         return first;
     }
 
@@ -453,37 +448,39 @@ namespace smt::noodler {
      * @param lab Counter label
      * @param in_vars Current length variables for each BasicTerm
      * @param out_var Length variable where the result is stored
-     * @return expr_ref Length formula
      */
-    expr_ref NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
+    bool NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
         // fresh output variable
-        out_var = util::mk_int_var_fresh(lab.left.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        expr_ref formula(this->m.mk_true(), this->m);
+        out_var = util::mk_fresh_noodler_var(lab.left.get_name().encode());
 
         // label of the form x := 0 --> out_var = 0
         if(lab.sum.size() == 1) {
             int val = std::stoi(lab.sum[0].get_name().encode());
-            formula = this->m.mk_eq(out_var, this->m_util_a.mk_int(val));
+            conjuncts.push_back(LenNode(LenFormulaType::EQ, {out_var, val}));
         } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
             int val = std::stoi(lab.sum[1].get_name().encode());
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.left) == in_vars.end()) {
-                expr_ref tmp_var(this->m);
-                formula = this->m.mk_and(formula, get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var));
+                BasicTerm tmp_var(BasicTermType::Variable);
+                if (!get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                    return false;
+                }
                 in_vars.insert_or_assign(lab.left, tmp_var);
             }
-            formula = this->m.mk_and(formula, this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_int(val))));
+            conjuncts.push_back(LenNode(LenFormulaType::EQ, {out_var, LenNode(LenFormulaType::PLUS, {in_vars.at(lab.left), val})}));
         } else {
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.sum[1]) == in_vars.end()) {
-                expr_ref tmp_var(this->m);
-                formula = this->m.mk_and(formula, get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var));
+                BasicTerm tmp_var(BasicTermType::Variable);
+                if (!get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                    return false;
+                }
                 in_vars.insert_or_assign(lab.sum[1], tmp_var);
             }
-            formula = this->m.mk_and(formula, this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), in_vars.at(lab.sum[1]))));
+            conjuncts.push_back(LenNode(LenFormulaType::EQ, {out_var, LenNode(LenFormulaType::PLUS, {in_vars.at(lab.left), in_vars.at(lab.sum[1])})}));
         }
 
-        return formula;
+        return true;
     }
 
     /**
@@ -494,42 +491,38 @@ namespace smt::noodler {
      * @param out_var Length variable where the result is stored
      * @return expr_ref Length formula
      */
-    expr_ref NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var) {
-        out_var = util::mk_int_var_fresh(lab.left.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        expr_ref formula(this->m);
+    bool NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
+        out_var = util::mk_fresh_noodler_var(lab.left.get_name().encode());
 
         if(lab.sum.size() == 1) {
-            util::throw_error("nielsen: incomplete");
+            // nielsen: incomplete
+            return false;
         } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
             int val = std::stoi(lab.sum[1].get_name().encode());
             // fresh variable j
-            expr_ref fresh = util::mk_int_var_fresh("j", this->m, this->m_util_s, this->m_util_a);
+            BasicTerm fresh = util::mk_fresh_noodler_var("j");
             // x1 = x0 + j*k
-            expr_ref update(this->m.mk_eq(out_var, this->m_util_a.mk_add(in_vars.at(lab.left), this->m_util_a.mk_mul(fresh, this->m_util_a.mk_int(val)))), this->m);
-            // j >= 0
-            expr_ref restr(this->m_util_a.mk_ge(fresh, this->m_util_a.mk_int(0)), this->m);
-            formula = this->m.mk_and(update, restr);
+            conjuncts.push_back(LenNode(LenFormulaType::EQ, {out_var, LenNode(LenFormulaType::PLUS, {in_vars.at(lab.left), LenNode(LenFormulaType::TIMES, {fresh, val})})}));
+            // 0 <= j
+            conjuncts.push_back(LenNode(LenFormulaType::LEQ, {0, fresh}));
+            return true;
         } else {
-            util::throw_error("nielsen: incomplete");
+            // nielsen: incomplete
+            return false;
         }
-
-        return formula;
     }
 
     /**
      * @brief Get length formula for a path with self-loops.
      * 
      * @param path Part of the counter system contining only self-loops.
-     * @param variable_map Mapping of each BasicTerm to the current length variable
      * @param actual_var_map Var map assigning temporary int variables to the original string variables
      * @return expr_ref Length formula
      */
-    expr_ref NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map, std::map<BasicTerm, expr_ref>& actual_var_map) {
-        expr_ref formula(this->m.mk_true(), this->m);
-
+    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
         // path of length 0 = true
         if(path.labels.size() == 0) {
-            return expr_ref(this->m.mk_true(), this->m);
+            return true;
         }
 
         // there is less edges than vertices; the first one has not self-loop (the rule is of the form x := 0)
@@ -537,42 +530,45 @@ namespace smt::noodler {
             auto it = path.self_loops.find(path.nodes[i]);
             CounterLabel lab = path.labels[i-1];
 
-            expr_ref out_var(this->m);
-            formula = this->m.mk_and(formula, get_label_formula(lab, actual_var_map, out_var));
+            BasicTerm out_var(BasicTermType::Variable);
+            if (!get_label_formula(lab, actual_var_map, out_var, conjuncts)) {
+                return false;
+            }
             actual_var_map.insert_or_assign(lab.left, out_var);
 
             // there is a self-loop
             if(it != path.self_loops.end()) {
-                expr_ref sl_var(this->m);
-                formula = this->m.mk_and(formula, get_label_sl_formula(it->second, actual_var_map, sl_var));
+                BasicTerm sl_var(BasicTermType::Variable);
+                if (!get_label_sl_formula(it->second, actual_var_map, sl_var, conjuncts)) {
+                    return false;
+                }
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
         }
 
-        return formula;
+        return true;
     }
 
     /**
      * @brief Generate connection of temporary int variables with the original string lengths terms. 
      * For instance x!1 = str.len(x) where x!1 is temporary int variable for x in @p actual_var_map.
      * 
-     * @param variable_map Mapping of original variables to z3 terms.
      * @param actual_var_map Actual var map of temporary int variables.
-     * @return expr_ref x!1 = str.len(x) for each variable x
+     * @return conjunction of x!1 = str.len(x) for each variable x
      */
-    expr_ref NielsenDecisionProcedure::generate_len_connection(const std::map<BasicTerm, expr_ref>& variable_map, const std::map<BasicTerm, expr_ref>& actual_var_map) {
-        expr_ref formula(this->m.mk_true(), this->m);
+    bool NielsenDecisionProcedure::generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
         // map the original string variable to their lengths.
         // i.e., str.len(x) = x_n (x_n is the last length variable of x)
         for(const BasicTerm& lterm : this->init_length_sensitive_vars) {
             auto it = actual_var_map.find(lterm);
             if(it == actual_var_map.end()) {
-                util::throw_error("nielsen: incomplete procedure");
+                // nielsen: incomplete procedure
+                return false;
             }
-            expr_ref prev_var = it->second;
-            formula = formula = this->m.mk_and(formula, this->m.mk_eq(this->m_util_s.str.mk_length(variable_map.at(lterm)), prev_var));
+            BasicTerm prev_var = it->second;
+            conjuncts.push_back(LenNode(LenFormulaType::EQ, {lterm, prev_var}));
         }
-        return formula;
+        return true;
     }
 
 } // Namespace smt::noodler.

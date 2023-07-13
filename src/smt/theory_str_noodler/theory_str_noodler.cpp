@@ -840,39 +840,42 @@ namespace smt::noodler {
             }
         }
 
-        /// TODO: this needs to be finished
-        /// Integrate the Nielsen transformation after the dispatcher is created!
-        if(instance.is_quadratic() && false) {
-            model_ref mod;
-            NielsenDecisionProcedure nproc(instance, aut_assignment, 
-                init_length_sensitive_vars, m, m_util_s, m_util_a, m_params);
-            nproc.preprocess();
-            expr_ref block_len(m.mk_false(), m);
-            nproc.init_computation();
-            while(nproc.compute_next_solution()) {
-                lengths = nproc.get_lengths(this->var_name);
-                if(check_len_sat(lengths, mod) == l_true) {
-                    STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
-                    return FC_DONE;
-                }
-                block_len = m.mk_or(block_len, lengths);
-                STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
-            }
-            if(!block_curr_len(block_len)) {
-                return FC_CONTINUE;
-            }
-            return FC_CONTINUE;
-        }
-        
-
         // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
             return FC_DONE;
         }
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, 
-            init_length_sensitive_vars, m_params };
+        // try Nielsen transformation (if enabled) to solve
+        /// TODO: a better test for when to try nielsen might be needed
+        if(m_params.m_try_nielsen && instance.is_quadratic()) {
+            NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
+            nproc.preprocess();
+            expr_ref block_len(m.mk_false(), m);
+            nproc.init_computation();
+            while (true) {
+                lbool result = nproc.compute_next_solution();
+                if (result == l_true) {
+                    expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths());
+                    if (check_len_sat(lengths) == l_true) {
+                        return FC_DONE;
+                    } else {
+                        STRACE("str", tout << "nielsen len unsat" <<  mk_pp(lengths, m) << std::endl;);
+                        block_len = m.mk_or(block_len, lengths);
+                    }
+                } else if (result == l_false) {
+                    // we did not find a solution (with satisfiable length constraints)
+                    // we need to block current assignment
+                    block_curr_len(block_len);
+                    return FC_CONTINUE;
+                } else {
+                    // we could not decide if there is solution, continue with noodler decision procedure
+                    break;
+                }
+            }
+        }
+
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
 
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
@@ -896,6 +899,7 @@ namespace smt::noodler {
             if (result == l_true) {
                 lengths = len_node_to_z3_formula(dec_proc.get_lengths());
                 if (check_len_sat(lengths) == l_true) {
+                    STRACE("str", tout << "len sat" << mk_pp(lengths, m) << std::endl;);
                     return FC_DONE;
                 } else {
                     STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
@@ -904,10 +908,12 @@ namespace smt::noodler {
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
+                STRACE("str", tout << "assignment unsat" << mk_pp(block_len, m) << std::endl;);
                 block_curr_len(block_len);
                 return FC_CONTINUE;
             } else {
                 // we could not decide if there is solution, let's just give up
+                STRACE("str", tout << "giving up" << std::endl);
                 return FC_GIVEUP;
             }
         }

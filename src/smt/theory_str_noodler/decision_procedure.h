@@ -280,9 +280,9 @@ namespace smt::noodler {
          * @brief Replace disequality L != R with equalities and a length constraint saved in dis_len.
          * 
          * @param diseq Disequality to replace
-         * @return Formula with equalities
+         * @return Vector with created equalities
          */
-        Formula replace_disequality(Predicate diseq);
+        std::vector<Predicate> replace_disequality(Predicate diseq);
 
         /**
          * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint

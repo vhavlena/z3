@@ -74,10 +74,13 @@ namespace smt::noodler {
             // if var is substituted, i.e. state.substitution_map[var] = x_1 x_2 ... x_n, then we have to create length equation
             //      |var| = |x_1| + |x_2| + ... + |x_n|
             std::vector<LenNode> plus_operands;
+            STRACE("str", tout << var << " ->");
             for (const auto& subst_var : substitution_map.at(var)) {
+                STRACE("str", tout << " " << subst_var);
                 plus_operands.emplace_back(subst_var);
             }
-            LenNode result(LenFormulaType::PLUS, plus_operands);
+            STRACE("str", tout << std::endl;);
+            LenNode result(LenFormulaType::EQ, {var, LenNode(LenFormulaType::PLUS, plus_operands)});
             // to be safe, we add |var| >= 0 (for the aut_ass case, it is done in aut_ass.get_lengths)
             return LenNode(LenFormulaType::AND, {result, LenNode(LenFormulaType::LEQ, {0, var})});
         } else {
@@ -593,7 +596,7 @@ namespace smt::noodler {
         // dis_len where L = x1a1y1, R= x2a2y2; see replace_disequality() for more info. We want to create formula
         // (|L| != |R| AND (|x1| == |x2| OR a1 != a2)) but
         //      - if a1 or a2 is only empty word, then only |L| != |R| can hold
-        //      - we check a1@char != a2@char instead of a1 != a2 and then we add at the end that a1@char/a2@char
+        //      - we check a1!char != a2!char instead of a1 != a2 and then we add at the end that a1!char/a2!char
         //        should be equal to one of the symbols of a1/a2
         //      - we also work with maximally substituted a1/a2, so that if we have multiple disequations that
         //        somehow depend on each other, the dependency stays
@@ -605,8 +608,8 @@ namespace smt::noodler {
         // here we save all a1/a2 whose disequation is checked, so that we can create the formula that 
         // each of these vars should be one of the symbols from its automaton
         std::set<BasicTerm> a_vars;
-        // get the "@char" version of a variable
-        auto get_char_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name().encode() + "@char"); };
+        // get the "!char" version of a variable
+        auto get_char_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name().encode() + "!char"); };
 
         // conjuncts of the final length formula
         std::vector<LenNode> conjuncts;
@@ -637,13 +640,13 @@ namespace smt::noodler {
                     std::vector<LenNode>{
                         // |L| != |R|
                         LR_diff_lengths,
-                        // |x1| == |x2| AND a1@char != a2@char
-                        LenNode(LenFormulaType::AND, { x1x2_same_lengths, LenNode(LenFormulaType::EQ, {get_char_var(a1), get_char_var(a2)})})
+                        // |x1| == |x2| AND a1!char != a2!char
+                        LenNode(LenFormulaType::AND, { x1x2_same_lengths, LenNode(LenFormulaType::NEQ, {get_char_var(a1), get_char_var(a2)})})
                     });
             }
         }
 
-        // for each a1/a2 var, we have to have that a1@char/a2@char should be equal to one of its symbols
+        // for each a1/a2 var, we have to have that a1!char/a2!char should be equal to one of its symbols
         for (const BasicTerm& a_var : a_vars) {
             auto a_var_nfa = solution.aut_ass.at(a_var);
             a_var_nfa->trim();
@@ -651,9 +654,11 @@ namespace smt::noodler {
             for (const auto &tran : a_var_nfa->delta) {
                 symbols_of_var.insert(tran.symb);
             }
+            std::vector<LenNode> disjuncts;
             for (auto symbol : symbols_of_var) {
-                conjuncts.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ get_char_var(a_var), symbol });
+                disjuncts.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ get_char_var(a_var), symbol });
             }
+            conjuncts.push_back(LenNode(LenFormulaType::OR, disjuncts));
         }
 
         return LenNode(LenFormulaType::AND, conjuncts);
@@ -668,16 +673,15 @@ namespace smt::noodler {
             if (dis_or_eq.is_equation()) {
                 equations.add_predicate(dis_or_eq);
             } else if (dis_or_eq.is_inequation()) {
-                for (auto const &eq_from_diseq : replace_disequality(dis_or_eq).get_predicates()) {
+                for (auto const &eq_from_diseq : replace_disequality(dis_or_eq)) {
                     equations.add_predicate(eq_from_diseq);
                 }
             } else {
                 util::throw_error("Decision procedure can handle only equations and disequations");
             }
         }
-        this->formula = std::move(equations);
 
-        STRACE("str",
+        STRACE("str-dis",
             tout << "Disequation to equation formulas:" << std::endl;
             for (const auto &dis_formula : dis_len) {
                 tout << "     " << dis_formula.second.second
@@ -685,17 +689,24 @@ namespace smt::noodler {
                      << " && " << dis_formula.first.first.get_name()
                      << " != " << dis_formula.first.second.get_name()
                      << ")" << std::endl;
-            }  
+            }
+        );
+
+        STRACE("str-dis",
+            tout << "Equations after removing disequations" << std::endl;
+            for (const auto &eq : equations.get_predicates()) {
+                tout << "    " << eq << std::endl;
+            }
         );
 
         SolvingState init_solving_state;
         init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
 
-        if (!this->formula.get_predicates().empty()) {
+        if (!equations.get_predicates().empty()) {
             // TODO we probably want to completely get rid of inclusion graphs
             std::deque<std::shared_ptr<GraphNode>> tmp;
-            Graph incl_graph = Graph::create_inclusion_graph(this->formula, tmp);
+            Graph incl_graph = Graph::create_inclusion_graph(equations, tmp);
             for (auto const &node : incl_graph.get_nodes()) {
                 init_solving_state.inclusions.insert(node->get_predicate());
                 if (!incl_graph.is_on_cycle(node)) {
@@ -794,13 +805,13 @@ namespace smt::noodler {
     /**
      * @brief Replace disequalities with equalities
      */
-    Formula DecisionProcedure::replace_disequality(Predicate diseq) {
+    std::vector<Predicate> DecisionProcedure::replace_disequality(Predicate diseq) {
         // From inequality L != P we create equalities L = x1a1y1 and R = x2a2y2
         // where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
         // we will check if (|L| != |P| || (|x1| == |x2| and a1 != a2)) after finding sat solution
         // from decision procedure.
 
-        Formula new_eqs;
+        std::vector<Predicate> new_eqs;
 
         // This optimization represents the situation where L = a1 and R = a2
         // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
@@ -821,7 +832,7 @@ namespace smt::noodler {
                     // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
                     {LenNode(LenFormulaType::TRUE, {}), LenNode(LenFormulaType::FALSE, {})} 
                 });
-                return Formula();
+                return std::vector<Predicate>();
             }
         }
 
@@ -844,9 +855,9 @@ namespace smt::noodler {
         init_aut_ass[y2] = sigma_star_automaton;
 
         // L = x1a1y1
-        new_eqs.add_predicate(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
+        new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
         // R = x2a2y2
-        new_eqs.add_predicate(Predicate(PredicateType::Equation, {diseq.get_right_side(), Concat{x2, a2, y2}}));
+        new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_right_side(), Concat{x2, a2, y2}}));
 
         // we create |L| != |P|, so we need to make all variables in both sides length ones
         // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
@@ -868,6 +879,7 @@ namespace smt::noodler {
         // we will create (len2 || (len1 && a1 != a2)) from this
         this->dis_len.insert({{a1, a2}, {len1, len2}});
 
+        STRACE("str-dis", tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
         return new_eqs;
     }
 

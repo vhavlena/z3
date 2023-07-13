@@ -127,9 +127,10 @@ namespace smt::noodler {
         PLUS,
         TIMES,
         EQ,
+        NEQ, // not equal
         NOT,
-        LEQ,
-        LEAF,
+        LEQ, // <=
+        LEAF, // int or variable (use LenNode(int) or LenNode(BasicTerm) constructors)
         AND,
         OR,
         TRUE,
@@ -157,6 +158,9 @@ namespace smt::noodler {
             break;
         case LenFormulaType::EQ:
             os << "(= " << node.succ[0] << " " << node.succ[1] << ")";
+            break;
+        case LenFormulaType::NEQ:
+            os << "(!= " << node.succ[0] << " " << node.succ[1] << ")";
             break;
         case LenFormulaType::NOT:
             os << "(not " << node.succ[0] << ")";
@@ -477,14 +481,14 @@ namespace smt::noodler {
     //----------------------------------------------------------------------------------------------------------------------------------
 
     class Formula {
+    private:
+        std::vector<Predicate> predicates;
     public:
-        Formula(): predicates() {}
-
         std::vector<Predicate>& get_predicates() { return predicates; }
         const std::vector<Predicate>& get_predicates() const { return predicates; }
 
         // TODO: Use std::move for both add functions?
-        void add_predicate(const Predicate& predicate) { predicates.push_back(predicate); }
+        void add_predicate(Predicate predicate) { predicates.push_back(std::move(predicate)); }
 
         std::string to_string() const {
             std::string ret;
@@ -565,9 +569,6 @@ namespace smt::noodler {
             }
             return new_formula;
         }
-
-    private:
-        std::vector<Predicate> predicates;
     }; // Class Formula.
 
     static bool operator==(const Formula& lhs, const Formula& rhs) { return lhs.get_predicates() == rhs.get_predicates(); }
