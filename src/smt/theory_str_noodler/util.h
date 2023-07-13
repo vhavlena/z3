@@ -25,6 +25,8 @@
 #include "formula.h"
 #include "aut_assignment.h"
 
+// FIXME most if not all these functions should probably be in theory_str_noodler
+
 namespace smt::noodler::util {
     using expr_pair = std::pair<expr_ref, expr_ref>;
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;

@@ -738,39 +738,38 @@ namespace smt::noodler {
             return FC_GIVEUP;
         }
 
+        // Solve Language (dis)equations
+        if (!solve_lang_eqs_diseqs()) {
+            return FC_DONE;
+        }
 
-        /**************************** SOLVE LANGAGUGE (DIS)EQUATIONS **************************/
-        for(const auto& item : this->m_lang_eq_todo_rel) {
-            // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
-            // so both sides of the (dis)equations should be terms representing reg. languages
-            expr_ref left_side = std::get<0>(item);
-            expr_ref right_side = std::get<1>(item);
-            bool is_equation = std::get<2>(item);
 
-            STRACE("str",
-                tout << "Checking lang (dis)eq: " << mk_pp(left_side, m) << (is_equation ? " == " : " != ") << mk_pp(right_side, m) << std::endl;
-            );
+        // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
+        // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
+        // universality checking should be faster.
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0) {
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            if(!std::get<2>(reg_data) // membership is negated
+                 && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
+            ) {
+                std::set<Mata::Symbol> symbols_in_regex;
+                util::extract_symbols(std::get<1>(reg_data), m_util_s, m, symbols_in_regex);
+                // add one "dummy" symbol representing the symbols not in the regex
+                util::get_dummy_symbols(1, symbols_in_regex);
 
-            // get symbols from both sides
-            std::set<uint32_t> alphabet;
-            util::extract_symbols(left_side, m_util_s, m, alphabet);
-            util::extract_symbols(right_side, m_util_s, m, alphabet);
+                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
 
-            // construct NFAs for both sides
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
+                Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
+                Mata::Nfa::Nfa sigma_star = Mata::Nfa::create_sigma_star_nfa(&alph);
 
-            // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
-            bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
-            if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
-                // the language (dis)equation does not hold => block it and return
-                app_ref lang_eq(m.mk_eq(left_side, right_side), m);
-                if(is_equation){
-                    add_axiom({mk_literal(m.mk_not(lang_eq))});
+                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
+                    // x should not belong in sigma*, so it is unsat
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return FC_CONTINUE;
                 } else {
-                    add_axiom({mk_literal(lang_eq)});
+                    // otherwise x should not belong in some nfa that is not sigma*, so it is sat
+                    return FC_DONE;
                 }
-                return FC_DONE;
             }
         }
 
@@ -785,29 +784,7 @@ namespace smt::noodler {
         );
 
         // Gather symbols
-        std::set<uint32_t> symbols_in_formula = get_symbols_from_relevant();
-
-        // satisfiability checking via universality checking
-        // this heuristics is applied only to the case when there is a single regular constraint x notin RE.
-        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->len_vars.size() == 0) {
-            const auto& reg_data = this->m_membership_todo_rel[0];
-            if(!std::get<2>(reg_data)) {
-                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_formula, false, false) };
-                Mata::Nfa::Nfa sigma_star;
-                sigma_star.initial.insert(0);
-                sigma_star.final.insert(0);
-                for (const auto& symbol : symbols_in_formula) {
-                    sigma_star.delta.add(0, symbol, 0);
-                }
-
-                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
-                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
-                    return FC_CONTINUE;
-                } else {
-                    return FC_DONE;
-                }
-            }
-        }
+        std::set<Mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
 
         // Create automata assignment for the formula.
         AutAssignment aut_assignment{util::create_aut_assignment_for_formula(
@@ -847,7 +824,7 @@ namespace smt::noodler {
         }
 
         // try Nielsen transformation (if enabled) to solve
-        /// TODO: a better test for when to try nielsen might be needed
+        /// FIXME: a better test for when to try nielsen might be needed
         if(m_params.m_try_nielsen && instance.is_quadratic()) {
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
@@ -1799,7 +1776,7 @@ namespace smt::noodler {
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
-            // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for rellevancy
+            // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for relevancy
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
     }
@@ -1853,49 +1830,6 @@ namespace smt::noodler {
         STRACE("str", ctx.display_literals_verbose(tout << "[Conflict]\n", lv) << '\n';);
     }
 
-    void theory_str_noodler::block_curr_assignment() {
-        STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
-
-        context& ctx = get_context();
-
-        ast_manager& m = get_manager();
-        expr *refinement = nullptr;
-        STRACE("str", tout << "[Refinement]\nformulas:\n";);
-        for (const auto& we : this->m_word_eq_todo_rel) {
-            // we create the equation according to we
-            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
-            expr *const e = m.mk_not(ctx.mk_eq_atom(we.first, we.second));
-            refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
-            STRACE("str", tout << we.first << " = " << we.second << '\n';);
-        }
-
-        literal_vector ls;
-        for (const auto& wi : this->m_word_diseq_todo_rel) {
-//            expr *const e = mk_eq_atom(wi.first, wi.second);
-            expr_ref e(ctx.mk_eq_atom(wi.first, wi.second), m);
-            refinement = refinement == nullptr ? e : m.mk_or(refinement, e);
-            STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
-        }
-
-        for (const auto& in : this->m_membership_todo_rel) {
-            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
-            if(std::get<2>(in)){
-                in_app = m.mk_not(in_app);
-                if(!ctx.e_internalized(in_app)) {
-                    ctx.internalize(in_app, false);
-                }
-            }
-            refinement = refinement == nullptr ? in_app : m.mk_or(refinement, in_app);
-            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
-        }
-
-        if (refinement != nullptr) {
-            add_axiom(refinement);
-        }
-        STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
-
-    }
-
     expr_ref theory_str_noodler::construct_refinement() {
         context& ctx = get_context();
 
@@ -1932,7 +1866,7 @@ namespace smt::noodler {
         return expr_ref(refinement, m);
     }
 
-    bool theory_str_noodler::block_curr_len(expr_ref len_formula) {
+    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         context& ctx = get_context();
@@ -1966,11 +1900,7 @@ namespace smt::noodler {
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
-
-        // if(axiomatized_instances.contains(refinement)) {
-        //     return false;
-        // }
-        // axiomatized_instances.push_back(refinement);
+        
         if(m_params.m_loop_protect) {
             this->axiomatized_instances.push_back({expr_ref(refinement, this->m), len_formula});
         }
@@ -1978,7 +1908,6 @@ namespace smt::noodler {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
         }
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
-        return true;
     }
 
     void theory_str_noodler::dump_assignments() const {
@@ -1998,12 +1927,12 @@ namespace smt::noodler {
     }
 
     expr_ref theory_str_noodler::mk_str_var_fresh(const std::string& name) {
-        // TODO remove this function probably and just use the one from util
+        // TODO move the function from util completely here?
         return util::mk_str_var_fresh(name, m, m_util_s);
     }
 
     expr_ref theory_str_noodler::mk_int_var_fresh(const std::string& name) {
-        // TODO remove this function probably and just use the one from util
+        // TODO move the function from util here?
         return util::mk_int_var_fresh(name, m, m_util_a);
     }
 
