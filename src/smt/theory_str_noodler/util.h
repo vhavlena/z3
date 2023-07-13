@@ -97,27 +97,6 @@ namespace smt::noodler::util {
     std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to);
 
     /**
-     * Get automata assignment for formula.
-     * @param[in] equations Vector of equations in formula to get symbols from.
-     * @param[in] disequations Vector of disequations in formula to get symbols from.
-     * @param[out] var_name Mapping of BasicTerm variables to the corresponding z3 expressions
-     * @param[in] regexes Vector of regexes in formula to get symbols from.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @return Automata assignment for the whole formula.
-     *
-     * TODO: Test.
-     */
-    [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
-            const Formula& instance,
-            const vector<expr_pair_flag>& regexes,
-            std::map<BasicTerm, expr_ref>& var_name,
-            const seq_util& m_util_s,
-            const ast_manager& m,
-            const std::set<uint32_t>& alphabet
-    );
-
-    /**
      * Convert expression @p expr to NFA using hexadecimal values as symbols.
      * @param[in] expression Expression to be converted to regex.
      * @param[in] m_util_s Seq util for AST.

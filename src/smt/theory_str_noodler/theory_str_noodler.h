@@ -55,11 +55,10 @@ namespace smt::noodler {
         // equivalence of z3 terms based on their length (terms are equiv if their length is for sure the same)
         var_union_find var_eqs;
 
-        StateLen<bool> state_len;
-
         // variables whose lengths are important
         obj_hashtable<expr> len_vars;
 
+        // used in final_check_eh, maps noodler variables to z3 string variables
         std::map<BasicTerm, expr_ref> var_name;
 
         // mapping predicates and function to variables that they substitute to
@@ -74,6 +73,7 @@ namespace smt::noodler {
         expr_ref_vector     m_length;             // length applications themselves
         std::vector<std::pair<expr_ref, expr_ref>> axiomatized_instances;
 
+        // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
         obj_map<expr, unsigned> bool_var_int;
         obj_hashtable<expr> bool_var_state;
@@ -195,6 +195,7 @@ namespace smt::noodler {
          */
         void add_axiom(std::vector<literal> ls);
 
+        // methods for rewriting different predicates into something simpler that we can handle
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
         void handle_substr_int(expr *e);
@@ -235,8 +236,6 @@ namespace smt::noodler {
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
-        void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
-
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 
         /**
@@ -258,7 +257,17 @@ namespace smt::noodler {
         /**
          * @brief Get all symbols used in relevant word (dis)equations and memberships
          */
-        std::set<uint32_t> get_symbols_from_relevant();
+        std::set<Mata::Symbol> get_symbols_from_relevant();
+        /**
+         * Get automata assignment for formula @p intance using relevant memberships in m_membership_todo_rel.
+         * As a side effect updates mapping of variables (BasicTerm) to the corresponding z3 expr.
+         * @param instance Formula containing (dis)equations
+         * @param noodler_alphabet Set of symbols occuring in the formula and memberships
+         */
+        [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
+                const Formula& instance,
+                const std::set<Mata::Symbol>& noodler_alphabet
+        );
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
