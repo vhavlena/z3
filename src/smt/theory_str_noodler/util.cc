@@ -415,10 +415,6 @@ namespace smt::noodler::util {
             throw_error("unsupported operation in regex");
         }
 
-        STRACE("str-create_nfa",
-            tout << "--------------" << (make_complement ? "Complemented " : "") << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
-        );
-
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.size() < 1000) {
@@ -427,6 +423,11 @@ namespace smt::noodler::util {
         if(determinize) {
             nfa = Mata::Nfa::minimize(nfa);
         }
+
+        STRACE("str-create_nfa",
+            tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
+            nfa.print_to_DOT(tout);
+        );
 
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
@@ -439,10 +440,8 @@ namespace smt::noodler::util {
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
+            STRACE("str-create_nfa", tout << "Automaton after complement:" << std::endl; nfa.print_to_DOT(tout););
         }
-        STRACE("str-create_nfa",
-            nfa.print_to_DOT(tout);
-        );
         return nfa;
     }
 

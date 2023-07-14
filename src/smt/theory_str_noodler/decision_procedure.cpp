@@ -74,12 +74,9 @@ namespace smt::noodler {
             // if var is substituted, i.e. state.substitution_map[var] = x_1 x_2 ... x_n, then we have to create length equation
             //      |var| = |x_1| + |x_2| + ... + |x_n|
             std::vector<LenNode> plus_operands;
-            STRACE("str", tout << var << " ->");
             for (const auto& subst_var : substitution_map.at(var)) {
-                STRACE("str", tout << " " << subst_var);
                 plus_operands.emplace_back(subst_var);
             }
-            STRACE("str", tout << std::endl;);
             LenNode result(LenFormulaType::EQ, {var, LenNode(LenFormulaType::PLUS, plus_operands)});
             // to be safe, we add |var| >= 0 (for the aut_ass case, it is done in aut_ass.get_lengths)
             return LenNode(LenFormulaType::AND, {result, LenNode(LenFormulaType::LEQ, {0, var})});
@@ -147,6 +144,22 @@ namespace smt::noodler {
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
                 solution = std::move(element_to_process);
+                STRACE("str",
+                    tout << "Found solution:" << std::endl;
+                    for (const auto &var_substitution : solution.substitution_map) {
+                        tout << "    " << var_substitution.first << " ->";
+                        for (const auto& subst_var : var_substitution.second) {
+                            tout << " " << subst_var;
+                        }
+                        tout << std::endl;
+                    }
+                    for (const auto& var_aut : solution.aut_ass) {
+                        tout << "    " << var_aut.first << " -> NFA" << std::endl;
+                        if (is_trace_enabled("str-nfa")) {
+                            var_aut.second->print_to_mata(tout);
+                        }
+                    }
+                );
                 return l_true;
             }
 
