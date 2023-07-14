@@ -413,7 +413,9 @@ namespace smt::noodler {
             // we do not need to handle these, concatenation is handled differently (TODO: explain better?)
             // and everything else will be handled during final_check_eh
         } else {
-            util::throw_error((std::stringstream() << "Unknown predicate/function " << mk_pp(n, get_manager()) << " in relevant_eh()").str());
+            std::stringstream error_msg;
+            error_msg << "Unknown predicate/function " << mk_pp(n, get_manager()) << " in relevant_eh()";
+            util::throw_error(error_msg.str());
         }
 
     }
