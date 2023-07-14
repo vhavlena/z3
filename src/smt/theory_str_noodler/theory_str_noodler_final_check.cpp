@@ -170,7 +170,7 @@ namespace smt::noodler {
     }
 
     bool theory_str_noodler::solve_lang_eqs_diseqs() {
-        for(const auto& item : this->m_lang_eq_todo_rel) {
+        for(const auto& item : this->m_lang_eq_or_diseq_todo_rel) {
             // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
             // so both sides of the (dis)equations should be terms representing reg. languages
             expr_ref left_side = std::get<0>(item);
@@ -196,8 +196,10 @@ namespace smt::noodler {
                 // the language (dis)equation does not hold => block it and return
                 app_ref lang_eq(m.mk_eq(left_side, right_side), m);
                 if(is_equation){
+                    STRACE("str", tout << mk_pp(lang_eq, m) << " is unsat" << std::endl);
                     add_axiom({mk_literal(m.mk_not(lang_eq))});
                 } else {
+                    STRACE("str", tout << mk_pp(m.mk_not(lang_eq), m) << " is unsat" << std::endl);
                     add_axiom({mk_literal(lang_eq)});
                 }
                 return false;

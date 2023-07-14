@@ -614,7 +614,7 @@ namespace smt::noodler {
         this->m_word_eq_todo_rel.clear();
         this->m_word_diseq_todo_rel.clear();
         this->m_membership_todo_rel.clear();
-        this->m_lang_eq_todo_rel.clear();
+        this->m_lang_eq_or_diseq_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
@@ -681,11 +681,11 @@ namespace smt::noodler {
         }
 
         // TODO check for relevancy of language (dis)equations, right now we assume everything is relevant
-        for(const auto& we : m_lang_eq_todo) {
-            this->m_lang_eq_todo_rel.push_back({we.first, we.second, true});
+        for(const auto& le : m_lang_eq_todo) {
+            this->m_lang_eq_or_diseq_todo_rel.push_back({le.first, le.second, true});
         }
-        for(const auto& we : m_lang_diseq_todo) {
-            this->m_lang_eq_todo_rel.push_back({we.first, we.second, false});
+        for(const auto& ld : m_lang_diseq_todo) {
+            this->m_lang_eq_or_diseq_todo_rel.push_back({ld.first, ld.second, false});
         }
     }
 
@@ -694,7 +694,7 @@ namespace smt::noodler {
      * 
      * It follows these steps:
      *   1) Remove constraints that are not relevant for the solution, adding all relevant constraints to *_todo_rel, ending with
-     *        - language equations and diseqations (m_lang_eq_todo_rel)
+     *        - language equations and diseqations (m_lang_eq_or_diseq_todo_rel)
      *        - word equations and diseqations (m_word_eq_todo_rel and m_word_diseq_todo_rel)
      *        - membership constraints (m_membership_todo_rel)
      *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown) 
@@ -717,16 +717,16 @@ namespace smt::noodler {
                 tout << "    " << mk_pp(we.first, m) << " == " << mk_pp(we.second, m) << std::endl;
             }
             tout << "  diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
-            for (const auto &we: this->m_word_diseq_todo_rel) {
-                tout << "    " << mk_pp(we.first, m) << " != " << mk_pp(we.second, m) << std::endl;
+            for (const auto &wd: this->m_word_diseq_todo_rel) {
+                tout << "    " << mk_pp(wd.first, m) << " != " << mk_pp(wd.second, m) << std::endl;
             }
             tout << "  membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
-            for (const auto &we: this->m_membership_todo_rel) {
-                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? "" : " not") << " in " << mk_pp(std::get<1>(we), m) << std::endl;
+            for (const auto &memb: this->m_membership_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(memb), m) << (std::get<2>(memb) ? "" : " not") << " in " << mk_pp(std::get<1>(memb), m) << std::endl;
             }
-            tout << "  lang (dis)eqs(" << this->m_lang_eq_todo_rel.size() << "):" << std::endl;
-            for (const auto &we: this->m_lang_eq_todo_rel) {
-                tout << "    " << mk_pp(std::get<0>(we), m) << (std::get<2>(we) ? " == " : " != ") << mk_pp(std::get<1>(we), m) << std::endl;
+            tout << "  lang (dis)eqs(" << this->m_lang_eq_or_diseq_todo_rel.size() << "):" << std::endl;
+            for (const auto &led: this->m_lang_eq_or_diseq_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(led), m) << (std::get<2>(led) ? " == " : " != ") << mk_pp(std::get<1>(led), m) << std::endl;
             }
         );
 
@@ -739,58 +739,11 @@ namespace smt::noodler {
 
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
-            return FC_DONE;
+            // one of the (dis)equations is unsat
+            return FC_CONTINUE;
         }
 
-
-        // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
-        // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
-        // universality checking should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0) {
-            const auto& reg_data = this->m_membership_todo_rel[0];
-            if(!std::get<2>(reg_data) // membership is negated
-                 && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
-            ) {
-                std::set<Mata::Symbol> symbols_in_regex;
-                util::extract_symbols(std::get<1>(reg_data), m_util_s, m, symbols_in_regex);
-                // add one "dummy" symbol representing the symbols not in the regex
-                util::get_dummy_symbols(1, symbols_in_regex);
-
-                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
-
-                Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
-                Mata::Nfa::Nfa sigma_star = Mata::Nfa::create_sigma_star_nfa(&alph);
-
-                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
-                    // x should not belong in sigma*, so it is unsat
-                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
-                    return FC_CONTINUE;
-                } else {
-                    // otherwise x should not belong in some nfa that is not sigma*, so it is sat
-                    return FC_DONE;
-                }
-            }
-        }
-
-        /***************************** SOLVE WORD (DIS)EQUATIONS ******************************/
-
-        // Gather word (dis)equations 
-        Formula instance = get_word_formula_from_relevant();
-        STRACE("str",
-            for(const auto& f : instance.get_predicates()) {
-                tout << f.to_string() << std::endl;
-            }
-        );
-
-        // Gather symbols
-        std::set<Mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
-
-        // Create automata assignment for the formula.
-        AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
-
-        // get the initial length vars that are needed here (i.e they are in aut_assignment)
-        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
-
+        /***************************** SOLVE WORD (DIS)EQUATIONS + REGULAR MEMBERSHIPS ******************************/
 
         // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
         // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
@@ -813,6 +766,53 @@ namespace smt::noodler {
                 }
             }
         }
+
+        // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
+        // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
+        // universality checking should be faster.
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0) {
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            if(!std::get<2>(reg_data) // membership is negated
+                 && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
+            ) {
+                std::set<Mata::Symbol> symbols_in_regex;
+                util::extract_symbols(std::get<1>(reg_data), m_util_s, m, symbols_in_regex);
+                // add one "dummy" symbol representing the symbols not in the regex
+                util::get_dummy_symbols(1, symbols_in_regex);
+
+                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
+
+                Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
+                Mata::Nfa::Nfa sigma_star = Mata::Nfa::create_sigma_star_nfa(&alph);
+
+                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
+                    // x should not belong in sigma*, so it is unsat
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    STRACE("str", tout << "Membership " << mk_pp(std::get<0>(reg_data), m) << " not in " << mk_pp(std::get<1>(reg_data), m) << " is unsat" << std::endl;);
+                    return FC_CONTINUE;
+                } else {
+                    // otherwise x should not belong in some nfa that is not sigma*, so it is sat
+                    return FC_DONE;
+                }
+            }
+        }
+
+        // Gather relevant word (dis)equations to noodler formula
+        Formula instance = get_word_formula_from_relevant();
+        STRACE("str",
+            for(const auto& f : instance.get_predicates()) {
+                tout << f.to_string() << std::endl;
+            }
+        );
+
+        // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
+        std::set<Mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
+
+        // Create automata assignment for the formula
+        AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
+
+        // Get the initial length vars that are needed here (i.e they are in aut_assignment)
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
@@ -853,16 +853,18 @@ namespace smt::noodler {
 
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
+            STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m));
-            return FC_DONE;
+            return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
         // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
         // length constraints from initial assignment
         expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
+            STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths);
-            return FC_DONE;
+            return FC_CONTINUE;
         }
 
         dec_proc.init_computation();
@@ -1837,22 +1839,6 @@ namespace smt::noodler {
         }
 
         return expr_ref(refinement, m);
-    }
-
-    void theory_str_noodler::dump_assignments() const {
-        STRACE("str", \
-                ast_manager& m = get_manager();
-                context& ctx = get_context();
-                std::cout << "dump all assignments:\n";
-                expr_ref_vector assignments{m};
-
-
-                ctx.get_assignments(assignments);
-                for (expr *const e : assignments) {
-                   // ctx.mark_as_relevant(e);
-                    std::cout <<"**"<< mk_pp(e, m) << (ctx.is_relevant(e) ? "\n" : " (not relevant)\n");
-                }
-        );
     }
 
     expr_ref theory_str_noodler::mk_str_var_fresh(const std::string& name) {
