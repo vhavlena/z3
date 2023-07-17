@@ -432,6 +432,7 @@ namespace smt::noodler::util {
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
+            STRACE("str-create_nfa", tout << "Complemented NFA:" << std::endl;);
             Mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
@@ -440,7 +441,7 @@ namespace smt::noodler::util {
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
-            STRACE("str-create_nfa", tout << "Automaton after complement:" << std::endl; nfa.print_to_DOT(tout););
+            STRACE("str-create_nfa", nfa.print_to_DOT(tout););
         }
         return nfa;
     }
