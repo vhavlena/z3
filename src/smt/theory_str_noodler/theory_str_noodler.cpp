@@ -394,13 +394,13 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             util::throw_error("str.is_digit is not supported");
         } else if (m_util_s.str.is_to_code(n)) { // str.to_code
-            util::throw_error("str.to_code is not supported");
+            handle_to_code(n);
         } else if (m_util_s.str.is_from_code(n)) { // str.from_code
-            util::throw_error("str.from_code is not supported");
+            handle_from_code(n);
         } else if (m_util_s.str.is_stoi(n)) { // str.to_int
-            util::throw_error("str.to_int is not supported");
+            handle_to_int(n);
         } else if (m_util_s.str.is_itos(n)) { // str.from_int
-            util::throw_error("str.from_int is not supported");
+            handle_from_int(n);
         } else if (
             m_util_s.str.is_concat(n) || // str.++
             m_util_s.re.is_to_re(n) || // str.to_re
@@ -1958,6 +1958,184 @@ namespace smt::noodler {
 
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
+    }
+
+    /**
+     * @brief Handle is_digit
+     * 
+     * Translates into equivalence:
+     * is_digit(s) <-> s \in [0-9]
+     * 
+     * @param e str.is_digit(s)
+     * 
+     * TODO: This probably makes is_digit always relevant.
+     */
+    void theory_str_noodler::handle_is_digit(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_is_digit(e, s));
+        // s \in [0-9]
+        expr *s_in_digit = m_util_s.re.mk_in_re(s, m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")));
+        // is_digit(s) -> s \in [0-9]
+        add_axiom({~mk_literal(e), mk_literal(s_in_digit)});
+        // ~is_digit(s) -> ~(s \in [0-9])
+        add_axiom({mk_literal(e), ~mk_literal(s_in_digit)});
+    }
+
+    void theory_str_noodler::handle_transform(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_to_code(e, s));
+
+        tranformation_type type;
+        std::string name_of_type;
+        if (m_util_s.str.is_to_code(e, s)) {
+            type = tranformation_type::TO_CODE;
+            name_of_type = "to_code";
+        } else if (m_util_s.str.is_from_code(e, s)) {
+            type = tranformation_type::FROM_CODE;
+            name_of_type = "from_code";
+        } else if (m_util_s.str.is_stoi(e, s)) {
+            type = tranformation_type::TO_INT;
+            name_of_type = "to_int";
+        } else if (m_util_s.str.is_itos(e, s)) {
+            type = tranformation_type::FROM_INT;
+            name_of_type = "from_int";
+        } else {
+            UNREACHABLE();
+        }
+        bool tranforming_from = (type == tranformation_type::FROM_CODE || type == tranformation_type::FROM_INT);
+        
+        // for TO_CODE: add s \not\in Sigma => -1
+        // for TO_INT: add s \not\in \d+ => -1 
+
+        // get the var for the argument
+        expr *var_for_s;
+        if (tranforming_from) {
+            // for from_* functions, the argument has integer type, we create a new var for it
+            var_for_s = mk_int_var_fresh(name_of_type + "_argument");
+            add_axiom({mk_literal(m.mk_eq(s, var_for_s))});
+        } else {
+            // for to_* functions, the argument has string tyoe, we have to find the variable for it
+            if (m_util_s.str.is_string(s)) {
+                // it seems that Z3 rewriter handles the case where we tranform from string literal, so this should be unreachable
+                UNREACHABLE();
+            } else if (util::is_str_variable(s, m_util_s)) {
+                // we are transforming directly from variable
+                var_for_s = s;
+            } else if(this->predicate_replace.contains(s)) {
+                // argument is some already function already processed by relevant_eh
+                var_for_s = this->predicate_replace[s];
+            } else {
+                // argument is not some already processed string function (probably concatenation)
+                // we need new string variable equal to the argument
+                var_for_s = mk_str_var_fresh(name_of_type + "_argument");
+                add_axiom({mk_literal(m.mk_eq(s, var_for_s))});
+                this->predicate_replace.insert(s, var_for_s);
+            }
+            // we need exact solution for the argument, so that we can compute
+            // the arithmetic formula for the result in final_check_eh
+            len_vars.insert(var_for_s);
+        }
+
+        // create var for the result
+        expr_ref var_for_e = tranforming_from ? mk_str_var_fresh(name_of_type + "_result") : mk_int_var_fresh(name_of_type + "_result");
+        add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
+
+        // add to todo
+        m_tranformation_todo.push_back({var_for_e, expr_ref(var_for_s, m), type});
+    }
+
+    void theory_str_noodler::handle_from_code(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_from_code(e, s));
+
+        // create int var for the argument s
+        expr_ref i = mk_int_var_fresh("from_code_argument");
+        add_axiom({mk_literal(m.mk_eq(i, s))});
+
+        // create str var for the result
+        expr_ref var_for_e = mk_str_var_fresh("from_code_result");
+        this->predicate_replace.insert(e, var_for_e);
+        // we need exact solution for the result, so that we can compute
+        // the arithmetic formula for the argument in final_check_eh
+        len_vars.insert(var_for_e);
+
+        // add to todo
+        m_from_code_todo.push_back({i, var_for_e});
+    }
+
+    void theory_str_noodler::handle_to_int(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_stoi(e, s));
+
+        // add s \not\in \d+ => -1 // you sure? maybe we want to solve it together
+
+
+        // find the variable for the argument s
+        expr *var_for_s;
+        if (m_util_s.str.is_string(s)) {
+            // I think this should be unreachable and should be handled by Z3 rewriter
+            util::throw_error("String literal in str.to_int should be handled by rewriter");
+        } else if (util::is_str_variable(s, m_util_s)) {
+            // simple case where we have to_int(var)
+            var_for_s = s;
+        } else if(this->predicate_replace.contains(s)) {
+            // argument is some already processed string function
+            var_for_s = this->predicate_replace[s];
+        } else {
+            // argument is not some already processed string function (probably concatenation)
+            // we need new string variable equal to the argument
+            var_for_s = mk_str_var_fresh("to_int_argument");
+            this->predicate_replace.insert(s, var_for_s);
+        }
+        // we need exact solution for the argument, so that we can compute
+        // the arithmetic formula for the result in final_check_eh
+        len_vars.insert(var_for_s);
+
+        // create int var for the result
+        expr_ref i = mk_int_var_fresh("to_int_result");
+        add_axiom({mk_literal(m.mk_eq(i, e))});
+
+        // add to todo
+        m_to_int_todo.push_back({i, expr_ref(var_for_s, m)});
+    }
+
+    void theory_str_noodler::handle_from_int(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_itos(e, s));
+
+        // create int var for the argument s
+        expr_ref i = mk_int_var_fresh("from_int_argument");
+        add_axiom({mk_literal(m.mk_eq(i, s))});
+
+        // create str var for the result
+        expr_ref var_for_e = mk_int_var_fresh("from_int_result");
+        this->predicate_replace.insert(e, var_for_e);
+        // we need exact solution for the result, so that we can compute
+        // the arithmetic formula for the argument in final_check_eh
+        len_vars.insert(var_for_e);
+
+        // add to todo
+        m_from_int_todo.push_back({i, var_for_e});
     }
 
     void theory_str_noodler::set_conflict(const literal_vector& lv) {
