@@ -16,7 +16,7 @@ namespace smt::noodler {
             if(cns.second != 0) {
                 // c1 + k*c2
                 LenNode right(LenFormulaType::PLUS, {c1, LenNode(LenFormulaType::TIMES, {k, c2})});
-                // add (z3_var = c1 + k*c2 && 0 <= k) to result
+                // add (var = c1 + k*c2 && 0 <= k) to result
                 res = LenNode(LenFormulaType::OR, 
                                 {res,
                                  LenNode(LenFormulaType::AND,
@@ -30,7 +30,7 @@ namespace smt::noodler {
             }
         }
 
-        // to be safe, also z3 must be >= 0
+        // to be safe, var must be >= 0
         res = LenNode(LenFormulaType::AND, {res, LenNode(LenFormulaType::LEQ, {0, var})});
         return res;
     }

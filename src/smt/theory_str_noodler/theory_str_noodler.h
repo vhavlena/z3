@@ -241,7 +241,7 @@ namespace smt::noodler {
         void remove_irrelevant_constr();
 
         /**
-        Convert equation/disaequation @p ex to the instance of Predicate. As a side effect updates mapping of
+        Convert (dis)equation @p ex to the instance of Predicate. As a side effect updates mapping of
         variables (BasicTerm) to the corresponding z3 expr.
         @param ex Z3 expression to be converted to Predicate.
         @return Instance of predicate
@@ -256,7 +256,7 @@ namespace smt::noodler {
          */
         std::set<Mata::Symbol> get_symbols_from_relevant();
         /**
-         * Get automata assignment for formula @p intance using relevant memberships in m_membership_todo_rel.
+         * Get automata assignment for formula @p instance using relevant memberships in m_membership_todo_rel.
          * As a side effect updates mapping of variables (BasicTerm) to the corresponding z3 expr.
          * @param instance Formula containing (dis)equations
          * @param noodler_alphabet Set of symbols occuring in the formula and memberships
