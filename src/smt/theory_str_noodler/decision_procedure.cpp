@@ -605,13 +605,18 @@ namespace smt::noodler {
             conjuncts.push_back(solution.get_lengths(len_var));
         }
 
+        // the following functions (getting formula for disequations and for transformations) assume that we have flattened substitution map
+        solution.flatten_substition_map();
+
+        // vars who should represent exactly one char and the exact value of this char is important (we get it from disequations)
+        std::set<BasicTerm> a_vars;
         // add the formula for solving disequations
-        conjuncts.push_back(diseqs_formula());
+        conjuncts.push_back(diseqs_formula(a_vars));
 
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
-    LenNode DecisionProcedure::diseqs_formula() {
+    LenNode DecisionProcedure::diseqs_formula(std::set<BasicTerm> &a_vars) {
         // This function creates arithmetic formula using solution for each ((a1, a2), (|x1| == |x2|, |L| != |R|) in
         // dis_len where L = x1a1y1, R= x2a2y2; see replace_disequality() for more info. We want to create formula
         // (|L| != |R| AND (|x1| == |x2| OR a1 != a2)) but
@@ -619,15 +624,11 @@ namespace smt::noodler {
         //      - we check a1!char != a2!char instead of a1 != a2 and then we add at the end that a1!char/a2!char
         //        should be equal to one of the symbols of a1/a2
         //      - we also work with maximally substituted a1/a2, so that if we have multiple disequations that
-        //        somehow depend on each other, the dependency stays
-
-        // we flatten the subtitution map, so that all the vars a1/a2 whose disequality we will check
-        // are substituted by maximal application of substitution_map
-        solution.flatten_substition_map();
-
-        // here we save all a1/a2 whose disequation is checked, so that we can create the formula that 
-        // each of these vars should be one of the symbols from its automaton
-        std::set<BasicTerm> a_vars;
+        //        somehow depend on each other, the dependency stays. For this, substitution map of solution
+        //        must be flattened.
+        // We also add to a_vars all a1/a2 whose disequation is checked, so that we can create the formula that 
+        // each of these vars should be one of the symbols from its automaton.
+        
         // get the "!char" version of a variable
         auto get_char_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name().encode() + "!char"); };
 
@@ -648,7 +649,9 @@ namespace smt::noodler {
                 // if one of the variables was only epsilon, the original sides of disequation have to have different lengths
                 conjuncts.push_back(LR_diff_lengths);
             } else {
-                // as neither a1 nor a2 are empty words, they can be substituted by exactly one var, we get it
+                // as neither a1 nor a2 are empty words, they can be substituted by exactly one var, we get them
+                SASSERT_EQ(solution.get_substituted_vars(a1).size(), 1);
+                SASSERT_EQ(solution.get_substituted_vars(a2).size(), 1);
                 a1 = solution.get_substituted_vars(a1)[0];
                 a2 = solution.get_substituted_vars(a2)[0];
 
@@ -682,6 +685,33 @@ namespace smt::noodler {
         }
 
         return LenNode(LenFormulaType::AND, conjuncts);
+    }
+
+    LenNode DecisionProcedure::tranformation_formula(const std::set<BasicTerm>& a_vars) {
+        for (const std::tuple<BasicTerm, BasicTerm, TranformationType>& transf : tranformations) {
+            BasicTerm result = std::get<0>(transf);
+            BasicTerm argument = std::get<1>(transf);
+            TranformationType type = std::get<2>(transf);
+            switch (type)
+            {
+            case TranformationType::TO_CODE:
+                //???
+                solution.aut_ass.sigma_automaton()
+                break;
+            case TranformationType::FROM_CODE:
+                //???
+                break;
+            case TranformationType::TO_INT:
+                //???
+                break;
+            case TranformationType::FROM_INT:
+                //???
+                break;
+            
+            default:
+                UNREACHABLE();
+            }
+        }
     }
 
     /**

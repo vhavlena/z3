@@ -22,6 +22,13 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
+    enum class TranformationType {
+        TO_CODE,
+        FROM_CODE,
+        TO_INT,
+        FROM_INT,
+    };
+
     /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
@@ -276,6 +283,8 @@ namespace smt::noodler {
         // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
         std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
 
+        std::vector<std::tuple<BasicTerm, BasicTerm, TranformationType>> tranformations;
+
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in dis_len.
          * 
@@ -285,11 +294,16 @@ namespace smt::noodler {
         std::vector<Predicate> replace_disequality(Predicate diseq);
 
         /**
-         * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint
-         * (|L| != |R| or (|x_1| == |x_2| and a_1 != a_2)) where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were
-         * created during replace_disequality()
+         * Gets the lengths constraints (from solution) for each disequation. For each diseqation it adds
+         * length constraint (|L| != |R| or (|x_1| == |x_2| and a_1 != a_2)) where L = x_1 a_1 y_1 and
+         * R = x_2 a_2 y_2 were created during replace_disequality().
+         * Assumes that substitution map of solution is flattened (solution.flatten_substitution_map())
+         * 
+         * @param[out] a_vars - all the a_1/a_2 vars whose exact symbol is needed for disequality check (used for to/from_int/code)
          */
-        LenNode diseqs_formula();
+        LenNode diseqs_formula(std::set<BasicTerm>& a_vars);
+
+        LenNode tranformation_formula(const std::set<BasicTerm>& a_vars);
 
         /**
          * Formula containing all not_contains predicate (nothing else)

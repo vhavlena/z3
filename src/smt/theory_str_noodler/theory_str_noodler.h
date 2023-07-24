@@ -39,12 +39,6 @@ Eternal glory to Yu-Fang.
 #include "nielsen_decision_procedure.h"
 
 namespace smt::noodler {
-    enum class tranformation_type {
-        TO_CODE,
-        FROM_CODE,
-        TO_INT,
-        FROM_INT,
-    };
 
     // FIXME add high level explanation of how this works (length vars are got from init_search_eh, predicates are translated in relevant_eh, final_check_eh does this and that etc)
     // FIXME a lot of stuff in this class comes from trau/z3str3 we still need to finish cleaning
@@ -103,11 +97,7 @@ namespace smt::noodler {
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
         // e = str.to_int(s), ot e = str.from_int(s), based on the transformation_type
-        scoped_vector<std::tuple<expr_ref,expr_ref,tranformation_type>> m_tranformation_todo;
-        scoped_vector<expr_pair> m_to_code_todo; // contains (i,s) where we have i = str.to_code(s)
-        scoped_vector<expr_pair> m_from_code_todo; // contains (i,s) where we have s = str.from_code(i)
-        scoped_vector<expr_pair> m_to_int_todo; // contains (i,s) where we have i = str.to_int(s)
-        scoped_vector<expr_pair> m_from_int_todo; // contains (i,s) where we have s = str.from_int(i) 
+        scoped_vector<std::tuple<expr_ref,expr_ref,TranformationType>> m_tranformation_todo;
         scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
@@ -118,7 +108,7 @@ namespace smt::noodler {
         vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         vector<expr_pair> m_not_contains_todo_rel; // not contains
-        // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in _todo is relevant => no _todo_rel version
+        // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in m_tranformation_todo is relevant => no _todo_rel version
         // not contains automatically leads to error, we do not check for the relevancy (yet), so no _todo_rel version
 
     public:
@@ -225,10 +215,7 @@ namespace smt::noodler {
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
         void handle_is_digit(expr *e);
-        void handle_to_code(expr *e);
-        void handle_from_code(expr *e);
-        void handle_to_int(expr *e);
-        void handle_from_int(expr *e);
+        void handle_transform(expr *e);
 
         // methods for assigning boolean values to predicates
         void assign_not_contains(expr *e);
