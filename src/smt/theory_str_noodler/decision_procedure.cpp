@@ -436,7 +436,7 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < noodle.size(); ++i) {
                     // TODO do not make a new_var if we can replace it with one left or right var (i.e. new_var is exactly left or right var)
                     // TODO also if we can substitute with epsilon, we should do that first? or generally process epsilon substitutions better, in some sort of 'preprocessing'
-                    BasicTerm new_var = util::mk_fresh_noodler_var(std::string("align_") + std::to_string(noodlification_no));
+                    BasicTerm new_var = util::mk_noodler_var_fresh(std::string("align_") + std::to_string(noodlification_no));
                     left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
                     right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
                     new_element.aut_ass[new_var] = noodle[i].first; // we assign the automaton to new_var
@@ -854,17 +854,17 @@ namespace smt::noodler {
         // automaton accepting empty word or exactly one symbol
         std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
 
-        BasicTerm x1 = util::mk_fresh_noodler_var("diseq_start");
+        BasicTerm x1 = util::mk_noodler_var_fresh("diseq_start");
         init_aut_ass[x1] = sigma_star_automaton;
-        BasicTerm a1 = util::mk_fresh_noodler_var("diseq_char");
+        BasicTerm a1 = util::mk_noodler_var_fresh("diseq_char");
         init_aut_ass[a1] = sigma_eps_automaton;
-        BasicTerm y1 = util::mk_fresh_noodler_var("diseq_end");
+        BasicTerm y1 = util::mk_noodler_var_fresh("diseq_end");
         init_aut_ass[y1] = sigma_star_automaton;
-        BasicTerm x2 = util::mk_fresh_noodler_var("diseq_start");
+        BasicTerm x2 = util::mk_noodler_var_fresh("diseq_start");
         init_aut_ass[x2] = sigma_star_automaton;
-        BasicTerm a2 = util::mk_fresh_noodler_var("diseq_char");
+        BasicTerm a2 = util::mk_noodler_var_fresh("diseq_char");
         init_aut_ass[a2] = sigma_eps_automaton;
-        BasicTerm y2 = util::mk_fresh_noodler_var("diseq_end");
+        BasicTerm y2 = util::mk_noodler_var_fresh("diseq_end");
         init_aut_ass[y2] = sigma_star_automaton;
 
         // L = x1a1y1

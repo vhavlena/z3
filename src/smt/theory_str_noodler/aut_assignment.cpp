@@ -11,7 +11,7 @@ namespace smt::noodler {
         for(const auto& cns : aut_constr) { // for each (c1, c2) representing lengths of var
             LenNode c1(cns.first);
             LenNode c2(cns.second);
-            LenNode k(util::mk_fresh_noodler_var("k"));
+            LenNode k(util::mk_noodler_var_fresh("k"));
 
             if(cns.second != 0) {
                 // c1 + k*c2

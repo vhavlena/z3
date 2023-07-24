@@ -447,7 +447,7 @@ namespace smt::noodler {
      */
     bool NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
         // fresh output variable
-        out_var = util::mk_fresh_noodler_var(lab.left.get_name().encode());
+        out_var = util::mk_noodler_var_fresh(lab.left.get_name().encode());
 
         // label of the form x := 0 --> out_var = 0
         if(lab.sum.size() == 1) {
@@ -488,7 +488,7 @@ namespace smt::noodler {
      * @return expr_ref Length formula
      */
     bool NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
-        out_var = util::mk_fresh_noodler_var(lab.left.get_name().encode());
+        out_var = util::mk_noodler_var_fresh(lab.left.get_name().encode());
 
         if(lab.sum.size() == 1) {
             // nielsen: incomplete
@@ -496,7 +496,7 @@ namespace smt::noodler {
         } else if(!lab.sum[1].is_variable()) { // label of the form x := x + k --> out_var = in_var + k
             int val = std::stoi(lab.sum[1].get_name().encode());
             // fresh variable j
-            BasicTerm fresh = util::mk_fresh_noodler_var("j");
+            BasicTerm fresh = util::mk_noodler_var_fresh("j");
             // x1 = x0 + j*k
             conjuncts.push_back(LenNode(LenFormulaType::EQ, {out_var, LenNode(LenFormulaType::PLUS, {in_vars.at(lab.left), LenNode(LenFormulaType::TIMES, {fresh, val})})}));
             // 0 <= j

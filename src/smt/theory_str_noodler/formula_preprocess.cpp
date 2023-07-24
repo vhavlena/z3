@@ -639,7 +639,7 @@ namespace smt::noodler {
 
         for(const auto& pr : regs) {
             if(pr.second >= mn) {
-                BasicTerm fresh_var = util::mk_fresh_noodler_var("regular_seq");
+                BasicTerm fresh_var = util::mk_noodler_var_fresh("regular_seq");
                 this->formula.replace(pr.first, Concat({fresh_var}));
                 update_reg_constr(fresh_var, pr.first);
                 new_eqs.insert(Predicate(PredicateType::Equation, std::vector<Concat>({Concat({fresh_var}), pr.first})));

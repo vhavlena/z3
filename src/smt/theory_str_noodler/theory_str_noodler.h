@@ -149,23 +149,17 @@ namespace smt::noodler {
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
         /**
-         * @brief Create fresh string variable
+         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
          *
-         * @param name Static part of the name (will be concatenated with other parts
-         *  distinguishing the name)
-         * @return expr_ref Fresh string variable
-         * 
-         * FIXME same function is in util, we should keep one
+         * @param name Infix of the name (rest is added to get a unique name)
+         * FIXME same function is in theory_str_noodler, decide which to keep
          */
         expr_ref mk_str_var_fresh(const std::string& name);
         /**
-         * @brief Create fresh int variable
+         * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
          *
-         * @param name Static part of the name (will be concatenated with other parts
-         *  distinguishing the name)
-         * @return expr_ref Fresh int variable
-         * 
-         * FIXME same function is in util, we should keep one
+         * @param name Infix of the name (rest is added to get a unique name)
+         * FIXME same function is in theory_str_noodler, decide which to keep
          */
         expr_ref mk_int_var_fresh(const std::string& name);
 
