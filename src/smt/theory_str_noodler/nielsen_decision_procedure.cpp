@@ -63,9 +63,8 @@ namespace smt::noodler {
                     continue;
                 }
                 // create a counter system from the Nielsen graph a condensate it
-                bool counter_system_created = false;
-                CounterSystem counter_system = create_counter_system(graph, counter_system_created);
-                if (!counter_system_created) {
+                CounterSystem counter_system;
+                if (!create_counter_system(graph, counter_system)) {
                     return l_undef;
                 }
                 condensate_counter_system(counter_system);
@@ -73,9 +72,8 @@ namespace smt::noodler {
                 this->length_paths.push_back({});
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
-                    bool path_exists = false;
-                    Path<CounterLabel> path = get_length_path(counter_system, c, path_exists);
-                    if (!path_exists) {
+                    Path<CounterLabel> path;
+                    if (!get_length_path(counter_system, c, path)) {
                         return l_undef;
                     }
                     this->length_paths[this->length_paths.size() - 1].push_back(path);
@@ -297,40 +295,39 @@ namespace smt::noodler {
         return false;
     }
 
-    CounterSystem NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, bool& counter_system_created) const {
-        CounterSystem ret;
-        counter_system_created = true;
+    bool NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, CounterSystem& result) const {
+        result = CounterSystem();
 
         // conversion of a nielsen label to the counter label
-        auto conv_fnc = [&](const NielsenLabel& lab) {
+        auto conv_fnc = [](const NielsenLabel& lab, CounterLabel& result) {
             if(lab.second.size() == 0) {
-                return CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}};
+                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}};
             } else if(lab.second.size() == 2 && lab.second[0].is_literal()) {
-                return CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}};
+                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}};
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
-                return CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
+                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
             } else {
-                counter_system_created = false;
-                return CounterLabel{lab.first, {}};
+                return false;
             }
+            return true;
         };
 
         // switch initial and final nodes
         for(const Formula& fin : graph.get_fins()) {
-            ret.set_init(fin);
+            result.set_init(fin);
         }
-        ret.add_fin(graph.get_init());
+        result.add_fin(graph.get_init());
         // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                CounterLabel target{conv_fnc(trans.second)};
-                if (!counter_system_created) {
-                    return ret;
+                CounterLabel target{BasicTerm(BasicTermType::Variable)}; // randomly initialize the variable, this has no meaning
+                if (!conv_fnc(trans.second, target)) { // the value of target is set here
+                    return false;
                 }
-                ret.add_edge(trans.first, pr.first, target);
+                result.add_edge(trans.first, pr.first, target);
             }
         }
-        return ret;
+        return true;
     }
 
     /**
@@ -420,25 +417,24 @@ namespace smt::noodler {
     /**
      * @brief Get path containing a node @p sl, which is expected to have a suitable self-loop.
      * 
+     * Returns false if such a path does not exists.
+     * 
      * @param cs Counter system
      * @param sl Node with a suitable self-loop
-     * @return Path<CounterLabel> Shortest path containing the node @p sl.
+     * @param[out] result Shortest path containing the node @p sl.
      */
-    Path<CounterLabel> NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, bool& path_exists) {
+    bool NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, Path<CounterLabel>& result) {
         std::optional<Path<CounterLabel>> first_opt = cs.shortest_path(cs.get_init(), sl.first);
         std::optional<Path<CounterLabel>> last_opt = cs.shortest_path(sl.first, *cs.get_fins().begin());
 
         if(!first_opt.has_value() || !last_opt.has_value()) {
             // no shortest path
-            path_exists = false;
-            return Path<CounterLabel>();
+            return false;
         }
-        Path<CounterLabel> first = first_opt.value();
-        Path<CounterLabel> last = last_opt.value();
-        first.append(last);
-        first.self_loops.insert(sl);
-        path_exists = true;
-        return first;
+        result = first_opt.value();
+        result.append(last_opt.value());
+        result.self_loops.insert(sl);
+        return true;
     }
 
     /**

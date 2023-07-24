@@ -285,10 +285,12 @@ namespace smt::noodler {
         /**
          * @brief Create a counter system from the Nielsen graph.
          * 
+         * Returns false if the counter system cannot be created.
+         * 
          * @param graph Graph to be converted to the counter system.
-         * @param[out] counter_system_created False if counter system is not created (should return unknown)
+         * @param[out] result Created counter system
          */
-        CounterSystem create_counter_system(const NielsenGraph& graph, bool& counter_system_created) const;
+        bool create_counter_system(const NielsenGraph& graph, CounterSystem& result) const;
 
         // counter graph condensation
         static void condensate_counter_system(CounterSystem& cs);
@@ -296,7 +298,7 @@ namespace smt::noodler {
 
         // extraction of a promising part of the condensated counter graph
         std::set<SelfLoop<CounterLabel>> find_self_loops(const CounterSystem& cs) const;
-        Path<CounterLabel> get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, bool& path_exists);
+        bool get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, Path<CounterLabel>& result);
 
         // construct length formula
         bool length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
