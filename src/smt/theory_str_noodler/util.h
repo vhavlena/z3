@@ -165,7 +165,7 @@ namespace smt::noodler::util {
     }
 
     /**
-     * @brief Get Z3 int var with exact given name
+     * @brief Get Z3 int var with exact given @p name
      *
      * @param name Name of the var
      */
@@ -176,7 +176,7 @@ namespace smt::noodler::util {
     }
 
     /**
-     * @brief Get Z3 string var with exact given name
+     * @brief Get Z3 string var with exact given @p name
      *
      * @param name Name of the var
      */
