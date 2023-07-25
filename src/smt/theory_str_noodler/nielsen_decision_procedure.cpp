@@ -422,6 +422,7 @@ namespace smt::noodler {
      * @param cs Counter system
      * @param sl Node with a suitable self-loop
      * @param[out] result Shortest path containing the node @p sl.
+     * @return bool True if a path was successfully constructed
      */
     bool NielsenDecisionProcedure::get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, Path<CounterLabel>& result) {
         std::optional<Path<CounterLabel>> first_opt = cs.shortest_path(cs.get_init(), sl.first);
@@ -444,6 +445,8 @@ namespace smt::noodler {
      * @param lab Counter label
      * @param in_vars Current length variables for each BasicTerm
      * @param out_var Length variable where the result is stored
+     * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @return bool True iff the formula was successfully created
      */
     bool NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
         // fresh output variable
@@ -485,7 +488,8 @@ namespace smt::noodler {
      * @param lab Counter label in self-loop
      * @param in_vars Current length variables for each BasicTerm
      * @param out_var Length variable where the result is stored
-     * @return expr_ref Length formula
+     * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @return bool True iff the formula was successfully created
      */
     bool NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
         out_var = util::mk_noodler_var_fresh(lab.left.get_name().encode());
@@ -513,7 +517,8 @@ namespace smt::noodler {
      * 
      * @param path Part of the counter system contining only self-loops.
      * @param actual_var_map Var map assigning temporary int variables to the original string variables
-     * @return expr_ref Length formula
+     * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @return bool True iff the formula was successfully created
      */
     bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
         // path of length 0 = true
@@ -550,7 +555,8 @@ namespace smt::noodler {
      * For instance x!1 = str.len(x) where x!1 is temporary int variable for x in @p actual_var_map.
      * 
      * @param actual_var_map Actual var map of temporary int variables.
-     * @return conjunction of x!1 = str.len(x) for each variable x
+     * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @return bool True iff the formula was successfully created
      */
     bool NielsenDecisionProcedure::generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
         // map the original string variable to their lengths.
