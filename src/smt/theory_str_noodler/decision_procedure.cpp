@@ -627,10 +627,10 @@ namespace smt::noodler {
             {
                 //???
                 Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
-                bool is_there_non_empty_var = false;
-                Mata::Nfa::is_in_lang()
+                std::vector<LenNode> bla_vars;
                 for (const BasicTerm& var : solution.get_substituted_vars(argument)) {
-                    if ()
+                    bla_vars.emplace_back(var);
+                    for (Mata::Nfa::)
                 }
                 break;
             }
