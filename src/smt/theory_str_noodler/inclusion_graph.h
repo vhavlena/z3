@@ -5,6 +5,7 @@
 #include <optional>
 #include <deque>
 #include <algorithm>
+
 #include "formula.h"
 
 namespace smt::noodler {

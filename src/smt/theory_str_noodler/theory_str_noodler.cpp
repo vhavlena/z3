@@ -7,8 +7,8 @@ Eternal glory to Yu-Fang.
 #include <sstream>
 #include <iostream>
 #include <cmath>
+
 #include "ast/ast_pp.h"
-#include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "smt/smt_context.h"
 #include "smt/smt_model_generator.h"
 #include "smt/theory_lra.h"
@@ -16,9 +16,9 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_context.h"
 #include "ast/seq_decl_plugin.h"
 #include "ast/reg_decl_plugins.h"
-#include "decision_procedure.h"
-#include <mata/nfa.hh>
 
+#include "decision_procedure.h"
+#include "theory_str_noodler.h"
 
 namespace smt::noodler {
 
@@ -785,7 +785,7 @@ namespace smt::noodler {
                 Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
 
                 Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
-                Mata::Nfa::Nfa sigma_star = Mata::Nfa::create_sigma_star_nfa(&alph);
+                Mata::Nfa::Nfa sigma_star = Mata::Nfa::Builder::create_sigma_star_nfa(&alph);
 
                 if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
                     // x should not belong in sigma*, so it is unsat

@@ -8,11 +8,13 @@
 #include <queue>
 #include <string>
 
+#include <mata/nfa/nfa.hh>
+
+#include "util/trace.h"
 #include "smt/params/theory_str_noodler_params.h"
-#include <util/trace.h>
+
 #include "formula.h"
 #include "aut_assignment.h"
-#include <mata/nfa.hh>
 #include "var_union_find.h"
 
 namespace smt::noodler {

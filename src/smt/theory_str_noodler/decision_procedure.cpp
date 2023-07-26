@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <functional>
 
-#include <mata/nfa-strings.hh>
+#include <mata/nfa/strings.hh>
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"

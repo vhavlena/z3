@@ -16,7 +16,8 @@ Eternal glory to Yu-Fang.
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <smt/params/smt_params.h>
+
+#include "smt/params/smt_params.h"
 #include "ast/arith_decl_plugin.h"
 #include "ast/seq_decl_plugin.h"
 #include "smt/params/theory_str_params.h"

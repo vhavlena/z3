@@ -1,11 +1,11 @@
 #include <cassert>
-#include <mata/re2parser.hh>
+
+#include "util/z3_exception.h"
 
 #include "util.h"
 #include "theory_str_noodler.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
-#include "util/z3_exception.h"
 
 namespace {
     using Mata::Nfa::Nfa;
@@ -257,7 +257,7 @@ namespace smt::noodler::util {
         } else if (m_util_s.re.is_empty(expression)) { // Handle empty language.
             // Do nothing, as nfa is initialized empty
         } else if (m_util_s.re.is_epsilon(expression)) { // Handle epsilon.
-            nfa = Mata::Nfa::create_empty_string_nfa();
+            nfa = Mata::Nfa::Builder::create_empty_string_nfa();
         } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
             nfa.initial.insert(0);
             nfa.final.insert(1);
@@ -294,7 +294,7 @@ namespace smt::noodler::util {
                 // for the case that body of the loop represents empty language...
                 if (low == 0) {
                     // ...we either return empty string if we have \emptyset{0,h}
-                    nfa = Mata::Nfa::create_empty_string_nfa();
+                    nfa = Mata::Nfa::Builder::create_empty_string_nfa();
                 } else {
                     // ... or empty language
                     nfa = std::move(body_nfa);
@@ -304,7 +304,7 @@ namespace smt::noodler::util {
                 body_nfa.unify_initial();
 
                 body_nfa = Mata::Nfa::reduce(body_nfa);
-                nfa = Mata::Nfa::create_empty_string_nfa();
+                nfa = Mata::Nfa::Builder::create_empty_string_nfa();
                 // we need to repeat body_nfa at least low times
                 for (unsigned i = 0; i < low; ++i) {
                     nfa.concatenate(body_nfa);

@@ -9,9 +9,11 @@
 #include <string>
 #include <memory>
 
+#include <mata/nfa/nfa.hh>
+#include <mata/nfa/strings.hh>
+#include <mata/nfa/builder.hh>
+
 #include "formula.h"
-#include <mata/nfa.hh>
-#include <mata/nfa-strings.hh>
 
 namespace smt::noodler {
 
@@ -76,7 +78,7 @@ namespace smt::noodler {
         }
 
         Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
-            Mata::Nfa::Nfa ret = Mata::Nfa::create_empty_string_nfa();
+            Mata::Nfa::Nfa ret = Mata::Nfa::Builder::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
                 ret = Mata::Nfa::concatenate(ret, *(this->at(t)));  // fails when not found
             }
