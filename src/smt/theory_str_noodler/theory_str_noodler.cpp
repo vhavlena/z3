@@ -1366,6 +1366,31 @@ namespace smt::noodler {
         literal s_emp = mk_eq_empty(s);
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
+        zstring str_a;
+        // str.replace "A" s t where a = "A"
+        if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
+            // s = emp -> v = t.a
+            add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+            // s = a -> v = t
+            add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
+            // s != eps && s != a -> v = a
+            add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, s,false)});
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        // str.replace "" s t where a = ""
+        } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
+            // s = emp -> v = t.a
+            add_axiom({~s_emp, mk_eq(v,t,false)});
+            // s = emp -> v = t.a
+            add_axiom({s_emp, mk_eq_empty(v)});
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
         // replace(a,s,t) = v
         add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
@@ -1789,6 +1814,9 @@ namespace smt::noodler {
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
           
+            add_axiom({mk_literal(e), ~mk_literal(re)});
+        } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
         } else {
             // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for relevancy
