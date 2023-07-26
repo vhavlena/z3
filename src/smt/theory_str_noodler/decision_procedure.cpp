@@ -66,35 +66,69 @@ namespace smt::noodler {
         inclusions_to_process = new_inclusions_to_process;
     }
 
-    AutAssignment SolvingState::flatten_substition_map() {
-        AutAssignment result = aut_ass;
-        std::function<std::shared_ptr<Mata::Nfa::Nfa>(const BasicTerm&)> flatten_var;
+    LenNode SolvingState::get_lengths(const BasicTerm& var) const {
+        if (aut_ass.count(var) > 0) {
+            // if var is not substituted, get length constraint from its automaton
+            return aut_ass.get_lengths(var);
+        } else if (substitution_map.count(var) > 0) {
+            // if var is substituted, i.e. state.substitution_map[var] = x_1 x_2 ... x_n, then we have to create length equation
+            //      |var| = |x_1| + |x_2| + ... + |x_n|
+            std::vector<LenNode> plus_operands;
+            for (const auto& subst_var : substitution_map.at(var)) {
+                plus_operands.emplace_back(subst_var);
+            }
+            LenNode result(LenFormulaType::EQ, {var, LenNode(LenFormulaType::PLUS, plus_operands)});
+            // to be safe, we add |var| >= 0 (for the aut_ass case, it is done in aut_ass.get_lengths)
+            return LenNode(LenFormulaType::AND, {result, LenNode(LenFormulaType::LEQ, {0, var})});
+        } else {
+            util::throw_error("Variable was neither in automata assignment nor was substituted");
+        }
+    }
 
-        flatten_var = [&result, &flatten_var, this](const BasicTerm &var) -> std::shared_ptr<Mata::Nfa::Nfa> {
-            if (result.count(var) == 0) {
-                std::shared_ptr<Mata::Nfa::Nfa> var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::create_empty_string_nfa());
+    void SolvingState::flatten_substition_map() {
+        std::unordered_map<BasicTerm, std::vector<BasicTerm>> new_substitution_map;
+        std::function<std::vector<BasicTerm>(const BasicTerm&)> flatten_var;
+
+        flatten_var = [&new_substitution_map, &flatten_var, this](const BasicTerm &var) -> std::vector<BasicTerm> {
+            if (new_substitution_map.count(var) == 0) {
+                std::vector<BasicTerm> flattened_mapping;
                 for (const auto &subst_var : this->substitution_map.at(var)) {
-                    var_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*var_aut, *flatten_var(subst_var)));
+                    if (aut_ass.count(subst_var) > 0) {
+                        // subst_var is not substituted, keep it
+                        flattened_mapping.push_back(subst_var);
+                    } else {
+                        // subst_var has a substitution, flatten it and insert it to the end of flattened_mapping
+                        std::vector<BasicTerm> flattened_mapping_of_subst_var = flatten_var(subst_var);
+                        flattened_mapping.insert(flattened_mapping.end(),
+                                                 flattened_mapping_of_subst_var.begin(),
+                                                 flattened_mapping_of_subst_var.end());
+                    }
                 }
-                result[var] = var_aut;
-                return var_aut;
+                new_substitution_map[var] = flattened_mapping;
+                return flattened_mapping;
             } else {
-                return result[var];
+                return new_substitution_map[var];
             }
         };
+
         for (const auto &subst_map_pair : substitution_map) {
             flatten_var(subst_map_pair.first);
         }
+
         STRACE("str-nfa",
             tout << "Flattened substitution map:" << std::endl;
-            for (const auto &var_aut : result) {
-                tout << "Var " << var_aut.first.get_name() << std::endl;
-                var_aut.second->print_to_DOT(tout);
+            for (const auto &var_map : new_substitution_map) {
+                tout << "    " << var_map.first.get_name() << " ->";
+                for (const auto &subst_var : var_map.second) {
+                    tout << " " << subst_var;
+                }
+                tout << std::endl;
             });
-        return result;
+
+        substitution_map = new_substitution_map;
     }
 
-    bool DecisionProcedure::compute_next_solution() {
+    lbool DecisionProcedure::compute_next_solution() {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE("str", tout << "------------------------"
@@ -110,7 +144,23 @@ namespace smt::noodler {
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
                 solution = std::move(element_to_process);
-                return true;
+                STRACE("str",
+                    tout << "Found solution:" << std::endl;
+                    for (const auto &var_substitution : solution.substitution_map) {
+                        tout << "    " << var_substitution.first << " ->";
+                        for (const auto& subst_var : var_substitution.second) {
+                            tout << " " << subst_var;
+                        }
+                        tout << std::endl;
+                    }
+                    for (const auto& var_aut : solution.aut_ass) {
+                        tout << "    " << var_aut.first << " -> NFA" << std::endl;
+                        if (is_trace_enabled("str-nfa")) {
+                            var_aut.second->print_to_mata(tout);
+                        }
+                    }
+                );
+                return l_true;
             }
 
             // we will now process one inclusion from the inclusion graph which is at front
@@ -386,7 +436,7 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < noodle.size(); ++i) {
                     // TODO do not make a new_var if we can replace it with one left or right var (i.e. new_var is exactly left or right var)
                     // TODO also if we can substitute with epsilon, we should do that first? or generally process epsilon substitutions better, in some sort of 'preprocessing'
-                    BasicTerm new_var(BasicTermType::Variable, VAR_PREFIX + std::string("_") + std::to_string(noodlification_no) + std::string("_") + std::to_string(i));
+                    BasicTerm new_var = util::mk_noodler_var_fresh(std::string("align_") + std::to_string(noodlification_no));
                     left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
                     right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
                     new_element.aut_ass[new_var] = noodle[i].first; // we assign the automaton to new_var
@@ -514,260 +564,197 @@ namespace smt::noodler {
         }
 
         // there are no solving states left, which means nothing led to solution -> it must be unsatisfiable
-        return false;
+        return l_false;
     }
 
-    expr_ref DecisionProcedure::get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars) {
-        expr_ref lengths(m.mk_true(), m);
-        
-        for(const BasicTerm& var : vars) {
-            
-            // get the z3 variable from var
-            expr_ref z3_var(this->m);
-            auto it = variable_map.find(var);
-            if(it != variable_map.end()) {
-                // take the existing variable from the map
-                z3_var = m_util_s.str.mk_length(it->second);
+    LenNode DecisionProcedure::get_initial_lengths() {
+        if (init_length_sensitive_vars.empty()) {
+            // there are no length sensitive vars, so we can immediately say true
+            return LenNode(LenFormulaType::TRUE);
+        }
+
+        // start from length formula from preprocessing
+        std::vector<LenNode> conjuncts = {preprocessing_len_formula};
+
+        // for each initial length variable get the lengths of all its possible words for automaton in init_aut_ass
+        for (const BasicTerm &var : init_length_sensitive_vars) {
+            conjuncts.push_back(init_aut_ass.get_lengths(var));
+        }
+
+        return LenNode(LenFormulaType::AND, conjuncts);
+    }
+
+    LenNode DecisionProcedure::get_lengths() {
+        if (solution.length_sensitive_vars.empty() && dis_len.empty()) {
+            // there are no length vars nor disequations, it is not needed to create the lengths formula
+            return LenNode(LenFormulaType::TRUE);
+        }
+
+        // start with length formula from preprocessing
+        std::vector<LenNode> conjuncts = {preprocessing_len_formula};
+
+        // decision procedure was run, we create length constraints from the solution, we only need to look at length sensitive vars
+        for (const BasicTerm &len_var : solution.length_sensitive_vars) {
+            conjuncts.push_back(solution.get_lengths(len_var));
+        }
+
+        // add the formula for solving disequations
+        conjuncts.push_back(diseqs_formula());
+
+        return LenNode(LenFormulaType::AND, conjuncts);
+    }
+
+    LenNode DecisionProcedure::diseqs_formula() {
+        // This function creates arithmetic formula using solution for each ((a1, a2), (|x1| == |x2|, |L| != |R|) in
+        // dis_len where L = x1a1y1, R= x2a2y2; see replace_disequality() for more info. We want to create formula
+        // (|L| != |R| AND (|x1| == |x2| OR a1 != a2)) but
+        //      - if a1 or a2 is only empty word, then only |L| != |R| can hold
+        //      - we check a1!char != a2!char instead of a1 != a2 and then we add at the end that a1!char/a2!char
+        //        should be equal to one of the symbols of a1/a2
+        //      - we also work with maximally substituted a1/a2, so that if we have multiple disequations that
+        //        somehow depend on each other, the dependency stays
+
+        // we flatten the subtitution map, so that all the vars a1/a2 whose disequality we will check
+        // are substituted by maximal application of substitution_map
+        solution.flatten_substition_map();
+
+        // here we save all a1/a2 whose disequation is checked, so that we can create the formula that 
+        // each of these vars should be one of the symbols from its automaton
+        std::set<BasicTerm> a_vars;
+        // get the "!char" version of a variable
+        auto get_char_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name().encode() + "!char"); };
+
+        // conjuncts of the final length formula
+        std::vector<LenNode> conjuncts;
+
+        for(const auto& pr: dis_len) {
+            // formula for |x1| == |x2|
+            LenNode x1x2_same_lengths = pr.second.first;
+            // formula for |L| != |R|
+            LenNode LR_diff_lengths = pr.second.second;
+
+            // variables a1 and a2 where we check a1 != a2
+            BasicTerm a1 = pr.first.first;
+            BasicTerm a2 = pr.first.second;
+
+            if (solution.is_var_empty_word(a1) || solution.is_var_empty_word(a2)) {
+                // if one of the variables was only epsilon, the original sides of disequation have to have different lengths
+                conjuncts.push_back(LR_diff_lengths);
             } else {
-                // if the variable is not found, it was introduced during preprocessing or decision procedure
-                // we therefore create a z3 variable using the name of var
-                z3_var = util::mk_int_var(var.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-            }
+                // as neither a1 nor a2 are empty words, they can be substituted by exactly one var, we get it
+                a1 = solution.get_substituted_vars(a1)[0];
+                a2 = solution.get_substituted_vars(a2)[0];
 
-            // add |z3_var| >= 0, important probably only for the case that var was introduced during preprocessing
-            // or decision procedure, existing z3 vars should have this already in the LIA solver
-            lengths = m.mk_and(lengths, m_util_a.mk_ge(z3_var, m_util_a.mk_int(0)));
+                a_vars.insert(a1);
+                a_vars.insert(a2);
 
-            if (state.aut_ass.count(var) > 0) {
-                // if var is not substituted, get length constraint from its automaton
-                std::set<std::pair<int, int>> aut_constr = Mata::Strings::get_word_lengths(*state.aut_ass.at(var));
-                lengths = this->m.mk_and(lengths, mk_len_aut(z3_var, aut_constr));
-            } else if (state.substitution_map.count(var) > 0) {
-                // if var is substituted, then we have to create length equation
-                // i.e. if state.substitution_map[var] = x_1 x_2 ... x_n, then we create |var| = |x_1| + |x_2| + ... + |x_n|
-
-                // translate each x_i to z3 var and create the sum |x_1| + |x_2| + ... + |x_n|
-                expr_ref sum(m_util_a.mk_int(0), m);
-                for(const BasicTerm&x_i : state.substitution_map.at(var)) {
-                    expr_ref z3_x_i(this->m);
-                    auto varit = variable_map.find(x_i);
-                    if(varit != variable_map.end()) {
-                        // take the existing variable from the map
-                        z3_x_i = m_util_s.str.mk_length(varit->second);
-                    } else {
-                        // if the variable is not found, it was introduced during preprocessing or decision procedure
-                        // we therefore create a z3 variable using the name of x_i
-                        z3_x_i = util::mk_int_var(x_i.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-                    }
-
-                    sum = m_util_a.mk_add(sum, z3_x_i);
-                }
-                lengths = m.mk_and(lengths, m.mk_eq(z3_var, sum));
-
-            } else {
-                util::throw_error("Variable was neither in automata assignment nor was substituted");
+                conjuncts.emplace_back(
+                    LenFormulaType::OR,
+                    std::vector<LenNode>{
+                        // |L| != |R|
+                        LR_diff_lengths,
+                        // |x1| == |x2| AND a1!char != a2!char
+                        LenNode(LenFormulaType::AND, { x1x2_same_lengths, LenNode(LenFormulaType::NEQ, {get_char_var(a1), get_char_var(a2)})})
+                    });
             }
         }
 
-        return lengths;
-    }
-
-    expr_ref DecisionProcedure::get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
-        expr_ref lengths(m.mk_true(), m);
-
-        // collect lengths introduced by the preprocessing
-        expr_ref prep_formula = util::len_to_expr(
-                this->prep_handler.get_len_formula(),
-                variable_map,
-                this->m, this->m_util_s, this->m_util_a );
-        lengths = this->m.mk_and(lengths, prep_formula);
-
-        if(this->solution.aut_ass.size() == 0) {
-            // if the decision procedure was not run yet, we return lengths based on the initial assignment it is assumed that this is called for
-            // UNSAT check which is run before decision procedure, so we create length constraints for all variables so that LIA solver can
-            // be more aggressive in giving us UNSAT
-            SolvingState tmp_state;
-            tmp_state.aut_ass = init_aut_ass;
-            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, tmp_state, tmp_state.aut_ass.get_keys()));
-        } else {
-            // decision procedure was run, we create length constraints from the solution, we only need to look at length sensitive vars
-            lengths = this->m.mk_and(lengths, get_length_from_solving_state(variable_map, solution, solution.length_sensitive_vars));
-
-            // check whether disequalities are satisfiable
-            // adds length constraint (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
-            // where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
-            lengths = this->m.mk_and(lengths, len_diseqs(variable_map, solution));
-            
+        // for each a1/a2 var, we have to have that a1!char/a2!char should be equal to one of its symbols
+        for (const BasicTerm& a_var : a_vars) {
+            auto a_var_nfa = solution.aut_ass.at(a_var);
+            a_var_nfa->trim();
+            std::set<Mata::Symbol> symbols_of_var;
+            for (const auto &tran : a_var_nfa->delta) {
+                symbols_of_var.insert(tran.symb);
+            }
+            std::vector<LenNode> disjuncts;
+            for (auto symbol : symbols_of_var) {
+                disjuncts.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ get_char_var(a_var), symbol });
+            }
+            conjuncts.push_back(LenNode(LenFormulaType::OR, disjuncts));
         }
 
-        return lengths;
-    }
-
-    expr_ref DecisionProcedure::check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr) {
-        // get_substituted_var(x, s) will get the most deep variable by which x is replaced in state.substitution_map and in
-        // s we keep the symbols by which the nfa for x accepts (the nfa should accept words of size at most 1)
-        std::function<std::vector<BasicTerm>(const smt::noodler::BasicTerm&, std::set<Mata::Symbol>&)> get_substituted_var;
-        get_substituted_var = [&state, &get_substituted_var](const smt::noodler::BasicTerm &var, std::set<Mata::Symbol> &symbols_of_var) {
-            auto bla = state.substitution_map.find(var);
-            if (bla != state.substitution_map.end()) {
-                // var is substituted
-                if (bla->second.size() == 0) {
-                    // if var is substituted by epsilon, symbols_of_var must be empty and var is the most deep variable
-                    symbols_of_var.clear();
-                    return std::vector<BasicTerm>{var};
-                } else {
-                    // var is substituted by some other var, recurse deeper
-                    assert(bla->second.size() == 1); // var can be substituted by only one variable
-                    return get_substituted_var(bla->second[0], symbols_of_var);
-                }
-            } else {
-                // var is not substituted, get the symbols of its nfa
-                assert(state.aut_ass.count(var) > 0); // var is either in substitution map or in aut_ass
-                auto nfa = state.aut_ass.at(var);
-                nfa->trim();
-                // get all one-symbol words accepted by nfa assuming
-                // that nfa accepts words of size 0 and 1
-                for (const auto &tran : nfa->delta) {
-                    symbols_of_var.insert(tran.symb);
-                }
-                return std::vector<BasicTerm>{var};
-            }
-        };
-
-        auto a1 = pr.first;
-        auto a2 = pr.second;
-
-        std::set<Mata::Symbol> s1, s2;
-        
-        auto subst_a1 = get_substituted_var(a1, s1)[0];
-        auto subst_a2 = get_substituted_var(a2, s2)[0];
-
-        STRACE("str",
-            tout << "diseq check where " << a1.get_name() << " is substituted by " << subst_a1.get_name() << " and s1:";
-            for (const auto s1el : s1) {
-                tout << " " << s1el;
-            }
-            tout << std::endl;
-            tout << "diseq check where " << a2.get_name() << " is substituted by " << subst_a2.get_name() << " and s2:";
-            for (const auto s2el : s2) {
-                tout << " " << s2el;
-            }
-            tout << std::endl;
-        );
-
-        if( (subst_a1 == subst_a2) || // if a1 and a2 were substituted by the same var, the disequation cannot hold
-            (s1.size() == 0 || s2.size() == 0) || // if one of the variables was only epsilon, the original sides of disequation have to have different lengths, so here we return false
-            (s1.size() == 1 && s2.size() == 1 && s1 == s2) // if we can only assign the same symbol to the variables, it is unsat
-          ) {
-            return expr_ref(this->m.mk_false(), this->m);
-        }
-
-        // gets the disjunction of equations "var == char" for each char in var_chars
-        auto get_char_disjunction = [this](const expr_ref &var, const std::set<Mata::Symbol> var_chars) {
-            expr_ref char_disj(this->m.mk_false(), this->m);
-            for (const auto &var_char : var_chars) {
-                // add "var == symbol" to disjunction
-                char_disj = this->m.mk_or(char_disj, this->m_util_a.mk_eq(var, this->m_util_a.mk_int(var_char)));
-            }
-            return char_disj;
-        };
-
-        // new int variables representing the char values of a1 and a2
-        expr_ref a1_z3_char = util::mk_int_var(subst_a1.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
-        expr_ref a2_z3_char = util::mk_int_var(subst_a2.get_name().encode() + "_char", this->m, this->m_util_s, this->m_util_a);
-
-        expr_ref res(this->m.mk_true(), this->m);
-        // char disjunct for a1
-        res = this->m.mk_and(res, get_char_disjunction(a1_z3_char, s1));
-        // char disjunct for a2
-        res = this->m.mk_and(res, get_char_disjunction(a2_z3_char, s2));
-        // a1 != a2
-        expr_ref a1_a2_eq(this->m_util_a.mk_eq(a1_z3_char, a2_z3_char), this->m);
-        res = this->m.mk_and(res, this->m.mk_not(a1_a2_eq));
-        // just to be sure, we also want |a1| == 1 and |a2| == 1
-        expr_ref a1_z3 = util::mk_int_var(subst_a1.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        expr_ref a2_z3 = util::mk_int_var(subst_a2.get_name().encode(), this->m, this->m_util_s, this->m_util_a);
-        res = this->m.mk_and(
-            res,
-            this->m_util_a.mk_eq(a1_z3, this->m_util_a.mk_int(1)),
-            this->m_util_a.mk_eq(a2_z3, this->m_util_a.mk_int(1))
-        );
-        
-        return res;
-    }
-
-    expr_ref DecisionProcedure::len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state) {
-        expr_ref ret(this->m.mk_true(), this->m);
-        for(const auto& pr: this->prep_handler.get_diseq_len()) {
-            expr_ref f1 = util::len_to_expr(
-                pr.second.first,
-                variable_map,
-                this->m, this->m_util_s, this->m_util_a );
-            expr_ref f2 = util::len_to_expr(
-                pr.second.second,
-                variable_map,
-                this->m, this->m_util_s, this->m_util_a );
-            ret = this->m.mk_and(ret, this->m.mk_or(f2, this->m.mk_and(f1, check_diseq(state, pr.first))));
-        }
-        return ret;
+        return LenNode(LenFormulaType::AND, conjuncts);
     }
 
     /**
      * @brief Creates initial inclusion graph according to the preprocessed instance.
      */
     void DecisionProcedure::init_computation() {
-        SolvingState initialWlEl;
-        initialWlEl.length_sensitive_vars = this->init_length_sensitive_vars;
-        initialWlEl.aut_ass = std::move(this->init_aut_ass);
-
-        if(!initialWlEl.aut_ass.is_sat()) { // TODO: return unsat core
-            return;
+        Formula equations;
+        for (auto const &dis_or_eq : formula.get_predicates()) {
+            if (dis_or_eq.is_equation()) {
+                equations.add_predicate(dis_or_eq);
+            } else if (dis_or_eq.is_inequation()) {
+                for (auto const &eq_from_diseq : replace_disequality(dis_or_eq)) {
+                    equations.add_predicate(eq_from_diseq);
+                }
+            } else {
+                util::throw_error("Decision procedure can handle only equations and disequations");
+            }
         }
 
-        if (!this->formula.get_predicates().empty()) {
+        STRACE("str-dis",
+            tout << "Disequation to equation formulas:" << std::endl;
+            for (const auto &dis_formula : dis_len) {
+                tout << "     " << dis_formula.second.second
+                     << " || (" << dis_formula.second.first
+                     << " && " << dis_formula.first.first.get_name()
+                     << " != " << dis_formula.first.second.get_name()
+                     << ")" << std::endl;
+            }
+        );
+
+        STRACE("str-dis",
+            tout << "Equations after removing disequations" << std::endl;
+            for (const auto &eq : equations.get_predicates()) {
+                tout << "    " << eq << std::endl;
+            }
+        );
+
+        SolvingState init_solving_state;
+        init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
+        init_solving_state.aut_ass = std::move(this->init_aut_ass);
+
+        if (!equations.get_predicates().empty()) {
             // TODO we probably want to completely get rid of inclusion graphs
             std::deque<std::shared_ptr<GraphNode>> tmp;
-            Graph incl_graph = Graph::create_inclusion_graph(this->formula, tmp);
+            Graph incl_graph = Graph::create_inclusion_graph(equations, tmp);
             for (auto const &node : incl_graph.get_nodes()) {
-                initialWlEl.inclusions.insert(node->get_predicate());
+                init_solving_state.inclusions.insert(node->get_predicate());
                 if (!incl_graph.is_on_cycle(node)) {
-                    initialWlEl.inclusions_not_on_cycle.insert(node->get_predicate());
+                    init_solving_state.inclusions_not_on_cycle.insert(node->get_predicate());
                 }
             }
             // TODO the ordering of inclusions_to_process right now is given by how they were added from the splitting graph, should we use something different? also it is not deterministic now, depends on hashes
             while (!tmp.empty()) {
-                initialWlEl.inclusions_to_process.push_back(tmp.front()->get_predicate());
+                init_solving_state.inclusions_to_process.push_back(tmp.front()->get_predicate());
                 tmp.pop_front();
             }
         }
 
-        worklist.push_back(initialWlEl);
+        worklist.push_back(init_solving_state);
     }
 
-    /**
-     * @brief Preprocessing.
-     */
-    void DecisionProcedure::preprocess(PreprocessType opt) {
-        // As a first add string literals to the automata assignment with automaton representing their string literal.
-        add_str_lits_to_init_aut_ass();
-        this->prep_handler = FormulaPreprocess(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
+    lbool DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
+        FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
         // So-far just lightweight preprocessing
-        this->prep_handler.reduce_diseqalities();
+        prep_handler.reduce_diseqalities();
         if (opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
+            prep_handler.underapprox_languages();
         }
-        this->prep_handler.propagate_variables();
-        this->prep_handler.propagate_eps();
-        this->prep_handler.remove_regular();
-        this->prep_handler.skip_len_sat();
-        this->prep_handler.generate_identities();
-        this->prep_handler.propagate_variables();
-        this->prep_handler.refine_languages();
-        this->prep_handler.reduce_diseqalities();
-        this->prep_handler.remove_trivial();
-        this->prep_handler.reduce_regular_sequence(3);
-        this->prep_handler.remove_regular();
+        prep_handler.propagate_variables();
+        prep_handler.propagate_eps();
+        prep_handler.remove_regular();
+        prep_handler.skip_len_sat();
+        prep_handler.generate_identities();
+        prep_handler.propagate_variables();
+        prep_handler.refine_languages();
+        prep_handler.reduce_diseqalities();
+        prep_handler.remove_trivial();
+        prep_handler.reduce_regular_sequence(3);
+        prep_handler.remove_regular();
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -780,100 +767,133 @@ namespace smt::noodler {
                 tout << std::endl;
             }   
         );
-        this->prep_handler.generate_equiv(this->len_eq_vars);
-        this->prep_handler.propagate_variables();
-        this->prep_handler.generate_identities();
-        this->prep_handler.remove_regular();
-        this->prep_handler.propagate_variables();
+        prep_handler.generate_equiv(len_eq_vars);
+        prep_handler.propagate_variables();
+        prep_handler.generate_identities();
+        prep_handler.remove_regular();
+        prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
-            this->prep_handler.underapprox_languages();
-            this->prep_handler.skip_len_sat();
-            this->prep_handler.reduce_regular_sequence(3);
-            this->prep_handler.remove_regular();
-            this->prep_handler.skip_len_sat();
+            prep_handler.underapprox_languages();
+            prep_handler.skip_len_sat();
+            prep_handler.reduce_regular_sequence(3);
+            prep_handler.remove_regular();
+            prep_handler.skip_len_sat();
         }
-        // replace disequalities
-        this->prep_handler.replace_disequalities();
 
         // Refresh the instance
-        this->init_aut_ass = this->prep_handler.get_aut_assignment();
-        this->init_length_sensitive_vars = this->prep_handler.get_len_variables();
-        this->formula = this->prep_handler.get_modified_formula();
+        this->formula = prep_handler.get_modified_formula();
+        this->init_aut_ass = prep_handler.get_aut_assignment();
+        this->init_length_sensitive_vars = prep_handler.get_len_variables();
+        this->preprocessing_len_formula = prep_handler.get_len_formula();
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
         STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
-        STRACE("str", tout << "Lenght formula from preprocessing:" << std::endl << this->prep_handler.get_len_formula() << std::endl);
+        STRACE("str", tout << "Lenght formula from preprocessing:" << preprocessing_len_formula << std::endl);
         STRACE("str",
-            tout << "Disequation formulas after preprocessing:" << std::endl;
-            for (const auto &bla : prep_handler.get_diseq_len()) {
-                bla.first.first.get_name();
-                tout << "     " << bla.second.second << " || (" << bla.second.first << " && " << bla.first.first.get_name() << " != " << bla.first.second.get_name() << ")" << std::endl;
-            }  
-        );
-        STRACE("str", tout << "preprocess-output:" << std::endl << this->formula.to_string() << std::endl; );
+            tout << "Length variables after preprocesssing:";
+            for (const auto &len_var : init_length_sensitive_vars) {
+                tout << " " << len_var;
+            }
+            tout << std::endl);
+        STRACE("str", tout << "Formula after preprocessing:" << std::endl << this->formula.to_string() << std::endl; );
+
+        if (!this->init_aut_ass.is_sat()) {
+            // some automaton in the assignment is empty => we won't find solution
+            return l_false;
+        } else if (this->formula.get_predicates().empty()) {
+            // preprocessing solved all (dis)equations => we set the solution (for lengths check)
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, this->init_length_sensitive_vars, {});
+            return l_true;
+        } else {
+            // preprocessing was not able to solve it, we at least reduce the size of created automata
+            this->init_aut_ass.reduce();
+            return l_undef;
+        }
     }
 
     /**
-     * @brief Make a length constraint for a single NFA loop, handle
-     *
-     * @param var variable
-     * @param v1 handle
-     * @param v2 loop
-     * @return expr_ref Length formula
+     * @brief Replace disequalities with equalities
      */
-    expr_ref DecisionProcedure::mk_len_aut_constr(const expr_ref& var, int v1, int v2) {
-        expr_ref len_x(var, this->m);
-        expr_ref k = util::mk_int_var_fresh("k", this->m, this->m_util_s, this->m_util_a);
-        expr_ref c1(this->m_util_a.mk_int(v1), this->m);
-        expr_ref c2(this->m_util_a.mk_int(v2), this->m);
+    std::vector<Predicate> DecisionProcedure::replace_disequality(Predicate diseq) {
+        // From inequality L != P we create equalities L = x1a1y1 and R = x2a2y2
+        // where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
+        // we will check if (|L| != |P| || (|x1| == |x2| and a1 != a2)) after finding sat solution
+        // from decision procedure.
 
-        if(v2 != 0) {
-            expr_ref right(this->m_util_a.mk_add(c1, this->m_util_a.mk_mul(k, c2)), this->m);
-            return expr_ref(this->m.mk_and(this->m.mk_eq(len_x, right), this->m_util_a.mk_ge(k, this->m_util_a.mk_int(0))), this->m);
-        }
-        return expr_ref(this->m.mk_eq(len_x, c1), this->m);
-    }
+        std::vector<Predicate> new_eqs;
 
-    /**
-     * @brief Make a length formula corresponding to a set of pairs <loop, handle>
-     *
-     * @param var Variable
-     * @param aut_constr Set of pairs <loop, handle>
-     * @return expr_ref Length constaint of the automaton
-     */
-    expr_ref DecisionProcedure::mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr) {
-        expr_ref res(this->m.mk_false(), this->m);
-        for(const auto& cns : aut_constr) {
-            res = this->m.mk_or(res, mk_len_aut_constr(var, cns.first, cns.second));
-        }
-        res = expr_ref(this->m.mk_and(res, this->m_util_a.mk_ge(var, this->m_util_a.mk_int(0))), this->m);
-        return res;
-    }
-    
-    void DecisionProcedure::add_str_lits_to_init_aut_ass() {
-        size_t counter{ 0 };
-        std::map<zstring, zstring> str_literals{};
-        for (auto& predicate : formula.get_predicates()) {
-            if (predicate.is_eq_or_ineq()) {
-                add_str_lits_to_init_aut_ass_for_side(predicate.get_left_side());
-                add_str_lits_to_init_aut_ass_for_side(predicate.get_right_side());
+        // This optimization represents the situation where L = a1 and R = a2
+        // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
+        if(diseq.get_left_side().size() == 1 && diseq.get_right_side().size() == 1) {
+            BasicTerm a1 = diseq.get_left_side()[0];
+            BasicTerm a2 = diseq.get_right_side()[0];
+            auto autl = init_aut_ass.at(a1);
+            auto autr = init_aut_ass.at(a2);
+            Mata::Nfa::Nfa sigma = init_aut_ass.sigma_automaton();
+
+            if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
+                // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+                init_length_sensitive_vars.insert(a1);
+                init_length_sensitive_vars.insert(a2);
+                // we add to dis_len the pair ((a1, a2), (|a1| == |a2|, |a1| != |a2|)) representing the formula (|a1| != |a2| || (|a1| == |a2| && a1 != a2))
+                dis_len.insert({
+                    {a1, a2},
+                    // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
+                    {LenNode(LenFormulaType::TRUE, {}), LenNode(LenFormulaType::FALSE, {})} 
+                });
+                return std::vector<Predicate>();
             }
         }
-    }
 
-    void DecisionProcedure::add_str_lits_to_init_aut_ass_for_side(std::vector<BasicTerm>& side) {
-        for (auto& term : side) {
-            if (term.is_literal()) { // Handle string literal.
-                if (init_aut_ass.find(term) == init_aut_ass.end()) {
-                    Nfa nfa{ util::create_word_nfa(term.get_name()) };
-                    init_aut_ass.emplace(term, std::make_shared<Nfa>(std::move(nfa)));
-                }
-            }
+        // automaton accepting everything
+        std::shared_ptr<Mata::Nfa::Nfa> sigma_star_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_star_automaton());
+        // automaton accepting empty word or exactly one symbol
+        std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
+
+        BasicTerm x1 = util::mk_noodler_var_fresh("diseq_start");
+        init_aut_ass[x1] = sigma_star_automaton;
+        BasicTerm a1 = util::mk_noodler_var_fresh("diseq_char");
+        init_aut_ass[a1] = sigma_eps_automaton;
+        BasicTerm y1 = util::mk_noodler_var_fresh("diseq_end");
+        init_aut_ass[y1] = sigma_star_automaton;
+        BasicTerm x2 = util::mk_noodler_var_fresh("diseq_start");
+        init_aut_ass[x2] = sigma_star_automaton;
+        BasicTerm a2 = util::mk_noodler_var_fresh("diseq_char");
+        init_aut_ass[a2] = sigma_eps_automaton;
+        BasicTerm y2 = util::mk_noodler_var_fresh("diseq_end");
+        init_aut_ass[y2] = sigma_star_automaton;
+
+        // L = x1a1y1
+        new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
+        // R = x2a2y2
+        new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_right_side(), Concat{x2, a2, y2}}));
+
+        // we create |L| != |P|, so we need to make all variables in both sides length ones
+        // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
+        // for example by taking L = x1y1, P = x2y2 and checking (|x1| = |y2| and some first symbol of y1,y2 differ)
+        for(const auto& t : diseq.get_vars()) {
+            init_length_sensitive_vars.insert(t);
         }
+        auto len2 = diseq.get_formula_eq();
+
+        // we want |x1| == |x2|, making x1 and x2 length ones
+        init_length_sensitive_vars.insert(x1);
+        init_length_sensitive_vars.insert(x2);
+        auto len1 = Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq();
+
+        // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
+        init_length_sensitive_vars.insert(a1);
+        init_length_sensitive_vars.insert(a2);
+
+        // we will create (len2 || (len1 && a1 != a2)) from this
+        this->dis_len.insert({{a1, a2}, {len1, len2}});
+
+        STRACE("str-dis", tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
+        return new_eqs;
     }
 
 } // Namespace smt::noodler.

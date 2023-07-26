@@ -17,7 +17,7 @@ namespace smt::noodler {
     /**
      * @brief Preprocess options
      */
-    enum PreprocessType {
+    enum struct PreprocessType {
         PLAIN,
         UNDERAPPROX
     };
@@ -36,82 +36,44 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
-        virtual void preprocess(PreprocessType opt) {
+        /**
+         * Do some preprocessing (can be called only before init_computation). Can
+         * potentionally already solve the formula.
+         * 
+         * @param opt The type of preprocessing
+         * @param len_eq_vars Equivalence class holding variables with the same length
+         * @return lbool representing whether preprocessing solved the formula
+         */
+        virtual lbool preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) {
             throw std::runtime_error("preprocess unimplemented");
         }
 
         /**
          * Compute next solution and save the satisfiable solution.
-         * @return True if there is an satisfiable element in the worklist.
+         * @return True if there is a satisfiable element in the worklist.
          */
-        virtual bool compute_next_solution() {
+        virtual lbool compute_next_solution() {
             throw std::runtime_error("Not implemented");
         }
 
         /**
-         * Get lengths for problem instance.
-         * @param variable_map: map of the BasicTerm variables to Z3 variables
-         * @return Conjunction of lengths of the current solution for variables in constructor
-         *  (variable renames, init length variables).
+         * Get length constraints for the initial assignment (possibly modified by preprocessing).
+         * If it is unsatisfiable, it means that there is no possible solution.
          */
-        virtual expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) {
+        virtual LenNode get_initial_lengths() {
+            throw std::runtime_error("Unimplemented");
+        }
+
+        /**
+         * Get length constraints for the solution. Assumes that we have some solution from
+         * running compute_next_solution(), the solution is actually solution if the length
+         * constraints hold.
+         */
+        virtual LenNode get_lengths() {
             throw std::runtime_error("Unimplemented");
         }
 
         virtual ~AbstractDecisionProcedure()=default;
-    };
-
-    /**
-     * @brief Debug instance of the Decision procedure. Always says SAT and return some length
-     * constraints. Simulates the situation when each instance has exactly 10 noodles.
-     */
-    class DecisionProcedureDebug : public AbstractDecisionProcedure {
-    private:
-        StateLen<int> state;
-        ast_manager& m;
-        seq_util& m_util_s;
-        arith_util& m_util_a;
-        Instance inst{};
-        LengthConstr* solution{ nullptr };
-
-    public:
-        DecisionProcedureDebug(const Instance& inst, LengthConstr& len,
-                               ast_manager& mn, seq_util& util_s, arith_util& util_a
-        ) : state{}, m{ mn }, m_util_s{ util_s }, m_util_a{ util_a } {
-            this->inst = inst;
-            this->solution = &len;
-            this->state.add(inst, 0);
-        }
-
-        bool compute_next_solution() override {
-            int cnt = this->state.get_val(inst);
-            if(cnt >= 10) {
-                return false;
-            }
-
-            expr_ref refinement_len(m);
-            app* atom;
-            for (const auto& eq : inst) {
-                obj_hashtable<expr> vars;
-                util::get_str_variables(to_app(eq), this->m_util_s, this->m, vars);
-
-                for(expr * const var : vars) {
-                    expr_ref len_str_l(m_util_s.str.mk_length(var), m);
-                    SASSERT(len_str_l);
-                    expr_ref num(m);
-                    num = this->m_util_a.mk_numeral(rational(cnt), true);
-                    atom = this->m_util_a.mk_le(len_str_l, num);
-                    refinement_len = refinement_len == nullptr ? atom : m.mk_and(refinement_len, atom);
-                }
-            }
-
-            this->state.update_val(inst, cnt+1);
-            *solution = refinement_len;
-            return true;
-        }
-
-        ~DecisionProcedureDebug() { }
-
     };
 
     /// A state of decision procedure that can lead to a solution
@@ -253,101 +215,83 @@ namespace smt::noodler {
         void substitute_vars(std::unordered_map<BasicTerm, std::vector<BasicTerm>> &substitution_map);
 
         /**
-         * @brief Combines aut_ass and substitution_map into one AutAssigment
-         *
-         * For example, if we have aut_ass[x] = aut1, aut_ass[y] = aut2, and substitution_map[z] = xy, then this will return
-         * automata assignment ret_ass where ret_ass[x] = aut1, ret_ass[y] = aut2, and ret_ass[z] = concatenation(aut1, aut2)
+         * @brief Get the length constraints for variable @p var
+         * 
+         * If @p var is substituted by x1x2x3... then it creates
+         * |var| = |x1| + |x2| + |x3| + ... otherwise, if @p var
+         * has an automaton assigned, it creates length constraint
+         * representing all possible lengths of words in the automaton.
          */
-        AutAssignment flatten_substition_map();
+        LenNode get_lengths(const BasicTerm& var) const;
+
+        /**
+         * @brief Flattens substitution_map so that each var maps only to vars in aut_assignment
+         *
+         * For example, if we have substitution_map[x] = yz, substitution_map[y] = z, and z is in aut_assignment, then at the end
+         * we will have substitution_map[x] = zz and substitution_map[y] = z
+         */
+        void flatten_substition_map();
+
+        /**
+         * @brief Checks if @p var is substituted by empty word
+         */
+        bool is_var_empty_word(const BasicTerm& var) { return (substitution_map.count(var) > 0 && substitution_map.at(var).empty()); }
+
+        /**
+         * @brief Get the vector of variables substituting @p var
+         * 
+         * In the case that @p var is not substituted (it is mapped to automaton), we return { @p var }.
+         * Useful especially after calling flatten_subtitution_map().
+         */
+        std::vector<BasicTerm> get_substituted_vars(const BasicTerm& var) {
+            if (substitution_map.count(var) > 0)
+                return substitution_map.at(var);
+            else
+                return std::vector<BasicTerm>{var};
+        }
     };
 
     class DecisionProcedure : public AbstractDecisionProcedure {
     protected:
-        // prefix of newly created vars during the procedure
-        // TODO there is a small possibility that such a variable already exists, we should either check how to call tmp variables or better, add to normal variables some prefix?
-        const std::string VAR_PREFIX = "tmp";
-        // counter of noodlifications, so that newly created variables will have unique names per noodlification
-        // by for example setting the name to VAR_PREFIX + "_" + noodlification_no + "_" + index_in_the_noodle
+        // counter of noodlifications
         unsigned noodlification_no = 0;
-
-        FormulaPreprocess prep_handler;
 
         // a deque containing states of decision procedure, each of them can lead to a solution
         std::deque<SolvingState> worklist;
 
         /// State of a found satisfiable solution set when one is computed using
-        ///  'DecisionProcedure::compute_next_solution()'.
+        ///  compute_next_solution() or after preprocess()
         SolvingState solution;
 
-        ast_manager& m;
-        seq_util& m_util_s;
-        arith_util& m_util_a;
+        // initial length vars, formula and automata assignment, can be updated by preprocessing, used for initializing the decision procedure
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+
+        // the length formula from preprocessing, get_lengths should create conjunct with it
+        LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
+
         const theory_str_noodler_params& m_params;
-        // equivalence class holding variables with the same length
-        BasicTermEqiv len_eq_vars;
+
+        // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
+        std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
 
         /**
-         * @brief Add all string literals in @c formula to initial automata assignment.
-         */
-        void add_str_lits_to_init_aut_ass();
-
-        /**
-         * Adds string literals to initial automata assignment.
-         * @param side Side for which to add literals.
-         */
-        void add_str_lits_to_init_aut_ass_for_side(std::vector<BasicTerm>& side);
-
-
-        expr_ref mk_len_aut_constr(const expr_ref& var, int v1, int v2);
-        
-
-        /**
-         * Get length formula from the solving state @p state wrt variables @p vars. For each var x in @p vars it
-         * creates either equation |x| = |x_1| + ... + |x_n| if x is substituted by 'x_1 ... x_n' or it add
-         * constraint created from the automaton to which x is mapped.
+         * @brief Replace disequality L != R with equalities and a length constraint saved in dis_len.
          * 
-         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
-         * @param state Solving state from which the lengths are created
-         * @param vars Set of variables for which we create the lenghts (should be some subset of variables)
-         * @return expr_ref Length formula
+         * @param diseq Disequality to replace
+         * @return Vector with created equalities
          */
-        expr_ref get_length_from_solving_state(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state, const std::unordered_set<smt::noodler::BasicTerm> &vars);
-
-
-        /**
-         * Check that the disequality a1 != a2 is satisfiable. Assumed to be called if the
-         * decision procedure returns SAT. Creates length constraint representing the conjunct:
-         * "a1 equals one of its chars" and "a2 equals one of its chars" and "a1 != a2"
-         * 
-         * See also len_diseqs and FormulaPreprocess::replace_disequalities().
-         * 
-         * @param state the solving state whose automata assignment and substitution map will be used
-         * @param pr pair (a1, a2) of the variables whose disequality we are checking
-         */
-        expr_ref check_diseq(const SolvingState &state, const std::pair<BasicTerm, BasicTerm>& pr);
+        std::vector<Predicate> replace_disequality(Predicate diseq);
 
         /**
          * Gets the lengths constraints for each disequation. For each diseqation it adds length constraint
-         * (|L| != |R| or (|x_1| == |x_2| and check_diseq(a_1,a_2)))
-         * where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were created during FormulaPreprocess::replace_disequalities()
-         * 
-         * @param variable_map Mapping of BasicTerm variables to Z3 expressions
-         * @param state Solving state from which the lengths are created
-         * @return the conjunction of length constraints of each diseqation
+         * (|L| != |R| or (|x_1| == |x_2| and a_1 != a_2)) where L = x_1 a_1 y_1 and R = x_2 a_2 y_2 were
+         * created during replace_disequality()
          */
-        expr_ref len_diseqs(const std::map<BasicTerm, expr_ref>& variable_map, const SolvingState &state);
+        LenNode diseqs_formula();
 
     public:
-
-        DecisionProcedure(ast_manager &m, seq_util &m_util_s, arith_util &m_util_a, const theory_str_noodler_params &par) 
-          : prep_handler(Formula(), AutAssignment(), {}, par),
-            m(m),
-            m_util_s(m_util_s),
-            m_util_a(m_util_a),
-            m_params(par) { }
         
         /**
          * Initialize a new decision procedure that can solve word equations
@@ -357,48 +301,37 @@ namespace smt::noodler {
          * occur in some length constraint in the rest of the formula).
          * 
          * @param equalities encodes the word equations
-         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
+         * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
-         * @param m Z3 AST manager
-         * @param m_util_s Z3 string manager
-         * @param m_util_a Z3 arithmetic manager
          * @param len_eq_vars Equivalence class holding variables with the same length
          * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(
              Formula equalities, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
-             ast_manager &m, seq_util &m_util_s, arith_util &m_util_a,
-             BasicTermEqiv len_eq_vars,
              const theory_str_noodler_params &par
-        ) : prep_handler(equalities, init_aut_ass, init_length_sensitive_vars, par),
-            m{m},
-            m_util_s{m_util_s},
-            m_util_a{m_util_a},
-            init_length_sensitive_vars(init_length_sensitive_vars),
+        ) : init_length_sensitive_vars(init_length_sensitive_vars),
             formula(equalities),
             init_aut_ass(init_aut_ass),
-            m_params(par),
-            len_eq_vars(len_eq_vars) { }
+            m_params(par) { }
         
-        bool compute_next_solution() override;
-
         /**
-         * @brief Get length constraints of the solution (or overapproximation from initial
-         * assignment if decision procedure was not run yet)
-         *
-         * @param variable_map Mapping of BasicTerm variables to the corresponding z3 variables
-         * @return expr_ref Length formula describing all solutions
+         * Do some preprocessing (can be called only before init_computation). Can
+         * potentionally already solve the formula. If it solves the formula as sat
+         * it is still needed to check for lengths.
+         * 
+         * @param opt The type of preprocessing
+         * @param len_eq_vars Equivalence class holding variables with the same length
+         * @return lbool representing whether preprocessing solved the formula
          */
-        expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
+        lbool preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) override;
+
         void init_computation() override;
+        lbool compute_next_solution() override;
 
-        void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
+        LenNode get_initial_lengths() override;
 
-        expr_ref mk_len_aut(const expr_ref& var, std::set<std::pair<int, int>>& aut_constr);
-
-        std::unordered_set<BasicTerm> &get_init_length_vars() { return init_length_sensitive_vars; }
-
+        LenNode get_lengths() override;
     };
 }
 

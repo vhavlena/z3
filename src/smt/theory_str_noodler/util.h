@@ -25,6 +25,8 @@
 #include "formula.h"
 #include "aut_assignment.h"
 
+// FIXME most if not all these functions should probably be in theory_str_noodler
+
 namespace smt::noodler::util {
     using expr_pair = std::pair<expr_ref, expr_ref>;
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
@@ -95,58 +97,6 @@ namespace smt::noodler::util {
     std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to);
 
     /**
-     * Get symbols for formula.
-     * @param[in] equations Vector of equations in formula to get symbols from.
-     * @param[in] disequations Vector of disequations in formula to get symbols from.
-     * @param[in] regexes Vector of regexes in formula to get symbols from.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @return Set of symbols in the whole formula.
-     *
-     * TODO: Test.
-     */
-    [[nodiscard]] std::set<uint32_t> get_symbols_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
-            const vector<expr_pair_flag>& regexes,
-            const vector<expr_pair_flag>& lang_regexes,
-            const seq_util& m_util_s,
-            const ast_manager& m
-    );
-
-    /**
-     * Get automata assignment for formula.
-     * @param[in] equations Vector of equations in formula to get symbols from.
-     * @param[in] disequations Vector of disequations in formula to get symbols from.
-     * @param[out] var_name Mapping of BasicTerm variables to the corresponding z3 expressions
-     * @param[in] regexes Vector of regexes in formula to get symbols from.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @return Automata assignment for the whole formula.
-     *
-     * TODO: Test.
-     */
-    [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
-            const Formula& instance,
-            const vector<expr_pair_flag>& regexes,
-            std::map<BasicTerm, expr_ref>& var_name,
-            const seq_util& m_util_s,
-            const ast_manager& m,
-            const std::set<uint32_t>& alphabet
-    );
-
-    /**
-     * Convert expression @p expr to regex in hexadecimal format accepted by RE2.
-     * @param[in] expr Expression to be converted to regex.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
-     * @return The resulting regex.
-     */
-    [[nodiscard]] std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m,
-                                                const std::set<uint32_t>& alphabet);
-
-    /**
      * Convert expression @p expr to NFA using hexadecimal values as symbols.
      * @param[in] expression Expression to be converted to regex.
      * @param[in] m_util_s Seq util for AST.
@@ -192,40 +142,61 @@ namespace smt::noodler::util {
     void get_len_exprs(app* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res);
 
     /**
-     * @brief Create a fresh int variable.
+     * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
      *
      * @param name Infix of the name (rest is added to get a unique name)
-     * @param m ast manager
-     * @param m_util_s string ast util
-     * @param m_util_a arith ast util
-     * @return expr_ref Fresh variable
+     * FIXME same function is in theory_str_noodler, decide which to keep
      */
-    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(m_util_s.mk_skolem(m.mk_fresh_var_name(name.c_str()), 0,
-            nullptr, int_sort), m);
-        return var;
+    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, arith_util& m_util_a) {
+        app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), false);
+        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
+        return expr_ref(fresh_var, m);
     }
-
-    static expr_ref mk_int_var(const std::string& name, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a) { /// WARNING: Already present in theory_str_noodler.h, we need to consolidate
-        sort * int_sort = m.mk_sort(m_util_a.get_family_id(), INT_SORT);
-        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
-            nullptr, int_sort), m);
-        return var;
+    
+    /**
+     * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
+     *
+     * @param name Infix of the name (rest is added to get a unique name)
+     * FIXME same function is in theory_str_noodler, decide which to keep
+     */
+    static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) {
+        app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), false);
+        return expr_ref(fresh_var, m);
     }
 
     /**
-     * @brief Create a fresh int variable.
+     * @brief Get Z3 int var with exact given @p name
      *
-     * @param name Infix of the name (rest is added to get a unique name)
-     * @param m ast manager
-     * @param m_util_s string ast util
-     * @return expr_ref Fresh variable
+     * @param name Name of the var
+     */
+    static expr_ref mk_int_var(const std::string& name, ast_manager& m, arith_util& m_util_a) {
+        app* var = m.mk_const(name, m_util_a.mk_int());
+        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
+        return expr_ref(var, m);
+    }
+
+    /**
+     * @brief Get Z3 string var with exact given @p name
+     *
+     * @param name Name of the var
      */
     static expr_ref mk_str_var(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        expr_ref var(m_util_s.mk_skolem(symbol(name), 0,
-            nullptr, m_util_s.mk_string_sort()), m);
-        return var;
+        app* var = m.mk_const(name, m_util_s.mk_string_sort());
+        return expr_ref(var, m);
+    }
+
+    /**
+     * @brief Create a fresh noodler (BasicTerm) variable with a given @p name followed by a unique suffix.
+     * 
+     * The suffix contains a number which is incremented for each use of this function for a given @p name
+     * 
+     * @param name Infix of the name (rest is added to get a unique name)
+     */
+    inline BasicTerm mk_noodler_var_fresh(const std::string& name) {
+        // TODO kinda ugly, function is defined in header and have static variable
+        // so it needs to be inline, maybe we should define some variable handler class
+        static std::map<std::string,unsigned> next_id_of_name;
+        return BasicTerm{BasicTermType::Variable, name + std::string("!n") + std::to_string((next_id_of_name[name])++)};
     }
 
     /**
@@ -251,77 +222,7 @@ namespace smt::noodler::util {
      * @param m_util_a arith ast util
      * @return expr_ref
      */
-    static expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
-        switch(node.type) {
-        case LenFormulaType::LEAF:
-            if(node.atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(std::stoi(node.atom_val.get_name().encode())), m);
-            else if (node.atom_val.get_type() == BasicTermType::Literal) {
-                // for literal, get the exact length of it
-                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
-            } else {
-                auto it = variable_map.find(node.atom_val);
-                expr_ref var_expr(m);
-                if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
-                } else {
-                    var_expr = expr_ref(mk_int_var(node.atom_val.get_name().encode(), m, m_util_s, m_util_a), m);
-                }
-                return var_expr;
-            }
-
-        case LenFormulaType::PLUS: {
-            assert(node.succ.size() >= 2);
-            expr_ref plus = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                plus = m_util_a.mk_add(plus, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
-            }
-            return plus;
-        }
-
-        case LenFormulaType::EQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m_util_a.mk_eq(left, right), m);
-        }
-
-        case LenFormulaType::LEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m_util_a.mk_le(left, right), m);
-        }
-
-        case LenFormulaType::NOT: {
-            assert(node.succ.size() == 1);
-            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m.mk_not(left), m);
-        }
-
-        case LenFormulaType::AND: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_true(), m);
-            expr_ref andref = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                andref = m.mk_and(andref, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
-            }
-            return andref;
-        }
-
-        case LenFormulaType::TRUE: {
-            return expr_ref(m.mk_true(), m);
-        }
-
-        case LenFormulaType::FALSE: {
-            return expr_ref(m.mk_false(), m);
-        }
-
-        }
-
-        assert(false);
-        return {{}, m};
-    }
+    expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a);
 }
 
 #endif

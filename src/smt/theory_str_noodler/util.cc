@@ -14,6 +14,7 @@ namespace {
 namespace smt::noodler::util {
 
     void throw_error(std::string errMsg) {
+        // TODO maybe for benchnarking throw_error in release should also really throw error
 #ifndef NDEBUG
         // for debugging, we use std::runtime_error, because that one is not caught by z3
         throw std::runtime_error(errMsg);
@@ -215,216 +216,6 @@ namespace smt::noodler::util {
         return dummy_symbols;
     }
 
-    std::set<uint32_t> get_symbols_for_formula(
-            const vector<expr_pair>& equations,
-            const vector<expr_pair>& disequations,
-            const vector<expr_pair_flag>& regexes,
-            const vector<expr_pair_flag>& lang_regexes,
-            const seq_util& m_util_s,
-            const ast_manager& m
-    ) {
-        std::set<uint32_t> symbols_in_formula{};
-        for (const auto &word_equation: equations) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: disequations) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &word_equation: regexes) {
-            util::extract_symbols(std::get<1>(word_equation), m_util_s, m, symbols_in_formula);
-        }
-
-        for (const auto &lang_eq: lang_regexes) {
-            util::extract_symbols(std::get<0>(lang_eq), m_util_s, m, symbols_in_formula);
-            util::extract_symbols(std::get<1>(lang_eq), m_util_s, m, symbols_in_formula);
-        }
-        return symbols_in_formula;
-    }
-
-    AutAssignment create_aut_assignment_for_formula(
-            const Formula& instance,
-            const vector<expr_pair_flag>& regexes,
-            std::map<BasicTerm, expr_ref>& var_name,
-            const seq_util& m_util_s,
-            const ast_manager& m,
-            const std::set<uint32_t>& noodler_alphabet
-    ) {
-        // Find all variables in the whole formula.
-        std::unordered_set<BasicTerm> variables_in_formula{};
-
-        for (const auto &pred: instance.get_predicates()) {
-            auto vars = pred.get_vars();
-            variables_in_formula.insert(vars.begin(), vars.end());
-        }
-
-        AutAssignment aut_assignment{};
-        aut_assignment.set_alphabet(noodler_alphabet);
-        // Create automata from their corresponding regexes.
-        std::unordered_set<std::string> variables_with_regex{};
-        for (const auto &word_equation: regexes) {
-            const auto& variable{ std::get<0>(word_equation) };
-            assert(is_app(variable));
-            const auto& variable_app{ to_app(variable) };
-            assert(variable_app->get_num_args() == 0);
-            const auto& variable_name{ variable_app->get_decl()->get_name().str() };
-            variables_with_regex.insert(variable_name);
-            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-            // If the regular constraint is in a negative form, create a complement of the regular expression instead.
-            const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
-            auto aut_ass_it{ aut_assignment.find(variable_term) };
-            if (aut_ass_it != aut_assignment.end()) {
-                // This variable already has some regular constraints. Hence, we create an intersection of the new one
-                //  with the previously existing.
-                aut_ass_it->second = std::make_shared<Nfa>(
-                        Mata::Nfa::reduce(Mata::Nfa::intersection(nfa, *aut_ass_it->second)));
-
-            } else { // We create a regular constraint for the current variable for the first time.
-                aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
-                var_name.insert({variable_term, variable});
-            }
-        }
-
-        // Assign sigma start automata for all yet unassigned variables.
-        Mata::OnTheFlyAlphabet mata_alphabet;
-        std::string hex_symbol_string;
-        for (const uint32_t symbol : noodler_alphabet) {
-            mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-        }
-
-        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::create_sigma_star_nfa(&mata_alphabet));
-        // remove the pointer to alphabet in the automaton, as it point to local variable (and we have the alphabet in aut_assignment)
-        nfa_sigma_star->alphabet = nullptr;
-        for (const auto& variable : variables_in_formula) {
-            if (variables_with_regex.find(variable.get_name().encode()) == variables_with_regex.end()) {
-                assert(aut_assignment.find(variable) == aut_assignment.end());
-                aut_assignment[variable] = nfa_sigma_star;
-            }
-        }
-
-        STRACE("str-nfa",
-            tout << "Created automata assignment for formula:" << std::endl;
-            for (const auto& single_aut_assignment: aut_assignment) {
-               tout << single_aut_assignment.first.get_name() << std::endl;
-               single_aut_assignment.second->print_to_DOT(tout);
-            }
-        );
-
-        return aut_assignment;
-    }
-
-    std::string conv_to_regex_hex(const app *expr, const seq_util& m_util_s, const ast_manager& m, const std::set<uint32_t>& alphabet) {
-        std::string regex{};
-        if (m_util_s.re.is_to_re(expr)) { // Handle conversion to regex function call.
-            // Assume that expression inside re.to_re() function is a string of characters.
-            SASSERT(expr->get_num_args() == 1);
-            const auto arg{ expr->get_arg(0) };
-            regex = conv_to_regex_hex(to_app(arg), m_util_s, m, alphabet);
-        } else if (m_util_s.re.is_concat(expr)) { // Handle concatenation.
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{ expr->get_arg(0) };
-            const auto right{ expr->get_arg(1) };
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            regex = conv_to_regex_hex(to_app(left), m_util_s, m, alphabet) + conv_to_regex_hex(to_app(right), m_util_s, m, alphabet);
-        } else if (m_util_s.re.is_antimirov_union(expr)) { // Handle Antimirov union.
-            assert(false && "re.is_antimirov_union(expr)");
-        } else if (m_util_s.re.is_complement(expr)) { // Handle complement.
-            assert(false && "re.is_complement(expr)");
-        } else if (m_util_s.re.is_derivative(expr)) { // Handle derivative.
-            assert(false && "re.is_derivative(expr)");
-        } else if (m_util_s.re.is_diff(expr)) { // Handle diff.
-            assert(false && "re.is_diff(expr)");
-        } else if (m_util_s.re.is_dot_plus(expr)) { // Handle dot plus.
-            assert(false && "re.is_dot_plus(expr)");
-        } else if (m_util_s.re.is_empty(expr)) { // Handle empty string.
-            assert(false && "re.is_empty(expr)");
-        } else if (m_util_s.re.is_epsilon(expr)) { // Handle epsilon.
-            assert(false && "re.is_epsilon(expr)");
-        } else if (m_util_s.re.is_full_char(expr)) { // Handle full char (single occurrence of any string symbol, '.').
-            regex += "[";
-            std::stringstream convert_stream;
-            for (const auto& symbol : alphabet) {
-                convert_stream << std::dec << "\\x{" << std::hex << symbol << std::dec << "}";
-            }
-            regex += convert_stream.str();
-            regex += "]";
-        } else if (m_util_s.re.is_full_seq(expr)) {
-            // Handle full sequence of characters (any sequence of characters, '.*') (SMT2: re.all).
-
-            regex += "[";
-            std::stringstream convert_stream;
-            for (const auto& symbol : alphabet) {
-                convert_stream << std::dec << "\\x{" << std::hex << symbol << std::dec << "}";
-            }
-            regex += convert_stream.str();
-            regex += "]*";
-        } else if (m_util_s.re.is_intersection(expr)) { // Handle intersection.
-            assert(false && "re.is_intersection(expr)");
-        } else if (m_util_s.re.is_loop(expr)) { // Handle loop.
-            assert(false && "re.is_loop(expr)");
-        } else if (m_util_s.re.is_of_pred(expr)) { // Handle of predicate.
-            assert(false && "re.is_of_pred(expr)");
-        } else if (m_util_s.re.is_opt(expr)) { // Handle optional.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")?";
-        } else if (m_util_s.re.is_range(expr)) { // Handle range.
-            SASSERT(expr->get_num_args() == 2);
-            const auto range_begin{ expr->get_arg(0) };
-            const auto range_end{ expr->get_arg(1) };
-            SASSERT(is_app(range_begin));
-            SASSERT(is_app(range_end));
-            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
-            auto current_value{ range_begin_value };
-            std::stringstream convert_stream;
-            while (current_value <= range_end_value) {
-                convert_stream << std::dec << "\\x{" << std::hex << current_value << std::dec << "}";
-                ++current_value;
-            }
-            regex = "[" + convert_stream.str() + "]";
-        } else if (m_util_s.re.is_reverse(expr)) { // Handle reverse.
-            assert(false && "re.is_reverse(expr)");
-        } else if (m_util_s.re.is_union(expr)) { // Handle union (= or; A|B).
-            SASSERT(expr->get_num_args() == 2);
-            const auto left{ expr->get_arg(0) };
-            const auto right{ expr->get_arg(1) };
-            SASSERT(is_app(left));
-            SASSERT(is_app(right));
-            regex = "(" + conv_to_regex_hex(to_app(left), m_util_s, m, alphabet) + ")|(" + conv_to_regex_hex(to_app(right), m_util_s, m, alphabet) + ")";
-        } else if (m_util_s.re.is_star(expr)) { // Handle star iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")*";
-        } else if (m_util_s.re.is_plus(expr)) { // Handle positive iteration.
-            SASSERT(expr->get_num_args() == 1);
-            const auto child{ expr->get_arg(0) };
-            SASSERT(is_app(child));
-            regex = "(" + conv_to_regex_hex(to_app(child), m_util_s, m, alphabet) + ")+";
-        } else if(m_util_s.str.is_string(expr)) { // Handle string literal.
-            SASSERT(expr->get_num_parameters() == 1);
-            const zstring string_literal{ expr->get_parameter(0).get_zstring() };
-            std::stringstream convert_stream;
-            for (size_t i{ 0 }; i < string_literal.length(); ++i) {
-                convert_stream << std::dec << "\\x{" << std::hex << string_literal[i] << std::dec << "}";
-                // std::setfill('0') << std::setw(2) <<
-            }
-            regex = convert_stream.str();
-        } else if(is_variable(expr, m_util_s)) { // Handle variable.
-            assert(false && "is_variable(expr)");
-        }
-
-        //std::cout << regex << "\n";
-        return regex;
-    }
-
     [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const std::set<uint32_t>& alphabet, bool determinize, bool make_complement) {
         Nfa nfa{};
@@ -624,10 +415,6 @@ namespace smt::noodler::util {
             throw_error("unsupported operation in regex");
         }
 
-        STRACE("str-create_nfa",
-            tout << "--------------" << (make_complement ? "Complemented " : "") << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
-        );
-
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.size() < 1000) {
@@ -637,9 +424,15 @@ namespace smt::noodler::util {
             nfa = Mata::Nfa::minimize(nfa);
         }
 
+        STRACE("str-create_nfa",
+            tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
+            nfa.print_to_DOT(tout);
+        );
+
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
+            STRACE("str-create_nfa", tout << "Complemented NFA:" << std::endl;);
             Mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
@@ -648,10 +441,8 @@ namespace smt::noodler::util {
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
+            STRACE("str-create_nfa", nfa.print_to_DOT(tout););
         }
-        STRACE("str-create_nfa",
-            nfa.print_to_DOT(tout);
-        );
         return nfa;
     }
 
@@ -734,5 +525,105 @@ namespace smt::noodler::util {
         } 
         
         return true;
+    }
+
+    expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a) {
+        switch(node.type) {
+        case LenFormulaType::LEAF:
+            if(node.atom_val.get_type() == BasicTermType::Length)
+                return expr_ref(m_util_a.mk_int(std::stoi(node.atom_val.get_name().encode())), m);
+            else if (node.atom_val.get_type() == BasicTermType::Literal) {
+                // for literal, get the exact length of it
+                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
+            } else {
+                auto it = variable_map.find(node.atom_val);
+                expr_ref var_expr(m);
+                if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+                    var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
+                } else {
+                    var_expr = mk_int_var(node.atom_val.get_name().encode(), m, m_util_a);
+                }
+                return var_expr;
+            }
+
+        case LenFormulaType::PLUS: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(0), m);
+            expr_ref plus = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                plus = m_util_a.mk_add(plus, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return plus;
+        }
+
+        case LenFormulaType::TIMES: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(1), m);
+            expr_ref times = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                times = m_util_a.mk_mul(times, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return times;
+        }
+
+        case LenFormulaType::EQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
+            return expr_ref(m_util_a.mk_eq(left, right), m);
+        }
+
+        case LenFormulaType::NEQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
+            return expr_ref(m.mk_not(m_util_a.mk_eq(left, right)), m);
+        }
+
+        case LenFormulaType::LEQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
+            return expr_ref(m_util_a.mk_le(left, right), m);
+        }
+
+        case LenFormulaType::NOT: {
+            assert(node.succ.size() == 1);
+            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            return expr_ref(m.mk_not(left), m);
+        }
+
+        case LenFormulaType::AND: {
+            if(node.succ.size() == 0)
+                return expr_ref(m.mk_true(), m);
+            expr_ref andref = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                andref = m.mk_and(andref, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return andref;
+        }
+
+        case LenFormulaType::OR: {
+            if(node.succ.size() == 0)
+                return expr_ref(m.mk_false(), m);
+            expr_ref orref = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                orref = m.mk_or(orref, len_to_expr(node.succ[i], variable_map, m, m_util_s, m_util_a));
+            }
+            return orref;
+        }
+
+        case LenFormulaType::TRUE: {
+            return expr_ref(m.mk_true(), m);
+        }
+
+        case LenFormulaType::FALSE: {
+            return expr_ref(m.mk_false(), m);
+        }
+
+        default:
+            throw_error("Unexpected length formula type");
+            return {{}, m};
+        }
     }
 }

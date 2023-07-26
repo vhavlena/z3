@@ -33,7 +33,6 @@ Eternal glory to Yu-Fang.
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "decision_procedure.h"
-#include "lang_decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
 #include "var_union_find.h"
@@ -41,27 +40,30 @@ Eternal glory to Yu-Fang.
 
 namespace smt::noodler {
 
+    // FIXME add high level explanation of how this works (length vars are got from init_search_eh, predicates are translated in relevant_eh, final_check_eh does this and that etc)
+    // FIXME a lot of stuff in this class comes from trau/z3str3 we still need to finish cleaning
     class theory_str_noodler : public theory {
     protected:
 
         int m_scope_level = 0;
-        static bool is_over_approximation;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
         arith_util m_util_a;
         seq_util m_util_s;
-        //ast_manager& m;
 
+        // equivalence of z3 terms based on their length (terms are equiv if their length is for sure the same)
         var_union_find var_eqs;
 
-        StateLen<bool> state_len;
+        // variables whose lengths are important
         obj_hashtable<expr> len_vars;
 
+        // used in final_check_eh, maps noodler variables to z3 string variables
         std::map<BasicTerm, expr_ref> var_name;
 
         // mapping predicates and function to variables that they substitute to
         obj_map<expr, expr*> predicate_replace;
 
+        // TODO what are these?
         std::vector<app_ref> axiomatized_len_axioms;
         obj_hashtable<expr> axiomatized_terms;
         obj_hashtable<expr> axiomatized_persist_terms;
@@ -70,29 +72,30 @@ namespace smt::noodler {
         expr_ref_vector     m_length;             // length applications themselves
         std::vector<std::pair<expr_ref, expr_ref>> axiomatized_instances;
 
+        // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
         obj_map<expr, unsigned> bool_var_int;
         obj_hashtable<expr> bool_var_state;
 
-        std::set<std::pair<int,int>> axiomatized_eq_vars;
         using expr_pair = std::pair<expr_ref, expr_ref>;
         using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
-        using tvar_pair = std::pair<theory_var , theory_var >;
 
-        scoped_vector<tvar_pair> m_word_eq_var_todo;
-        scoped_vector<tvar_pair> m_word_diseq_var_todo;
+        // constraints that are (possibly) to be processed in final_check_eh (added either in relevant_eh or ?assign_eh?)
+        // they also need to be popped and pushed in pop_scope_eh and push_scope_eh)
+        scoped_vector<expr_pair> m_word_eq_todo; // pair contains left and right side of the (word) equality
+        scoped_vector<expr_pair> m_word_diseq_todo; // pair contains left and right side of the (word) disequality
+        scoped_vector<expr_pair> m_lang_eq_todo; //pair contains left and right side of the language equality
+        scoped_vector<expr_pair> m_lang_diseq_todo; // pair contains left and right side of the language disequality
+        scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
+        scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
 
-
-        scoped_vector<expr_pair> m_lang_eq_todo;
-        scoped_vector<expr_pair> m_word_eq_todo;
-        scoped_vector<expr_pair> m_word_diseq_todo;
-        scoped_vector<expr_pair> m_lang_diseq_todo;
-        scoped_vector<expr_pair> m_not_contains_todo;
-        scoped_vector<expr_pair_flag> m_membership_todo;
-        vector<expr_pair> m_word_eq_todo_rel;
-        vector<expr_pair> m_word_diseq_todo_rel;
-        vector<expr_pair_flag> m_lang_eq_todo_rel;
-        vector<expr_pair_flag> m_membership_todo_rel;
+        // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
+        // todo constraints and check if they are relevant for current SAT assignment => if they are
+        // they are added to one of these sets
+        vector<expr_pair> m_word_eq_todo_rel; // pair contains left and right side of the equality
+        vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the disequality
+        vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
+        vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -120,67 +123,71 @@ namespace smt::noodler {
         void finalize_model(model_generator& mg) override;
         lbool validate_unsat_core(expr_ref_vector& unsat_core) override;
 
+        // FIXME ensure_enode is non-virtual function of theory, why are we redegfining it?
+        enode* ensure_enode(expr* e);
+
         void add_length_axiom(expr* n);
 
-        expr_ref mk_str_var(symbol const&);
-        enode* ensure_enode(expr* a);
-        expr_ref mk_skolem(symbol const& s, expr *e1, expr *e2 = nullptr, expr *e3 = nullptr,
-                           expr *e4 = nullptr, sort *sort = nullptr);
-        expr_ref mk_len(expr* s) const { return expr_ref(m_util_s.str.mk_length(s), m); }
-
-        void add_axiom(expr *e);
-        void add_block_axiom(expr *const e);
-        literal mk_eq_empty(expr* n, bool phase = true);
-        expr_ref mk_last(expr* e);
-        expr_ref mk_first(expr* e);
+        /**
+         * @brief Get concatenation of e1 and e2
+         */
         expr_ref mk_concat(expr* e1, expr* e2);
 
-        lbool check_len_sat(expr_ref len_formula, model_ref &mod);
-
+        /**
+         * @brief Creates literal representing that n is empty string
+         */
+        literal mk_eq_empty(expr* n);
 
         bool has_length(expr *e) const { return m_has_length.contains(e); }
-        void add_length(expr* e);
         void enforce_length(expr* n);
 
         ~theory_str_noodler() {}
 
     protected:
-        bool is_of_this_theory(expr *e) const;
-        bool is_string_sort(expr *e) const;
-        bool is_regex_sort(expr *e) const;
-        bool is_const_fun(expr *e) const;
-
-        /**
-         * Check whether an @p expression is a string variable.
-         *
-         * Function checks only the top-level expression and is not recursive.
-         * Regex variables do not count as string variables.
-         * @param expression Expression to check.
-         * @return True if @p expression is a variable, false otherwise.
-         */
-        bool is_str_variable(const expr* expression) const;
-
-        /**
-         * Check whether an @p expression is any kind of variable (string, regex, integer).
-         *
-         * Function checks only the top-level expression and is not recursive.
-         * @param expression Expression to check.
-         * @return True if @p expression is a variable, false otherwise.
-         */
-        bool is_variable(const expr* expression) const;
-
-        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
-
         expr_ref mk_sub(expr *a, expr *b);
-        zstring print_word_term(expr * a) const;
-
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
-        expr_ref mk_str_var(const std::string& name);
-        expr_ref mk_int_var(const std::string& name);
+        /**
+         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
+         *
+         * @param name Infix of the name (rest is added to get a unique name)
+         * FIXME same function is in theory_str_noodler, decide which to keep
+         */
+        expr_ref mk_str_var_fresh(const std::string& name);
+        /**
+         * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
+         *
+         * @param name Infix of the name (rest is added to get a unique name)
+         * FIXME same function is in theory_str_noodler, decide which to keep
+         */
+        expr_ref mk_int_var_fresh(const std::string& name);
 
-        void add_axiom(std::initializer_list<literal> ls);
+        /**
+         * @brief Transforms LenNode to the z3 formula
+         * 
+         * Uses mapping var_name, those variables v that are mapped are assumed to be string variables
+         * and will be transformed into (str.len v) while other variables (which are probably created
+         * during preprocessing/decision procedure) are taken as int variables.
+         */
+        expr_ref len_node_to_z3_formula(const LenNode& len_formula);
+
+        /**
+         * @brief Adds @p e as a theory axiom (i.e. to SAT solver).
+         * 
+         * @param e Axiom to add, probably should be a predicate.
+         * 
+         * TODO Nobody probably knows what happens in here.
+         */
+        void add_axiom(expr *e);
+        /**
+         * @brief Adds a new clause of literals from @p ls.
+         * 
+         * TODO Nobody probably knows what happens in here, and it is a bit different than the other add_axiom
+         */
+        void add_axiom(std::vector<literal> ls);
+
+        // methods for rewriting different predicates into something simpler that we can handle
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
         void handle_substr_int(expr *e);
@@ -193,37 +200,94 @@ namespace smt::noodler {
         void handle_contains(expr *e);
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
+
         void set_conflict(const literal_vector& ls);
-        void block_curr_assignment();
-        bool block_curr_len(expr_ref len_formula);
+
         expr_ref construct_refinement();
-        void block_curr_lang();
-        void dump_assignments() const;
         void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
         void propagate_concat_axiom(enode * cat);
         void propagate_basic_string_axioms(enode * str);
-        void tightest_prefix(expr*,expr*);
-        void print_ast(expr *e);
-        void print_ctx(context& ctx);
 
-        void block_len(int n_cnt);
-        void block_len_single(int n_cnt, const app_ref& bool_var, expr_ref& refine);
+        /**
+         * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,
+         * or string term @p s does not occur in @p x@p s other than at the end. I.e. we are checking
+         * (not-negated assumptions) -> (string term @p s does not occur in @p x@p s other than at the end)
+         * 
+         * It does it by checking that s does not occur anywhere in xs reduced by one character (i.e. xs[0:-2])
+         * 
+         * Translates to the following theory axioms:
+         * not(s = eps) -> neg_assumptions || s = s1.s2
+         * not(s = eps) -> neg_assumptions || s2 in re.allchar (is a single character)
+         * not(s = eps) -> neg_assumptions || not(contains(x.s1, s))
+         * (s = eps) && (x != eps) -> neg_assumptions
+         * 
+         * For the case that s is a string literal, we do not add the two first axioms and we take s1 = s[0:-2].
+         * 
+         * @param neg_assumptions Negated assumptions that have to hold for checking tightest prefix
+         */
+        void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
-        void get_len_state_var(const obj_hashtable<expr>& conj, app_ref* bool_var);
-        void update_len_state_var(const obj_hashtable<expr>& conj, const app_ref& bool_var);
-        std::vector<app_ref> find_state_var(const obj_hashtable<expr>& conj);
+        /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 
+        /**
+         * @brief Adds string constraints from *_todo that are relevant for SAT checking to *_todo_rel.
+         */
         void remove_irrelevant_constr();
 
+        /**
+        Convert (dis)equation @p ex to the instance of Predicate. As a side effect updates mapping of
+        variables (BasicTerm) to the corresponding z3 expr.
+        @param ex Z3 expression to be converted to Predicate.
+        @return Instance of predicate
+        */
         Predicate conv_eq_pred(app* expr);
-
-        void conj_instance(const obj_hashtable<app>& conj, Formula &res);
-        Formula conv_lang_instance(const std::set<Mata::Symbol>& alphabet, AutAssignment& out);
-
+        /**
+         * @brief Creates noodler formula containing relevant word equations and disequations
+         */
+        Formula get_word_formula_from_relevant();
+        /**
+         * @brief Get all symbols used in relevant word (dis)equations and memberships
+         */
+        std::set<Mata::Symbol> get_symbols_from_relevant();
+        /**
+         * Get automata assignment for formula @p instance using relevant memberships in m_membership_todo_rel.
+         * As a side effect updates mapping of variables (BasicTerm) to the corresponding z3 expr.
+         * @param instance Formula containing (dis)equations
+         * @param noodler_alphabet Set of symbols occuring in the formula and memberships
+         */
+        [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
+                const Formula& instance,
+                const std::set<Mata::Symbol>& noodler_alphabet
+        );
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+
+        /**
+         * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them
+         * does not hold, returns false and also blocks it in the SAT assignment.
+         */
+        bool solve_lang_eqs_diseqs();
+        /**
+         * Solve the problem using underapproximating decision procedure, if it returns l_true,
+         * the original formula is SAT, otherwise we need to run normal decision procedure.
+         */
+        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+
+        /**
+         * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
+         */
+        lbool check_len_sat(expr_ref len_formula);
+
+        /**
+         * @brief Blocks current SAT assignment for given @p len_formula
+         * 
+         * TODO explain better
+         */
+        void block_curr_len(expr_ref len_formula);
+
+        /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
 

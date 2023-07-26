@@ -260,18 +260,16 @@ namespace smt::noodler {
      */
     class NielsenDecisionProcedure : public AbstractDecisionProcedure {
     private:
-        ast_manager& m;
-        seq_util& m_util_s;
-        arith_util& m_util_a;
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
-        FormulaPreprocess prep_handler;
         const theory_str_noodler_params& m_params;
 
         std::vector<NielsenGraph> graphs {};
         std::vector<std::vector<Path<CounterLabel>>> length_paths;
         size_t length_paths_index = 0;
+
+        LenNode length_formula_for_solution = LenNode(LenFormulaType::TRUE);
 
     protected:
         // functions for the construction of a Nielsen graph
@@ -284,8 +282,15 @@ namespace smt::noodler {
         Formula trim_formula(const Formula& formula) const;
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
 
-        // counter system creation
-        CounterSystem create_counter_system(const NielsenGraph& graph) const;
+        /**
+         * @brief Create a counter system from the Nielsen graph.
+         * 
+         * Returns false if the counter system cannot be created.
+         * 
+         * @param graph Graph to be converted to the counter system.
+         * @param[out] result Created counter system
+         */
+        bool create_counter_system(const NielsenGraph& graph, CounterSystem& result) const;
 
         // counter graph condensation
         static void condensate_counter_system(CounterSystem& cs);
@@ -293,18 +298,15 @@ namespace smt::noodler {
 
         // extraction of a promising part of the condensated counter graph
         std::set<SelfLoop<CounterLabel>> find_self_loops(const CounterSystem& cs) const;
-        Path<CounterLabel> get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl);
+        bool get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, Path<CounterLabel>& result);
 
         // construct length formula
-        expr_ref length_formula_path(const Path<CounterLabel>& path, const std::map<BasicTerm, expr_ref>& variable_map, std::map<BasicTerm, expr_ref>& actual_var_map);
-        expr_ref get_label_formula(const CounterLabel& lab, std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
-        expr_ref get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, expr_ref>& in_vars, expr_ref& out_var);
-        expr_ref generate_len_connection(const std::map<BasicTerm, expr_ref>& variable_map, const std::map<BasicTerm, expr_ref>& actual_var_map);
+        bool length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
+        bool get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
+        bool get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
+        bool generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
 
     public:
-        NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const theory_str_noodler_params& par);
-
-        NielsenDecisionProcedure(ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
         
         /**
          * Initialize a new decision procedure that can solve language (dis)equality constraints.
@@ -312,22 +314,24 @@ namespace smt::noodler {
          * @param equalities encodes the language equations
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA)
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
-         * @param m Z3 AST manager
-         * @param m_util_s Z3 string manager
-         * @param m_util_a Z3 arithmetic manager
          * @param par Parameters for Noodler string theory.
          */
         NielsenDecisionProcedure(const Formula &equalities, AutAssignment init_aut_ass,
                            const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                           ast_manager& m, seq_util& m_util_s, arith_util& m_util_a,
                            const theory_str_noodler_params& par
-         );
+         ) : init_length_sensitive_vars{ init_length_sensitive_vars },
+             formula { equalities },
+             init_aut_ass{ init_aut_ass },
+             m_params(par) { }
 
-        bool compute_next_solution() override;
-        expr_ref get_lengths(const std::map<BasicTerm, expr_ref>& variable_map) override;
+        lbool compute_next_solution() override;
+        LenNode get_initial_lengths() override {
+            return LenNode(LenFormulaType::TRUE);
+        }
+        LenNode get_lengths() override;
         void init_computation() override;
 
-        void preprocess(PreprocessType opt = PreprocessType::PLAIN) override;
+        lbool preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) override;
 
     };
 
