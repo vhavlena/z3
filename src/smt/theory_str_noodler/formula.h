@@ -297,6 +297,17 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if the predicate contains only constant strings.
+         */
+        bool is_str_const() const {
+            for(const auto& side : this->params) {
+                for(const BasicTerm& t : side)
+                    if(!t.is_literal()) return false;
+            }
+            return true;
+        }
+
+        /**
          * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
          * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
          *

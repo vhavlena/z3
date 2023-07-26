@@ -362,6 +362,8 @@ namespace smt::noodler {
         void refine_languages();
         void reduce_diseqalities();
 
+        bool contains_unsat_predicates() const;
+
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
          *

@@ -1074,12 +1074,14 @@ namespace smt::noodler {
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                if(is_sigma_star(pr.second.get_left_set())) {
+                auto left_set = pr.second.get_left_set();
+                if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                if(is_sigma_star(pr.second.get_right_set())) {
+                auto right_set = pr.second.get_right_set();
+                if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
                 }               
             }
@@ -1238,6 +1240,31 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
+    }
+
+    /**
+     * @brief Check if the instance is clearly unsatisfiable.
+     * 
+     * @return True --> unsat for sure.
+     */
+    bool FormulaPreprocessor::contains_unsat_predicates() const {
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(pr.second.is_inequation() && pr.second.get_left_side() == pr.second.get_right_side()) {
+                return true;
+            }
+            if(pr.second.is_equation() && pr.second.is_str_const()) {
+                zstring left{};
+                zstring right{};
+                for(const BasicTerm& t : pr.second.get_left_side()) {
+                    left = left + t.get_name();
+                }
+                for(const BasicTerm& t : pr.second.get_right_side()) {
+                    right = right + t.get_name();
+                }
+                if(left != right) return true;
+            }
+        }
+        return false;
     }
 
 } // Namespace smt::noodler.
