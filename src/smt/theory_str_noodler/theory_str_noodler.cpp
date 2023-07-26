@@ -1208,6 +1208,45 @@ namespace smt::noodler {
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
+        expr_ref v = mk_str_var_fresh("substr");
+
+        // Check if the substring is of the form str.substr x k 1 and rewrite to str.at x k
+        rational num_l;
+        if(m_util_a.is_numeral(l, num_l) && num_l == 1) {
+            expr_ref at(m_util_s.str.mk_at(s, i), m);
+            add_axiom({mk_eq(v, e, false)});
+            add_axiom({mk_eq(v, at, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+
+        // check the form str.substr "B" x y
+        zstring str_s;
+        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
+            expr_ref zero(m_util_a.mk_int(0), m);
+            expr_ref one(m_util_a.mk_int(1), m);
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+
+            literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
+            literal i_ge_1 = mk_literal(m_util_a.mk_ge(i, one));
+            literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
+
+            add_axiom({~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
+            add_axiom({~i_ge_1, mk_eq(v, eps, false)});
+            add_axiom({~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, e, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+        // check the form str.substr "" x y --> str.substr "" x y == ""
+        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            add_axiom({mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, e, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+
         expr* num = nullptr;
         expr* pred = nullptr;
         rational r;
@@ -1219,7 +1258,6 @@ namespace smt::noodler {
         expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
         m_rewrite(post_bound); // simplify
 
-        expr_ref v = mk_str_var_fresh("substr");
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
         expr_ref y = mk_str_var_fresh("post_substr");
