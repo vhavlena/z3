@@ -245,7 +245,7 @@ namespace smt::noodler {
         bool is_var_empty_word(const BasicTerm& var) { return (substitution_map.count(var) > 0 && substitution_map.at(var).empty()); }
 
         /**
-         * @brief Get the vector of variables substituting @p var
+         * @brief Get the vector of variables substituting @p var.
          * 
          * In the case that @p var is not substituted (it is mapped to automaton), we return { @p var }.
          * Useful especially after calling flatten_subtitution_map().
@@ -274,34 +274,21 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+        std::vector<std::tuple<BasicTerm,BasicTerm,TranformationType>> transformations;
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
+        std::vector<LenNode> disequations_len_formula_conjuncts;
 
         const theory_str_noodler_params& m_params;
 
-        // contains pairs ((a1, a2), (len1, len2)) where we want formula (len2 or (len1 and (a1 != a2))) to hold, see replace_disequalities
-        std::map<std::pair<BasicTerm, BasicTerm>,std::pair<LenNode, LenNode>> dis_len;
-
-        std::vector<std::tuple<BasicTerm, BasicTerm, TranformationType>> tranformations;
-
         /**
-         * @brief Replace disequality L != R with equalities and a length constraint saved in dis_len.
+         * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
          * 
          * @param diseq Disequality to replace
          * @return Vector with created equalities
          */
         std::vector<Predicate> replace_disequality(Predicate diseq);
-
-        /**
-         * Gets the lengths constraints (from solution) for each disequation. For each diseqation it adds
-         * length constraint (|L| != |R| or (|x_1| == |x_2| and a_1 != a_2)) where L = x_1 a_1 y_1 and
-         * R = x_2 a_2 y_2 were created during replace_disequality().
-         * Assumes that substitution map of solution is flattened (solution.flatten_substitution_map())
-         * 
-         * @param[out] a_vars - all the a_1/a_2 vars whose exact symbol is needed for disequality check (used for to/from_int/code)
-         */
-        LenNode diseqs_formula(std::set<BasicTerm>& a_vars);
 
         LenNode tranformation_formula(const std::set<BasicTerm>& a_vars);
 
