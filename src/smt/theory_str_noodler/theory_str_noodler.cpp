@@ -1220,7 +1220,7 @@ namespace smt::noodler {
             return;
         }
 
-        // check the form str.substr "B" x y
+        // check the form str.substr "B" i l
         zstring str_s;
         if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
             expr_ref zero(m_util_a.mk_int(0), m);
@@ -1228,12 +1228,23 @@ namespace smt::noodler {
             expr_ref eps(m_util_s.str.mk_string(""), m);
 
             literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
+            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
+            literal l_eq_0 = mk_literal(m_util_a.mk_eq(l, zero));
             literal i_ge_1 = mk_literal(m_util_a.mk_ge(i, one));
             literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
+            literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
 
-            add_axiom({~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
-            add_axiom({~i_ge_1, mk_eq(v, eps, false)});
-            add_axiom({~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, eps, false)});
+            // l < 0 -> v = eps
+            add_axiom({l_ge_0, mk_eq(v, eps, false)});
+            // l >= 0 && i = 0 && i >= 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
+            // l >= 0 && i >= 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_ge_1, mk_eq(v, eps, false)});
+            // l >= 0 && i = 0 && l < 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
+            // substr(s, i, l) = v
             add_axiom({mk_eq(v, e, false)});
             this->predicate_replace.insert(e, v.get());
             return;
