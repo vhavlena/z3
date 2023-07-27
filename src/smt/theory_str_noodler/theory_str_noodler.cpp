@@ -893,16 +893,16 @@ namespace smt::noodler {
             if (result == l_true) {
                 lengths = len_node_to_z3_formula(dec_proc.get_lengths());
                 if (check_len_sat(lengths) == l_true) {
-                    STRACE("str", tout << "len sat" << mk_pp(lengths, m) << std::endl;);
+                    STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     return FC_DONE;
                 } else {
-                    STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
+                    STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
                     block_len = m.mk_or(block_len, lengths);
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
-                STRACE("str", tout << "assignment unsat" << mk_pp(block_len, m) << std::endl;);
+                STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
                 block_curr_len(block_len);
                 return FC_CONTINUE;
             } else {
@@ -1098,7 +1098,7 @@ namespace smt::noodler {
         // add the replacement charat -> v
         predicate_replace.insert(e, fresh.get());
         // update length variables
-        util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(s, this->m_util_s, m, this->len_vars, &this->predicate_replace);
         this->len_vars.insert(x);
     }
 
@@ -1391,7 +1391,6 @@ namespace smt::noodler {
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
         literal a_emp = mk_eq_empty(a);
         literal s_emp = mk_eq_empty(s);
-        literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
         zstring str_a;
         // str.replace "A" s t where a = "A"
@@ -1399,9 +1398,10 @@ namespace smt::noodler {
             // s = emp -> v = t.a
             add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
             // s = a -> v = t
-            add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
+            // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
             // s != eps && s != a -> v = a
-            add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, s,false)});
+            add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
             // replace(a,s,t) = v
             add_axiom({mk_eq(v, r, false)});
             predicate_replace.insert(r, v.get());
@@ -1418,6 +1418,7 @@ namespace smt::noodler {
             return;
         }
 
+        literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
         // replace(a,s,t) = v
         add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
@@ -1705,8 +1706,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
     }
 
     /**
@@ -1789,8 +1790,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
     }
 
     /**
