@@ -1,4 +1,5 @@
 #include "inclusion_graph.h"
+#include "util.h"
 
 namespace {
     using namespace smt::noodler;
@@ -25,6 +26,9 @@ namespace {
         auto& predicate{ node->get_predicate() };
         std::string result{};
         switch (predicate.get_type()) {
+            case PredicateType::NotContains: {
+                util::throw_error("Decision procedure can handle only equations and disequations");
+            }
             case PredicateType::Equation:
             case PredicateType::Inequation: {
                 std::string left_side{};

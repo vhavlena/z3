@@ -112,6 +112,18 @@ namespace smt::noodler {
                 }
                 return result;
             }
+
+            case PredicateType::NotContains: {
+                std::string result{ "Notcontains " };
+                for (const auto& item: params[0]) {
+                    result += " " + item.to_string();
+                }
+                result += " ,";
+                for (const auto& item: params[1]) {
+                    result += " " + item.to_string();
+                }
+                return result;
+            }
         }
 
         throw std::runtime_error("Unhandled predicate type passed as 'this' to to_string().");

@@ -82,6 +82,7 @@ namespace smt::noodler {
             return LenNode(LenFormulaType::AND, {result, LenNode(LenFormulaType::LEQ, {0, var})});
         } else {
             util::throw_error("Variable was neither in automata assignment nor was substituted");
+            return LenNode(BasicTerm(BasicTermType::Literal)); // return something to get rid of warnings
         }
     }
 
@@ -129,6 +130,12 @@ namespace smt::noodler {
     }
 
     lbool DecisionProcedure::compute_next_solution() {
+
+        // if we have a not contains, we give unknown
+        if(this->not_contains.get_predicates().size() > 0) {
+            return l_undef;
+        }
+
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE("str", tout << "------------------------"

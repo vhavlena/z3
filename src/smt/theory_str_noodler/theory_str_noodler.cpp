@@ -617,6 +617,7 @@ namespace smt::noodler {
         this->m_word_diseq_todo_rel.clear();
         this->m_membership_todo_rel.clear();
         this->m_lang_eq_or_diseq_todo_rel.clear();
+        this->m_not_contains_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
@@ -682,6 +683,24 @@ namespace smt::noodler {
             }
         }
 
+        // not contains
+        for(const auto& not_con_pair: this->m_not_contains_todo) {
+            app_ref con_expr(m_util_s.str.mk_contains(not_con_pair.first, not_con_pair.second), m);
+            app_ref not_con_expr(m.mk_not(con_expr), m);
+
+            STRACE("str",
+                tout << "  NOT contains " << mk_pp(con_expr.get(), m) << " is " << (ctx.is_relevant(con_expr.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(con_expr.get())
+                     << ", " << mk_pp(not_con_expr.get(), m) << " is " << (ctx.is_relevant(not_con_expr.get()) ? "" : "not ") << "relevant"
+                     << std::endl;
+            );
+
+            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) && 
+                !this->m_not_contains_todo_rel.contains(not_con_pair)) {
+                this->m_not_contains_todo_rel.push_back(not_con_pair);
+            }
+        }
+
         // TODO check for relevancy of language (dis)equations, right now we assume everything is relevant
         for(const auto& le : m_lang_eq_todo) {
             this->m_lang_eq_or_diseq_todo_rel.push_back({le.first, le.second, true});
@@ -730,14 +749,11 @@ namespace smt::noodler {
             for (const auto &led: this->m_lang_eq_or_diseq_todo_rel) {
                 tout << "    " << mk_pp(std::get<0>(led), m) << (std::get<2>(led) ? " == " : " != ") << mk_pp(std::get<1>(led), m) << std::endl;
             }
+            tout << "  not_contains(" << this->m_not_contains_todo_rel.size() << "):" << std::endl;
+            for (const auto &notc: this->m_not_contains_todo_rel) {
+                tout << "    " << mk_pp(notc.first, m) << "; " << mk_pp(notc.second, m) << std::endl;
+            }
         );
-
-        // difficult not(contains) predicates -> unknown
-        // TODO: should we check if any of those not contains are relevant? if we are not planning to check for relevancy, we can just throw error when we are processsing not contains in relevant_eh() and not here
-        if(!this->m_not_contains_todo.empty()) {
-            STRACE("str", tout << "giving up, there is not contains" << std::endl);
-            return FC_GIVEUP;
-        }
 
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
@@ -772,7 +788,7 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0) {
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             const auto& reg_data = this->m_membership_todo_rel[0];
             if(!std::get<2>(reg_data) // membership is negated
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
@@ -824,7 +840,7 @@ namespace smt::noodler {
 
         // try Nielsen transformation (if enabled) to solve
         /// FIXME: a better test for when to try nielsen might be needed
-        if(m_params.m_try_nielsen && instance.is_quadratic()) {
+        if(m_params.m_try_nielsen && instance.is_quadratic() && this->m_membership_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
             expr_ref block_len(m.mk_false(), m);

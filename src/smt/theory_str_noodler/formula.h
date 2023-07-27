@@ -31,6 +31,7 @@ namespace smt::noodler {
     enum struct PredicateType {
         Equation,
         Inequation,
+        NotContains,
     };
 
     [[nodiscard]] static std::string to_string(PredicateType predicate_type) {
@@ -39,6 +40,8 @@ namespace smt::noodler {
                 return "Equation";
             case PredicateType::Inequation:
                 return "Inequation";
+            case PredicateType::NotContains:
+                return "Notcontains";
         }
 
         throw std::runtime_error("Unhandled predicate type passed to to_string().");
@@ -509,6 +512,18 @@ namespace smt::noodler {
             }
             return ret;
         }
+
+        void extract_predicates(PredicateType type, Formula& extracted) {
+            std::vector<Predicate> new_predicates {};
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() == type) {
+                    extracted.add_predicate(pred);
+                } else {
+                    new_predicates.emplace_back(pred);
+                }
+            }
+            this->predicates = new_predicates;
+        } 
 
         /**
          * @brief Get union of variables from all predicates

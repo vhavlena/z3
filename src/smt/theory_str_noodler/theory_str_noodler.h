@@ -95,6 +95,7 @@ namespace smt::noodler {
         vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the disequality
         vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
+        vector<expr_pair> m_not_contains_todo_rel; // not contains
 
     public:
         char const * get_name() const override { return "noodler"; }

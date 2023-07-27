@@ -43,6 +43,15 @@ namespace smt::noodler {
             instance.add_predicate(inst);
         }
 
+        // construct not contains predicates
+        for(const auto& not_contains : this->m_not_contains_todo_rel) {
+            std::vector<BasicTerm> left, right;
+            util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, left);
+            util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, right);
+            Predicate inst(PredicateType::NotContains, std::vector<Concat>{left, right});
+            instance.add_predicate(inst);
+        }
+
         return instance;
     }
 
@@ -61,6 +70,11 @@ namespace smt::noodler {
 
         for (const auto &membership: m_membership_todo_rel) {
             util::extract_symbols(std::get<1>(membership), m_util_s, m, symbols_in_formula);
+        }
+        // extract from not contains
+        for(const auto& not_contains : m_not_contains_todo_rel) {
+            util::extract_symbols(not_contains.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(not_contains.second, m_util_s, m, symbols_in_formula);
         }
 
         /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
