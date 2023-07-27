@@ -272,6 +272,11 @@ namespace smt::noodler {
 
         LenNode length_formula_for_solution = LenNode(LenFormulaType::TRUE);
 
+        /**
+         * Formula containing all not_contains predicate (nothing else)
+         */
+        Formula not_contains{};
+
     protected:
         // functions for the construction of a Nielsen graph
         bool is_pred_unsat(const Predicate& pred) const;
@@ -323,7 +328,11 @@ namespace smt::noodler {
          ) : init_length_sensitive_vars{ init_length_sensitive_vars },
              formula { equalities },
              init_aut_ass{ init_aut_ass },
-             m_params(par) { }
+             m_params(par) { 
+                
+            // we extract from the input formula all not_contains predicates and add them to not_contains formula
+            this->formula.extract_predicates(PredicateType::NotContains, this->not_contains);
+        }
 
         lbool compute_next_solution() override;
         LenNode get_initial_lengths() override {
