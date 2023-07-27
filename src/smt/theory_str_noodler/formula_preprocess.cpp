@@ -1,6 +1,4 @@
-
 #include "formula_preprocess.h"
-#include <mata/nfa.hh>
 #include "util.h"
 
 namespace smt::noodler {

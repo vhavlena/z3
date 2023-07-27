@@ -24,6 +24,7 @@
 #include <map>
 #include <unordered_set>
 #include <iostream>
+
 #include "util/zstring.h"
 
 namespace smt::noodler {

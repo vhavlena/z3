@@ -2,7 +2,8 @@
 #include <utility>
 #include <algorithm>
 
-#include <mata/nfa-strings.hh>
+#include <mata/nfa/strings.hh>
+
 #include "util.h"
 #include "aut_assignment.h"
 #include "nielsen_decision_procedure.h"

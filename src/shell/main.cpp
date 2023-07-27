@@ -18,6 +18,7 @@ Revision History:
 
 --*/
 #include<iostream>
+#include <mata/utils/util.hh> // for git sha of mata
 #include "util/memory_manager.h"
 #include "util/trace.h"
 #include "util/debug.h"
@@ -39,9 +40,6 @@ Revision History:
 #include "util/file_path.h"
 #include "shell/lp_frontend.h"
 #include "shell/drat_frontend.h"
-
-// for git sha of mata
-#include "mata/util.hh"
 
 #if defined( _WINDOWS ) && defined( __MINGW32__ ) && ( defined( __GNUG__ ) || defined( __clang__ ) )
 #include <crtdbg.h>

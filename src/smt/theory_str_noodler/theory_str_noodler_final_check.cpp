@@ -1,3 +1,4 @@
+#include <mata/nfa/builder.hh>
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 
 namespace smt::noodler {
@@ -127,7 +128,7 @@ namespace smt::noodler {
 
         // create sigma star automaton for our alphabet
         Mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
-        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::create_sigma_star_nfa(&mata_alphabet));
+        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::Builder::create_sigma_star_nfa(&mata_alphabet));
         // remove the pointer to alphabet in the automaton, as it points to local variable (and we have the alphabet in aut_assignment)
         nfa_sigma_star->alphabet = nullptr;
 
