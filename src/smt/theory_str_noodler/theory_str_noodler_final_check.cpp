@@ -56,7 +56,14 @@ namespace smt::noodler {
     }
 
     std::set<Mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
-        std::set<Mata::Symbol> symbols_in_formula{};
+        /* OTHER_SYMBOL represents all symbols not occuring in the problem. It is needed,
+         * because if we have for example disequation x != y and nothing else, we would
+         * have no symbols and incorrectly say it is unsat. Similarly, for 'x not in "aaa"
+         * and |x| = 3', we would only get symbol 'a' and say (incorrectly) unsat. This
+         * symbol however needs to have special semantics, for example to_code should
+         * interpret is as anything but used symbols.
+         */
+        std::set<Mata::Symbol> symbols_in_formula{OTHER_SYMBOL};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             extract_symbols(word_equation.first, symbols_in_formula);
@@ -76,35 +83,6 @@ namespace smt::noodler {
             extract_symbols(not_contains.first, symbols_in_formula);
             extract_symbols(not_contains.second, symbols_in_formula);
         }
-
-        /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
-         * We need some dummy symbols, to represent the symbols not occuring in predicates,
-         * otherwise, we might return unsat even though the formula is sat. For example if
-         * we had x != y and no other predicate, we would have no symbols and the formula
-         * would be unsat. With one dummy symbol, it becomes sat.
-         * We add new dummy symbols for each diseqation and 'x not in RE' predicate, as we
-         * could be in situation where we have for example x != y, y != z, z != x, and
-         * |x| = |y| = |z|. If we added only one dummy symbol, then this would be unsat,
-         * but if we have three symbols, it becomes sat (which this formula is). We add
-         * dummy symbols also for 'x not in RE' because they basically represent
-         * disequations too (for example 'x not in "aaa"' and |x| = 3 should be sat, but
-         * with only symbol "a" it becomes unsat).
-         * 
-         * FIXME: We can possibly create more dummy symbols than the size of alphabet
-         * (from the string theory standard the size of the alphabet is 196607), but
-         * it is an edge-case that probably cannot happen.
-         */
-        size_t number_of_dummy_symbs = this->m_word_diseq_todo_rel.size();
-        for (const auto& membership : this->m_membership_todo_rel) {
-            if(!std::get<2>(membership)){
-                number_of_dummy_symbs++;
-            }
-        }
-        // to be safe, we set the minimum number of dummy symbols as 3
-        number_of_dummy_symbs = std::max(number_of_dummy_symbs, size_t(3));
-
-        // add needed number of dummy symbols to symbols_in_formula
-        util::get_dummy_symbols(number_of_dummy_symbs, symbols_in_formula);
 
         return symbols_in_formula;
     }

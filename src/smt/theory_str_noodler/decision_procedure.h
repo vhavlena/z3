@@ -29,6 +29,10 @@ namespace smt::noodler {
         FROM_INT,
     };
 
+    // Symbol for representing all symbols not ocurring in the problem (i.e. a minterm).
+    // We set it to 196608, as characters in smt can have value in [0, 196607].
+    const Mata::Symbol OTHER_SYMBOL = 196608;
+
     /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.

@@ -617,21 +617,50 @@ namespace smt::noodler {
     }
 
     LenNode DecisionProcedure::tranformation_formula(const std::set<BasicTerm>& a_vars) {
+        std::vector<LenNode> result_conjuncts;
         for (const std::tuple<BasicTerm, BasicTerm, TranformationType>& transf : transformations) {
             BasicTerm result = std::get<0>(transf);
             BasicTerm argument = std::get<1>(transf);
             TranformationType type = std::get<2>(transf);
+            auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
             switch (type)
             {
             case TranformationType::TO_CODE:
             {
-                //???
                 Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
-                std::vector<LenNode> bla_vars;
-                for (const BasicTerm& var : solution.get_substituted_vars(argument)) {
-                    bla_vars.emplace_back(var);
-                    for (Mata::Nfa::)
+                std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
+                std::vector<LenNode> some_disjunt = {};
+                for (const BasicTerm& var : substituted_vars) {
+                    std::vector<LenNode> to_code_disjunction;
+                    for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(var))) {
+                        if (s == OTHER_SYMBOL) {
+                            // if s == minterm => do something else
+                            std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), 196607})};
+                            for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
+                                if (s2 != OTHER_SYMBOL) {
+                                    conjuncts_here.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
+                                }
+                            }
+                            to_code_disjunction.emplace_back(LenFormulaType::AND, conjuncts_here);
+                        } else {
+                            to_code_disjunction.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
+                        }
+                    }
+                    some_disjunt.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                        LenNode(LenFormulaType::EQ, {result, to_code_var(var)}), // result is equal to to_code(var)
+                        LenNode(LenFormulaType::EQ, {var, 1}), // lenght of var is 1
+                        LenNode(LenFormulaType::OR, std::move(to_code_disjunction)) // to_code(var) is equal to code point of one of its words
+                    });
                 }
+                LenNode disjunct_some(LenFormulaType::OR, some_disjunt);
+                LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
+                LenNode result_is_defined(LenFormulaType::AND, {disjunct_some, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
+
+                LenNode result_is_undefined(LenFormulaType::AND, {LenNode(LenFormulaType::NEQ, {sum_of_substituted_vars, 1}), LenNode(LenFormulaType::EQ, {result, -1})});
+
+                result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
+
+                // TODO needs to get all the to_code vars, so that it can be properly handled by to_int
                 break;
             }
             case TranformationType::FROM_CODE:
@@ -797,7 +826,7 @@ namespace smt::noodler {
      * Replace disequality @p diseq L != P by equalities L = x1a1y1 and R = x2a2y2
      * where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
      * also create arithmetic formula:
-     *   |x1| = |x2| && to_code(a1) != to_code(a2) && (to_code(a1) = -1 => |y1| = 0) && (to_code(a2) = -1 => |y2| = 0
+     *   |x1| = |x2| && to_code(a1) != to_code(a2) && (|a1| = 0 => |y1| = 0) && (|a2| = 0 => |y2| = 0)
      * The variables a1/a2 represent the characters on which the two sides differ
      * (they have different code values). They have to occur on the same position,
      * i.e. lengths of x1 and x2 are equal. The situation where one of the a1/a2
@@ -879,10 +908,10 @@ namespace smt::noodler {
         // we are also going to check for the lengths of y1 and y2, so they have to be length
         init_length_sensitive_vars.insert(y1);
         init_length_sensitive_vars.insert(y2);
-        // (to_code(a1) = -1) => (|y1| = 0)
-        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a1_to_code, -1}), LenNode(LenFormulaType::EQ, {y1, 0})}));
-        // (to_code(a2) = -1) => (|y2| = 0)
-        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a2_to_code, -1}), LenNode(LenFormulaType::EQ, {y2, 0})}));
+        // (|a1| = 0) => (|y1| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a1, 0}), LenNode(LenFormulaType::EQ, {y1, 0})}));
+        // (|a2| = 0) => (|y2| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a2, 0}), LenNode(LenFormulaType::EQ, {y2, 0})}));
 
         STRACE("str-dis", tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
         return new_eqs;
