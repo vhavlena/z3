@@ -945,7 +945,7 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         context &ctx = get_context();
         expr_ref ex{e, m};
-        m_rewrite(ex);
+        // m_rewrite(ex);
         if (!ctx.e_internalized(ex)) {
             ctx.internalize(ex, false);
         }
@@ -1389,6 +1389,7 @@ namespace smt::noodler {
         expr_ref y = mk_str_var_fresh("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
+        expr_ref eps(m_util_s.str.mk_string(""), m);
         literal a_emp = mk_eq_empty(a);
         literal s_emp = mk_eq_empty(s);
 
@@ -1396,7 +1397,7 @@ namespace smt::noodler {
         // str.replace "A" s t where a = "A"
         if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
             // s = emp -> v = t.a
-            add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
             // s = a -> v = t
             // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
             add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
