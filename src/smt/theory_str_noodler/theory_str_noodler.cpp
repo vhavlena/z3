@@ -2001,7 +2001,7 @@ namespace smt::noodler {
         expr *s = nullptr;
         VERIFY(m_util_s.str.is_to_code(e, s));
 
-        tranformation_type type;
+        TranformationType type;
         std::string name_of_type;
         if (m_util_s.str.is_to_code(e, s)) {
             type = TranformationType::TO_CODE;
@@ -2053,11 +2053,7 @@ namespace smt::noodler {
         expr_ref var_for_e = tranforming_from ? mk_str_var_fresh(name_of_type + "_result") : mk_int_var_fresh(name_of_type + "_result");
         add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
 
-        if (type == TranformationType::TO_CODE) {
-            add_axiom({mk_literal(m_util_a.mk_g)})
-            // s \in Sigma <-> to_code s != -1
-            add_axiom()
-        }
+        // The range of from_* functions is bounded, we have to bound it also for the decision procedure
 
         if (type == TranformationType::FROM_CODE) {
             // the result of str.from_code can only be either a char representing the code value, or empty string (if argument is out of range of any code value)
@@ -2080,7 +2076,7 @@ namespace smt::noodler {
             len_vars.insert(var_for_e);
         }
 
-        // add to todo
+        // Add to todo
         m_tranformation_todo.push_back({var_for_e, expr_ref(var_for_s, m), type});
     }
 

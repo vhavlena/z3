@@ -623,54 +623,61 @@ namespace smt::noodler {
             BasicTerm argument = std::get<1>(transf);
             TranformationType type = std::get<2>(transf);
             auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
+            auto process_one_symbol_words = [this, &to_code_var](const BasicTerm& string_var, const BasicTerm &int_var) -> LenNode {
+                std::vector<LenNode> to_code_disjunction;
+                for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(string_var))) {
+                    if (s == OTHER_SYMBOL) {
+                        // if s == minterm => do something else
+                        std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(string_var)}), LenNode(LenFormulaType::LEQ, {to_code_var(string_var), 196607})};
+                        for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
+                            if (s2 != OTHER_SYMBOL) {
+                                conjuncts_here.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(string_var), s2});
+                            }
+                        }
+                        to_code_disjunction.emplace_back(LenFormulaType::AND, conjuncts_here);
+                    } else {
+                        to_code_disjunction.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(string_var), s});
+                    }
+                }
+                return LenNode(LenFormulaType::AND, std::vector<LenNode>{
+                    LenNode(LenFormulaType::EQ, {int_var, to_code_var(string_var)}), // result is equal to to_code(var)
+                    LenNode(LenFormulaType::EQ, {string_var, 1}), // lenght of var is 1
+                    LenNode(LenFormulaType::OR, std::move(to_code_disjunction)) // to_code(var) is equal to code point of one of its words
+                });
+            };
             switch (type)
             {
+            case TranformationType::FROM_CODE:
+                std::swap(result, argument);
+                // fall trough, we do nearly the same thing
             case TranformationType::TO_CODE:
             {
                 Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
                 std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
                 std::vector<LenNode> some_disjunt = {};
                 for (const BasicTerm& var : substituted_vars) {
-                    std::vector<LenNode> to_code_disjunction;
-                    for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(var))) {
-                        if (s == OTHER_SYMBOL) {
-                            // if s == minterm => do something else
-                            std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), 196607})};
-                            for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
-                                if (s2 != OTHER_SYMBOL) {
-                                    conjuncts_here.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
-                                }
-                            }
-                            to_code_disjunction.emplace_back(LenFormulaType::AND, conjuncts_here);
-                        } else {
-                            to_code_disjunction.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
-                        }
-                    }
-                    some_disjunt.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
-                        LenNode(LenFormulaType::EQ, {result, to_code_var(var)}), // result is equal to to_code(var)
-                        LenNode(LenFormulaType::EQ, {var, 1}), // lenght of var is 1
-                        LenNode(LenFormulaType::OR, std::move(to_code_disjunction)) // to_code(var) is equal to code point of one of its words
-                    });
+                    some_disjunt.emplace_back(process_one_symbol_words(var, result));
                 }
                 LenNode disjunct_some(LenFormulaType::OR, some_disjunt);
                 LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
                 LenNode result_is_defined(LenFormulaType::AND, {disjunct_some, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
 
-                LenNode result_is_undefined(LenFormulaType::AND, {LenNode(LenFormulaType::NEQ, {sum_of_substituted_vars, 1}), LenNode(LenFormulaType::EQ, {result, -1})});
+                LenNode result_is_undefined(LenFormulaType::AND, {
+                    LenNode(LenFormulaType::NEQ, {sum_of_substituted_vars, 1}),
+                    (type == TranformationType::TO_CODE) ?
+                        LenNode(LenFormulaType::EQ, {result, -1}) :
+                        LenNode(LenFormulaType::NEQ, {LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, 196607})})})
+                });
 
                 result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
 
                 // TODO needs to get all the to_code vars, so that it can be properly handled by to_int
                 break;
             }
-            case TranformationType::FROM_CODE:
-                //???
-                break;
             case TranformationType::TO_INT:
-                //???
-                break;
             case TranformationType::FROM_INT:
                 //???
+                util::throw_error("unimplemented");
                 break;
             
             default:
