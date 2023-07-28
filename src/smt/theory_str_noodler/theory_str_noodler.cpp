@@ -779,8 +779,22 @@ namespace smt::noodler {
                     }
                 }
                 if(found) {
-                    block_curr_len(len_formula);
-                    return FC_CONTINUE;
+                    /**
+                     * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
+                     * is not sufficient for SAT solver to get another solution. We hence find unsat core of 
+                     * the current assignment with the len_formula and add this unsat core as 
+                     * a theory lemma.
+                     */
+                    expr_ref unsat_core(m.mk_true(), m);
+                    if(check_len_sat(len_formula, &unsat_core) == l_false) {
+                        unsat_core = m.mk_not(unsat_core);
+                        ctx.internalize(unsat_core.get(), true);
+                        add_axiom({mk_literal(unsat_core)});
+                        block_curr_len(len_formula);
+                        return FC_CONTINUE;
+                    } else {
+                        return FC_DONE;
+                    }
                 }
             }
         }

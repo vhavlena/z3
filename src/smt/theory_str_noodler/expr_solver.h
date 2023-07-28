@@ -33,13 +33,14 @@ Eternal glory to Yu-Fang.
 namespace smt::noodler {
     class int_expr_solver:expr_solver{
         bool unsat_core=false;
-        kernel m_kernel;
         ast_manager& m;
         bool initialized;
         expr_ref_vector erv;
     public:
+        kernel m_kernel;
+    public:
         int_expr_solver(ast_manager& m, smt_params fp):
-                m_kernel(m, fp), m(m),erv(m){
+                m(m),erv(m),m_kernel(m, fp){
             fp.m_string_solver = symbol("none");
             initialized=false;
        }

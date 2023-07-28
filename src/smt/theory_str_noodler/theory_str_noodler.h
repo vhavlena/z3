@@ -278,7 +278,7 @@ namespace smt::noodler {
         /**
          * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
          */
-        lbool check_len_sat(expr_ref len_formula);
+        lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr);
 
         /**
          * @brief Blocks current SAT assignment for given @p len_formula

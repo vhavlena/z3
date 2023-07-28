@@ -241,7 +241,7 @@ namespace smt::noodler {
         return l_false;
     }
 
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core) {
         if (len_formula == m.mk_true()) {
             // we assume here that existing length constraints are satisfiable, so adding true will do nothing
             return l_true;
@@ -255,6 +255,13 @@ namespace smt::noodler {
         }
         m_int_solver.initialize(get_context(), include_ass);
         auto ret = m_int_solver.check_sat(len_formula);
+        // construct an unsat core --> might be expensive
+        // TODO: better interface of m_int_solver
+        if(unsat_core != nullptr) {
+            for(unsigned i=0;i<m_int_solver.m_kernel.get_unsat_core_size();i++){
+                *unsat_core = m.mk_and(*unsat_core, m_int_solver.m_kernel.get_unsat_core_expr(i));
+            }
+        }
         return ret;
     }
 
