@@ -997,6 +997,14 @@ namespace smt::noodler {
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
+                expr_ref ex{ctx.literal2expr(l), m};
+                // if the expression is not internalized, internalize it and make relevant
+                if(!ctx.e_internalized(ex)) {
+                    ctx.internalize(ex, false);
+                    enode *const n = ctx.get_enode(ex);
+                    ctx.mark_as_relevant(n);
+                }
+                
                 ctx.mark_as_relevant(l);
                 lv.push_back(l);
             }
@@ -1397,10 +1405,11 @@ namespace smt::noodler {
         // str.replace "A" s t where a = "A"
         if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
             // s = emp -> v = t.a
-            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
+            add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+            // add_axiom({~mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
             // s = a -> v = t
             // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
-            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
+            add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
             // s != eps && s != a -> v = a
             add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
             // replace(a,s,t) = v
