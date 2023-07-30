@@ -1011,12 +1011,11 @@ namespace smt::noodler {
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
-                expr_ref ex{ctx.literal2expr(l), m};
+                expr_ref ex = ctx.literal2expr(l);
                 // if the expression is not internalized, internalize it and make relevant
                 if(!ctx.e_internalized(ex)) {
-                    ctx.internalize(ex, false);
-                    enode *const n = ctx.get_enode(ex);
-                    ctx.mark_as_relevant(n);
+                    // TODO: when I set the second argument to false; I got assertion violation.
+                    ctx.internalize(ex, true);
                 }
                 
                 ctx.mark_as_relevant(l);

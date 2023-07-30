@@ -121,8 +121,10 @@ namespace smt::noodler {
             const auto& variable_app{ to_app(variable) };
             assert(variable_app->get_num_args() == 0);
             const auto& variable_name{ variable_app->get_decl()->get_name().str() };
-            // TODO are we sure that variable is really variable and not string literal? i.e. can Z3 give us `string literal in RE`?
-            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            if(m_util_s.str.is_string(variable_app)) {
+                variable_term = BasicTerm(BasicTermType::Literal, variable_name);
+            }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };

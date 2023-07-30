@@ -1050,6 +1050,18 @@ namespace smt::noodler {
                     update_reg_constr(var, pr.second.get_left_side());
             }
         }
+
+        // Check if there is a regular constraint of the form "A" in .... 
+        // In that case, we construct automaton for "A" and make a product with the 
+        // corresponding language of the Basic Term "A".
+        for(const auto& pr : this->aut_ass) {
+            if(pr.first.is_literal()) {
+                Mata::Nfa::Nfa word_aut = util::create_word_nfa(pr.first.get_name());
+                Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(pr.second), word_aut);
+                inters.trim();
+                this->aut_ass[pr.first] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+            }
+        }
     }
 
     /**

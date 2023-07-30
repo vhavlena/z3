@@ -16,6 +16,7 @@
 #include "formula.h"
 #include "aut_assignment.h"
 #include "var_union_find.h"
+#include "util.h"
 
 namespace smt::noodler {
 
