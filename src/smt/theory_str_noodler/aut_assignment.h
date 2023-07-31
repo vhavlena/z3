@@ -135,6 +135,21 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if the automataon accepts only a single word. It is only underapproximation,
+         * as is_singleton is false for the NFA p1 -a-> p2, q1 -a-> q2 where p1, q1 are initial and p2, q2 are final.
+         * To get a precise information, the determinization+minimization might be necessary, which is often 
+         * expensive. 
+         * 
+         * @param t Variable
+         * @return True -> is surely singleton, False -> inconclusive
+         */
+        bool is_singleton(const BasicTerm& t) const {
+            Mata::Nfa::Nfa aut = *this->at(t);
+            aut.trim();
+            return aut.size() == aut.get_num_of_trans() + 1 && aut.initial.size() == 1 && aut.final.size() == 1;
+        }
+
+        /**
          * @brief Check if the language of the basic term has a fixed length
          * 
          * @param t BasicTerm
