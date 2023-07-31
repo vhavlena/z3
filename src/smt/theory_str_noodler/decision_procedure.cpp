@@ -794,12 +794,17 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
 
-        if(prep_handler.contains_unsat_predicates()) {
-            return l_false;
-        }
-
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
+        }
+
+        // there remains some not contains --> return undef
+        if(this->not_contains.get_predicates().size() > 0) {
+            return l_undef;
+        }
+
+        if(prep_handler.contains_unsat_predicates()) {
+            return l_false;
         }
 
         STRACE("str-nfa", tout << "Automata after preprocessing" << std::endl << init_aut_ass.print());
