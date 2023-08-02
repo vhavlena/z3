@@ -794,6 +794,9 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
 
+        // try to replace the not contains predicates (so-far we replace it by regular constraints)
+        replace_not_contains();
+
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
@@ -910,6 +913,39 @@ namespace smt::noodler {
 
         STRACE("str-dis", tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
         return new_eqs;
+    }
+
+    /**
+     * @brief Try to replace not contains predicates. In particular, we replace predicates of the form (not_contains lit x) where 
+     * lit is a literal by a regular constraint x notin Alit' where  Alit' was obtained from A(lit) by setting all 
+     * states initial and final. 
+     */
+    void DecisionProcedure::replace_not_contains() {
+        Formula remain_not_contains{};
+        for(const Predicate& pred : this->not_contains.get_predicates()) {
+            Concat left = pred.get_params()[0];
+            Concat right = pred.get_params()[1];
+            if(left.size() == 1 && right.size() == 1) {
+                if(this->init_aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
+                    Mata::Nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
+                    for(unsigned i = 0; i < nfa_copy.size(); i++) {
+                        nfa_copy.initial.insert(i);
+                        nfa_copy.final.insert(i);
+                    }
+
+                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    for (const auto& symbol : this->init_aut_ass.get_alphabet()) {
+                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+                    }
+
+                    Mata::Nfa::Nfa complement = Mata::Nfa::complement(nfa_copy, mata_alphabet);
+                    this->init_aut_ass.restrict_lang(right[0], complement);
+                    continue;
+                }
+            }
+            remain_not_contains.add_predicate(pred);
+        }
+        this->not_contains = remain_not_contains;
     }
 
 } // Namespace smt::noodler.

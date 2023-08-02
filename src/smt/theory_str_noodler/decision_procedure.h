@@ -296,6 +296,11 @@ namespace smt::noodler {
          */
         Formula not_contains{};
 
+        /**
+         * @brief Construct constraints to get rid of not_contains predicates.
+         */
+        void replace_not_contains();
+
     public:
         
         /**

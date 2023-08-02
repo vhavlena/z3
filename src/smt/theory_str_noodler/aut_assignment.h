@@ -212,6 +212,16 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Restrict language of the given basic term @p t by @p restr_nfa.  
+         * 
+         * @param t Basic term to be restricted
+         * @param restr_nfa Language restriction represented by an NFA.
+         */
+        void restrict_lang(const BasicTerm& t, const Mata::Nfa::Nfa& restr_nfa) {
+            (*this)[t] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(restr_nfa, *(*this)[t]));
+        }
+
+        /**
          * @brief Get the length formula representing all possible lengths of the automaton for @p var
          */
         LenNode get_lengths(const BasicTerm& var) const;
