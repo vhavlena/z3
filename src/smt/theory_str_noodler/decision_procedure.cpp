@@ -797,13 +797,13 @@ namespace smt::noodler {
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
         replace_not_contains();
 
-        if(this->formula.get_predicates().size() > 0) {
-            this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
-        }
-
         // there remains some not contains --> return undef
         if(this->not_contains.get_predicates().size() > 0) {
             return l_undef;
+        }
+
+        if(this->formula.get_predicates().size() > 0) {
+            this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
         if(prep_handler.contains_unsat_predicates()) {

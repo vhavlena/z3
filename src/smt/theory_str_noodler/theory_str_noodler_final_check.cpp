@@ -116,19 +116,19 @@ namespace smt::noodler {
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
         for (const auto &word_equation: m_membership_todo_rel) {
-            const expr_ref& variable{ std::get<0>(word_equation) };
-            assert(is_app(variable));
-            const auto& variable_app{ to_app(variable) };
-            assert(variable_app->get_num_args() == 0);
-            const auto& variable_name{ variable_app->get_decl()->get_name().str() };
-            BasicTerm variable_term{ BasicTermType::Variable, variable_name };
-            if(m_util_s.str.is_string(variable_app)) {
-                variable_term = BasicTerm(BasicTermType::Literal, variable_name);
+            const expr_ref& var_expr{ std::get<0>(word_equation) };
+            assert(is_app(var_expr));
+            const auto& var_app{ to_app(var_expr) };
+            assert(var_app->get_num_args() == 0);
+            const std::string& variable_name{ var_app->get_decl()->get_name().str() };
+            BasicTerm term{ BasicTermType::Variable, variable_name };
+            if(m_util_s.str.is_string(var_app)) {
+                term = BasicTerm(BasicTermType::Literal, variable_name);
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
-            auto aut_ass_it{ aut_assignment.find(variable_term) };
+            auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
@@ -136,9 +136,9 @@ namespace smt::noodler {
                         Mata::Nfa::reduce(Mata::Nfa::intersection(nfa, *aut_ass_it->second)));
 
             } else { // We create a regular constraint for the current variable for the first time.
-                aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+                aut_assignment[term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
                 // TODO explain after this function is moved to theory_str_noodler, we do this because var_name contains only variables occuring in instance and not those that occur only in str.in_re
-                var_name.insert({variable_term, variable});
+                this->var_name.insert({term, var_expr});
             }
         }
 
