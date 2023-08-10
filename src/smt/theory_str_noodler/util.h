@@ -33,6 +33,12 @@ namespace smt::noodler::util {
     using expr_pair = std::pair<expr_ref, expr_ref>;
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
 
+    struct RegexInfo {
+        unsigned min_length;
+        lbool universal;
+        lbool empty;
+    };
+
     /**
      * Throws error and select which class to throw based on debug (if we are
      * debugging, we do not want z3 to catch our error, if we are not debugging
@@ -225,6 +231,8 @@ namespace smt::noodler::util {
      * @return expr_ref
      */
     expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a);
+
+    RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s, const ast_manager& m);
 }
 
 #endif

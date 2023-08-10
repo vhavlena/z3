@@ -626,4 +626,184 @@ namespace smt::noodler::util {
             return {{}, m};
         }
     }
+
+    [[nodiscard]] RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s, const ast_manager& m) {
+        if (m_util_s.re.is_to_re(expression)) { // Handle conversion of to regex function call.
+            SASSERT(expression->get_num_args() == 1);
+            const auto arg{ expression->get_arg(0) };
+            // Assume that expression inside re.to_re() function is a string of characters.
+            if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
+                throw_error("we support only string literals in str.to_re");
+            }
+            return get_regex_info(to_app(arg), m_util_s, m);
+        } else if (m_util_s.re.is_concat(expression)) { // Handle regex concatenation.
+            SASSERT(expression->get_num_args() > 0);
+            RegexInfo res = get_regex_info(to_app(expression->get_arg(0)), m_util_s, m);
+            for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
+                RegexInfo con = get_regex_info(to_app(expression->get_arg(i)), m_util_s, m);
+                res.min_length += con.min_length;
+                if(res.empty == l_undef || con.empty == l_undef) {
+                    res.empty = l_undef;
+                } else {
+                    res.empty = to_lbool(res.empty == l_true || con.empty == l_true);
+                }
+            }
+            
+            if(res.min_length > 0) {
+                res.universal = l_false;
+            } else {
+                res.universal = l_undef;
+            }
+            return res;
+        } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
+            throw_error("antimirov union is unsupported");
+        } else if (m_util_s.re.is_complement(expression)) { // Handle complement.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
+            SASSERT(is_app(child));
+            RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
+            if(res.empty == l_true) {
+                res.empty = l_false;
+                res.universal = l_true;
+                res.min_length = 0;
+            } else if (res.min_length > 0) { // there is a word with length > 0
+                res.universal = l_false;
+                res.min_length = 0;
+                res.empty = l_false;
+            } else if(res.universal) {
+                res.universal = l_false;
+                res.min_length = 0;
+                res.empty = l_true;
+            } else {
+                res.universal = l_undef;
+                res.empty = l_undef;
+                res.min_length = 0;
+            }
+            return res;
+        } else if (m_util_s.re.is_derivative(expression)) { // Handle derivative.
+            throw_error("derivative is unsupported");
+        } else if (m_util_s.re.is_diff(expression)) { // Handle diff.
+            throw_error("regex difference is unsupported");
+        } else if (m_util_s.re.is_dot_plus(expression)) { // Handle dot plus.
+            return RegexInfo{.min_length = 1, .universal = l_false, .empty = l_false};
+        } else if (m_util_s.re.is_empty(expression)) { // Handle empty language.
+            return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_true};
+        } else if (m_util_s.re.is_epsilon(expression)) { // Handle epsilon.
+            return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_false};
+        } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
+            return RegexInfo{.min_length = 1, .universal = l_false, .empty = l_false};
+        } else if (m_util_s.re.is_full_seq(expression)) {
+            return RegexInfo{.min_length = 0, .universal = l_true, .empty = l_false};
+        } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
+            SASSERT(expression->get_num_args() > 0);
+            RegexInfo res = get_regex_info(to_app(expression->get_arg(0)), m_util_s, m);
+            for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
+                RegexInfo prod = get_regex_info(to_app(expression->get_arg(i)), m_util_s, m);
+                res.min_length = std::max(res.min_length, prod.min_length);
+            }
+            res.empty = l_undef;
+            res.universal = l_undef;
+            if(res.min_length > 0) {
+                res.universal = l_false;
+            }
+            return res;
+        } else if (m_util_s.re.is_loop(expression)) { // Handle loop.
+            unsigned low, high;
+            expr *body;
+            if (m_util_s.re.is_loop(expression, body, low, high)) {
+            } else if (m_util_s.re.is_loop(expression, body, low)) {
+            } else {
+                throw_error("loop should contain at least lower bound");
+            }
+
+            RegexInfo res = get_regex_info(to_app(body), m_util_s, m);
+            if(res.empty == l_true && low == 0) {
+                return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_false};
+            }
+
+            res.min_length *= low;
+            if(res.min_length > 0) {
+                res.universal = l_false;
+            }
+
+            return res;
+
+        } else if (m_util_s.re.is_of_pred(expression)) { // Handle of predicate.
+            throw_error("of predicate is unsupported");
+        } else if (m_util_s.re.is_opt(expression)) { // Handle optional.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
+            SASSERT(is_app(child));
+            RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
+            res.min_length = 0;
+            return res;
+        } else if (m_util_s.re.is_range(expression)) { // Handle range.
+            SASSERT(expression->get_num_args() == 2);
+            const auto range_begin{ expression->get_arg(0) };
+            const auto range_end{ expression->get_arg(1) };
+            SASSERT(is_app(range_begin));
+            SASSERT(is_app(range_end));
+            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
+
+            if(range_begin_value <= range_end_value) {
+                return RegexInfo{.min_length = 1, .universal = l_false, .empty = l_false};
+            } else {
+                return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_true};
+            }
+        } else if (m_util_s.re.is_reverse(expression)) { // Handle reverse.
+            throw_error("reverse is unsupported");
+        } else if (m_util_s.re.is_union(expression)) { // Handle union (= or; A|B).
+            SASSERT(expression->get_num_args() == 2);
+            const auto left{ expression->get_arg(0) };
+            const auto right{ expression->get_arg(1) };
+            SASSERT(is_app(left));
+            SASSERT(is_app(right));
+            
+            RegexInfo res = get_regex_info(to_app(left), m_util_s, m);
+            RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
+            
+            res.universal = l_undef;
+            res.min_length = std::min(uni.min_length, res.min_length);
+            if(res.empty == l_undef && uni.empty == l_false) {
+                res.empty = l_false;
+            } else if(res.empty == l_false && uni.empty == l_undef) {
+                res.empty = l_false;  
+            } else if(res.empty == l_false && uni.empty == l_false) {
+                res.empty = l_false;            
+            } else {
+                res.empty = l_undef;
+            }
+
+            if(res.min_length > 0) {
+                res.universal = l_false;
+            }
+
+            return res;
+            
+        } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
+            SASSERT(is_app(child));
+            RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
+            return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_false};
+
+        } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
+            SASSERT(expression->get_num_args() == 1);
+            const auto child{ expression->get_arg(0) };
+            SASSERT(is_app(child));
+
+            RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
+            res.universal = l_undef;
+            return res;
+        } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
+            SASSERT(expression->get_num_parameters() == 1);
+            return RegexInfo{.min_length = expression->get_parameter(0).get_zstring().length(), .universal = l_false, .empty = l_false};
+        } else if(is_variable(expression, m_util_s)) { // Handle variable.
+            throw_error("variable in regexes are unsupported");
+        } else {
+            throw_error("unsupported operation in regex");
+        }
+        return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_undef};
+    }
 }

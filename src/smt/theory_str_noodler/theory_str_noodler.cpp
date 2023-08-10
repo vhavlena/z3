@@ -818,6 +818,13 @@ namespace smt::noodler {
         // universality checking should be faster.
         if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             const auto& reg_data = this->m_membership_todo_rel[0];
+            util::RegexInfo regInfo = util::get_regex_info(to_app(std::get<1>(reg_data)), m_util_s, m);
+            if(!std::get<2>(reg_data) && regInfo.universal == l_false) {
+                return FC_DONE;
+            }
+            if(std::get<2>(reg_data) && regInfo.empty == l_false) {
+                return FC_DONE;
+            }
             if(!std::get<2>(reg_data) // membership is negated
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
             ) {
