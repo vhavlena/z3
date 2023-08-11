@@ -639,6 +639,9 @@ namespace smt::noodler::util {
         } else if (m_util_s.re.is_concat(expression)) { // Handle regex concatenation.
             SASSERT(expression->get_num_args() > 0);
             RegexInfo res = get_regex_info(to_app(expression->get_arg(0)), m_util_s, m);
+            // min_length: sum of min_lengths of concats
+            // empty: one of them is undef --> undef
+            // universal: if min_length > 0 --> not universal
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
                 RegexInfo con = get_regex_info(to_app(expression->get_arg(i)), m_util_s, m);
                 res.min_length += con.min_length;
@@ -661,23 +664,23 @@ namespace smt::noodler::util {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
+            // min_length: 0
+            // empty: universal --> true; empty --> false; min_length > 0 and !empty --> false
+            // universal: empty --> true< universal --> false
             RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
+            res.min_length = 0;
             if(res.empty == l_true) {
                 res.empty = l_false;
                 res.universal = l_true;
-                res.min_length = 0;
-            } else if (res.min_length > 0) { // there is a word with length > 0
+            } else if (res.min_length > 0 && res.empty == l_false) { // there is a word with length > 0
                 res.universal = l_false;
-                res.min_length = 0;
                 res.empty = l_false;
-            } else if(res.universal) {
+            } else if(res.universal == l_true) {
                 res.universal = l_false;
-                res.min_length = 0;
                 res.empty = l_true;
             } else {
                 res.universal = l_undef;
                 res.empty = l_undef;
-                res.min_length = 0;
             }
             return res;
         } else if (m_util_s.re.is_derivative(expression)) { // Handle derivative.
@@ -696,6 +699,9 @@ namespace smt::noodler::util {
             return RegexInfo{.min_length = 0, .universal = l_true, .empty = l_false};
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
             SASSERT(expression->get_num_args() > 0);
+            // min_length: maximum of each regex from intersection
+            // empty: undef
+            // universal: min_length > 0 --> false; otherwise undef
             RegexInfo res = get_regex_info(to_app(expression->get_arg(0)), m_util_s, m);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
                 RegexInfo prod = get_regex_info(to_app(expression->get_arg(i)), m_util_s, m);
@@ -716,16 +722,17 @@ namespace smt::noodler::util {
                 throw_error("loop should contain at least lower bound");
             }
 
+            // min_length: low == 0 --> 0; otherwise min_length * low
+            // empty: low == 0 --> false; otherwise the same as the original empty
+            // universal: min_length --> false; low == 0 --> false
             RegexInfo res = get_regex_info(to_app(body), m_util_s, m);
             if(res.empty == l_true && low == 0) {
                 return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_false};
             }
-
             res.min_length *= low;
             if(res.min_length > 0) {
                 res.universal = l_false;
             }
-
             return res;
 
         } else if (m_util_s.re.is_of_pred(expression)) { // Handle of predicate.
@@ -734,6 +741,7 @@ namespace smt::noodler::util {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
+            // min_length: 0 (epsilon)
             RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
             res.min_length = 0;
             return res;
@@ -746,6 +754,9 @@ namespace smt::noodler::util {
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
             const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
 
+            // min_length: if there is some symbol in range --> min_length = 1; otherwise min_length = 0 (empty)
+            // empty:  if there is some symbol in range --> false; otherwise true
+            // universal: false
             if(range_begin_value <= range_end_value) {
                 return RegexInfo{.min_length = 1, .universal = l_false, .empty = l_false};
             } else {
@@ -760,9 +771,11 @@ namespace smt::noodler::util {
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             
+            // min_length: minimum of min_length of both guys
+            // empty: one of them is empty --> true; otherwise undef
+            // universal: min_length > 0 --> false; otherwise undef
             RegexInfo res = get_regex_info(to_app(left), m_util_s, m);
             RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
-            
             res.universal = l_undef;
             res.min_length = std::min(uni.min_length, res.min_length);
             if(res.empty == l_undef && uni.empty == l_false) {
@@ -774,11 +787,9 @@ namespace smt::noodler::util {
             } else {
                 res.empty = l_undef;
             }
-
             if(res.min_length > 0) {
                 res.universal = l_false;
             }
-
             return res;
             
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
@@ -793,6 +804,7 @@ namespace smt::noodler::util {
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
 
+            // empty: the original guy is empty <--> true
             RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
             res.universal = l_undef;
             return res;

@@ -33,6 +33,14 @@ namespace smt::noodler::util {
     using expr_pair = std::pair<expr_ref, expr_ref>;
     using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
 
+    /**
+     * @brief Info gathered about a regex. 
+     * - min_length: length of shortest words in the regex. In fact it expresses that in the regex there is no 
+     *      word shorter than min_length. It does not mean that regex contains a word of length exactly min_length. 
+     *      If empty == l_true or l_undef, this values is not valid. 
+     * - universal: is regex universal?
+     * - empty: is regex empty?
+     */
     struct RegexInfo {
         unsigned min_length;
         lbool universal;
@@ -232,6 +240,15 @@ namespace smt::noodler::util {
      */
     expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a);
 
+    /**
+     * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
+     * RegexInfo gathers information about emptyness; universality; length of shortest words
+     * 
+     * @param expression Regex to be checked
+     * @param m_util_s tring ast util
+     * @param m ast manager
+     * @return RegexInfo 
+     */
     RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s, const ast_manager& m);
 }
 
