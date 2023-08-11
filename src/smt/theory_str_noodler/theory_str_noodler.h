@@ -34,6 +34,7 @@ Eternal glory to Yu-Fang.
 #include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
+#include "regex.h"
 #include "var_union_find.h"
 #include "nielsen_decision_procedure.h"
 

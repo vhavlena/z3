@@ -59,22 +59,22 @@ namespace smt::noodler {
         std::set<Mata::Symbol> symbols_in_formula{};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
-            util::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
         }
 
         for (const auto &word_disequation: m_word_diseq_todo_rel) {
-            util::extract_symbols(word_disequation.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(word_disequation.second, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(word_disequation.first, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(word_disequation.second, m_util_s, m, symbols_in_formula);
         }
 
         for (const auto &membership: m_membership_todo_rel) {
-            util::extract_symbols(std::get<1>(membership), m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(std::get<1>(membership), m_util_s, m, symbols_in_formula);
         }
         // extract from not contains
         for(const auto& not_contains : m_not_contains_todo_rel) {
-            util::extract_symbols(not_contains.first, m_util_s, m, symbols_in_formula);
-            util::extract_symbols(not_contains.second, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(not_contains.first, m_util_s, m, symbols_in_formula);
+            regex::extract_symbols(not_contains.second, m_util_s, m, symbols_in_formula);
         }
 
         /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
@@ -129,8 +129,8 @@ namespace smt::noodler {
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
-            auto aut_ass_it{ aut_assignment.find(term) };
+            Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
+            auto aut_ass_it{ aut_assignment.find(variable_term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
@@ -160,7 +160,7 @@ namespace smt::noodler {
                     } else if (var_or_literal.is_literal()) {
                         // to string literals. assign automaton accepting the word denoted by the literal
                         // TODO if Z3 can give us `string literal in RE` then we should check if aut_assignment does not contain this literal already (if yes, do intersection)
-                        Nfa nfa{ util::create_word_nfa(var_or_literal.get_name()) };
+                        Nfa nfa{ regex::create_word_nfa(var_or_literal.get_name()) };
                         aut_assignment.emplace(var_or_literal, std::make_shared<Nfa>(std::move(nfa)));
                     }
                 }
@@ -202,12 +202,12 @@ namespace smt::noodler {
 
             // get symbols from both sides
             std::set<uint32_t> alphabet;
-            util::extract_symbols(left_side, m_util_s, m, alphabet);
-            util::extract_symbols(right_side, m_util_s, m, alphabet);
+            regex::extract_symbols(left_side, m_util_s, m, alphabet);
+            regex::extract_symbols(right_side, m_util_s, m, alphabet);
 
             // construct NFAs for both sides
-            Mata::Nfa::Nfa nfa1 = util::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = util::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
+            Mata::Nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
