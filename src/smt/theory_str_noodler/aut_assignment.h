@@ -135,7 +135,7 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Check if the automataon accepts only a single word. It is only underapproximation,
+         * @brief Check if the automaton accepts only a single word. It is only underapproximation,
          * as is_singleton is false for the NFA p1 -a-> p2, q1 -a-> q2 where p1, q1 are initial and p2, q2 are final.
          * To get a precise information, the determinization+minimization might be necessary, which is often 
          * expensive. 
@@ -218,7 +218,7 @@ namespace smt::noodler {
          * @param restr_nfa Language restriction represented by an NFA.
          */
         void restrict_lang(const BasicTerm& t, const Mata::Nfa::Nfa& restr_nfa) {
-            (*this)[t] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(restr_nfa, *(*this)[t]));
+            (*this)[t] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(restr_nfa, *this->at(t)));
         }
 
         /**

@@ -513,6 +513,14 @@ namespace smt::noodler {
             return ret;
         }
 
+        /**
+         * @brief Extract and remove predicate of the type @p type from the formula. 
+         * The predicates of the type @p type are stored in the output @p extracted
+         * It removes the extracted predicates from the current formula.
+         * 
+         * @param type Predicate type
+         * @param[out] extracted Where to store extracted predicates
+         */
         void extract_predicates(PredicateType type, Formula& extracted) {
             std::vector<Predicate> new_predicates {};
             for(const Predicate& pred : this->predicates) {
