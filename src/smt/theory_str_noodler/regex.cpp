@@ -462,7 +462,7 @@ namespace smt::noodler::regex {
 
             // min_length: low == 0 --> 0; otherwise min_length * low
             // empty: low == 0 --> false; otherwise the same as the original empty
-            // universal: min_length --> false; low == 0 --> false
+            // universal: min_length > 0 --> false; empty && low == 0 --> false
             RegexInfo res = get_regex_info(to_app(body), m_util_s, m);
             if(res.empty == l_true && low == 0) {
                 return RegexInfo{.min_length = 0, .universal = l_false, .empty = l_false};
