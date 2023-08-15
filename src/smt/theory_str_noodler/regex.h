@@ -38,7 +38,7 @@ namespace smt::noodler::regex {
      * @brief Info gathered about a regex. 
      * - min_length: length of shortest words in the regex. In fact it expresses that in the regex there is no 
      *      word shorter than min_length. It does not mean that regex contains a word of length exactly min_length. 
-     *      If empty == l_true or l_undef, this values is not valid. 
+     *      If empty == l_true or l_undef, this value is not valid. 
      * - universal: is regex universal?
      * - empty: is regex empty?
      */
