@@ -1255,11 +1255,12 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Check if the instance is clearly unsatisfiable.
+     * @brief Check if the instance is clearly unsatisfiable. It checks trivial (dis)equations
+     * of the form x != x, ab = cd (x is term, a,b,c,d are constants).
      * 
      * @return True --> unsat for sure.
      */
-    bool FormulaPreprocessor::contains_unsat_predicates() const {
+    bool FormulaPreprocessor::contains_unsat_eqs_or_diseqs() const {
         for(const auto& pr : this->formula.get_predicates()) {
             if(pr.second.is_inequation() && pr.second.get_left_side() == pr.second.get_right_side()) {
                 return true;

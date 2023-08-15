@@ -806,7 +806,7 @@ namespace smt::noodler {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
         }
 
-        if(prep_handler.contains_unsat_predicates()) {
+        if(prep_handler.contains_unsat_eqs_or_diseqs()) {
             return l_false;
         }
 
