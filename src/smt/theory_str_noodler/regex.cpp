@@ -510,7 +510,7 @@ namespace smt::noodler::regex {
             SASSERT(is_app(right));
             
             // min_length: minimum of min_length of both guys
-            // empty: one of them is empty --> true; otherwise undef
+            // empty: if one of them is not empty --> false; otherwise undef
             // universal: min_length > 0 --> false; otherwise undef
             RegexInfo res = get_regex_info(to_app(left), m_util_s, m);
             RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
