@@ -1020,6 +1020,9 @@ namespace smt::noodler {
 
     /**
      * @brief Refine languages for equations of the form X = R (|X|=1) to the L(X) = L(X) \cap L(R).
+     * Moreover, for the literal terms l from the current automata assignments, restrict its 
+     * languages to L(l) = L(l) \cap {l}. Recall that the automata assignment contains not only 
+     * variables but also literals.
      */
     void FormulaPreprocessor::refine_languages() {
         std::set<BasicTerm> ineq_vars;
