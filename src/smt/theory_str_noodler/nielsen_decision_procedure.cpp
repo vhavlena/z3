@@ -45,11 +45,6 @@ namespace smt::noodler {
      * @return True -> satisfiable
      */
     lbool NielsenDecisionProcedure::compute_next_solution() {
-        // if we have a not contains, we give unknown
-        if(this->not_contains.get_predicates().size() > 0) {
-            return l_undef;
-        }
-
         // if the compute_next_solution was called for the first time
         if(this->graphs.size() == 0) {
             std::vector<Formula> instances = divide_independent_formula(this->formula);

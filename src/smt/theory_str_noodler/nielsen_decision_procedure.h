@@ -272,11 +272,6 @@ namespace smt::noodler {
 
         LenNode length_formula_for_solution = LenNode(LenFormulaType::TRUE);
 
-        /**
-         * Formula containing all not_contains predicate (nothing else)
-         */
-        Formula not_contains{};
-
     protected:
         // functions for the construction of a Nielsen graph
         bool is_pred_unsat(const Predicate& pred) const;
@@ -330,11 +325,8 @@ namespace smt::noodler {
              init_aut_ass{ init_aut_ass },
              m_params(par) { 
             
-            // we extract from the input formula all not_contains predicates and add them to not_contains formula
-            this->formula.extract_predicates(PredicateType::NotContains, this->not_contains);
-
             // Nielsen currently supports only quadratic equations (no inequalities and not(contains))
-            if(!this->formula.is_quadratic() || this->not_contains.get_predicates().size() > 0) {
+            if(!this->formula.is_quadratic()) {
                 util::throw_error("Nielsen supports quadratic equations only");
             }
         }
