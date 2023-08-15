@@ -79,7 +79,7 @@ namespace smt::noodler::regex {
 
     /**
      * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
-     * RegexInfo gathers information about emptyness; universality; length of shortest words
+     * RegexInfo gathers information about emptiness; universality; length of shortest words
      * 
      * @param expression Regex to be checked
      * @param m_util_s string ast util
