@@ -82,7 +82,7 @@ namespace smt::noodler::regex {
      * RegexInfo gathers information about emptyness; universality; length of shortest words
      * 
      * @param expression Regex to be checked
-     * @param m_util_s tring ast util
+     * @param m_util_s string ast util
      * @param m ast manager
      * @return RegexInfo 
      */
