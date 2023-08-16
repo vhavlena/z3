@@ -247,6 +247,15 @@ namespace smt::noodler {
         void remove_irrelevant_constr();
 
         /**
+         * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
+         * @param[in] ex Expression to be checked for symbols.
+         * @param[in] m_util_s Seq util for AST.
+         * @param[in] m AST manager.
+         * @param[out] alphabet A set of symbols with where found symbols are appended to.
+         */
+        void extract_symbols(expr * ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet);
+
+        /**
         Convert (dis)equation @p ex to the instance of Predicate. As a side effect updates mapping of
         variables (BasicTerm) to the corresponding z3 expr.
         @param ex Z3 expression to be converted to Predicate.
