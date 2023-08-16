@@ -59,17 +59,17 @@ namespace smt::noodler {
         std::set<Mata::Symbol> symbols_in_formula{};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
-            extract_symbols(word_equation.first, m_util_s, m, symbols_in_formula);
-            extract_symbols(word_equation.second, m_util_s, m, symbols_in_formula);
+            extract_symbols(word_equation.first, symbols_in_formula);
+            extract_symbols(word_equation.second, symbols_in_formula);
         }
 
         for (const auto &word_disequation: m_word_diseq_todo_rel) {
-            extract_symbols(word_disequation.first, m_util_s, m, symbols_in_formula);
-            extract_symbols(word_disequation.second, m_util_s, m, symbols_in_formula);
+            extract_symbols(word_disequation.first, symbols_in_formula);
+            extract_symbols(word_disequation.second, symbols_in_formula);
         }
 
         for (const auto &membership: m_membership_todo_rel) {
-            extract_symbols(std::get<1>(membership), m_util_s, m, symbols_in_formula);
+            extract_symbols(std::get<1>(membership), symbols_in_formula);
         }
         // extract from not contains
         for(const auto& not_contains : m_not_contains_todo_rel) {
@@ -202,8 +202,8 @@ namespace smt::noodler {
 
             // get symbols from both sides
             std::set<uint32_t> alphabet;
-            extract_symbols(left_side, m_util_s, m, alphabet);
-            extract_symbols(right_side, m_util_s, m, alphabet);
+            extract_symbols(left_side, alphabet);
+            extract_symbols(right_side, alphabet);
 
             // construct NFAs for both sides
             Mata::Nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
@@ -309,7 +309,7 @@ namespace smt::noodler {
         STRACE("str-block", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
     }
 
-    void extract_symbols(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::set<uint32_t>& alphabet) {
+    void theory_str_noodler::extract_symbols(expr* const ex, std::set<uint32_t>& alphabet) {
         if (m_util_s.str.is_string(ex)) {
             auto ex_app{ to_app(ex) };
             SASSERT(ex_app->get_num_parameters() == 1);
@@ -334,14 +334,14 @@ namespace smt::noodler {
             if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
                 util::throw_error("we support only string literals in str.to_re");
             }
-            extract_symbols(to_app(arg), m_util_s, m, alphabet);
+            extract_symbols(to_app(arg), alphabet);
             return;
         } else if (m_util_s.re.is_concat(ex_app) // Handle regex concatenation.
                 || m_util_s.str.is_concat(ex_app) // Handle string concatenation.
                 || m_util_s.re.is_intersection(ex_app) // Handle intersection.
             ) {
             for (unsigned int i = 0; i < ex_app->get_num_args(); ++i) {
-                extract_symbols(to_app(ex_app->get_arg(i)), m_util_s, m, alphabet);
+                extract_symbols(to_app(ex_app->get_arg(i)), alphabet);
             }
             return;
         } else if (m_util_s.re.is_antimirov_union(ex_app)) { // Handle Antimirov union.
@@ -350,7 +350,7 @@ namespace smt::noodler {
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
-            extract_symbols(to_app(child), m_util_s, m, alphabet);
+            extract_symbols(to_app(child), alphabet);
             return;
         } else if (m_util_s.re.is_derivative(ex_app)) { // Handle derivative.
             util::throw_error("derivative is unsupported");
@@ -379,7 +379,7 @@ namespace smt::noodler {
             SASSERT(ex_app->get_num_args() == 1);
             const auto child{ ex_app->get_arg(0) };
             SASSERT(is_app(child));
-            extract_symbols(to_app(child), m_util_s, m, alphabet);
+            extract_symbols(to_app(child), alphabet);
             return;
         } else if (m_util_s.re.is_range(ex_app)) { // Handle range.
             SASSERT(ex_app->get_num_args() == 2);
@@ -403,8 +403,8 @@ namespace smt::noodler {
             const auto right{ ex_app->get_arg(1) };
             SASSERT(is_app(left));
             SASSERT(is_app(right));
-            extract_symbols(to_app(left), m_util_s, m, alphabet);
-            extract_symbols(to_app(right), m_util_s, m, alphabet);
+            extract_symbols(to_app(left), alphabet);
+            extract_symbols(to_app(right), alphabet);
             return;
         } else if(util::is_variable(ex_app, m_util_s)) { // Handle variable.
             util::throw_error("variable should not occur here");
@@ -414,7 +414,7 @@ namespace smt::noodler {
             for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
                 SASSERT(is_app(ex_app->get_arg(i)));
                 app *arg = to_app(ex_app->get_arg(i));
-                extract_symbols(arg, m_util_s, m, alphabet);
+                extract_symbols(arg, alphabet);
             }
         }
     }

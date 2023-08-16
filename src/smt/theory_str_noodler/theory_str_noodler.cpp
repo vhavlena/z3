@@ -831,7 +831,7 @@ namespace smt::noodler {
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
             ) {
                 std::set<Mata::Symbol> symbols_in_regex;
-                extract_symbols(std::get<1>(reg_data), m_util_s, m, symbols_in_regex);
+                extract_symbols(std::get<1>(reg_data), symbols_in_regex);
                 // add one "dummy" symbol representing the symbols not in the regex
                 util::get_dummy_symbols(1, symbols_in_regex);
 
