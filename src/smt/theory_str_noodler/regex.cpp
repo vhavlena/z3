@@ -438,14 +438,19 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
             SASSERT(expression->get_num_args() > 0);
             // min_length: maximum of each regex from intersection
-            // empty: undef
+            // empty: if one of them is empty --> true; otherwise undef
             // universal: min_length > 0 --> false; otherwise undef
             RegexInfo res = get_regex_info(to_app(expression->get_arg(0)), m_util_s, m);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
                 RegexInfo prod = get_regex_info(to_app(expression->get_arg(i)), m_util_s, m);
                 res.min_length = std::max(res.min_length, prod.min_length);
+                if(prod.empty == l_true) {
+                    res.empty = l_true;
+                }
             }
-            res.empty = l_undef;
+            if(res.empty != l_true) {
+                res.empty =  l_undef;
+            }
             res.universal = l_undef;
             if(res.min_length > 0) {
                 res.universal = l_false;
