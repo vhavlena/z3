@@ -482,6 +482,7 @@ namespace smt::noodler::regex {
             // min_length: 0 (epsilon)
             RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
             res.min_length = 0;
+            res.empty = l_false;
             return res;
         } else if (m_util_s.re.is_range(expression)) { // Handle range.
             SASSERT(expression->get_num_args() == 2);
@@ -511,7 +512,7 @@ namespace smt::noodler::regex {
             
             // min_length: minimum of min_length of both guys
             // empty: if one of them is not empty --> false; otherwise undef
-            // universal: min_length > 0 --> false; otherwise undef
+            // universal: if min_length > 0 --> false; if both are universal --> true; otherwise undef
             RegexInfo res = get_regex_info(to_app(left), m_util_s, m);
             RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
             res.universal = l_undef;
@@ -521,9 +522,14 @@ namespace smt::noodler::regex {
             } else if(res.empty == l_false && uni.empty == l_undef) {
                 res.empty = l_false;  
             } else if(res.empty == l_false && uni.empty == l_false) {
-                res.empty = l_false;            
+                res.empty = l_false;
+            } else if(res.empty == l_false && uni.empty == l_false) {
+                res.empty = l_false;
             } else {
                 res.empty = l_undef;
+            }
+            if(res.universal == l_true || uni.universal == l_true) {
+                res.universal = l_true;
             }
             if(res.min_length > 0) {
                 res.universal = l_false;
@@ -535,7 +541,7 @@ namespace smt::noodler::regex {
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
             RegexInfo res = get_regex_info(to_app(child), m_util_s, m);
-            return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_false};
+            return RegexInfo{.min_length = 0, .universal = res.universal == l_true ? l_true : l_undef, .empty = l_false};
 
         } else if (m_util_s.re.is_plus(expression)) { // Handle positive iteration.
             SASSERT(expression->get_num_args() == 1);
