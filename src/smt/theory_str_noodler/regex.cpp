@@ -205,7 +205,7 @@ namespace smt::noodler::regex {
             nfa.remove_epsilon();
         } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
             SASSERT(expression->get_num_parameters() == 1);
-            nfa = create_word_nfa(expression->get_parameter(0).get_zstring());
+            nfa = AutAssignment::create_word_nfa(expression->get_parameter(0).get_zstring());
         } else if(util::is_variable(expression, m_util_s)) { // Handle variable.
             util::throw_error("variable in regexes are unsupported");
         } else {
@@ -240,18 +240,6 @@ namespace smt::noodler::regex {
                 });
             STRACE("str-create_nfa", nfa.print_to_DOT(tout););
         }
-        return nfa;
-    }
-
-    Nfa create_word_nfa(const zstring& word) {
-        const size_t word_length{ word.length() };
-        Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length } };
-        nfa.initial.insert(0);
-        size_t state{ 0 };
-        for (; state < word.length(); ++state) {
-            nfa.delta.add(state, word[state], state + 1);
-        }
-        nfa.final.insert(state);
         return nfa;
     }
 

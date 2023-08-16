@@ -62,13 +62,6 @@ namespace smt::noodler::regex {
                                              const std::set<uint32_t>& alphabet, bool determinize = false, bool make_complement = false);
 
     /**
-     * Create NFA accepting a word in Z3 zstring representation.
-     * @param word Word to accept.
-     * @return NFA.
-     */
-    Mata::Nfa::Nfa create_word_nfa(const zstring& word);
-
-    /**
      * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
      * RegexInfo gathers information about emptiness; universality; length of shortest words
      * 

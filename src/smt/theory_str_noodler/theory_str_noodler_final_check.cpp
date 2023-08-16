@@ -160,7 +160,7 @@ namespace smt::noodler {
                     } else if (var_or_literal.is_literal()) {
                         // to string literals. assign automaton accepting the word denoted by the literal
                         // TODO if Z3 can give us `string literal in RE` then we should check if aut_assignment does not contain this literal already (if yes, do intersection)
-                        Nfa nfa{ regex::create_word_nfa(var_or_literal.get_name()) };
+                        Nfa nfa{ AutAssignment::create_word_nfa(var_or_literal.get_name()) };
                         aut_assignment.emplace(var_or_literal, std::make_shared<Nfa>(std::move(nfa)));
                     }
                 }

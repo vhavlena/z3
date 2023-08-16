@@ -34,4 +34,16 @@ namespace smt::noodler {
         res = LenNode(LenFormulaType::AND, {res, LenNode(LenFormulaType::LEQ, {0, var})});
         return res;
     }
+
+    Nfa AutAssignment::create_word_nfa(const zstring& word) {
+        const size_t word_length{ word.length() };
+        Mata::Nfa::Nfa nfa{ word_length, { 0 }, { word_length } };
+        nfa.initial.insert(0);
+        size_t state{ 0 };
+        for (; state < word.length(); ++state) {
+            nfa.delta.add(state, word[state], state + 1);
+        }
+        nfa.final.insert(state);
+        return nfa;
+    }
 }

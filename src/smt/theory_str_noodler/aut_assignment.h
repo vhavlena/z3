@@ -226,6 +226,13 @@ namespace smt::noodler {
          */
         LenNode get_lengths(const BasicTerm& var) const;
 
+        /**
+         * Create NFA accepting a word in Z3 zstring representation.
+         * @param word Word to accept.
+         * @return NFA.
+         */
+        static Mata::Nfa::Nfa create_word_nfa(const zstring& word);
+
     };
 
 } // Namespace smt::noodler.
