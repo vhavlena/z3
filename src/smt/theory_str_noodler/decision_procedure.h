@@ -22,7 +22,7 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
-    enum class TranformationType {
+    enum class TransformationType {
         TO_CODE,
         FROM_CODE,
         TO_INT,
@@ -278,7 +278,8 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
-        std::vector<std::tuple<BasicTerm,BasicTerm,TranformationType>> transformations;
+        // contains to/from_code/int transformations
+        std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations;
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
@@ -294,7 +295,12 @@ namespace smt::noodler {
          */
         std::vector<Predicate> replace_disequality(Predicate diseq);
 
-        LenNode tranformation_formula(const std::set<BasicTerm>& a_vars);
+        /**
+         * @brief Gets length constraint that represent to/from_code/int transformations
+         * 
+         * TODO: from_int, to_int not implemented yet
+         */
+        LenNode transformation_formula();
 
         /**
          * Formula containing all not_contains predicate (nothing else)

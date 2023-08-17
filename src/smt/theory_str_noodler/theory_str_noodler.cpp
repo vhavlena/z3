@@ -1999,29 +1999,28 @@ namespace smt::noodler {
         axiomatized_persist_terms.insert(e);
 
         expr *s = nullptr;
-        VERIFY(m_util_s.str.is_to_code(e, s));
 
-        TranformationType type;
+        TransformationType type;
         std::string name_of_type;
         if (m_util_s.str.is_to_code(e, s)) {
-            type = TranformationType::TO_CODE;
+            type = TransformationType::TO_CODE;
             name_of_type = "to_code";
         } else if (m_util_s.str.is_from_code(e, s)) {
-            type = TranformationType::FROM_CODE;
+            type = TransformationType::FROM_CODE;
             name_of_type = "from_code";
         } else if (m_util_s.str.is_stoi(e, s)) {
-            type = TranformationType::TO_INT;
+            type = TransformationType::TO_INT;
             name_of_type = "to_int";
         } else if (m_util_s.str.is_itos(e, s)) {
-            type = TranformationType::FROM_INT;
+            type = TransformationType::FROM_INT;
             name_of_type = "from_int";
         } else {
             UNREACHABLE();
         }
-        bool tranforming_from = (type == TranformationType::FROM_CODE || type == TranformationType::FROM_INT);
+        bool tranforming_from = (type == TransformationType::FROM_CODE || type == TransformationType::FROM_INT);
 
         // get the var for the argument
-        expr *var_for_s;
+        expr *var_for_s = nullptr;
         if (tranforming_from) {
             // for from_code and from_int, the argument has integer type, we create a new var for it
             var_for_s = mk_int_var_fresh(name_of_type + "_argument");
@@ -2055,7 +2054,7 @@ namespace smt::noodler {
 
         // The range of from_* functions is bounded, we have to bound it also for the decision procedure
 
-        if (type == TranformationType::FROM_CODE) {
+        if (type == TransformationType::FROM_CODE) {
             // the result of str.from_code can only be either a char representing the code value, or empty string (if argument is out of range of any code value)
             expr *sigma_eps = m_util_s.re.mk_union(m_util_s.re.mk_epsilon(nullptr), m_util_s.re.mk_full_char(nullptr));
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, sigma_eps))});
@@ -2063,7 +2062,7 @@ namespace smt::noodler {
             len_vars.insert(var_for_e);
         }
 
-        if (type == TranformationType::FROM_INT) {
+        if (type == TransformationType::FROM_INT) {
             // the result of str.from_code can only be either a decimal representation of a number without leading zeros, or empty string (if argument is negative)
             expr *zero = m_util_s.str.mk_string("0"); // if argument == 0, the result will be 0
             expr *nums_without_zero = m_util_s.re.mk_concat(

@@ -97,7 +97,7 @@ namespace smt::noodler {
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
         // e = str.to_int(s), ot e = str.from_int(s), based on the transformation_type
-        scoped_vector<std::tuple<expr_ref,expr_ref,TranformationType>> m_tranformation_todo;
+        scoped_vector<std::tuple<expr_ref,expr_ref,TransformationType>> m_tranformation_todo;
         scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
