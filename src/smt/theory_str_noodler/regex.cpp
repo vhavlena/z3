@@ -400,14 +400,10 @@ namespace smt::noodler::regex {
             RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
             res.universal = l_undef;
             res.min_length = std::min(uni.min_length, res.min_length);
-            if(res.empty == l_undef && uni.empty == l_false) {
+            if(res.empty == l_false || uni.empty == l_false) {
                 res.empty = l_false;
-            } else if(res.empty == l_false && uni.empty == l_undef) {
-                res.empty = l_false;  
-            } else if(res.empty == l_false && uni.empty == l_false) {
-                res.empty = l_false;
-            } else if(res.empty == l_false && uni.empty == l_false) {
-                res.empty = l_false;
+            } else if(res.empty == l_true && uni.empty == l_true) {
+                res.empty = l_true;
             } else {
                 res.empty = l_undef;
             }
