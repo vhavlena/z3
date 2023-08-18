@@ -398,9 +398,8 @@ namespace smt::noodler::regex {
             // universal: if min_length > 0 --> false; if both are universal --> true; otherwise undef
             RegexInfo res = get_regex_info(to_app(left), m_util_s, m);
             RegexInfo uni = get_regex_info(to_app(right), m_util_s, m);
-            res.universal = l_undef;
             res.min_length = std::min(uni.min_length, res.min_length);
-            if(res.empty == l_false || uni.empty == l_false) {
+            if(uni.empty == l_false || res.empty == l_false) {
                 res.empty = l_false;
             } else if(res.empty == l_true && uni.empty == l_true) {
                 res.empty = l_true;
@@ -409,7 +408,10 @@ namespace smt::noodler::regex {
             }
             if(res.universal == l_true || uni.universal == l_true) {
                 res.universal = l_true;
+            } else {
+                res.universal = l_undef;
             }
+
             if(res.min_length > 0) {
                 res.universal = l_false;
             }
