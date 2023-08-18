@@ -787,6 +787,10 @@ namespace smt::noodler {
                 Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
                 Mata::Nfa::Nfa sigma_star = Mata::Nfa::Builder::create_sigma_star_nfa(&alph);
 
+                STRACE("str-gen_nfa_univ",
+                    nfa.print_to_mata(tout);
+                );
+
                 if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
                     // x should not belong in sigma*, so it is unsat
                     block_curr_len(expr_ref(this->m.mk_false(), this->m));
