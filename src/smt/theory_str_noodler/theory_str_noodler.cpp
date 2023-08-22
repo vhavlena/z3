@@ -1880,7 +1880,12 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
         STRACE("str", tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
-        m_not_contains_todo.push_back({{x, m},{y, m}});
+
+        zstring s;
+        // not(contains) was not axiomatized in handle_not_contains
+        if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() == 1)) {
+            m_not_contains_todo.push_back({{x, m},{y, m}});
+        }
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
