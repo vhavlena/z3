@@ -201,6 +201,9 @@ namespace smt::noodler {
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
 
+        // methods for assigning boolean values to predicates
+        void assign_not_contains(expr *e);
+
         void set_conflict(const literal_vector& ls);
 
         expr_ref construct_refinement();

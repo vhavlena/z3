@@ -469,7 +469,7 @@ namespace smt::noodler {
             if (is_true) {
                 handle_contains(e);
             } else {
-                handle_not_contains(e);
+                assign_not_contains(e);
             }
         } else if (m_util_s.str.is_in_re(e)) {
             // INFO the problem from previous cannot occur here - Vojta
@@ -842,6 +842,10 @@ namespace smt::noodler {
 
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
+
+        // for(const auto & t : symbols_in_formula) {
+        //     std::cout << t << std::endl;
+        // }
 
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
@@ -1863,10 +1867,20 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
-        } else {
-            // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for relevancy
-            m_not_contains_todo.push_back({{x, m},{y, m}});
         }
+    }
+
+    /**
+     * @brief Handler for assigning boolean value to the not(contains) predicate.
+     * 
+     * @param e Not contains predicate
+     */
+    void theory_str_noodler::assign_not_contains(expr *e) {
+        expr* cont = this->m.mk_not(e);
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y));
+        STRACE("str", tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
+        m_not_contains_todo.push_back({{x, m},{y, m}});
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
