@@ -121,9 +121,11 @@ namespace smt::noodler {
             const auto& var_app{ to_app(var_expr) };
             assert(var_app->get_num_args() == 0);
             const std::string& variable_name{ var_app->get_decl()->get_name().str() };
+
+            zstring s;
             BasicTerm term{ BasicTermType::Variable, variable_name };
-            if(m_util_s.str.is_string(var_app)) {
-                term = BasicTerm(BasicTermType::Literal, variable_name);
+            if(m_util_s.str.is_string(var_app, s)) {
+                term = BasicTerm(BasicTermType::Literal, s.encode());
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
