@@ -1144,11 +1144,12 @@ namespace smt::noodler {
         expr_ref v = mk_str_var_fresh("substr");
 
         int val = r.get_int32();
-        for(int i = 0; i < val; i++) {
+        for(int v = 0; v < val; v++) {
             expr_ref var = mk_str_var_fresh("pre_substr");
             expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
             x = m_util_s.str.mk_concat(x, var);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -1344,7 +1345,9 @@ namespace smt::noodler {
         // create axioms in_substri is Sigma
         for(const expr_ref& val : vars) {
             expr_ref re(m_util_s.re.mk_in_re(val, m_util_s.re.mk_full_char(nullptr)), m);
-            add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            literal pred_ge = mk_literal(m_util_a.mk_ge(pred, m_util_a.mk_int(0)));
+            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
+            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(val), m_util_a.mk_int(1), false)});
         }
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
@@ -1864,6 +1867,7 @@ namespace smt::noodler {
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
+            add_axiom({mk_literal(cont), mk_literal(re)});
         } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)) ), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
