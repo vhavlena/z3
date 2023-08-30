@@ -44,6 +44,14 @@ namespace smt::noodler {
     class theory_str_noodler : public theory {
     protected:
 
+        /**
+         * Structure for storing items for the loop protection.
+         */
+        struct stored_instance {
+            expr_ref lengths; // length formula 
+            bool initial_length; // was the length formula obtained from the initial length checking?
+        };
+
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
@@ -69,7 +77,7 @@ namespace smt::noodler {
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
-        std::vector<std::pair<expr_ref, expr_ref>> axiomatized_instances;
+        std::vector<std::pair<expr_ref, stored_instance>> axiomatized_instances;
 
         // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
@@ -289,9 +297,13 @@ namespace smt::noodler {
         /**
          * @brief Blocks current SAT assignment for given @p len_formula
          * 
+         * @param len_formula Length formula corresponding to the current instance
+         * @param add_axiomatized Add item to the vector of axiomatized instances (for the loop protection)
+         * @param init_lengths Was the length formula obtained from the initial length checking (for the fool protection)
+         * 
          * TODO explain better
          */
-        void block_curr_len(expr_ref len_formula);
+        void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };

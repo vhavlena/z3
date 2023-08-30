@@ -770,31 +770,45 @@ namespace smt::noodler {
             expr_ref refine = construct_refinement();
             if(refine != nullptr) {
                 bool found = false;
+                /**
+                 * Variable denoting that the only stored instance in @p axiomatized_instances was obtained by unsat from initial lengths. In that case 
+                 * if we get SAT from lengths, we do not surely know if it is indeed sat and we need to call the decision procedure again (now it 
+                 * should proceed to the main decision procedure and obtain lengths different from the initial assignment).
+                 */
+                bool init_only = true;
                 expr_ref len_formula(this->m);
+
                 for(const auto& pr : this->axiomatized_instances) {
                     if(pr.first == refine) {
-                        len_formula = pr.second;
+                        len_formula = pr.second.lengths;
+                        init_only = init_only && pr.second.initial_length;
                         found = true;
-                        break;
+
+                        /**
+                         * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
+                         * is not sufficient for SAT solver to get another solution. We hence find unsat core of 
+                         * the current assignment with the len_formula and add this unsat core as 
+                         * a theory lemma.
+                         */
+                        STRACE("str", tout << "loop-protection: found " << std::endl;);
+                        expr_ref unsat_core(m.mk_true(), m);
+                        if(check_len_sat(len_formula, &unsat_core) == l_false) {
+                            unsat_core = m.mk_not(unsat_core);
+                            ctx.internalize(unsat_core.get(), true);
+                            add_axiom({mk_literal(unsat_core)});
+                            block_curr_len(len_formula, false);
+                            STRACE("str", tout << "loop-protection: unsat " << std::endl;);
+                            return FC_CONTINUE;
+                        } 
                     }
                 }
-                if(found) {
+                if(found && !init_only) {
                     /**
-                     * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
-                     * is not sufficient for SAT solver to get another solution. We hence find unsat core of 
-                     * the current assignment with the len_formula and add this unsat core as 
-                     * a theory lemma.
+                     * If all stored items are SAT and the lengths were obtained from the main decision 
+                     * procedure --> it is safe to say SAT.
                      */
-                    expr_ref unsat_core(m.mk_true(), m);
-                    if(check_len_sat(len_formula, &unsat_core) == l_false) {
-                        unsat_core = m.mk_not(unsat_core);
-                        ctx.internalize(unsat_core.get(), true);
-                        add_axiom({mk_literal(unsat_core)});
-                        block_curr_len(len_formula);
-                        return FC_CONTINUE;
-                    } else {
-                        return FC_DONE;
-                    }
+                    STRACE("str", tout << "loop-protection: sat " << std::endl;);
+                    return FC_DONE;
                 }
             }
         }
@@ -899,7 +913,7 @@ namespace smt::noodler {
         expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
-            block_curr_len(lengths);
+            block_curr_len(lengths, true, true);
             return FC_CONTINUE;
         }
 

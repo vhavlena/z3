@@ -269,7 +269,7 @@ namespace smt::noodler {
         return ret;
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
+    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
         STRACE("str-block", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         context& ctx = get_context();
@@ -300,8 +300,8 @@ namespace smt::noodler {
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
         }
         
-        if(m_params.m_loop_protect) {
-            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), len_formula});
+        if(m_params.m_loop_protect && add_axiomatized) {
+            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
         }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
