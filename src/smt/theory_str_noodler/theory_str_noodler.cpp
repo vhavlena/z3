@@ -469,7 +469,7 @@ namespace smt::noodler {
             if (is_true) {
                 handle_contains(e);
             } else {
-                handle_not_contains(e);
+                assign_not_contains(e);
             }
         } else if (m_util_s.str.is_in_re(e)) {
             // INFO the problem from previous cannot occur here - Vojta
@@ -617,6 +617,7 @@ namespace smt::noodler {
         this->m_word_diseq_todo_rel.clear();
         this->m_membership_todo_rel.clear();
         this->m_lang_eq_or_diseq_todo_rel.clear();
+        this->m_not_contains_todo_rel.clear();
 
         for (const auto& we : m_word_eq_todo) {
             app_ref eq(m.mk_eq(we.first, we.second), m);
@@ -682,6 +683,24 @@ namespace smt::noodler {
             }
         }
 
+        // not contains
+        for(const auto& not_con_pair: this->m_not_contains_todo) {
+            app_ref con_expr(m_util_s.str.mk_contains(not_con_pair.first, not_con_pair.second), m);
+            app_ref not_con_expr(m.mk_not(con_expr), m);
+
+            STRACE("str",
+                tout << "  NOT contains " << mk_pp(con_expr.get(), m) << " is " << (ctx.is_relevant(con_expr.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(con_expr.get())
+                     << ", " << mk_pp(not_con_expr.get(), m) << " is " << (ctx.is_relevant(not_con_expr.get()) ? "" : "not ") << "relevant"
+                     << std::endl;
+            );
+
+            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) && 
+                !this->m_not_contains_todo_rel.contains(not_con_pair)) {
+                this->m_not_contains_todo_rel.push_back(not_con_pair);
+            }
+        }
+
         // TODO check for relevancy of language (dis)equations, right now we assume everything is relevant
         for(const auto& le : m_lang_eq_todo) {
             this->m_lang_eq_or_diseq_todo_rel.push_back({le.first, le.second, true});
@@ -730,14 +749,11 @@ namespace smt::noodler {
             for (const auto &led: this->m_lang_eq_or_diseq_todo_rel) {
                 tout << "    " << mk_pp(std::get<0>(led), m) << (std::get<2>(led) ? " == " : " != ") << mk_pp(std::get<1>(led), m) << std::endl;
             }
+            tout << "  not_contains(" << this->m_not_contains_todo_rel.size() << "):" << std::endl;
+            for (const auto &notc: this->m_not_contains_todo_rel) {
+                tout << "    " << mk_pp(notc.first, m) << "; " << mk_pp(notc.second, m) << std::endl;
+            }
         );
-
-        // difficult not(contains) predicates -> unknown
-        // TODO: should we check if any of those not contains are relevant? if we are not planning to check for relevancy, we can just throw error when we are processsing not contains in relevant_eh() and not here
-        if(!this->m_not_contains_todo.empty()) {
-            STRACE("str", tout << "giving up, there is not contains" << std::endl);
-            return FC_GIVEUP;
-        }
 
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
@@ -754,17 +770,45 @@ namespace smt::noodler {
             expr_ref refine = construct_refinement();
             if(refine != nullptr) {
                 bool found = false;
+                /**
+                 * Variable denoting that the only stored instance in @p axiomatized_instances was obtained by unsat from initial lengths. In that case 
+                 * if we get SAT from lengths, we do not surely know if it is indeed sat and we need to call the decision procedure again (now it 
+                 * should proceed to the main decision procedure and obtain lengths different from the initial assignment).
+                 */
+                bool init_only = true;
                 expr_ref len_formula(this->m);
+
                 for(const auto& pr : this->axiomatized_instances) {
                     if(pr.first == refine) {
-                        len_formula = pr.second;
+                        len_formula = pr.second.lengths;
+                        init_only = init_only && pr.second.initial_length;
                         found = true;
-                        break;
+
+                        /**
+                         * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
+                         * is not sufficient for SAT solver to get another solution. We hence find unsat core of 
+                         * the current assignment with the len_formula and add this unsat core as 
+                         * a theory lemma.
+                         */
+                        STRACE("str", tout << "loop-protection: found " << std::endl;);
+                        expr_ref unsat_core(m.mk_true(), m);
+                        if(check_len_sat(len_formula, &unsat_core) == l_false) {
+                            unsat_core = m.mk_not(unsat_core);
+                            ctx.internalize(unsat_core.get(), true);
+                            add_axiom({mk_literal(unsat_core)});
+                            block_curr_len(len_formula, false);
+                            STRACE("str", tout << "loop-protection: unsat " << std::endl;);
+                            return FC_CONTINUE;
+                        } 
                     }
                 }
-                if(found) {
-                    block_curr_len(len_formula);
-                    return FC_CONTINUE;
+                if(found && !init_only) {
+                    /**
+                     * If all stored items are SAT and the lengths were obtained from the main decision 
+                     * procedure --> it is safe to say SAT.
+                     */
+                    STRACE("str", tout << "loop-protection: sat " << std::endl;);
+                    return FC_DONE;
                 }
             }
         }
@@ -772,7 +816,7 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0) {
+        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             const auto& reg_data = this->m_membership_todo_rel[0];
             if(!std::get<2>(reg_data) // membership is negated
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
@@ -813,6 +857,10 @@ namespace smt::noodler {
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
 
+        // for(const auto & t : symbols_in_formula) {
+        //     std::cout << t << std::endl;
+        // }
+
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
@@ -824,7 +872,7 @@ namespace smt::noodler {
 
         // try Nielsen transformation (if enabled) to solve
         /// FIXME: a better test for when to try nielsen might be needed
-        if(m_params.m_try_nielsen && instance.is_quadratic()) {
+        if(m_params.m_try_nielsen && instance.is_quadratic() && this->m_membership_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
             expr_ref block_len(m.mk_false(), m);
@@ -865,7 +913,7 @@ namespace smt::noodler {
         expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
-            block_curr_len(lengths);
+            block_curr_len(lengths, true, true);
             return FC_CONTINUE;
         }
 
@@ -877,16 +925,16 @@ namespace smt::noodler {
             if (result == l_true) {
                 lengths = len_node_to_z3_formula(dec_proc.get_lengths());
                 if (check_len_sat(lengths) == l_true) {
-                    STRACE("str", tout << "len sat" << mk_pp(lengths, m) << std::endl;);
+                    STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     return FC_DONE;
                 } else {
-                    STRACE("str", tout << "len unsat" <<  mk_pp(lengths, m) << std::endl;);
+                    STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
                     block_len = m.mk_or(block_len, lengths);
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
-                STRACE("str", tout << "assignment unsat" << mk_pp(block_len, m) << std::endl;);
+                STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
                 block_curr_len(block_len);
                 return FC_CONTINUE;
             } else {
@@ -929,7 +977,7 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         context &ctx = get_context();
         expr_ref ex{e, m};
-        m_rewrite(ex);
+        // m_rewrite(ex);
         if (!ctx.e_internalized(ex)) {
             ctx.internalize(ex, false);
         }
@@ -1082,7 +1130,7 @@ namespace smt::noodler {
         // add the replacement charat -> v
         predicate_replace.insert(e, fresh.get());
         // update length variables
-        util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(s, this->m_util_s, m, this->len_vars, &this->predicate_replace);
         this->len_vars.insert(x);
     }
 
@@ -1110,11 +1158,12 @@ namespace smt::noodler {
         expr_ref v = mk_str_var_fresh("substr");
 
         int val = r.get_int32();
-        for(int i = 0; i < val; i++) {
+        for(int v = 0; v < val; v++) {
             expr_ref var = mk_str_var_fresh("pre_substr");
             expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
             x = m_util_s.str.mk_concat(x, var);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -1208,6 +1257,56 @@ namespace smt::noodler {
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
+        expr_ref v = mk_str_var_fresh("substr");
+
+        // Check if the substring is of the form str.substr x k 1 and rewrite to str.at x k
+        rational num_l;
+        if(m_util_a.is_numeral(l, num_l) && num_l == 1) {
+            expr_ref at(m_util_s.str.mk_at(s, i), m);
+            add_axiom({mk_eq(v, e, false)});
+            add_axiom({mk_eq(v, at, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+
+        // check the form str.substr "B" i l
+        zstring str_s;
+        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
+            expr_ref zero(m_util_a.mk_int(0), m);
+            expr_ref one(m_util_a.mk_int(1), m);
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+
+            literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
+            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
+            literal l_eq_0 = mk_literal(m_util_a.mk_eq(l, zero));
+            literal i_ge_1 = mk_literal(m_util_a.mk_ge(i, one));
+            literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
+            literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
+
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, eps, false)});
+            // l < 0 -> v = eps
+            add_axiom({l_ge_0, mk_eq(v, eps, false)});
+            // l >= 0 && i = 0 && i >= 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
+            // l >= 0 && i >= 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_ge_1, mk_eq(v, eps, false)});
+            // l >= 0 && i = 0 && l < 1 -> v = eps
+            add_axiom({~l_ge_0, ~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
+            // substr(s, i, l) = v
+            add_axiom({mk_eq(v, e, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+        // check the form str.substr "" x y --> str.substr "" x y == ""
+        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            add_axiom({mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, e, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+
         expr* num = nullptr;
         expr* pred = nullptr;
         rational r;
@@ -1219,7 +1318,6 @@ namespace smt::noodler {
         expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
         m_rewrite(post_bound); // simplify
 
-        expr_ref v = mk_str_var_fresh("substr");
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
         expr_ref y = mk_str_var_fresh("post_substr");
@@ -1261,7 +1359,9 @@ namespace smt::noodler {
         // create axioms in_substri is Sigma
         for(const expr_ref& val : vars) {
             expr_ref re(m_util_s.re.mk_in_re(val, m_util_s.re.mk_full_char(nullptr)), m);
-            add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            literal pred_ge = mk_literal(m_util_a.mk_ge(pred, m_util_a.mk_int(0)));
+            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
+            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(val), m_util_a.mk_int(1), false)});
         }
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
@@ -1324,10 +1424,39 @@ namespace smt::noodler {
         expr_ref y = mk_str_var_fresh("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
         expr_ref xsy = mk_concat(x, mk_concat(s, y));
+        expr_ref eps(m_util_s.str.mk_string(""), m);
         literal a_emp = mk_eq_empty(a);
         literal s_emp = mk_eq_empty(s);
-        literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
 
+        zstring str_a;
+        // str.replace "A" s t where a = "A"
+        if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
+            // s = emp -> v = t.a
+            // NOTE: if we use ~s_emp, this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
+            // s = a -> v = t
+            // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
+            // add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
+            // s != eps && s != a -> v = a
+            add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        // str.replace "" s t where a = ""
+        } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
+            // s = emp -> v = t.a
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v,t,false)});
+            // s = emp -> v = t.a
+            add_axiom({s_emp, mk_eq_empty(v)});
+            // replace(a,s,t) = v
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
+        literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
         // replace(a,s,t) = v
         add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
@@ -1615,8 +1744,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
     }
 
     /**
@@ -1699,8 +1828,8 @@ namespace smt::noodler {
         add_axiom({lit_e, len_y_gt_len_x, eq_mx_my});
 
         // update length variables
-        util::get_str_variables(x, this->m_util_s, m, this->len_vars);
-        util::get_str_variables(y, this->m_util_s, m, this->len_vars);
+        util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
     }
 
     /**
@@ -1752,8 +1881,27 @@ namespace smt::noodler {
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
-        } else {
-            // TODO: shouldn't we just throw error here that we cannot handle not contains? or are we planning to handle it? or maybe it might be irrelevant, but in final_check_eh we throw unknown anyway, we do not check for relevancy
+            add_axiom({mk_literal(cont), mk_literal(re)});
+        } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)) ), m);
+            add_axiom({mk_literal(e), ~mk_literal(re)});
+        }
+    }
+
+    /**
+     * @brief Handler for assigning boolean value to the not(contains) predicate.
+     * 
+     * @param e Not contains predicate
+     */
+    void theory_str_noodler::assign_not_contains(expr *e) {
+        expr* cont = this->m.mk_not(e);
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y));
+        STRACE("str", tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
+
+        zstring s;
+        // not(contains) was not axiomatized in handle_not_contains
+        if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() == 1)) {
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
     }

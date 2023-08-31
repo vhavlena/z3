@@ -291,6 +291,16 @@ namespace smt::noodler {
          */
         LenNode diseqs_formula();
 
+        /**
+         * Formula containing all not_contains predicate (nothing else)
+         */
+        Formula not_contains{};
+
+        /**
+         * @brief Construct constraints to get rid of not_contains predicates.
+         */
+        void replace_not_contains();
+
     public:
         
         /**
@@ -300,20 +310,24 @@ namespace smt::noodler {
          * keeping the length dependencies between variables (for the variables that
          * occur in some length constraint in the rest of the formula).
          * 
-         * @param equalities encodes the word equations
+         * @param formula encodes the string formula (including equations, not contains)
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
          * @param len_eq_vars Equivalence class holding variables with the same length
          * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(
-             Formula equalities, AutAssignment init_aut_ass,
+             Formula formula, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
              const theory_str_noodler_params &par
         ) : init_length_sensitive_vars(init_length_sensitive_vars),
-            formula(equalities),
+            formula(formula),
             init_aut_ass(init_aut_ass),
-            m_params(par) { }
+            m_params(par) {
+            
+            // we extract from the input formula all not_contains predicates and add them to not_contains formula
+            this->formula.extract_predicates(PredicateType::NotContains, this->not_contains);
+        }
         
         /**
          * Do some preprocessing (can be called only before init_computation). Can

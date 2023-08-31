@@ -16,6 +16,7 @@
 #include "formula.h"
 #include "aut_assignment.h"
 #include "var_union_find.h"
+#include "util.h"
 
 namespace smt::noodler {
 
@@ -361,6 +362,8 @@ namespace smt::noodler {
 
         void refine_languages();
         void reduce_diseqalities();
+
+        bool contains_unsat_eqs_or_diseqs() const;
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.

@@ -323,7 +323,13 @@ namespace smt::noodler {
          ) : init_length_sensitive_vars{ init_length_sensitive_vars },
              formula { equalities },
              init_aut_ass{ init_aut_ass },
-             m_params(par) { }
+             m_params(par) { 
+            
+            // Nielsen currently supports only quadratic equations (no inequalities and not(contains))
+            if(!this->formula.is_quadratic()) {
+                util::throw_error("Nielsen supports quadratic equations only");
+            }
+        }
 
         lbool compute_next_solution() override;
         LenNode get_initial_lengths() override {

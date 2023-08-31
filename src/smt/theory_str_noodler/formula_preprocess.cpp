@@ -1020,6 +1020,9 @@ namespace smt::noodler {
 
     /**
      * @brief Refine languages for equations of the form X = R (|X|=1) to the L(X) = L(X) \cap L(R).
+     * Moreover, for the literal terms l from the current automata assignments, restrict its 
+     * languages to L(l) = L(l) \cap {l}. Recall that the automata assignment contains not only 
+     * variables but also literals.
      */
     void FormulaPreprocessor::refine_languages() {
         std::set<BasicTerm> ineq_vars;
@@ -1050,6 +1053,18 @@ namespace smt::noodler {
                     update_reg_constr(var, pr.second.get_left_side());
             }
         }
+
+        // Check if there is a regular constraint of the form "A" in .... 
+        // In that case, we construct automaton for "A" and make a product with the 
+        // corresponding language of the Basic Term "A".
+        for(const auto& pr : this->aut_ass) {
+            if(pr.first.is_literal()) {
+                Mata::Nfa::Nfa word_aut = util::create_word_nfa(pr.first.get_name());
+                Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(pr.second), word_aut);
+                inters.trim();
+                this->aut_ass[pr.first] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+            }
+        }
     }
 
     /**
@@ -1074,12 +1089,14 @@ namespace smt::noodler {
                 continue;
 
             if(this->formula.single_occurr(pr.second.get_left_set())) {
-                if(is_sigma_star(pr.second.get_left_set())) {
+                auto left_set = pr.second.get_left_set();
+                if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
-                if(is_sigma_star(pr.second.get_right_set())) {
+                auto right_set = pr.second.get_right_set();
+                if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
                 }               
             }
@@ -1238,6 +1255,32 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
+    }
+
+    /**
+     * @brief Check if the instance is clearly unsatisfiable. It checks trivial (dis)equations
+     * of the form x != x, ab = cd (x is term, a,b,c,d are constants).
+     * 
+     * @return True --> unsat for sure.
+     */
+    bool FormulaPreprocessor::contains_unsat_eqs_or_diseqs() const {
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(pr.second.is_inequation() && pr.second.get_left_side() == pr.second.get_right_side()) {
+                return true;
+            }
+            if(pr.second.is_equation() && pr.second.is_str_const()) {
+                zstring left{};
+                zstring right{};
+                for(const BasicTerm& t : pr.second.get_left_side()) {
+                    left = left + t.get_name();
+                }
+                for(const BasicTerm& t : pr.second.get_right_side()) {
+                    right = right + t.get_name();
+                }
+                if(left != right) return true;
+            }
+        }
+        return false;
     }
 
 } // Namespace smt::noodler.

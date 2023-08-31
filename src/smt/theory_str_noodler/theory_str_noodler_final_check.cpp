@@ -43,6 +43,15 @@ namespace smt::noodler {
             instance.add_predicate(inst);
         }
 
+        // construct not contains predicates
+        for(const auto& not_contains : this->m_not_contains_todo_rel) {
+            std::vector<BasicTerm> left, right;
+            util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, left);
+            util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, right);
+            Predicate inst(PredicateType::NotContains, std::vector<Concat>{left, right});
+            instance.add_predicate(inst);
+        }
+
         return instance;
     }
 
@@ -61,6 +70,11 @@ namespace smt::noodler {
 
         for (const auto &membership: m_membership_todo_rel) {
             util::extract_symbols(std::get<1>(membership), m_util_s, m, symbols_in_formula);
+        }
+        // extract from not contains
+        for(const auto& not_contains : m_not_contains_todo_rel) {
+            util::extract_symbols(not_contains.first, m_util_s, m, symbols_in_formula);
+            util::extract_symbols(not_contains.second, m_util_s, m, symbols_in_formula);
         }
 
         /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
@@ -102,17 +116,21 @@ namespace smt::noodler {
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
         for (const auto &word_equation: m_membership_todo_rel) {
-            const expr_ref& variable{ std::get<0>(word_equation) };
-            assert(is_app(variable));
-            const auto& variable_app{ to_app(variable) };
-            assert(variable_app->get_num_args() == 0);
-            const auto& variable_name{ variable_app->get_decl()->get_name().str() };
-            // TODO are we sure that variable is really variable and not string literal? i.e. can Z3 give us `string literal in RE`?
-            const BasicTerm variable_term{ BasicTermType::Variable, variable_name };
+            const expr_ref& var_expr{ std::get<0>(word_equation) };
+            assert(is_app(var_expr));
+            const auto& var_app{ to_app(var_expr) };
+            assert(var_app->get_num_args() == 0);
+            const std::string& variable_name{ var_app->get_decl()->get_name().str() };
+
+            zstring s;
+            BasicTerm term{ BasicTermType::Variable, variable_name };
+            if(m_util_s.str.is_string(var_app, s)) {
+                term = BasicTerm(BasicTermType::Literal, s.encode());
+            }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
-            auto aut_ass_it{ aut_assignment.find(variable_term) };
+            auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
@@ -120,9 +138,9 @@ namespace smt::noodler {
                         Mata::Nfa::reduce(Mata::Nfa::intersection(nfa, *aut_ass_it->second)));
 
             } else { // We create a regular constraint for the current variable for the first time.
-                aut_assignment[variable_term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+                aut_assignment[term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
                 // TODO explain after this function is moved to theory_str_noodler, we do this because var_name contains only variables occuring in instance and not those that occur only in str.in_re
-                var_name.insert({variable_term, variable});
+                this->var_name.insert({term, var_expr});
             }
         }
 
@@ -227,7 +245,7 @@ namespace smt::noodler {
         return l_false;
     }
 
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core) {
         if (len_formula == m.mk_true()) {
             // we assume here that existing length constraints are satisfiable, so adding true will do nothing
             return l_true;
@@ -241,10 +259,17 @@ namespace smt::noodler {
         }
         m_int_solver.initialize(get_context(), include_ass);
         auto ret = m_int_solver.check_sat(len_formula);
+        // construct an unsat core --> might be expensive
+        // TODO: better interface of m_int_solver
+        if(unsat_core != nullptr) {
+            for(unsigned i=0;i<m_int_solver.m_kernel.get_unsat_core_size();i++){
+                *unsat_core = m.mk_and(*unsat_core, m_int_solver.m_kernel.get_unsat_core_expr(i));
+            }
+        }
         return ret;
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula) {
+    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
         STRACE("str-block", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         context& ctx = get_context();
@@ -275,8 +300,8 @@ namespace smt::noodler {
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
         }
         
-        if(m_params.m_loop_protect) {
-            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), len_formula});
+        if(m_params.m_loop_protect && add_axiomatized) {
+            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
         }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));

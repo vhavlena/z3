@@ -44,6 +44,14 @@ namespace smt::noodler {
     class theory_str_noodler : public theory {
     protected:
 
+        /**
+         * Structure for storing items for the loop protection.
+         */
+        struct stored_instance {
+            expr_ref lengths; // length formula 
+            bool initial_length; // was the length formula obtained from the initial length checking?
+        };
+
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
@@ -69,7 +77,7 @@ namespace smt::noodler {
         obj_hashtable<expr> propgated_string_theory;
         obj_hashtable<expr> m_has_length;          // is length applied
         expr_ref_vector     m_length;             // length applications themselves
-        std::vector<std::pair<expr_ref, expr_ref>> axiomatized_instances;
+        std::vector<std::pair<expr_ref, stored_instance>> axiomatized_instances;
 
         // TODO what are these?
         vector<std::pair<obj_hashtable<expr>,std::vector<app_ref>>> len_state;
@@ -95,6 +103,7 @@ namespace smt::noodler {
         vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the disequality
         vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
+        vector<expr_pair> m_not_contains_todo_rel; // not contains
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -200,6 +209,9 @@ namespace smt::noodler {
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
 
+        // methods for assigning boolean values to predicates
+        void assign_not_contains(expr *e);
+
         void set_conflict(const literal_vector& ls);
 
         expr_ref construct_refinement();
@@ -276,15 +288,22 @@ namespace smt::noodler {
 
         /**
          * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
+         * 
+         * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of 
+         * the current @p len_formula. If the parameter is nullptr, the unsat core is not computed.
          */
-        lbool check_len_sat(expr_ref len_formula);
+        lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr);
 
         /**
          * @brief Blocks current SAT assignment for given @p len_formula
          * 
+         * @param len_formula Length formula corresponding to the current instance
+         * @param add_axiomatized Add item to the vector of axiomatized instances (for the loop protection)
+         * @param init_lengths Was the length formula obtained from the initial length checking (for the fool protection)
+         * 
          * TODO explain better
          */
-        void block_curr_len(expr_ref len_formula);
+        void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };

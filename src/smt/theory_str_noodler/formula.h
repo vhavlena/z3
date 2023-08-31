@@ -31,6 +31,7 @@ namespace smt::noodler {
     enum struct PredicateType {
         Equation,
         Inequation,
+        NotContains,
     };
 
     [[nodiscard]] static std::string to_string(PredicateType predicate_type) {
@@ -39,6 +40,8 @@ namespace smt::noodler {
                 return "Equation";
             case PredicateType::Inequation:
                 return "Inequation";
+            case PredicateType::NotContains:
+                return "Notcontains";
         }
 
         throw std::runtime_error("Unhandled predicate type passed to to_string().");
@@ -297,6 +300,17 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if the predicate contains only constant strings.
+         */
+        bool is_str_const() const {
+            for(const auto& side : this->params) {
+                for(const BasicTerm& t : side)
+                    if(!t.is_literal()) return false;
+            }
+            return true;
+        }
+
+        /**
          * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
          * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
          *
@@ -498,6 +512,26 @@ namespace smt::noodler {
             }
             return ret;
         }
+
+        /**
+         * @brief Extract and remove predicate of the type @p type from the formula. 
+         * The predicates of the type @p type are stored in the output @p extracted
+         * It removes the extracted predicates from the current formula.
+         * 
+         * @param type Predicate type
+         * @param[out] extracted Where to store extracted predicates
+         */
+        void extract_predicates(PredicateType type, Formula& extracted) {
+            std::vector<Predicate> new_predicates {};
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() == type) {
+                    extracted.add_predicate(pred);
+                } else {
+                    new_predicates.emplace_back(pred);
+                }
+            }
+            this->predicates = new_predicates;
+        } 
 
         /**
          * @brief Get union of variables from all predicates
