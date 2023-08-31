@@ -90,26 +90,25 @@ namespace smt::noodler {
 
         // constraints that are (possibly) to be processed in final_check_eh (added either in relevant_eh or ?assign_eh?)
         // they also need to be popped and pushed in pop_scope_eh and push_scope_eh)
-        scoped_vector<expr_pair> m_word_eq_todo; // pair contains left and right side of the (word) equality
-        scoped_vector<expr_pair> m_word_diseq_todo; // pair contains left and right side of the (word) disequality
+        scoped_vector<expr_pair> m_word_eq_todo; // pair contains left and right side of the word equality
+        scoped_vector<expr_pair> m_word_diseq_todo; // pair contains left and right side of the word disequality
         scoped_vector<expr_pair> m_lang_eq_todo; //pair contains left and right side of the language equality
         scoped_vector<expr_pair> m_lang_diseq_todo; // pair contains left and right side of the language disequality
+        scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
         // e = str.to_int(s), ot e = str.from_int(s), based on the transformation_type
         scoped_vector<std::tuple<expr_ref,expr_ref,TransformationType>> m_tranformation_todo;
-        scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
         // todo constraints and check if they are relevant for current SAT assignment => if they are
         // they are added to one of these sets
-        vector<expr_pair> m_word_eq_todo_rel; // pair contains left and right side of the equality
-        vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the disequality
-        vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
+        vector<expr_pair> m_word_eq_todo_rel; // pair contains left and right side of the word equality
+        vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the word disequality
+        vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains left and right side of the language (dis)equality and a flag - true -> equality, false -> diseq
+        vector<expr_pair> m_not_contains_todo_rel; // first element should not contain the second one
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
-        vector<expr_pair> m_not_contains_todo_rel; // not contains
         // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in m_tranformation_todo is relevant => no _todo_rel version
-        // not contains automatically leads to error, we do not check for the relevancy (yet), so no _todo_rel version
 
     public:
         char const * get_name() const override { return "noodler"; }
