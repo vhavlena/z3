@@ -40,7 +40,7 @@ See [instructions for building Z3][cmake] for more details.
 [make]: README-Z3.md#building-z3-using-make-and-gccclang
 [cmake]: README-Z3.md#building-z3-using-cmake
 
-To build tests for Z3-Noodler, run the following 
+To build tests for Z3-Noodler (assuming you have [Catch2](https://github.com/catchorg/Catch2) version 3 installed), run the following 
 command.
 ```shell
 make test-noodler
@@ -53,7 +53,7 @@ cd build/
 ./z3 smt.string_solver="noodler" <instance_file.smt2> 
 ```
 
-To run tests for Z3-Noodler (assuming you have [Catch2](https://github.com/catchorg/Catch2) version 3 installed), execute
+To run tests for Z3-Noodler, execute
 ```shell
 cd build/
 ./test-noodler
