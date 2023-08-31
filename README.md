@@ -53,7 +53,7 @@ cd build/
 ./z3 smt.string_solver="noodler" <instance_file.smt2> 
 ```
 
-To run tests for Z3-Noodler, execute
+To run tests for Z3-Noodler (assuming you have [Catch2](https://github.com/catchorg/Catch2) version 3 installed), execute
 ```shell
 cd build/
 ./test-noodler
