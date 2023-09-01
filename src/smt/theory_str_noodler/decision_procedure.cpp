@@ -684,6 +684,9 @@ namespace smt::noodler {
                 UNREACHABLE();
             }
         }
+        STRACE("str-transform",
+            tout << "Formula for transformation: " << LenNode(LenFormulaType::AND, result_conjuncts) << std::endl;
+        );
         return LenNode(LenFormulaType::AND, result_conjuncts);
     }
 
