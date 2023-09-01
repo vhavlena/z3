@@ -3,7 +3,7 @@
 #include <utility>
 
 #include <catch2/catch_test_macros.hpp>
-#include <mata/re2parser.hh>
+#include <mata/parser/re2parser.hh>
 
 #include "smt/theory_str_noodler/decision_procedure.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
@@ -28,7 +28,7 @@ public:
     DecisionProcedureCUT(const Formula &equalities, AutAssignment init_aut_ass,
                          const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                          ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, const BasicTermEqiv& len_eq_vars, const theory_str_noodler_params& par
-    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, m, m_util_s, m_util_a, len_eq_vars, par) {}
+    ) : DecisionProcedure(equalities, std::move(init_aut_ass), init_length_sensitive_vars, par) {}
 
     using DecisionProcedure::compute_next_solution;
     using DecisionProcedure::get_lengths;

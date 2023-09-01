@@ -4,7 +4,7 @@
 
 #include <smt/theory_str_noodler/formula_preprocess.h>
 #include <smt/theory_str_noodler/theory_str_noodler.h>
-#include <mata/re2parser.hh>
+#include <mata/parser/re2parser.hh>
 
 using namespace smt::noodler;
 
@@ -32,18 +32,18 @@ TEST_CASE( "Preprocess to strings", "[noodler]" ) {
     conj.add_predicate(predicate2);
     FormulaVar fvar(conj);
 
-    VarNode v1{.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1};
-    VarNode v2{.term = BasicTerm(BasicTermType::Variable, "x_1"), .eq_index = 0, .position = -1};
+    VarNode v1{BasicTerm(BasicTermType::Variable, "x_1"), 0, -1};
+    VarNode v2{BasicTerm(BasicTermType::Variable, "x_1"), 0, -1};
 
     CHECK(v1 == v2);
     INFO(fvar.to_string());
     CHECK(fvar.get_var_positions(predicate1, 0, true) == std::set<VarNode>({
-        {.term = term, .eq_index = 0, .position = -1 },
-        {.term = term, .eq_index = 0, .position = -2 },
-        {.term = lit, .eq_index = 0, .position = -3 },
-        {.term = lit, .eq_index = 0, .position = 1 },
-        {.term = term2, .eq_index = 0, .position = 2 },
-        {.term = term2, .eq_index = 0, .position = 3 } }));
+        VarNode{term, 0, -1 },
+        VarNode{term, 0, -2 },
+        VarNode{lit, 0, -3 },
+        VarNode{lit, 0, 1 },
+        VarNode{term2, 0, 2 },
+        VarNode{term2, 0, 3} }));
 }
 
 TEST_CASE( "Remove regular", "[noodler]" ) {

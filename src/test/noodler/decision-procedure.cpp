@@ -183,9 +183,9 @@ TEST_CASE("Decision Procedure", "[noodler]") {
 
         REQUIRE(proc.compute_next_solution());
 
-        AutAssignment squashed_aut_ass = proc.solution.flatten_substition_map();
-        CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('x')), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('z')), *regex_to_nfa("a")));
+        proc.solution.flatten_substition_map();
+        CHECK(Mata::Nfa::are_equivalent(*proc.solution.aut_ass.at(get_var('x')), *regex_to_nfa("a")));
+        CHECK(Mata::Nfa::are_equivalent(*proc.solution.aut_ass.at(get_var('z')), *regex_to_nfa("a")));
 
         // FIXME: Length formula len is different than formula from lambda. Hashes are not equal.
         // auto l_vars = { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") };
@@ -238,11 +238,10 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         proc.init_computation();
 
         REQUIRE(proc.compute_next_solution());
-
-        AutAssignment squashed_aut_ass = proc.solution.flatten_substition_map();
-        CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('x')), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('z')), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(*squashed_aut_ass.at(get_var('r')), *regex_to_nfa("aa")));
+        proc.solution.flatten_substition_map();
+        CHECK(Mata::Nfa::are_equivalent(*proc.solution.aut_ass.at(get_var('x')), *regex_to_nfa("a")));
+        CHECK(Mata::Nfa::are_equivalent(*proc.solution.aut_ass.at(get_var('z')), *regex_to_nfa("a")));
+        CHECK(Mata::Nfa::are_equivalent(*proc.solution.aut_ass.at(get_var('r')), *regex_to_nfa("aa")));
 
         CHECK(!proc.compute_next_solution());
     }

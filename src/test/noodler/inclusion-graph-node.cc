@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <catch2/catch_test_macros.hpp>
-#include <mata/nfa.hh>
+#include <mata/nfa/nfa.hh>
 
 #include "smt/theory_str_noodler/inclusion_graph.h"
 
