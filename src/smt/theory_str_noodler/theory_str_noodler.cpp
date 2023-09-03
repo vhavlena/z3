@@ -904,7 +904,7 @@ namespace smt::noodler {
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
-            block_curr_len(expr_ref(m.mk_false(), m));
+            block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
             return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
