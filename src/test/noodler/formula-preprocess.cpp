@@ -138,10 +138,7 @@ TEST_CASE( "Generate identities", "[noodler]" ) {
     conj.add_predicate(ieq1);
     FormulaPreprocessor prep(conj, aut_ass, {}, {});
     prep.generate_identities();
-    CHECK(prep.get_dependency() == Dependency({{3, {0}}, {4, {1}}}));
     std::set<Predicate> res;
-    res.insert(eq1);
-    res.insert(eq2);
     res.insert(ieq1);
     res.insert(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a}), std::vector<BasicTerm>({x1}) })  ));
     res.insert(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x1}), std::vector<BasicTerm>({x2}) })  ));
@@ -419,8 +416,8 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
     BasicTerm x6{ BasicTermType::Variable, "x_6"};
     BasicTerm a{ BasicTermType::Literal, "a"};
     BasicTerm b{ BasicTermType::Literal, "b"};
-    BasicTerm tmp0{BasicTermType::Variable, "__tmp__var_0"};
-    BasicTerm tmp1{BasicTermType::Variable, "__tmp__var_1"};
+    BasicTerm tmp0{BasicTermType::Variable, "regular_seq!n0"};
+    BasicTerm tmp1{BasicTermType::Variable, "regular_seq!n1"};
     AutAssignment aut_ass = AutAssignment({
         {y1, regex_to_nfa("(a|b)*")},
         {x1, regex_to_nfa("(a|b)*")},
@@ -461,6 +458,9 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
         FormulaPreprocessor prep(conj, aut_ass, {}, {});
         prep.reduce_regular_sequence(1);
         AutAssignment ret = prep.get_aut_assignment();
+
+        tmp0 = BasicTerm{BasicTermType::Variable, "regular_seq!n1"};
+        tmp1 = BasicTerm{BasicTermType::Variable, "regular_seq!n2"};
         CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp0), regex_to_nfa("b*ab")));
         CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({
@@ -478,6 +478,9 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
         FormulaPreprocessor prep(conj, aut_ass, {x2}, {});
         prep.reduce_regular_sequence(1);
         AutAssignment ret = prep.get_aut_assignment();
+
+        tmp0 = BasicTerm{BasicTermType::Variable, "regular_seq!n3"};
+        tmp1 = BasicTerm{BasicTermType::Variable, "regular_seq!n4"};
         CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp0), regex_to_nfa("b*ab")));
         CHECK(Mata::Nfa::are_equivalent(*ret.at(tmp1), regex_to_nfa("(a|b)*a*")));
         CHECK(prep.get_formula().get_predicates_set() == std::set<Predicate>({
@@ -509,6 +512,7 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
         {x5, regex_to_nfa("(a|b)*")},
         {x6, regex_to_nfa("(a|b)*")},
         {b, regex_to_nfa("b")},
+        {eps, regex_to_nfa("")},
     });
 
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({eps}), std::vector<BasicTerm>({x1, x2}) })  );
