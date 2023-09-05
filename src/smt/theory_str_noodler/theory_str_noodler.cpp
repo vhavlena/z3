@@ -1976,6 +1976,10 @@ namespace smt::noodler {
         for (const auto& wi : this->m_word_diseq_todo_rel) {
 //            expr *const e = mk_eq_atom(wi.first, wi.second);
             expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            // e might not be internalized
+            if(!ctx.e_internalized(e)) {
+                ctx.internalize(e, false);
+            }
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
             //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
         }
