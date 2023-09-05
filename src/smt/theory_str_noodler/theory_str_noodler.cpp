@@ -935,7 +935,11 @@ namespace smt::noodler {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
                 STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
-                block_curr_len(block_len);
+                if(m.is_false(block_len)) {
+                    block_curr_len(block_len, false, true);
+                } else {
+                    block_curr_len(block_len);
+                }
                 return FC_CONTINUE;
             } else {
                 // we could not decide if there is solution, let's just give up
