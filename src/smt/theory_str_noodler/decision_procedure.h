@@ -313,7 +313,6 @@ namespace smt::noodler {
          * @param formula encodes the string formula (including equations, not contains)
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
-         * @param len_eq_vars Equivalence class holding variables with the same length
          * @param par Parameters for Noodler string theory.
          */
         DecisionProcedure(

@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include <catch2/catch_test_macros.hpp>
-#include <mata/nfa.hh>
+#include <mata/nfa/nfa.hh>
 
 #include "smt/theory_str_noodler/inclusion_graph.h"
 
@@ -58,7 +58,7 @@ TEST_CASE( "Inclusion graph node", "[noodler]" ) {
 TEST_CASE("Conversion to strings", "[noodler]") {
     CHECK(smt::noodler::to_string(BasicTermType::Literal) == "Literal");
     CHECK(smt::noodler::to_string(BasicTermType::Variable) == "Variable");
-    CHECK(BasicTerm{ BasicTermType::Literal }.to_string().empty());
+    CHECK(BasicTerm{ BasicTermType::Literal }.to_string() == "\"\"");
     CHECK(BasicTerm{ BasicTermType::Literal, "4" }.to_string() == "\"4\"");
     CHECK(BasicTerm{ BasicTermType::Variable, "x_42" }.to_string() == "x_42");
 
