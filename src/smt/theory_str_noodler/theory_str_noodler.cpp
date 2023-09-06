@@ -820,6 +820,7 @@ namespace smt::noodler {
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
         if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_transformations && this->m_not_contains_todo_rel.size() == 0) {
+            STRACE("str", tout << "Trying heuristic for the case we only have 'x (not)in RE'" << std::endl);
             const auto& reg_data = this->m_membership_todo_rel[0];
             // Heuristic: Get info about the regular expression. If the membership is negated and the regex is not universal for sure --> return FC_DONE.
             // If the membership is in the positive form and the regex is not empty --> regurn FC_DONE.
@@ -868,22 +869,19 @@ namespace smt::noodler {
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
 
-        // for(const auto & t : symbols_in_formula) {
-        //     std::cout << t << std::endl;
-        // }
-
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
-            STRACE("str", tout << "underapprox sat \n";);
+            STRACE("str", tout << "Underapprox sat" << std::endl;);
             return FC_DONE;
         }
 
         // try Nielsen transformation (if enabled) to solve
         /// FIXME: a better test for when to try nielsen might be needed
         if(m_params.m_try_nielsen && instance.is_quadratic() && this->m_membership_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
+            STRACE("str", tout << "Trying nielsen" << std::endl);
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
             expr_ref block_len(m.mk_false(), m);
@@ -912,6 +910,7 @@ namespace smt::noodler {
 
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
 
+        STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
@@ -928,6 +927,7 @@ namespace smt::noodler {
             return FC_CONTINUE;
         }
 
+        STRACE("str", tout << "Starting main decision procedure" << std::endl);
         dec_proc.init_computation();
 
         expr_ref block_len(m.mk_false(), m);
@@ -2016,11 +2016,12 @@ namespace smt::noodler {
             name_of_type = "from_int";
         } else {
             UNREACHABLE();
+            return;
         }
         bool tranforming_from = (type == TransformationType::FROM_CODE || type == TransformationType::FROM_INT);
 
         // get the var for the argument
-        expr *var_for_s = nullptr;
+        expr_ref var_for_s(m);
         if (tranforming_from) {
             // for from_code and from_int, the argument has integer type, we create a new var for it
             var_for_s = mk_int_var_fresh(name_of_type + "_argument");
@@ -2030,6 +2031,7 @@ namespace smt::noodler {
             if (m_util_s.str.is_string(s)) {
                 // it seems that Z3 rewriter handles the case where we tranform from string literal, so this should be unreachable
                 UNREACHABLE();
+                return;
             } else if (util::is_str_variable(s, m_util_s)) {
                 // we are transforming directly from variable
                 var_for_s = s;
@@ -2051,12 +2053,16 @@ namespace smt::noodler {
         // create var for the result
         expr_ref var_for_e = tranforming_from ? mk_str_var_fresh(name_of_type + "_result") : mk_int_var_fresh(name_of_type + "_result");
         add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
+        if (tranforming_from) {
+            this->predicate_replace.insert(e, var_for_e);
+            len_vars.insert(var_for_e); // dunno if this is needed
+        }
 
         // The range of from_* functions is bounded, we have to bound it also for the decision procedure
 
         if (type == TransformationType::FROM_CODE) {
             // the result of str.from_code can only be either a char representing the code value, or empty string (if argument is out of range of any code value)
-            expr *sigma_eps = m_util_s.re.mk_union(m_util_s.re.mk_epsilon(nullptr), m_util_s.re.mk_full_char(nullptr));
+            app *sigma_eps = m_util_s.re.mk_union(m_util_s.re.mk_epsilon(e->get_sort()), m_util_s.re.mk_full_char(e->get_sort()));
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, sigma_eps))});
 
             len_vars.insert(var_for_e);
@@ -2064,12 +2070,12 @@ namespace smt::noodler {
 
         if (type == TransformationType::FROM_INT) {
             // the result of str.from_code can only be either a decimal representation of a number without leading zeros, or empty string (if argument is negative)
-            expr *zero = m_util_s.str.mk_string("0"); // if argument == 0, the result will be 0
-            expr *nums_without_zero = m_util_s.re.mk_concat(
+            app *zero = m_util_s.re.mk_to_re(m_util_s.str.mk_string("0")); // if argument == 0, the result will be 0
+            app *nums_without_zero = m_util_s.re.mk_concat(
                                             m_util_s.re.mk_plus(m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))),
                                             m_util_s.re.mk_star(m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")))
                                         ); // if argument > 0, the result will be of form [1-9]+[0-9]*
-            expr *epsilon = m_util_s.re.mk_epsilon(nullptr); // if argument < 0, the result is empty string
+            app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
 
             len_vars.insert(var_for_e);

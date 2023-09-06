@@ -3,6 +3,7 @@
 
 namespace smt::noodler {
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
+        STRACE("str-conv-eq", tout << "conv_eq_pred: " << mk_pp(ex, m) << std::endl);
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
         if(m.is_not(ex)) {
