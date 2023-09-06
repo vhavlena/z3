@@ -394,10 +394,17 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             handle_is_digit(n);
         } else if (
-            m_util_s.str.is_to_code(n) || // str.to_code
-            m_util_s.str.is_from_code(n) || // str.from_code
             m_util_s.str.is_stoi(n) || // str.to_int
             m_util_s.str.is_itos(n) // str.from_int
+        ) {
+            // handle_transform can handle to/from_int, but decision procedure cannot.
+            // We throw error here so that we get to unknown faster. After decision
+            // procedure gets support for it, remove this and let it fall trough with
+            // is/from_code to handle_transform
+            util::throw_error("str.to_int and str.from_int is not supported (yet)");
+        } else if (
+            m_util_s.str.is_to_code(n) || // str.to_code
+            m_util_s.str.is_from_code(n) // str.from_code
         ) {
             handle_transform(n);
         } else if (
