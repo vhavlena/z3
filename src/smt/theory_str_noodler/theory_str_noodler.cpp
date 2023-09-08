@@ -904,7 +904,7 @@ namespace smt::noodler {
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
-            block_curr_len(expr_ref(m.mk_false(), m));
+            block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
             return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
@@ -935,7 +935,11 @@ namespace smt::noodler {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
                 STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
-                block_curr_len(block_len);
+                if(m.is_false(block_len)) {
+                    block_curr_len(block_len, false, true);
+                } else {
+                    block_curr_len(block_len);
+                }
                 return FC_CONTINUE;
             } else {
                 // we could not decide if there is solution, let's just give up
@@ -1972,6 +1976,10 @@ namespace smt::noodler {
         for (const auto& wi : this->m_word_diseq_todo_rel) {
 //            expr *const e = mk_eq_atom(wi.first, wi.second);
             expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            // e might not be internalized
+            if(!ctx.e_internalized(e)) {
+                ctx.internalize(e, false);
+            }
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
             //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
         }
