@@ -73,8 +73,8 @@ namespace smt::noodler {
         }
         // extract from not contains
         for(const auto& not_contains : m_not_contains_todo_rel) {
-            regex::extract_symbols(not_contains.first, m_util_s, m, symbols_in_formula);
-            regex::extract_symbols(not_contains.second, m_util_s, m, symbols_in_formula);
+            extract_symbols(not_contains.first, symbols_in_formula);
+            extract_symbols(not_contains.second, symbols_in_formula);
         }
 
         /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
@@ -130,7 +130,7 @@ namespace smt::noodler {
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
             Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
-            auto aut_ass_it{ aut_assignment.find(variable_term) };
+            auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
