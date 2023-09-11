@@ -821,10 +821,10 @@ namespace smt::noodler {
             // Heuristic: Get info about the regular expression. If the membership is negated and the regex is not universal for sure --> return FC_DONE.
             // If the membership is in the positive form and the regex is not empty --> regurn FC_DONE.
             regex::RegexInfo regInfo = regex::get_regex_info(to_app(std::get<1>(reg_data)), m_util_s, m);
-            if(!std::get<2>(reg_data) && regInfo.universal == l_false) {
+            if(!std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.universal == l_false) {
                 return FC_DONE;
             }
-            if(std::get<2>(reg_data) && regInfo.empty == l_false) {
+            if(std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.empty == l_false) {
                 return FC_DONE;
             }
             if(!std::get<2>(reg_data) // membership is negated
