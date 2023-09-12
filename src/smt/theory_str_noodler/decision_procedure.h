@@ -22,6 +22,7 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
+    // By transformations we mean the tranformations of strings to ints and vice versa (also to and from code)
     enum class TransformationType {
         TO_CODE,
         FROM_CODE,
