@@ -293,6 +293,7 @@ namespace smt::noodler {
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
+        // keeps the length formulas from replace_disequality(), they need to hold for solution to be satisfiable (get_lengths should create conjunct from them)
         std::vector<LenNode> disequations_len_formula_conjuncts;
 
         const theory_str_noodler_params& m_params;

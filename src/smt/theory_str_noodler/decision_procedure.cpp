@@ -617,34 +617,13 @@ namespace smt::noodler {
     }
 
     LenNode DecisionProcedure::transformation_formula() {
+        auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
+
         std::vector<LenNode> result_conjuncts;
         for (const std::tuple<BasicTerm, BasicTerm, TransformationType>& transf : transformations) {
             BasicTerm result = std::get<0>(transf);
             BasicTerm argument = std::get<1>(transf);
             TransformationType type = std::get<2>(transf);
-            auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
-            auto process_one_symbol_words = [this, &to_code_var](const BasicTerm& string_var, const BasicTerm &int_var) -> LenNode {
-                std::vector<LenNode> to_code_disjunction;
-                for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(string_var))) {
-                    if (is_dummy_symbol(s)) {
-                        // if s == minterm => do something else
-                        std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(string_var)}), LenNode(LenFormulaType::LEQ, {to_code_var(string_var), zstring::max_char()})};
-                        for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
-                            if (is_dummy_symbol(s2)) {
-                                conjuncts_here.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(string_var), s2});
-                            }
-                        }
-                        to_code_disjunction.emplace_back(LenFormulaType::AND, conjuncts_here);
-                    } else {
-                        to_code_disjunction.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(string_var), s});
-                    }
-                }
-                return LenNode(LenFormulaType::AND, std::vector<LenNode>{
-                    LenNode(LenFormulaType::EQ, {int_var, to_code_var(string_var)}), // result is equal to to_code(var)
-                    LenNode(LenFormulaType::EQ, {string_var, 1}), // lenght of var is 1
-                    LenNode(LenFormulaType::OR, std::move(to_code_disjunction)) // to_code(var) is equal to code point of one of its words
-                });
-            };
             switch (type)
             {
             case TransformationType::FROM_CODE:
@@ -652,22 +631,68 @@ namespace smt::noodler {
                 // fall trough, we do nearly the same thing
             case TransformationType::TO_CODE:
             {
+                /* Having result=to_code(argument) we need to take all var_1 ... var_n
+                 * substituting argument in solution. We need to have one of the |var_i| = 1
+                 * and all others |var_j| = 0; var_i will be then the char whose code point
+                 * we want to return. We keep this code point in int variable var_i!to_code,
+                 * where result = var_i!to_code (we do this, so that different transformations
+                 * are connected - they use the same !to_code variables).
+                 * If this does not happen (i.e. argument is not word of length one), the result
+                 * is equal to -1.
+                 * 
+                 * We also handle from_code here, we swapped arugment and result so we have
+                 * argument = from_code(result). We can do exactly the same, we compute the
+                 * code point from which we are constructing the char by checking possible
+                 * chars in solution. The only difference is that if result is not a valid
+                 * code point, then argument must be an empty string.
+                 */
                 Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
                 std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
-                std::vector<LenNode> some_disjunt = {};
-                for (const BasicTerm& var : substituted_vars) {
-                    some_disjunt.emplace_back(process_one_symbol_words(var, result));
-                }
-                LenNode disjunct_some(LenFormulaType::OR, some_disjunt);
-                LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
-                LenNode result_is_defined(LenFormulaType::AND, {disjunct_some, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
 
-                LenNode result_is_undefined(LenFormulaType::AND, {
-                    LenNode(LenFormulaType::NEQ, {sum_of_substituted_vars, 1}),
-                    (type == TransformationType::TO_CODE) ?
-                        LenNode(LenFormulaType::EQ, {result, -1}) :
-                        LenNode(LenFormulaType::NEQ, {LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, zstring::max_char()})})})
-                });
+                // Disjunction representing that result is equal to code point of one of the chars of some var_i
+                LenNode result_solution(LenFormulaType::OR, {});
+                for (const BasicTerm& var : substituted_vars) {
+                    // disjunction that will say that var!to_code is equal to code point of one of the chars in var
+                    LenNode to_code_disjunction = LenNode(LenFormulaType::OR, {});
+                    for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(var))) { // iterate trough chars of var
+                        if (!is_dummy_symbol(s)) {
+                            // var!to_code == s
+                            to_code_disjunction.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
+                        } else {
+                            // if s represents symbols not in the alphabet => var!to_code must be a code point of such a symbol which is not in alphabet, i.e. it is...
+                            // ...valid code point (0 <= var!to_code <= max_char) and...
+                            std::vector<LenNode> minterm_to_code{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), zstring::max_char()})};
+                            // ...it is not equal to code point of some symbol in the alphabet
+                            for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
+                                if (!is_dummy_symbol(s2)) {
+                                    minterm_to_code.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
+                                }
+                            }
+                            to_code_disjunction.succ.emplace_back(LenFormulaType::AND, minterm_to_code);
+                        }
+                    }
+                    result_solution.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                        to_code_disjunction, // var!to_code is equal to code point of one of its symbols TODO: do this only once for given var
+                        LenNode(LenFormulaType::EQ, {result, to_code_var(var)}), // result is equal to var!to_code
+                        LenNode(LenFormulaType::EQ, {var, 1}) // lenght of var is 1
+                    });
+                }
+
+                // sum_of_substituted_vars = |var_1| + |var_2| + ... + |var_n|
+                LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
+                // result is defined, i.e. exactly one |var_i| = 0 (by checking sum_of_substituted_vars = 1) and the result is the code point of one of the chars of var_i
+                LenNode result_is_defined(LenFormulaType::AND, {result_solution, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
+
+                LenNode result_is_undefined(LenFormulaType::AND, {});
+                if (type == TransformationType::TO_CODE) {
+                    // result is undefined, i.e. the argument is not a word of length one and result is then equal to -1
+                    result_is_undefined.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{sum_of_substituted_vars, 1});
+                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{result, -1});
+                } else {
+                    // we have argument = from_code(result), if result is not valid code point (0 <= result <= max_char() does not hold), then argument must be empty word (length is equal to 0)
+                    result_is_undefined.succ.emplace_back(LenFormulaType::NOT, std::vector<LenNode>{LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, zstring::max_char()})})});
+                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{argument, 0});
+                }
 
                 result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
 
@@ -858,8 +883,8 @@ namespace smt::noodler {
                 init_length_sensitive_vars.insert(var2);
 
                 // variables that are results of to_code applied to var1/var2
-                BasicTerm var1_to_code = BasicTerm(BasicTermType::Variable, var1.get_name().encode() + "!to_code");
-                BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!to_code");
+                BasicTerm var1_to_code = BasicTerm(BasicTermType::Variable, var1.get_name().encode() + "!ineq_to_code");
+                BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!ineq_to_code");
 
                 // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
                 transformations.emplace_back(var1_to_code, var1, TransformationType::TO_CODE);
