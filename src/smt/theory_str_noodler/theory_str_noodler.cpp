@@ -2034,7 +2034,7 @@ namespace smt::noodler {
             var_for_s = mk_int_var_fresh(name_of_type + "_argument");
             add_axiom({mk_literal(m.mk_eq(s, var_for_s))});
         } else {
-            // for to_code and to_int, the argument has string tyoe, we have to find the variable for it
+            // for to_code and to_int, the argument has string type, we have to find the variable for it
             if (m_util_s.str.is_string(s)) {
                 // it seems that Z3 rewriter handles the case where we tranform from string literal, so this should be unreachable
                 UNREACHABLE();
