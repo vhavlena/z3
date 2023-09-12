@@ -57,14 +57,8 @@ namespace smt::noodler {
     }
 
     std::set<Mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
-        /* OTHER_SYMBOL represents all symbols not occuring in the problem. It is needed,
-         * because if we have for example disequation x != y and nothing else, we would
-         * have no symbols and incorrectly say it is unsat. Similarly, for 'x not in "aaa"
-         * and |x| = 3', we would only get symbol 'a' and say (incorrectly) unsat. This
-         * symbol however needs to have special semantics, for example to_code should
-         * interpret is as anything but used symbols.
-         */
-        std::set<Mata::Symbol> symbols_in_formula{OTHER_SYMBOL};
+        // start with symbol representing everything not in formula
+        std::set<Mata::Symbol> symbols_in_formula{get_dummy_symbol()};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             extract_symbols(word_equation.first, symbols_in_formula);

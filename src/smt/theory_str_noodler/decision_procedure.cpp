@@ -626,11 +626,11 @@ namespace smt::noodler {
             auto process_one_symbol_words = [this, &to_code_var](const BasicTerm& string_var, const BasicTerm &int_var) -> LenNode {
                 std::vector<LenNode> to_code_disjunction;
                 for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(string_var))) {
-                    if (s == OTHER_SYMBOL) {
+                    if (is_dummy_symbol(s)) {
                         // if s == minterm => do something else
-                        std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(string_var)}), LenNode(LenFormulaType::LEQ, {to_code_var(string_var), 196607})};
+                        std::vector<LenNode> conjuncts_here{LenNode(LenFormulaType::LEQ, {0, to_code_var(string_var)}), LenNode(LenFormulaType::LEQ, {to_code_var(string_var), zstring::max_char()})};
                         for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
-                            if (s2 != OTHER_SYMBOL) {
+                            if (is_dummy_symbol(s2)) {
                                 conjuncts_here.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(string_var), s2});
                             }
                         }
@@ -666,7 +666,7 @@ namespace smt::noodler {
                     LenNode(LenFormulaType::NEQ, {sum_of_substituted_vars, 1}),
                     (type == TransformationType::TO_CODE) ?
                         LenNode(LenFormulaType::EQ, {result, -1}) :
-                        LenNode(LenFormulaType::NEQ, {LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, 196607})})})
+                        LenNode(LenFormulaType::NEQ, {LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, zstring::max_char()})})})
                 });
 
                 result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
