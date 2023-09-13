@@ -313,6 +313,14 @@ namespace smt::noodler {
          */
         void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
+        /**
+         * @brief Checks if the current instance is suitable for Nielsen decision procedure.
+         * 
+         * @param instance Current instance converted to Formula
+         * @return true <-> suitable for Nielsen-based decision procedure
+         */
+        bool is_nielsen_suitable(const Formula& instance) const;
+
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }

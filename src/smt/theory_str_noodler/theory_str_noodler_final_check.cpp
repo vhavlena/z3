@@ -418,4 +418,15 @@ namespace smt::noodler {
             }
         }
     }
+
+    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance) const {
+        if(this->m_membership_todo_rel.size() != 0 || this->m_not_contains_todo_rel.size() != 0) {
+            return false;
+        }
+        if(!instance.is_quadratic()) {
+            return false;
+        }
+        Graph incl = Graph::create_inclusion_graph(instance);
+        return incl.is_cyclic();
+    }
 }

@@ -881,7 +881,7 @@ namespace smt::noodler {
 
         // try Nielsen transformation (if enabled) to solve
         /// FIXME: a better test for when to try nielsen might be needed
-        if(m_params.m_try_nielsen && instance.is_quadratic() && this->m_membership_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
+        if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
             expr_ref block_len(m.mk_false(), m);
