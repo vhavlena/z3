@@ -818,15 +818,24 @@ namespace smt::noodler {
         // universality checking should be faster.
         if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
             const auto& reg_data = this->m_membership_todo_rel[0];
+            // Heuristic: Get info about the regular expression. If the membership is negated and the regex is not universal for sure --> return FC_DONE.
+            // If the membership is in the positive form and the regex is not empty --> regurn FC_DONE.
+            regex::RegexInfo regInfo = regex::get_regex_info(to_app(std::get<1>(reg_data)), m_util_s, m);
+            if(!std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.universal == l_false) {
+                return FC_DONE;
+            }
+            if(std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.empty == l_false) {
+                return FC_DONE;
+            }
             if(!std::get<2>(reg_data) // membership is negated
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
             ) {
                 std::set<Mata::Symbol> symbols_in_regex;
-                util::extract_symbols(std::get<1>(reg_data), m_util_s, m, symbols_in_regex);
+                extract_symbols(std::get<1>(reg_data), symbols_in_regex);
                 // add one "dummy" symbol representing the symbols not in the regex
                 util::get_dummy_symbols(1, symbols_in_regex);
 
-                Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
+                Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
 
                 Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
                 Mata::Nfa::Nfa sigma_star = Mata::Nfa::Builder::create_sigma_star_nfa(&alph);

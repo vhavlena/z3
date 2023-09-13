@@ -34,6 +34,7 @@ Eternal glory to Yu-Fang.
 #include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
+#include "regex.h"
 #include "var_union_find.h"
 #include "nielsen_decision_procedure.h"
 
@@ -244,6 +245,13 @@ namespace smt::noodler {
          * @brief Adds string constraints from *_todo that are relevant for SAT checking to *_todo_rel.
          */
         void remove_irrelevant_constr();
+
+        /**
+         * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
+         * @param[in] ex Expression to be checked for symbols.
+         * @param[out] alphabet A set of symbols with where found symbols are appended to.
+         */
+        void extract_symbols(expr * ex, std::set<uint32_t>& alphabet);
 
         /**
         Convert (dis)equation @p ex to the instance of Predicate. As a side effect updates mapping of

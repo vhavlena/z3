@@ -1059,7 +1059,7 @@ namespace smt::noodler {
         // corresponding language of the Basic Term "A".
         for(const auto& pr : this->aut_ass) {
             if(pr.first.is_literal()) {
-                Mata::Nfa::Nfa word_aut = util::create_word_nfa(pr.first.get_name());
+                Mata::Nfa::Nfa word_aut = AutAssignment::create_word_nfa(pr.first.get_name());
                 Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(pr.second), word_aut);
                 inters.trim();
                 this->aut_ass[pr.first] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
