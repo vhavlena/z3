@@ -65,7 +65,8 @@ namespace smt::noodler {
         // variables whose lengths are important
         obj_hashtable<expr> len_vars;
 
-        // used in final_check_eh, maps noodler variables to z3 string variables
+        // used in final_check_eh, maps noodler string variables to z3 string variables
+        // AND int variables to predicates they represent (see handle_transform)
         std::map<BasicTerm, expr_ref> var_name;
 
         // mapping predicates and function to variables that they substitute to
