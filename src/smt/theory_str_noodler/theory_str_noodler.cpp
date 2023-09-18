@@ -759,6 +759,10 @@ namespace smt::noodler {
             for (const auto &notc: this->m_not_contains_todo_rel) {
                 tout << "    " << mk_pp(notc.first, m) << "; " << mk_pp(notc.second, m) << std::endl;
             }
+            tout << " transformations(" << this->m_tranformation_todo.size() << "):" << std::endl;
+            for (const auto &transf: this->m_tranformation_todo) {
+                tout << "    " << mk_pp(std::get<0>(transf), m) << " = " << get_transformation_name(std::get<2>(transf)) << "(" << mk_pp(std::get<1>(transf), m) << ")" << std::endl;
+            }
         );
 
         bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
@@ -876,11 +880,13 @@ namespace smt::noodler {
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
 
+        std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations = get_transformations_as_basicterms(aut_assignment, symbols_in_formula);
+
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
-        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
+        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, transformations) == l_true) {
             STRACE("str", tout << "Underapprox sat" << std::endl;);
             return FC_DONE;
         }
@@ -915,7 +921,7 @@ namespace smt::noodler {
             }
         }
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, transformations };
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
@@ -2032,7 +2038,9 @@ namespace smt::noodler {
         if (tranforming_from) {
             // for from_code and from_int, the argument has integer type, we create a new var for it
             var_for_s = mk_int_var_fresh(name_of_type + "_argument");
-            add_axiom({mk_literal(m.mk_eq(s, var_for_s))});
+            // bit of a hack, we abuse var_name to save the predicate to which int var is mapped, because
+            // using equation here did not work (lia solver ignored it)
+            var_name.insert({util::get_variable_basic_term(var_for_s), expr_ref(s, m)});
         } else {
             // for to_code and to_int, the argument has string type, we have to find the variable for it
             if (m_util_s.str.is_string(s)) {
@@ -2058,25 +2066,32 @@ namespace smt::noodler {
         }
 
         // create var for the result
-        expr_ref var_for_e = tranforming_from ? mk_str_var_fresh(name_of_type + "_result") : mk_int_var_fresh(name_of_type + "_result");
-        add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
+        expr_ref var_for_e(m);
         if (tranforming_from) {
+            var_for_e = mk_str_var_fresh(name_of_type + "_result");
+            add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
             this->predicate_replace.insert(e, var_for_e);
             len_vars.insert(var_for_e); // dunno if this is needed
+        } else {
+            var_for_e = mk_int_var_fresh(name_of_type + "_result");
+            // bit of a hack, we abuse var_name to save the predicate to which int var is mapped, because
+            // using equation here did not work (lia solver ignored it)
+            var_name.insert({util::get_variable_basic_term(var_for_e), expr_ref(e, m)});
         }
 
         // The range of from_* functions is bounded, we have to bound it also for the decision procedure
 
         if (type == TransformationType::FROM_CODE) {
             // the result of str.from_code can only be either a char representing the code value, or empty string (if argument is out of range of any code value)
-            app *sigma_eps = m_util_s.re.mk_union(m_util_s.re.mk_epsilon(e->get_sort()), m_util_s.re.mk_full_char(e->get_sort()));
+            app *sigma_eps = m_util_s.re.mk_union(
+                                            m_util_s.re.mk_epsilon(e->get_sort()),
+                                            m_util_s.re.mk_full_char(nullptr)
+                                        );
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, sigma_eps))});
-
-            len_vars.insert(var_for_e);
         }
 
         if (type == TransformationType::FROM_INT) {
-            // the result of str.from_code can only be either a decimal representation of a number without leading zeros, or empty string (if argument is negative)
+            // the result of str.from_int can only be either a decimal representation of a number without leading zeros, or empty string (if argument is negative)
             app *zero = m_util_s.re.mk_to_re(m_util_s.str.mk_string("0")); // if argument == 0, the result will be 0
             app *nums_without_zero = m_util_s.re.mk_concat(
                                             m_util_s.re.mk_plus(m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))),
@@ -2084,8 +2099,6 @@ namespace smt::noodler {
                                         ); // if argument > 0, the result will be of form [1-9]+[0-9]*
             app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
-
-            len_vars.insert(var_for_e);
         }
 
         // Add to todo

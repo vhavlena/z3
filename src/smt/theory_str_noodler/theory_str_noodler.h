@@ -288,6 +288,13 @@ namespace smt::noodler {
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+        /**
+         * @brief Get the transformations (to/from_int/code) with noodler variables
+         * 
+         * Side effect: string variables in transformations which are not mapped in the automata
+         * assignment @p ass will be mapped to sigma* after this.
+         */
+        std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> get_transformations_as_basicterms(AutAssignment &ass, const std::set<Mata::Symbol>& noodler_alphabet);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them
@@ -298,7 +305,9 @@ namespace smt::noodler {
          * Solve the problem using underapproximating decision procedure, if it returns l_true,
          * the original formula is SAT, otherwise we need to run normal decision procedure.
          */
-        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass,
+                                const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                                std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations);
 
         /**
          * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.

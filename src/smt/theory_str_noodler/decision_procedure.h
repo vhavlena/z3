@@ -30,6 +30,24 @@ namespace smt::noodler {
         FROM_INT,
     };
 
+    inline std::string get_transformation_name(TransformationType tran_type) {
+        switch (tran_type)
+        {
+        case TransformationType::TO_CODE:
+            return "to_code";
+        case TransformationType::FROM_CODE:
+            return "from_code";
+        case TransformationType::TO_INT:
+            return "to_int";
+        case TransformationType::FROM_INT:
+            return "from_int";
+        
+        default:
+            UNREACHABLE();
+            return "";
+        }
+    }
+
     /**
      * @brief Get the value of the symbol representing all symbols not ocurring in the formula (i.e. a minterm)
      * 
@@ -340,10 +358,12 @@ namespace smt::noodler {
         DecisionProcedure(
              Formula formula, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
-             const theory_str_noodler_params &par
+             const theory_str_noodler_params &par,
+             std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations
         ) : init_length_sensitive_vars(init_length_sensitive_vars),
             formula(formula),
             init_aut_ass(init_aut_ass),
+            transformations(transformations),
             m_params(par) {
             
             // we extract from the input formula all not_contains predicates and add them to not_contains formula

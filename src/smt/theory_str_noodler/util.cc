@@ -72,7 +72,7 @@ namespace smt::noodler::util {
 
     bool is_variable(const expr* expression, const seq_util& m_util_s) {
         // TODO: When we are able to detect other kinds of variables, add their checks here.
-        return is_str_variable(expression, m_util_s);
+        return is_app(expression) && to_app(expression)->get_num_args() == 0;
     }
 
     bool is_str_variable(const expr* expression, const seq_util& m_util_s) {
@@ -186,10 +186,16 @@ namespace smt::noodler::util {
             } else {
                 auto it = variable_map.find(node.atom_val);
                 expr_ref var_expr(m);
-                if(it != variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
-                    var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
-                } else {
+                if(it == variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
                     var_expr = mk_int_var(node.atom_val.get_name().encode(), m, m_util_a);
+                } else {
+                    if (m_util_s.is_string(it->second.get()->get_sort())) {
+                        // for string variables we want its length
+                        var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
+                    } else {
+                        // we assume here that all other variables are int, so they map into the predicate they represent 
+                        var_expr = it->second;
+                    }
                 }
                 return var_expr;
             }

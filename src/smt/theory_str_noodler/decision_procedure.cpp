@@ -617,6 +617,9 @@ namespace smt::noodler {
     }
 
     LenNode DecisionProcedure::transformation_formula() {
+        STRACE("str-transform",
+            tout << "Creating formula for transformations" << std::endl;
+        );
         auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
 
         std::vector<LenNode> result_conjuncts;
@@ -627,10 +630,16 @@ namespace smt::noodler {
             switch (type)
             {
             case TransformationType::FROM_CODE:
+                STRACE("str-transform",
+                    tout << " procesing from_code with result " << result << " and argument " << argument << " which is handled by" << std::flush;
+                );
                 std::swap(result, argument);
                 // fall trough, we do nearly the same thing
             case TransformationType::TO_CODE:
             {
+                STRACE("str-transform",
+                    tout << " procesing to_code with result " << result << " and argument " << argument << std::endl;
+                );
                 /* Having result=to_code(argument) we need to take all var_1 ... var_n
                  * substituting argument in solution. We need to have one of the |var_i| = 1
                  * and all others |var_j| = 0; var_i will be then the char whose code point
