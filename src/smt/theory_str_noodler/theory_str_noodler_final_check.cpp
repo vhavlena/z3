@@ -429,4 +429,24 @@ namespace smt::noodler {
         Graph incl = Graph::create_inclusion_graph(instance);
         return incl.is_cyclic();
     }
+
+    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const {
+        int ln = 0;
+        for(const Predicate& pred : instance.get_predicates()) {
+            for(const BasicTerm& var : pred.get_vars()) {
+                
+                if(aut_ass.at(var)->size() <= 1) {
+                    continue;
+                }
+                if(aut_ass.is_co_finite(var, ln)) {
+                    continue;
+                }
+                if(aut_ass.is_singleton(var)) {
+                    continue;
+                }
+                return false;
+            }
+        }
+        return true;
+    }
 }

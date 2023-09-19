@@ -874,7 +874,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
-        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
+        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment) && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
             STRACE("str", tout << "underapprox sat \n";);
             return FC_DONE;
         }

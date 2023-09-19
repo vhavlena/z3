@@ -321,6 +321,15 @@ namespace smt::noodler {
          */
         bool is_nielsen_suitable(const Formula& instance) const;
 
+        /**
+         * @brief Check if the current instance is suitable for underapproximation.
+         * 
+         * @param instance Current instance converted to Formula
+         * @param aut_ass Current automata assignment
+         * @return true <-> suitable for underapproximation
+         */
+        bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const;
+
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
