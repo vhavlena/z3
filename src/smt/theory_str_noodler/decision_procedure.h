@@ -354,6 +354,7 @@ namespace smt::noodler {
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
          * @param par Parameters for Noodler string theory.
+         * @param transformations Contains to/from_code/int transformations (x,y,transformation) where x = transformation(y)
          */
         DecisionProcedure(
              Formula formula, AutAssignment init_aut_ass,
