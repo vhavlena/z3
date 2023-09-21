@@ -432,6 +432,11 @@ namespace smt::noodler {
 
     bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const {
         int ln = 0;
+        /**
+         * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
+         * language of the variable is 1) sigma star (approximated by the first condition) 2) co-finite (complement is a finite language), or 
+         * 3) singleton meaning that the variable is string literal. 
+         */
         for(const Predicate& pred : instance.get_predicates()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 
