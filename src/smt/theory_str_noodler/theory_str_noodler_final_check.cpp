@@ -161,19 +161,19 @@ namespace smt::noodler {
         return init_lengths;
     }
 
-    std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> theory_str_noodler::get_transformations_as_basicterms(AutAssignment& ass, const std::set<Mata::Symbol>& noodler_alphabet) {
+    std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<Mata::Symbol>& noodler_alphabet) {
         Mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
         auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::Builder::create_sigma_star_nfa(&mata_alphabet));
         
-        std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations;
-        for (const auto& transf : m_tranformation_todo) {
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions;
+        for (const auto& transf : m_conversion_todo) {
             BasicTerm result(BasicTermType::Variable, to_app(std::get<0>(transf))->get_decl()->get_name().str());
             BasicTerm argument(BasicTermType::Variable, to_app(std::get<1>(transf))->get_decl()->get_name().str());
-            TransformationType type = std::get<2>(transf);
+            ConversionType type = std::get<2>(transf);
 
-            transformations.emplace_back(result, argument, type);
+            conversions.emplace_back(result, argument, type);
 
-            if (type == TransformationType::FROM_CODE || type == TransformationType::FROM_INT) {
+            if (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT) {
                 var_name.insert({result, expr_ref(std::get<0>(transf), m)});
                 ass.insert({result, nfa_sigma_star});
             } else {
@@ -181,7 +181,7 @@ namespace smt::noodler {
                 ass.insert({argument, nfa_sigma_star});
             }
         }
-        return transformations;
+        return conversions;
     }
 
     bool theory_str_noodler::solve_lang_eqs_diseqs() {
@@ -227,8 +227,8 @@ namespace smt::noodler {
 
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
-                                                std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations) {
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, transformations };
+                                                std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions) {
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
         if (dec_proc.preprocess(PreprocessType::UNDERAPPROX) == l_false) {
             return l_false;
         }
@@ -252,7 +252,7 @@ namespace smt::noodler {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;
-        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_tranformation_todo.size() == 0) {
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo && this->m_conversion_todo.size() == 0) {
             include_ass = false;
         }
         m_int_solver.initialize(get_context(), include_ass);

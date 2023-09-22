@@ -22,24 +22,24 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
-    // By transformations we mean the tranformations of strings to ints and vice versa (also to and from code)
-    enum class TransformationType {
+    // Conversions of strings to ints/code values and vice versa
+    enum class ConversionType {
         TO_CODE,
         FROM_CODE,
         TO_INT,
         FROM_INT,
     };
 
-    inline std::string get_transformation_name(TransformationType tran_type) {
-        switch (tran_type)
+    inline std::string get_conversion_name(ConversionType type) {
+        switch (type)
         {
-        case TransformationType::TO_CODE:
+        case ConversionType::TO_CODE:
             return "to_code";
-        case TransformationType::FROM_CODE:
+        case ConversionType::FROM_CODE:
             return "from_code";
-        case TransformationType::TO_INT:
+        case ConversionType::TO_INT:
             return "to_int";
-        case TransformationType::FROM_INT:
+        case ConversionType::FROM_INT:
             return "from_int";
         
         default:
@@ -306,8 +306,8 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
-        // contains to/from_code/int transformations
-        std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations;
+        // contains to/from_code/int conversions
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions;
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
@@ -325,11 +325,11 @@ namespace smt::noodler {
         std::vector<Predicate> replace_disequality(Predicate diseq);
 
         /**
-         * @brief Gets length constraint that represent to/from_code/int transformations
+         * @brief Gets length constraint that represent to/from_code/int conversions
          * 
          * TODO: from_int, to_int not implemented yet
          */
-        LenNode transformation_formula();
+        LenNode get_formula_for_conversions();
 
         /**
          * Formula containing all not_contains predicate (nothing else)
@@ -354,17 +354,17 @@ namespace smt::noodler {
          * @param init_aut_ass gives regular constraints (maps each variable from @p equalities to some NFA), assumes all NFAs are non-empty
          * @param init_length_sensitive_vars the variables that occur in length constraints in the rest of formula
          * @param par Parameters for Noodler string theory.
-         * @param transformations Contains to/from_code/int transformations (x,y,transformation) where x = transformation(y)
+         * @param conversions Contains to/from_code/int conversions (x,y,conversion) where x = conversion(y)
          */
         DecisionProcedure(
              Formula formula, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
              const theory_str_noodler_params &par,
-             std::vector<std::tuple<BasicTerm,BasicTerm,TransformationType>> transformations
+             std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions
         ) : init_length_sensitive_vars(init_length_sensitive_vars),
             formula(formula),
             init_aut_ass(init_aut_ass),
-            transformations(transformations),
+            conversions(conversions),
             m_params(par) {
             
             // we extract from the input formula all not_contains predicates and add them to not_contains formula

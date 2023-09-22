@@ -593,7 +593,7 @@ namespace smt::noodler {
 
     LenNode DecisionProcedure::get_lengths() {
         if (solution.length_sensitive_vars.empty()) {
-            // There are no length vars (which also means no disequations nor transformations), it is not needed to create the lengths formula.
+            // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
             return LenNode(LenFormulaType::TRUE);
         }
 
@@ -607,44 +607,44 @@ namespace smt::noodler {
             conjuncts.push_back(solution.get_lengths(len_var));
         }
 
-        // the following functions (getting formula for transformations) assume that we have flattened substitution map
+        // the following functions (getting formula for conversions) assume that we have flattened substitution map
         solution.flatten_substition_map();
 
-        // add formula for transformations
-        conjuncts.push_back(transformation_formula());
+        // add formula for conversions
+        conjuncts.push_back(get_formula_for_conversions());
 
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
-    LenNode DecisionProcedure::transformation_formula() {
-        STRACE("str-transform",
-            tout << "Creating formula for transformations" << std::endl;
+    LenNode DecisionProcedure::get_formula_for_conversions() {
+        STRACE("str-conversion",
+            tout << "Creating formula for conversions" << std::endl;
         );
         auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
 
         std::vector<LenNode> result_conjuncts;
-        for (const std::tuple<BasicTerm, BasicTerm, TransformationType>& transf : transformations) {
+        for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
             BasicTerm result = std::get<0>(transf);
             BasicTerm argument = std::get<1>(transf);
-            TransformationType type = std::get<2>(transf);
+            ConversionType type = std::get<2>(transf);
             switch (type)
             {
-            case TransformationType::FROM_CODE:
-                STRACE("str-transform",
+            case ConversionType::FROM_CODE:
+                STRACE("str-conversion",
                     tout << " procesing from_code with result " << result << " and argument " << argument << " which is handled by" << std::flush;
                 );
                 std::swap(result, argument);
                 // fall trough, we do nearly the same thing
-            case TransformationType::TO_CODE:
+            case ConversionType::TO_CODE:
             {
-                STRACE("str-transform",
+                STRACE("str-conversion",
                     tout << " procesing to_code with result " << result << " and argument " << argument << std::endl;
                 );
                 /* Having result=to_code(argument) we need to take all var_1 ... var_n
                  * substituting argument in solution. We need to have one of the |var_i| = 1
                  * and all others |var_j| = 0; var_i will be then the char whose code point
                  * we want to return. We keep this code point in int variable var_i!to_code,
-                 * where result = var_i!to_code (we do this, so that different transformations
+                 * where result = var_i!to_code (we do this, so that different conversions
                  * are connected - they use the same !to_code variables).
                  * If this does not happen (i.e. argument is not word of length one), the result
                  * is equal to -1.
@@ -693,7 +693,7 @@ namespace smt::noodler {
                 LenNode result_is_defined(LenFormulaType::AND, {result_solution, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
 
                 LenNode result_is_undefined(LenFormulaType::AND, {});
-                if (type == TransformationType::TO_CODE) {
+                if (type == ConversionType::TO_CODE) {
                     // result is undefined, i.e. the argument is not a word of length one and result is then equal to -1
                     result_is_undefined.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{sum_of_substituted_vars, 1});
                     result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{result, -1});
@@ -708,8 +708,8 @@ namespace smt::noodler {
                 // TODO needs to get all the to_code vars, so that it can be properly handled by to_int
                 break;
             }
-            case TransformationType::TO_INT:
-            case TransformationType::FROM_INT:
+            case ConversionType::TO_INT:
+            case ConversionType::FROM_INT:
                 //???
                 util::throw_error("unimplemented");
                 break;
@@ -718,8 +718,8 @@ namespace smt::noodler {
                 UNREACHABLE();
             }
         }
-        STRACE("str-transform",
-            tout << "Formula for transformation: " << LenNode(LenFormulaType::AND, result_conjuncts) << std::endl;
+        STRACE("str-conversion",
+            tout << "Formula for conversions: " << LenNode(LenFormulaType::AND, result_conjuncts) << std::endl;
         );
         return LenNode(LenFormulaType::AND, result_conjuncts);
     }
@@ -896,8 +896,8 @@ namespace smt::noodler {
                 BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!ineq_to_code");
 
                 // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
-                transformations.emplace_back(var1_to_code, var1, TransformationType::TO_CODE);
-                transformations.emplace_back(var2_to_code, var2, TransformationType::TO_CODE);
+                conversions.emplace_back(var1_to_code, var1, ConversionType::TO_CODE);
+                conversions.emplace_back(var2_to_code, var2, ConversionType::TO_CODE);
 
                 // add to_code(var1) != to_code(var2) to the len formula for disequations
                 disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::NEQ, {var1_to_code, var2_to_code}));
