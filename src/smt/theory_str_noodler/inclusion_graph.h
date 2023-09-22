@@ -188,6 +188,15 @@ namespace smt::noodler {
             return (nodes_not_on_cycle.count(node) == 0);
         }
 
+        /**
+         * @brief Check if the inclusion graph is cyclic.
+         * 
+         * @return true <-> the inclusion graph contains a cycle.
+         */
+        bool is_cyclic() const {
+            return this->nodes.size() != this->nodes_not_on_cycle.size();
+        }
+
         void set_is_on_cycle(const std::shared_ptr<GraphNode> &node, bool is_on_cycle) {
             assert(nodes.count(node) > 0);
             if (!is_on_cycle) {

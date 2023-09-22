@@ -418,4 +418,40 @@ namespace smt::noodler {
             }
         }
     }
+
+    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance) const {
+        if(this->m_membership_todo_rel.size() != 0 || this->m_not_contains_todo_rel.size() != 0) {
+            return false;
+        }
+        if(!instance.is_quadratic()) {
+            return false;
+        }
+        Graph incl = Graph::create_inclusion_graph(instance);
+        return incl.is_cyclic();
+    }
+
+    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const {
+        int ln = 0;
+        /**
+         * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
+         * language of the variable is 1) sigma star (approximated by the first condition) 2) co-finite (complement is a finite language), or 
+         * 3) singleton meaning that the variable is string literal. 
+         */
+        for(const Predicate& pred : instance.get_predicates()) {
+            for(const BasicTerm& var : pred.get_vars()) {
+                
+                if(aut_ass.at(var)->size() <= 1) {
+                    continue;
+                }
+                if(aut_ass.is_co_finite(var, ln)) {
+                    continue;
+                }
+                if(aut_ass.is_singleton(var)) {
+                    continue;
+                }
+                return false;
+            }
+        }
+        return true;
+    }
 }

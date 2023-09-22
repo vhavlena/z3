@@ -1192,6 +1192,7 @@ namespace smt::noodler {
                     LenNode eq = LenNode(LenFormulaType::EQ, {left, right});
                     this->add_to_len_formula(LenNode(LenFormulaType::NOT, {eq}));
                     this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+                    this->len_variables.insert(var);
                 }
             }
         }
