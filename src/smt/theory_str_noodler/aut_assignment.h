@@ -85,8 +85,18 @@ namespace smt::noodler {
             return ret;
         }
 
+        /**
+         * @brief Checks if the automaton for @p t is equal to language containing only empty word.
+         */
         bool is_epsilon(const BasicTerm &t) const {
             return Mata::Strings::is_lang_eps(*(this->at(t)));
+        }
+
+        /**
+         * @brief Checks if the automaton for @p t contains empty word in its language.
+         */
+        bool contains_epsilon(const BasicTerm &t) const {
+            return Mata::Nfa::is_in_lang(*(this->at(t)), {{}, {}});
         }
 
         // adds all mappings of variables from other to this assignment except those which already exists in this assignment

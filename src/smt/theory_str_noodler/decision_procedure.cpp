@@ -205,7 +205,7 @@ namespace smt::noodler {
                                                       : inclusion_to_process.get_right_set();
                 bool non_empty_side_contains_empty_word = true;
                 for (const auto &var : non_empty_side_vars) {
-                    if (Mata::Nfa::is_in_lang(*element_to_process.aut_ass.at(var), {{}, {}})) {
+                    if (element_to_process.aut_ass.contains_epsilon(var)) {
                         // var contains empty word, we substitute it with only empty word, but only if...
                         if (right_side_vars.empty() // ...non-empty side is the left side (var is from left) or...
                                || element_to_process.length_sensitive_vars.count(var) > 0 // ...var is length-aware
@@ -592,96 +592,136 @@ namespace smt::noodler {
     }
 
     LenNode DecisionProcedure::get_lengths() {
-        if (solution.length_sensitive_vars.empty() && dis_len.empty()) {
-            // there are no length vars nor disequations, it is not needed to create the lengths formula
+        if (solution.length_sensitive_vars.empty()) {
+            // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
             return LenNode(LenFormulaType::TRUE);
         }
 
-        // start with length formula from preprocessing
-        std::vector<LenNode> conjuncts = {preprocessing_len_formula};
+        // start with formula for disequations
+        std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
+        // add length formula from preprocessing
+        conjuncts.push_back(preprocessing_len_formula);
 
-        // decision procedure was run, we create length constraints from the solution, we only need to look at length sensitive vars
+        // create length constraints from the solution, we only need to look at length sensitive vars
         for (const BasicTerm &len_var : solution.length_sensitive_vars) {
             conjuncts.push_back(solution.get_lengths(len_var));
         }
 
-        // add the formula for solving disequations
-        conjuncts.push_back(diseqs_formula());
+        // the following functions (getting formula for conversions) assume that we have flattened substitution map
+        solution.flatten_substition_map();
+
+        // add formula for conversions
+        conjuncts.push_back(get_formula_for_conversions());
 
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
-    LenNode DecisionProcedure::diseqs_formula() {
-        // This function creates arithmetic formula using solution for each ((a1, a2), (|x1| == |x2|, |L| != |R|) in
-        // dis_len where L = x1a1y1, R= x2a2y2; see replace_disequality() for more info. We want to create formula
-        // (|L| != |R| AND (|x1| == |x2| OR a1 != a2)) but
-        //      - if a1 or a2 is only empty word, then only |L| != |R| can hold
-        //      - we check a1!char != a2!char instead of a1 != a2 and then we add at the end that a1!char/a2!char
-        //        should be equal to one of the symbols of a1/a2
-        //      - we also work with maximally substituted a1/a2, so that if we have multiple disequations that
-        //        somehow depend on each other, the dependency stays
+    LenNode DecisionProcedure::get_formula_for_conversions() {
+        STRACE("str-conversion",
+            tout << "Creating formula for conversions" << std::endl;
+        );
+        auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
 
-        // we flatten the subtitution map, so that all the vars a1/a2 whose disequality we will check
-        // are substituted by maximal application of substitution_map
-        solution.flatten_substition_map();
+        std::vector<LenNode> result_conjuncts;
+        for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
+            BasicTerm result = std::get<0>(transf);
+            BasicTerm argument = std::get<1>(transf);
+            ConversionType type = std::get<2>(transf);
+            switch (type)
+            {
+            case ConversionType::FROM_CODE:
+                STRACE("str-conversion",
+                    tout << " procesing from_code with result " << result << " and argument " << argument << " which is handled by" << std::flush;
+                );
+                std::swap(result, argument);
+                // fall trough, we do nearly the same thing
+            case ConversionType::TO_CODE:
+            {
+                STRACE("str-conversion",
+                    tout << " procesing to_code with result " << result << " and argument " << argument << std::endl;
+                );
+                /* Having result=to_code(argument) we need to take all var_1 ... var_n
+                 * substituting argument in solution. We need to have one of the |var_i| = 1
+                 * and all others |var_j| = 0; var_i will be then the char whose code point
+                 * we want to return. We keep this code point in int variable var_i!to_code,
+                 * where result = var_i!to_code (we do this, so that different conversions
+                 * are connected - they use the same !to_code variables).
+                 * If this does not happen (i.e. argument is not word of length one), the result
+                 * is equal to -1.
+                 * 
+                 * We also handle from_code here, we swapped arugment and result so we have
+                 * argument = from_code(result). We can do exactly the same, we compute the
+                 * code point from which we are constructing the char by checking possible
+                 * chars in solution. The only difference is that if result is not a valid
+                 * code point, then argument must be an empty string.
+                 */
+                Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
+                std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
 
-        // here we save all a1/a2 whose disequation is checked, so that we can create the formula that 
-        // each of these vars should be one of the symbols from its automaton
-        std::set<BasicTerm> a_vars;
-        // get the "!char" version of a variable
-        auto get_char_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name().encode() + "!char"); };
-
-        // conjuncts of the final length formula
-        std::vector<LenNode> conjuncts;
-
-        for(const auto& pr: dis_len) {
-            // formula for |x1| == |x2|
-            LenNode x1x2_same_lengths = pr.second.first;
-            // formula for |L| != |R|
-            LenNode LR_diff_lengths = pr.second.second;
-
-            // variables a1 and a2 where we check a1 != a2
-            BasicTerm a1 = pr.first.first;
-            BasicTerm a2 = pr.first.second;
-
-            if (solution.is_var_empty_word(a1) || solution.is_var_empty_word(a2)) {
-                // if one of the variables was only epsilon, the original sides of disequation have to have different lengths
-                conjuncts.push_back(LR_diff_lengths);
-            } else {
-                // as neither a1 nor a2 are empty words, they can be substituted by exactly one var, we get it
-                a1 = solution.get_substituted_vars(a1)[0];
-                a2 = solution.get_substituted_vars(a2)[0];
-
-                a_vars.insert(a1);
-                a_vars.insert(a2);
-
-                conjuncts.emplace_back(
-                    LenFormulaType::OR,
-                    std::vector<LenNode>{
-                        // |L| != |R|
-                        LR_diff_lengths,
-                        // |x1| == |x2| AND a1!char != a2!char
-                        LenNode(LenFormulaType::AND, { x1x2_same_lengths, LenNode(LenFormulaType::NEQ, {get_char_var(a1), get_char_var(a2)})})
+                // Disjunction representing that result is equal to code point of one of the chars of some var_i
+                LenNode result_solution(LenFormulaType::OR, {});
+                for (const BasicTerm& var : substituted_vars) {
+                    // disjunction that will say that var!to_code is equal to code point of one of the chars in var
+                    LenNode to_code_disjunction = LenNode(LenFormulaType::OR, {});
+                    for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(var))) { // iterate trough chars of var
+                        if (!is_dummy_symbol(s)) {
+                            // var!to_code == s
+                            to_code_disjunction.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
+                        } else {
+                            // if s represents symbols not in the alphabet => var!to_code must be a code point of such a symbol which is not in alphabet, i.e. it is...
+                            // ...valid code point (0 <= var!to_code <= max_char) and...
+                            std::vector<LenNode> minterm_to_code{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), zstring::max_char()})};
+                            // ...it is not equal to code point of some symbol in the alphabet
+                            for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
+                                if (!is_dummy_symbol(s2)) {
+                                    minterm_to_code.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
+                                }
+                            }
+                            to_code_disjunction.succ.emplace_back(LenFormulaType::AND, minterm_to_code);
+                        }
+                    }
+                    result_solution.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                        to_code_disjunction, // var!to_code is equal to code point of one of its symbols TODO: do this only once for given var
+                        LenNode(LenFormulaType::EQ, {result, to_code_var(var)}), // result is equal to var!to_code
+                        LenNode(LenFormulaType::EQ, {var, 1}) // lenght of var is 1
                     });
+                }
+
+                // sum_of_substituted_vars = |var_1| + |var_2| + ... + |var_n|
+                LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
+                // result is defined, i.e. exactly one |var_i| = 1 (by checking sum_of_substituted_vars = 1) and the result is the code point of one of the chars of var_i
+                LenNode result_is_defined(LenFormulaType::AND, {result_solution, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
+
+                LenNode result_is_undefined(LenFormulaType::AND, {});
+                if (type == ConversionType::TO_CODE) {
+                    // result is undefined, i.e. the argument is not a word of length one and result is then equal to -1
+                    result_is_undefined.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{sum_of_substituted_vars, 1});
+                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{result, -1});
+                } else {
+                    // we have argument = from_code(result), if result is not valid code point (0 <= result <= max_char() does not hold), then argument must be empty word (length is equal to 0)
+                    result_is_undefined.succ.emplace_back(LenFormulaType::NOT, std::vector<LenNode>{LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, zstring::max_char()})})});
+                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{argument, 0});
+                }
+
+                result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
+
+                // TODO needs to get all the to_code vars, so that it can be properly handled by to_int
+                break;
+            }
+            case ConversionType::TO_INT:
+            case ConversionType::FROM_INT:
+                //???
+                util::throw_error("unimplemented");
+                break;
+            
+            default:
+                UNREACHABLE();
             }
         }
-
-        // for each a1/a2 var, we have to have that a1!char/a2!char should be equal to one of its symbols
-        for (const BasicTerm& a_var : a_vars) {
-            auto a_var_nfa = solution.aut_ass.at(a_var);
-            a_var_nfa->trim();
-            std::set<Mata::Symbol> symbols_of_var;
-            for (const auto &tran : a_var_nfa->delta) {
-                symbols_of_var.insert(tran.symb);
-            }
-            std::vector<LenNode> disjuncts;
-            for (auto symbol : symbols_of_var) {
-                disjuncts.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ get_char_var(a_var), symbol });
-            }
-            conjuncts.push_back(LenNode(LenFormulaType::OR, disjuncts));
-        }
-
-        return LenNode(LenFormulaType::AND, conjuncts);
+        STRACE("str-conversion",
+            tout << "Formula for conversions: " << LenNode(LenFormulaType::AND, result_conjuncts) << std::endl;
+        );
+        return LenNode(LenFormulaType::AND, result_conjuncts);
     }
 
     /**
@@ -702,14 +742,7 @@ namespace smt::noodler {
         }
 
         STRACE("str-dis",
-            tout << "Disequation to equation formulas:" << std::endl;
-            for (const auto &dis_formula : dis_len) {
-                tout << "     " << dis_formula.second.second
-                     << " || (" << dis_formula.second.first
-                     << " && " << dis_formula.first.first.get_name()
-                     << " != " << dis_formula.first.second.get_name()
-                     << ")" << std::endl;
-            }
+            tout << "Disequation len formula: " << LenNode(LenFormulaType::AND, disequations_len_formula_conjuncts) << std::endl;
         );
 
         STRACE("str-dis",
@@ -835,43 +868,59 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Replace disequalities with equalities
+     * Replace disequality @p diseq L != P by equalities L = x1a1y1 and R = x2a2y2
+     * where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
+     * also create arithmetic formula:
+     *   |x1| = |x2| && to_code(a1) != to_code(a2) && (|a1| = 0 => |y1| = 0) && (|a2| = 0 => |y2| = 0)
+     * The variables a1/a2 represent the characters on which the two sides differ
+     * (they have different code values). They have to occur on the same position,
+     * i.e. lengths of x1 and x2 are equal. The situation where one of the a1/a2
+     * is empty word (to_code returns -1) represents that one of the sides is
+     * longer than the other (they differ on the character just after the last
+     * character of the shorter side). We have to force that nothing is after
+     * the empty a1/a2, i.e. length of y1/y2 must be 0.
      */
     std::vector<Predicate> DecisionProcedure::replace_disequality(Predicate diseq) {
-        // From inequality L != P we create equalities L = x1a1y1 and R = x2a2y2
-        // where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
-        // we will check if (|L| != |P| || (|x1| == |x2| and a1 != a2)) after finding sat solution
-        // from decision procedure.
 
-        std::vector<Predicate> new_eqs;
+        // automaton accepting empty word or exactly one symbol
+        std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
+
+        // function that will take a1 and a2 and create the "to_code(a1) != to_code(a2)" part of the arithmetic formula
+        auto create_to_code_ineq = [this](const BasicTerm& var1, const BasicTerm& var2) {
+                // we are going to check that to_code(var1) != to_code(var2), we need exact languages, so we make them length
+                init_length_sensitive_vars.insert(var1);
+                init_length_sensitive_vars.insert(var2);
+
+                // variables that are results of to_code applied to var1/var2
+                BasicTerm var1_to_code = BasicTerm(BasicTermType::Variable, var1.get_name().encode() + "!ineq_to_code");
+                BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!ineq_to_code");
+
+                // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
+                conversions.emplace_back(var1_to_code, var1, ConversionType::TO_CODE);
+                conversions.emplace_back(var2_to_code, var2, ConversionType::TO_CODE);
+
+                // add to_code(var1) != to_code(var2) to the len formula for disequations
+                disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::NEQ, {var1_to_code, var2_to_code}));
+        };
 
         // This optimization represents the situation where L = a1 and R = a2
-        // and we know that a1,a2 \in \Sigma, i.e. we do not create new equations.
+        // and we know that a1,a2 \in \Sigma \cup {\epsilon}, i.e. we do not create new equations.
         if(diseq.get_left_side().size() == 1 && diseq.get_right_side().size() == 1) {
             BasicTerm a1 = diseq.get_left_side()[0];
             BasicTerm a2 = diseq.get_right_side()[0];
             auto autl = init_aut_ass.at(a1);
             auto autr = init_aut_ass.at(a2);
-            Mata::Nfa::Nfa sigma = init_aut_ass.sigma_automaton();
 
-            if(Mata::Nfa::is_included(*autl, sigma) && Mata::Nfa::is_included(*autr, sigma)) {
-                // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
-                init_length_sensitive_vars.insert(a1);
-                init_length_sensitive_vars.insert(a2);
-                // we add to dis_len the pair ((a1, a2), (|a1| == |a2|, |a1| != |a2|)) representing the formula (|a1| != |a2| || (|a1| == |a2| && a1 != a2))
-                dis_len.insert({
-                    {a1, a2},
-                    // represents (|a1| == |a2|, |a1| != |a2|), must be (true, false) as a1 and a2 have the same length 1
-                    {LenNode(LenFormulaType::TRUE, {}), LenNode(LenFormulaType::FALSE, {})} 
-                });
+            if(Mata::Nfa::is_included(*autl, *sigma_eps_automaton) && Mata::Nfa::is_included(*autr, *sigma_eps_automaton)) {
+                // create to_code(a1) != to_code(a2)
+                create_to_code_ineq(a1, a2);
+                STRACE("str-dis", tout << "from disequation " << diseq << " no new equations were created" << std::endl;);
                 return std::vector<Predicate>();
             }
         }
 
         // automaton accepting everything
         std::shared_ptr<Mata::Nfa::Nfa> sigma_star_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_star_automaton());
-        // automaton accepting empty word or exactly one symbol
-        std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
 
         BasicTerm x1 = util::mk_noodler_var_fresh("diseq_start");
         init_aut_ass[x1] = sigma_star_automaton;
@@ -886,30 +935,28 @@ namespace smt::noodler {
         BasicTerm y2 = util::mk_noodler_var_fresh("diseq_end");
         init_aut_ass[y2] = sigma_star_automaton;
 
+        std::vector<Predicate> new_eqs;
         // L = x1a1y1
         new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_left_side(), Concat{x1, a1, y1}}));
         // R = x2a2y2
         new_eqs.push_back(Predicate(PredicateType::Equation, {diseq.get_right_side(), Concat{x2, a2, y2}}));
 
-        // we create |L| != |P|, so we need to make all variables in both sides length ones
-        // TODO do we actually need to do that? maybe we do not need the check for |L| != |P| and solve it differently,
-        // for example by taking L = x1y1, P = x2y2 and checking (|x1| = |y2| and some first symbol of y1,y2 differ)
-        for(const auto& t : diseq.get_vars()) {
-            init_length_sensitive_vars.insert(t);
-        }
-        auto len2 = diseq.get_formula_eq();
-
         // we want |x1| == |x2|, making x1 and x2 length ones
         init_length_sensitive_vars.insert(x1);
         init_length_sensitive_vars.insert(x2);
-        auto len1 = Predicate(PredicateType::Equation, {Concat({x1}), Concat({x2})}).get_formula_eq();
+        // |x1| = |x2|
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::EQ, {x1, x2}));
 
-        // we are going to check that a1 and a2 contain different symbols, we need exact languages, so we make them length
-        init_length_sensitive_vars.insert(a1);
-        init_length_sensitive_vars.insert(a2);
+        // create to_code(a1) != to_code(a2)
+        create_to_code_ineq(a1, a2);
 
-        // we will create (len2 || (len1 && a1 != a2)) from this
-        this->dis_len.insert({{a1, a2}, {len1, len2}});
+        // we are also going to check for the lengths of y1 and y2, so they have to be length
+        init_length_sensitive_vars.insert(y1);
+        init_length_sensitive_vars.insert(y2);
+        // (|a1| = 0) => (|y1| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a1, 0}), LenNode(LenFormulaType::EQ, {y1, 0})}));
+        // (|a2| = 0) => (|y2| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a2, 0}), LenNode(LenFormulaType::EQ, {y2, 0})}));
 
         STRACE("str-dis", tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
         return new_eqs;

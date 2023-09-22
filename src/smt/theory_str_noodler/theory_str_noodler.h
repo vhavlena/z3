@@ -65,7 +65,8 @@ namespace smt::noodler {
         // variables whose lengths are important
         obj_hashtable<expr> len_vars;
 
-        // used in final_check_eh, maps noodler variables to z3 string variables
+        // used in final_check_eh, maps noodler string variables to z3 string variables
+        // AND int variables to predicates they represent (see handle_conversion)
         std::map<BasicTerm, expr_ref> var_name;
 
         // mapping predicates and function to variables that they substitute to
@@ -90,21 +91,25 @@ namespace smt::noodler {
 
         // constraints that are (possibly) to be processed in final_check_eh (added either in relevant_eh or ?assign_eh?)
         // they also need to be popped and pushed in pop_scope_eh and push_scope_eh)
-        scoped_vector<expr_pair> m_word_eq_todo; // pair contains left and right side of the (word) equality
-        scoped_vector<expr_pair> m_word_diseq_todo; // pair contains left and right side of the (word) disequality
+        scoped_vector<expr_pair> m_word_eq_todo; // pair contains left and right side of the word equality
+        scoped_vector<expr_pair> m_word_diseq_todo; // pair contains left and right side of the word disequality
         scoped_vector<expr_pair> m_lang_eq_todo; //pair contains left and right side of the language equality
         scoped_vector<expr_pair> m_lang_diseq_todo; // pair contains left and right side of the language disequality
         scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
+        // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
+        // e = str.to_int(s), or e = str.from_int(s), based on the conversion type
+        scoped_vector<std::tuple<expr_ref,expr_ref,ConversionType>> m_conversion_todo;
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
         // todo constraints and check if they are relevant for current SAT assignment => if they are
         // they are added to one of these sets
-        vector<expr_pair> m_word_eq_todo_rel; // pair contains left and right side of the equality
-        vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the disequality
-        vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains and right side of the (dis)equality and a flag - true -> equality, false -> diseq
+        vector<expr_pair> m_word_eq_todo_rel; // pair contains left and right side of the word equality
+        vector<expr_pair> m_word_diseq_todo_rel; // pair contains left and right side of the word disequality
+        vector<expr_pair_flag> m_lang_eq_or_diseq_todo_rel; // contains left and right side of the language (dis)equality and a flag - true -> equality, false -> diseq
+        vector<expr_pair> m_not_contains_todo_rel; // first element should not contain the second one
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
-        vector<expr_pair> m_not_contains_todo_rel; // not contains
+        // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in m_conversion_todo is relevant => no _todo_rel version
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -209,6 +214,8 @@ namespace smt::noodler {
         void handle_contains(expr *e);
         void handle_not_contains(expr *e);
         void handle_in_re(expr *e, bool is_true);
+        void handle_is_digit(expr *e);
+        void handle_conversion(expr *e);
 
         // methods for assigning boolean values to predicates
         void assign_not_contains(expr *e);
@@ -282,6 +289,13 @@ namespace smt::noodler {
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+        /**
+         * @brief Get the conversions (to/from_int/code) with noodler variables
+         * 
+         * Side effect: string variables in conversions which are not mapped in the automata
+         * assignment @p ass will be mapped to sigma* after this.
+         */
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> get_conversions_as_basicterms(AutAssignment &ass, const std::set<Mata::Symbol>& noodler_alphabet);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them
@@ -292,7 +306,9 @@ namespace smt::noodler {
          * Solve the problem using underapproximating decision procedure, if it returns l_true,
          * the original formula is SAT, otherwise we need to run normal decision procedure.
          */
-        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+        lbool solve_underapprox(const Formula& instance, const AutAssignment& aut_ass,
+                                const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                                std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions);
 
         /**
          * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.

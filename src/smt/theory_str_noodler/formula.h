@@ -154,51 +154,41 @@ namespace smt::noodler {
     static std::ostream& operator<<(std::ostream& os, const LenNode& node) {
         switch (node.type)
         {
+        case LenFormulaType::TRUE:
+            return (os << "true");
+        case LenFormulaType::FALSE:
+            return (os << "false");
+        case LenFormulaType::LEAF:
+            return (os << node.atom_val.get_name());
+        case LenFormulaType::NOT:
+            return os << "(not" << node.succ.at(0) << ")";
+        case LenFormulaType::LEQ:
+            return os << "(<= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
+        case LenFormulaType::EQ:
+            return os << "(= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
+        case LenFormulaType::NEQ:
+            return os << "(!= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::PLUS:
-            os << "(+ " << node.succ[0] << " " << node.succ[1] << ")";
+            os << "(+";
             break;
         case LenFormulaType::TIMES:
-            os << "(* " << node.succ[0] << " " << node.succ[1] << ")";
-            break;
-        case LenFormulaType::EQ:
-            os << "(= " << node.succ[0] << " " << node.succ[1] << ")";
-            break;
-        case LenFormulaType::NEQ:
-            os << "(!= " << node.succ[0] << " " << node.succ[1] << ")";
-            break;
-        case LenFormulaType::NOT:
-            os << "(not " << node.succ[0] << ")";
-            break;
-        case LenFormulaType::LEQ:
-            os << "(<= " << node.succ[0] << " " << node.succ[1] << ")";
-            break;
-        case LenFormulaType::LEAF:
-            os << node.atom_val.get_name();
+            os << "(*";
             break;
         case LenFormulaType::AND:
             os << "(and";
-            for (const auto &succ_node : node.succ) {
-                os << " " << succ_node;
-            }
-            os << ")";
             break;
         case LenFormulaType::OR:
             os << "(or";
-            for (const auto &succ_node : node.succ) {
-                os << " " << succ_node;
-            }
-            os << ")";
-            break;
-        case LenFormulaType::TRUE:
-            os << "true";
-            break;
-        case LenFormulaType::FALSE:
-            os << "false";
             break;
         
         default:
-            break;
+            UNREACHABLE();
         }
+
+        for (const auto &succ_node : node.succ) {
+            os << " " << succ_node;
+        }
+        os << ")";
         return os;
     }
 

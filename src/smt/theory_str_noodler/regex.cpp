@@ -206,7 +206,7 @@ namespace smt::noodler::regex {
         } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
             SASSERT(expression->get_num_parameters() == 1);
             nfa = AutAssignment::create_word_nfa(expression->get_parameter(0).get_zstring());
-        } else if(util::is_variable(expression, m_util_s)) { // Handle variable.
+        } else if(util::is_variable(expression)) { // Handle variable.
             util::throw_error("variable in regexes are unsupported");
         } else {
             util::throw_error("unsupported operation in regex");
@@ -436,7 +436,7 @@ namespace smt::noodler::regex {
         } else if(m_util_s.str.is_string(expression)) { // Handle string literal.
             SASSERT(expression->get_num_parameters() == 1);
             return RegexInfo{.min_length = expression->get_parameter(0).get_zstring().length(), .universal = l_false, .empty = l_false};
-        } else if(util::is_variable(expression, m_util_s)) { // Handle variable.
+        } else if(util::is_variable(expression)) { // Handle variable.
             util::throw_error("variable in regexes are unsupported");
         } else {
             util::throw_error("unsupported operation in regex");

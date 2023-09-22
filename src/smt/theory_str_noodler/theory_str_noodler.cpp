@@ -392,15 +392,21 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
             util::throw_error("str.replace_re_all is not supported");
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
-            util::throw_error("str.is_digit is not supported");
-        } else if (m_util_s.str.is_to_code(n)) { // str.to_code
-            util::throw_error("str.to_code is not supported");
-        } else if (m_util_s.str.is_from_code(n)) { // str.from_code
-            util::throw_error("str.from_code is not supported");
-        } else if (m_util_s.str.is_stoi(n)) { // str.to_int
-            util::throw_error("str.to_int is not supported");
-        } else if (m_util_s.str.is_itos(n)) { // str.from_int
-            util::throw_error("str.from_int is not supported");
+            handle_is_digit(n);
+        } else if (
+            m_util_s.str.is_stoi(n) || // str.to_int
+            m_util_s.str.is_itos(n) // str.from_int
+        ) {
+            // handle_conversion can handle to/from_int, but decision procedure cannot.
+            // We throw error here so that we get to unknown faster. After decision
+            // procedure gets support for it, remove this and let it fall trough with
+            // is/from_code to handle_conversion
+            util::throw_error("str.to_int and str.from_int is not supported (yet)");
+        } else if (
+            m_util_s.str.is_to_code(n) || // str.to_code
+            m_util_s.str.is_from_code(n) // str.from_code
+        ) {
+            handle_conversion(n);
         } else if (
             m_util_s.str.is_concat(n) || // str.++
             m_util_s.re.is_to_re(n) || // str.to_re
@@ -753,7 +759,15 @@ namespace smt::noodler {
             for (const auto &notc: this->m_not_contains_todo_rel) {
                 tout << "    " << mk_pp(notc.first, m) << "; " << mk_pp(notc.second, m) << std::endl;
             }
+            tout << " conversions(" << this->m_conversion_todo.size() << "):" << std::endl;
+            for (const auto &conv: this->m_conversion_todo) {
+                tout << "    " << mk_pp(std::get<0>(conv), m) << " = " << get_conversion_name(std::get<2>(conv)) << "(" << mk_pp(std::get<1>(conv), m) << ")" << std::endl;
+            }
         );
+
+        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
+        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
+        bool contains_conversions = !this->m_conversion_todo.empty();
 
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
@@ -816,7 +830,8 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && this->m_word_eq_todo_rel.size() == 0 && this->m_word_diseq_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
+        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
+            STRACE("str", tout << "Trying heuristic for the case we only have 'x (not)in RE'" << std::endl);
             const auto& reg_data = this->m_membership_todo_rel[0];
             // Heuristic: Get info about the regular expression. If the membership is negated and the regex is not universal for sure --> return FC_DONE.
             // If the membership is in the positive form and the regex is not empty --> regurn FC_DONE.
@@ -830,10 +845,9 @@ namespace smt::noodler {
             if(!std::get<2>(reg_data) // membership is negated
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
             ) {
-                std::set<Mata::Symbol> symbols_in_regex;
+                // start with minterm representing symbols not ocurring in the regex
+                std::set<Mata::Symbol> symbols_in_regex{get_dummy_symbol()};
                 extract_symbols(std::get<1>(reg_data), symbols_in_regex);
-                // add one "dummy" symbol representing the symbols not in the regex
-                util::get_dummy_symbols(1, symbols_in_regex);
 
                 Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
 
@@ -866,22 +880,20 @@ namespace smt::noodler {
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
 
-        // for(const auto & t : symbols_in_formula) {
-        //     std::cout << t << std::endl;
-        // }
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions = get_conversions_as_basicterms(aut_assignment, symbols_in_formula);
 
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
-        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment) && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars) == l_true) {
-            STRACE("str", tout << "underapprox sat \n";);
+        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment) && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
+            STRACE("str", tout << "Sat from underapproximation" << std::endl;);
             return FC_DONE;
         }
 
         // try Nielsen transformation (if enabled) to solve
-        /// FIXME: a better test for when to try nielsen might be needed
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
+            STRACE("str", tout << "Trying nielsen" << std::endl);
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
             expr_ref block_len(m.mk_false(), m);
@@ -908,8 +920,9 @@ namespace smt::noodler {
             }
         }
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
 
+        STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
@@ -926,6 +939,7 @@ namespace smt::noodler {
             return FC_CONTINUE;
         }
 
+        STRACE("str", tout << "Starting main decision procedure" << std::endl);
         dec_proc.init_computation();
 
         expr_ref block_len(m.mk_false(), m);
@@ -1958,6 +1972,136 @@ namespace smt::noodler {
 
         expr_ref r{re, m};
         this->m_membership_todo.push_back(std::make_tuple(expr_ref(re_constr, m), r, is_true));
+    }
+
+    /**
+     * @brief Handle is_digit
+     * 
+     * Translates into equivalence:
+     * is_digit(s) <-> s \in [0-9]
+     * 
+     * @param e str.is_digit(s)
+     * 
+     * TODO: This probably makes is_digit always relevant.
+     */
+    void theory_str_noodler::handle_is_digit(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+        VERIFY(m_util_s.str.is_is_digit(e, s));
+        // s \in [0-9]
+        expr *s_in_digit = m_util_s.re.mk_in_re(s, m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")));
+        // is_digit(s) -> s \in [0-9]
+        add_axiom({~mk_literal(e), mk_literal(s_in_digit)});
+        // ~is_digit(s) -> ~(s \in [0-9])
+        add_axiom({mk_literal(e), ~mk_literal(s_in_digit)});
+    }
+
+    /**
+     * @brief Handle to_code, from_code, to_int, from_int
+     * 
+     * Collects (and possibly creates) variables for the argument and result
+     * of the term and puts them in m_conversion_todo.
+     */
+    void theory_str_noodler::handle_conversion(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        expr *s = nullptr;
+
+        ConversionType type;
+        std::string name_of_type;
+        if (m_util_s.str.is_to_code(e, s)) {
+            type = ConversionType::TO_CODE;
+            name_of_type = "to_code";
+        } else if (m_util_s.str.is_from_code(e, s)) {
+            type = ConversionType::FROM_CODE;
+            name_of_type = "from_code";
+        } else if (m_util_s.str.is_stoi(e, s)) {
+            type = ConversionType::TO_INT;
+            name_of_type = "to_int";
+        } else if (m_util_s.str.is_itos(e, s)) {
+            type = ConversionType::FROM_INT;
+            name_of_type = "from_int";
+        } else {
+            UNREACHABLE();
+            return;
+        }
+        bool tranforming_from = (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT);
+
+        // get the var for the argument
+        expr_ref var_for_s(m);
+        if (tranforming_from) {
+            // for from_code and from_int, the argument has integer type, we create a new var for it
+            var_for_s = mk_int_var_fresh(name_of_type + "_argument");
+            // bit of a hack, we abuse var_name to save the predicate to which int var is mapped, because
+            // using equation here did not work (lia solver ignored it)
+            var_name.insert({util::get_variable_basic_term(var_for_s), expr_ref(s, m)});
+        } else {
+            // for to_code and to_int, the argument has string type, we have to find the variable for it
+            if (m_util_s.str.is_string(s)) {
+                // it seems that Z3 rewriter handles the case where we tranform from string literal, so this should be unreachable
+                UNREACHABLE();
+                return;
+            } else if (util::is_str_variable(s, m_util_s)) {
+                // we are converting directly from variable
+                var_for_s = s;
+            } else if(this->predicate_replace.contains(s)) {
+                // argument is some function that already has a replacing variable
+                var_for_s = this->predicate_replace[s];
+            } else {
+                // argument does not have a replacing variable (probably concatenation)
+                // we need to create one
+                var_for_s = mk_str_var_fresh(name_of_type + "_argument");
+                add_axiom({mk_literal(m.mk_eq(s, var_for_s))});
+                this->predicate_replace.insert(s, var_for_s);
+            }
+            // we need exact solution for the argument, so that we can compute
+            // the arithmetic formula for the result in final_check_eh
+            len_vars.insert(var_for_s);
+        }
+
+        // create var for the result
+        expr_ref var_for_e(m);
+        if (tranforming_from) {
+            var_for_e = mk_str_var_fresh(name_of_type + "_result");
+            add_axiom({mk_literal(m.mk_eq(var_for_e, e))});
+            this->predicate_replace.insert(e, var_for_e);
+            len_vars.insert(var_for_e); // dunno if this is needed
+        } else {
+            var_for_e = mk_int_var_fresh(name_of_type + "_result");
+            // bit of a hack, we abuse var_name to save the predicate to which int var is mapped, because
+            // using equation here did not work (lia solver ignored it)
+            var_name.insert({util::get_variable_basic_term(var_for_e), expr_ref(e, m)});
+        }
+
+        // The range of from_* functions is bounded, we have to bound it also for the decision procedure
+
+        if (type == ConversionType::FROM_CODE) {
+            // the result of str.from_code can only be either a char representing the code value, or empty string (if argument is out of range of any code value)
+            app *sigma_eps = m_util_s.re.mk_union(
+                                            m_util_s.re.mk_epsilon(e->get_sort()),
+                                            m_util_s.re.mk_full_char(nullptr)
+                                        );
+            add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, sigma_eps))});
+        }
+
+        if (type == ConversionType::FROM_INT) {
+            // the result of str.from_int can only be either a decimal representation of a number without leading zeros, or empty string (if argument is negative)
+            app *zero = m_util_s.re.mk_to_re(m_util_s.str.mk_string("0")); // if argument == 0, the result will be 0
+            app *nums_without_zero = m_util_s.re.mk_concat(
+                                            m_util_s.re.mk_plus(m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))),
+                                            m_util_s.re.mk_star(m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")))
+                                        ); // if argument > 0, the result will be of form [1-9]+[0-9]*
+            app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
+            add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
+        }
+
+        // Add to todo
+        m_conversion_todo.push_back({var_for_e, expr_ref(var_for_s, m), type});
     }
 
     void theory_str_noodler::set_conflict(const literal_vector& lv) {

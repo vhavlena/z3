@@ -3,6 +3,7 @@
 
 namespace smt::noodler {
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
+        STRACE("str-conv-eq", tout << "conv_eq_pred: " << mk_pp(ex, m) << std::endl);
         const app* eq = ex;
         PredicateType ptype = PredicateType::Equation;
         if(m.is_not(ex)) {
@@ -56,7 +57,8 @@ namespace smt::noodler {
     }
 
     std::set<Mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
-        std::set<Mata::Symbol> symbols_in_formula{};
+        // start with symbol representing everything not in formula
+        std::set<Mata::Symbol> symbols_in_formula{get_dummy_symbol()};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             extract_symbols(word_equation.first, symbols_in_formula);
@@ -76,35 +78,6 @@ namespace smt::noodler {
             extract_symbols(not_contains.first, symbols_in_formula);
             extract_symbols(not_contains.second, symbols_in_formula);
         }
-
-        /* Get number of dummy symbols needed for disequations and 'x not in RE' predicates.
-         * We need some dummy symbols, to represent the symbols not occuring in predicates,
-         * otherwise, we might return unsat even though the formula is sat. For example if
-         * we had x != y and no other predicate, we would have no symbols and the formula
-         * would be unsat. With one dummy symbol, it becomes sat.
-         * We add new dummy symbols for each diseqation and 'x not in RE' predicate, as we
-         * could be in situation where we have for example x != y, y != z, z != x, and
-         * |x| = |y| = |z|. If we added only one dummy symbol, then this would be unsat,
-         * but if we have three symbols, it becomes sat (which this formula is). We add
-         * dummy symbols also for 'x not in RE' because they basically represent
-         * disequations too (for example 'x not in "aaa"' and |x| = 3 should be sat, but
-         * with only symbol "a" it becomes unsat).
-         * 
-         * FIXME: We can possibly create more dummy symbols than the size of alphabet
-         * (from the string theory standard the size of the alphabet is 196607), but
-         * it is an edge-case that probably cannot happen.
-         */
-        size_t number_of_dummy_symbs = this->m_word_diseq_todo_rel.size();
-        for (const auto& membership : this->m_membership_todo_rel) {
-            if(!std::get<2>(membership)){
-                number_of_dummy_symbs++;
-            }
-        }
-        // to be safe, we set the minimum number of dummy symbols as 3
-        number_of_dummy_symbs = std::max(number_of_dummy_symbs, size_t(3));
-
-        // add needed number of dummy symbols to symbols_in_formula
-        util::get_dummy_symbols(number_of_dummy_symbs, symbols_in_formula);
 
         return symbols_in_formula;
     }
@@ -188,6 +161,29 @@ namespace smt::noodler {
         return init_lengths;
     }
 
+    std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<Mata::Symbol>& noodler_alphabet) {
+        Mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
+        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::Builder::create_sigma_star_nfa(&mata_alphabet));
+        
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions;
+        for (const auto& transf : m_conversion_todo) {
+            BasicTerm result(BasicTermType::Variable, to_app(std::get<0>(transf))->get_decl()->get_name().str());
+            BasicTerm argument(BasicTermType::Variable, to_app(std::get<1>(transf))->get_decl()->get_name().str());
+            ConversionType type = std::get<2>(transf);
+
+            conversions.emplace_back(result, argument, type);
+
+            if (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT) {
+                var_name.insert({result, expr_ref(std::get<0>(transf), m)});
+                ass.insert({result, nfa_sigma_star});
+            } else {
+                var_name.insert({argument, expr_ref(std::get<1>(transf), m)});
+                ass.insert({argument, nfa_sigma_star});
+            }
+        }
+        return conversions;
+    }
+
     bool theory_str_noodler::solve_lang_eqs_diseqs() {
         for(const auto& item : this->m_lang_eq_or_diseq_todo_rel) {
             // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
@@ -229,8 +225,10 @@ namespace smt::noodler {
         return true;
     }
 
-    lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params };
+    lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
+                                                const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                                                std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions) {
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
         if (dec_proc.preprocess(PreprocessType::UNDERAPPROX) == l_false) {
             return l_false;
         }
@@ -254,7 +252,7 @@ namespace smt::noodler {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;
-        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0) {
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0) {
             include_ass = false;
         }
         m_int_solver.initialize(get_context(), include_ass);
@@ -320,7 +318,7 @@ namespace smt::noodler {
             return;
         }
 
-        if(util::is_variable(ex, m_util_s)) { // Skip variables.
+        if(util::is_variable(ex)) { // Skip variables.
             return;
         }
 
@@ -406,7 +404,7 @@ namespace smt::noodler {
             extract_symbols(to_app(left), alphabet);
             extract_symbols(to_app(right), alphabet);
             return;
-        } else if(util::is_variable(ex_app, m_util_s)) { // Handle variable.
+        } else if(util::is_variable(ex_app)) { // Handle variable.
             util::throw_error("variable should not occur here");
         } else {
             // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
@@ -420,7 +418,7 @@ namespace smt::noodler {
     }
 
     bool theory_str_noodler::is_nielsen_suitable(const Formula& instance) const {
-        if(this->m_membership_todo_rel.size() != 0 || this->m_not_contains_todo_rel.size() != 0) {
+        if(!this->m_membership_todo_rel.empty() || !this->m_not_contains_todo_rel.empty() || !this->m_conversion_todo.empty()) {
             return false;
         }
         if(!instance.is_quadratic()) {

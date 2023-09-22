@@ -69,7 +69,7 @@ namespace smt::noodler::util {
      * @param expression Expression to check.
      * @return True if @p expression is a variable, false otherwise.
      */
-    bool is_variable(const expr* expression, const seq_util& m_util_s);
+    bool is_variable(const expr* expression);
 
     /**
      * Get variable names from a given expression @p ex. Append to the output parameter @p res.
