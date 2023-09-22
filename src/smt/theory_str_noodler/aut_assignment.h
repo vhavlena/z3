@@ -130,13 +130,13 @@ namespace smt::noodler {
          * @param[out] len Length of the word missing in the language
          * @return true Is complement of a word
          */
-        bool is_co_finite(const BasicTerm& t, int& len) {
+        bool is_co_finite(const BasicTerm& t, int& len) const {
             Mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : this->alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
 
-            auto cmp = Mata::Nfa::minimize(Mata::Nfa::complement(*(*this)[t], mata_alphabet));
+            auto cmp = Mata::Nfa::minimize(Mata::Nfa::complement(*(*this).at(t), mata_alphabet));
             if(!Mata::Nfa::is_lang_empty(cmp))
                 len = cmp.size() - 1;
             else 

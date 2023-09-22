@@ -886,14 +886,13 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
         // try underapproximation (if enabled) to solve
-        if(m_params.m_underapproximation && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
-            STRACE("str", tout << "Underapprox sat" << std::endl;);
+        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment) && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
+            STRACE("str", tout << "Sat from underapproximation" << std::endl;);
             return FC_DONE;
         }
 
         // try Nielsen transformation (if enabled) to solve
-        /// FIXME: a better test for when to try nielsen might be needed
-        if(m_params.m_try_nielsen && instance.is_quadratic() && this->m_membership_todo_rel.size() == 0 && this->m_not_contains_todo_rel.size() == 0) {
+        if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
             STRACE("str", tout << "Trying nielsen" << std::endl);
             NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
             nproc.preprocess();
