@@ -252,7 +252,7 @@ namespace smt::noodler {
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
         // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;
-        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo && this->m_conversion_todo.size() == 0) {
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0) {
             include_ass = false;
         }
         m_int_solver.initialize(get_context(), include_ass);
