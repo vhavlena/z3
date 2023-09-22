@@ -56,9 +56,9 @@ namespace smt::noodler {
         return instance;
     }
 
-    std::set<Mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
+    std::set<mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
         // start with symbol representing everything not in formula
-        std::set<Mata::Symbol> symbols_in_formula{get_dummy_symbol()};
+        std::set<mata::Symbol> symbols_in_formula{get_dummy_symbol()};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             extract_symbols(word_equation.first, symbols_in_formula);
@@ -84,7 +84,7 @@ namespace smt::noodler {
 
     AutAssignment theory_str_noodler::create_aut_assignment_for_formula(
             const Formula& instance,
-            const std::set<Mata::Symbol>& noodler_alphabet
+            const std::set<mata::Symbol>& noodler_alphabet
     ) {
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
@@ -102,24 +102,24 @@ namespace smt::noodler {
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
+            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
             auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
-                aut_ass_it->second = std::make_shared<Nfa>(
-                        Mata::Nfa::reduce(Mata::Nfa::intersection(nfa, *aut_ass_it->second)));
+                aut_ass_it->second = std::make_shared<mata::nfa::Nfa>(
+                        mata::nfa::reduce(mata::nfa::intersection(nfa, *aut_ass_it->second)));
 
             } else { // We create a regular constraint for the current variable for the first time.
-                aut_assignment[term] = std::make_shared<Nfa>(std::forward<Nfa>(std::move(nfa)));
+                aut_assignment[term] = std::make_shared<mata::nfa::Nfa>(std::forward<mata::nfa::Nfa>(std::move(nfa)));
                 // TODO explain after this function is moved to theory_str_noodler, we do this because var_name contains only variables occuring in instance and not those that occur only in str.in_re
                 this->var_name.insert({term, var_expr});
             }
         }
 
         // create sigma star automaton for our alphabet
-        Mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
-        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::Builder::create_sigma_star_nfa(&mata_alphabet));
+        mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
+        auto nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&mata_alphabet));
         // remove the pointer to alphabet in the automaton, as it points to local variable (and we have the alphabet in aut_assignment)
         nfa_sigma_star->alphabet = nullptr;
 
@@ -133,8 +133,8 @@ namespace smt::noodler {
                     } else if (var_or_literal.is_literal()) {
                         // to string literals. assign automaton accepting the word denoted by the literal
                         // TODO if Z3 can give us `string literal in RE` then we should check if aut_assignment does not contain this literal already (if yes, do intersection)
-                        Nfa nfa{ AutAssignment::create_word_nfa(var_or_literal.get_name()) };
-                        aut_assignment.emplace(var_or_literal, std::make_shared<Nfa>(std::move(nfa)));
+                        mata::nfa::Nfa nfa{ AutAssignment::create_word_nfa(var_or_literal.get_name()) };
+                        aut_assignment.emplace(var_or_literal, std::make_shared<mata::nfa::Nfa>(std::move(nfa)));
                     }
                 }
             }
@@ -161,9 +161,9 @@ namespace smt::noodler {
         return init_lengths;
     }
 
-    std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<Mata::Symbol>& noodler_alphabet) {
-        Mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
-        auto nfa_sigma_star = std::make_shared<Nfa>(Mata::Nfa::Builder::create_sigma_star_nfa(&mata_alphabet));
+    std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<mata::Symbol>& noodler_alphabet) {
+        mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
+        auto nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&mata_alphabet));
         
         std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions;
         for (const auto& transf : m_conversion_todo) {
@@ -202,11 +202,11 @@ namespace smt::noodler {
             extract_symbols(right_side, alphabet);
 
             // construct NFAs for both sides
-            Mata::Nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
-            Mata::Nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
+            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
+            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
-            bool are_equiv = Mata::Nfa::are_equivalent(nfa1, nfa2);
+            bool are_equiv = mata::nfa::are_equivalent(nfa1, nfa2);
             if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
                 // the language (dis)equation does not hold => block it and return
                 app_ref lang_eq(m.mk_eq(left_side, right_side), m);
@@ -438,7 +438,7 @@ namespace smt::noodler {
         for(const Predicate& pred : instance.get_predicates()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 
-                if(aut_ass.at(var)->size() <= 1) {
+                if(aut_ass.at(var)->num_of_states() <= 1) {
                     continue;
                 }
                 if(aut_ass.is_co_finite(var, ln)) {

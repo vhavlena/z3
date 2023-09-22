@@ -18,7 +18,7 @@ Revision History:
 
 --*/
 #include<iostream>
-#include <mata/utils/util.hh> // for git sha of mata
+#include <mata/utils/utils.hh> // for git sha of mata
 #include "util/memory_manager.h"
 #include "util/trace.h"
 #include "util/debug.h"
@@ -75,7 +75,7 @@ void display_usage() {
     std::cout << " bit";
 #ifdef Z3GITHASH
     std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH)
-              << " - mata hashcode " << Mata::g_GIT_SHA1;
+              << " - mata hashcode " << mata::g_GIT_SHA1;
 #endif
     std::cout << "]. (C) Copyright 2006-2016 Microsoft Corp.\n";
     std::cout << "Usage: z3 [options] [-file:]file\n";
@@ -181,7 +181,7 @@ static void parse_cmd_line_args(std::string& input_file, int argc, char ** argv)
                 std::cout << " bit";
 #ifdef Z3GITHASH
                 std::cout << " - build hashcode " << STRINGIZE_VALUE_OF(Z3GITHASH)
-                          << " - mata hashcode " << Mata::g_GIT_SHA1;
+                          << " - mata hashcode " << mata::g_GIT_SHA1;
 #endif
                 std::cout << "\n";
                 exit(0);

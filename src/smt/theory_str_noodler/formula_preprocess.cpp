@@ -282,18 +282,18 @@ namespace smt::noodler {
      * @param upd Concatenation of terms for updating @p var.
      */
     void FormulaPreprocessor::update_reg_constr(const BasicTerm& var, const std::vector<BasicTerm>& upd) {
-        Mata::Nfa::Nfa concat = this->aut_ass.get_automaton_concat(upd);
+        mata::nfa::Nfa concat = this->aut_ass.get_automaton_concat(upd);
         auto iter = this->aut_ass.find(var);
         if(iter != this->aut_ass.end()) {
-            Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(iter->second), concat);
+            mata::nfa::Nfa inters = mata::nfa::intersection(*(iter->second), concat);
             inters.trim();
             if(this->m_params.m_preprocess_red) {
-                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+                this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(inters));
             } else {
-                this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(inters);
+                this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(inters);
             }     
         } else {
-            this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(concat);
+            this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(concat);
         }
     }
 
@@ -848,16 +848,16 @@ namespace smt::noodler {
      * @param res Extensible variables
      */
     void FormulaPreprocessor::gather_extended_vars(Predicate::EquationSideType side, std::set<BasicTerm>& res) {
-        Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+        mata::nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
         for(const auto& pr : this->formula.get_varmap()) {
             if(pr.second.size() > 0) {
-                Mata::Nfa::Nfa concat;
+                mata::nfa::Nfa concat;
                 if(side == Predicate::EquationSideType::Left)
-                    concat = Mata::Nfa::concatenate(sigma_star, *(this->aut_ass.at(pr.first)));
+                    concat = mata::nfa::concatenate(sigma_star, *(this->aut_ass.at(pr.first)));
                 else
-                    concat = Mata::Nfa::concatenate(*(this->aut_ass.at(pr.first)), sigma_star);
+                    concat = mata::nfa::concatenate(*(this->aut_ass.at(pr.first)), sigma_star);
 
-                if(Mata::Nfa::are_equivalent(*(this->aut_ass.at(pr.first)), concat)) {
+                if(mata::nfa::are_equivalent(*(this->aut_ass.at(pr.first)), concat)) {
                     res.insert(pr.first);
                 }
             }
@@ -1059,10 +1059,10 @@ namespace smt::noodler {
         // corresponding language of the Basic Term "A".
         for(const auto& pr : this->aut_ass) {
             if(pr.first.is_literal()) {
-                Mata::Nfa::Nfa word_aut = AutAssignment::create_word_nfa(pr.first.get_name());
-                Mata::Nfa::Nfa inters = Mata::Nfa::intersection(*(pr.second), word_aut);
+                mata::nfa::Nfa word_aut = AutAssignment::create_word_nfa(pr.first.get_name());
+                mata::nfa::Nfa inters = mata::nfa::intersection(*(pr.second), word_aut);
                 inters.trim();
-                this->aut_ass[pr.first] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(inters));
+                this->aut_ass[pr.first] = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(inters));
             }
         }
     }
@@ -1075,9 +1075,9 @@ namespace smt::noodler {
         std::set<size_t> rem_ids;
 
         auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {
-            Mata::Nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
+            mata::nfa::Nfa sigma_star = this->aut_ass.sigma_star_automaton();
             for(const BasicTerm& bt : bts) {
-                if(!Mata::Nfa::are_equivalent(sigma_star, *this->aut_ass.at(bt))) {
+                if(!mata::nfa::are_equivalent(sigma_star, *this->aut_ass.at(bt))) {
                     return false;
                 }
             }
@@ -1191,7 +1191,7 @@ namespace smt::noodler {
                     LenNode left = LenNode(var);
                     LenNode eq = LenNode(LenFormulaType::EQ, {left, right});
                     this->add_to_len_formula(LenNode(LenFormulaType::NOT, {eq}));
-                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
                     this->len_variables.insert(var);
                 }
             }
@@ -1208,45 +1208,45 @@ namespace smt::noodler {
             if(!pr.second.is_inequation())
                 continue;
 
-            Mata::Nfa::Nfa aut_left = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-            Mata::Nfa::Nfa aut_right = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-            if(Mata::Nfa::is_lang_empty((Mata::Nfa::intersection(aut_left, aut_right)))) { // L(left) \cap L(right) == empty
+            mata::nfa::Nfa aut_left = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+            mata::nfa::Nfa aut_right = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+            if(mata::nfa::intersection(aut_left, aut_right).is_lang_empty()) { // L(left) \cap L(right) == empty
                 rem_ids.insert(pr.first);
                 continue;
             }
             
             if(pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_variable()) {
                 BasicTerm var = pr.second.get_left_side()[0];
-                Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
-                if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
+                mata::nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_right_side());
+                if(mata::nfa::intersection(*this->aut_ass.at(var), other).is_lang_empty()) {
                     rem_ids.insert(pr.first);
                     continue;
                 }
                 if(pr.second.get_right_side().size() < 1 || (pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_literal())) {
                     auto alphabet =  this->aut_ass.get_alphabet(false);
-                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    mata::OnTheFlyAlphabet mata_alphabet{};
                     for (const auto& symbol : alphabet) {
                         mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
                     }
-                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(*this->aut_ass.at(var), Mata::Nfa::complement(other, mata_alphabet)));
+                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), mata::nfa::complement(other, mata_alphabet)));
                     rem_ids.insert(pr.first);
                     continue;
                 }
             }
             if(pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_variable()) {
                 BasicTerm var = pr.second.get_right_side()[0];
-                Mata::Nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
-                if(Mata::Nfa::is_lang_empty(Mata::Nfa::intersection(*this->aut_ass.at(var), other))) {
+                mata::nfa::Nfa other = this->aut_ass.get_automaton_concat(pr.second.get_left_side());
+                if(mata::nfa::intersection(*this->aut_ass.at(var), other).is_lang_empty()) {
                     rem_ids.insert(pr.first);
                     continue;
                 }
                 if(pr.second.get_left_side().size() < 1 || (pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_literal())) {
                     auto alphabet =  this->aut_ass.get_alphabet(false);
-                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    mata::OnTheFlyAlphabet mata_alphabet{};
                     for (const auto& symbol : alphabet) {
                         mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
                     }
-                    this->aut_ass[var] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(*this->aut_ass.at(var), Mata::Nfa::complement(other, mata_alphabet)));
+                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), mata::nfa::complement(other, mata_alphabet)));
                     rem_ids.insert(pr.first);
                     continue;
                 }
