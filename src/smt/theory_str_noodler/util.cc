@@ -186,7 +186,9 @@ namespace smt::noodler::util {
             } else {
                 auto it = variable_map.find(node.atom_val);
                 expr_ref var_expr(m);
-                if(it == variable_map.end()) { // if the variable is not found, it was introduced in the preprocessing -> create a new z3 variable
+                if(it == variable_map.end()) {
+                    // if the variable is not found, it was introduced in the preprocessing/decision procedure
+                    // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
                     var_expr = mk_int_var(node.atom_val.get_name().encode(), m, m_util_a);
                 } else {
                     if (m_util_s.is_string(it->second.get()->get_sort())) {
