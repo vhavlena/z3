@@ -689,7 +689,7 @@ namespace smt::noodler {
 
                 // sum_of_substituted_vars = |var_1| + |var_2| + ... + |var_n|
                 LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
-                // result is defined, i.e. exactly one |var_i| = 0 (by checking sum_of_substituted_vars = 1) and the result is the code point of one of the chars of var_i
+                // result is defined, i.e. exactly one |var_i| = 1 (by checking sum_of_substituted_vars = 1) and the result is the code point of one of the chars of var_i
                 LenNode result_is_defined(LenFormulaType::AND, {result_solution, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
 
                 LenNode result_is_undefined(LenFormulaType::AND, {});
