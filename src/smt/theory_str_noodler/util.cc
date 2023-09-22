@@ -55,7 +55,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(is_variable(ex, m_util_s)) {
+        if(is_variable(ex)) {
             res.insert(std::to_string(to_app(ex)->get_name()));
             return;
         }
@@ -70,23 +70,16 @@ namespace smt::noodler::util {
         }
     }
 
-    bool is_variable(const expr* expression, const seq_util& m_util_s) {
-        // TODO: When we are able to detect other kinds of variables, add their checks here.
-        return is_app(expression) && to_app(expression)->get_num_args() == 0;
+    bool is_variable(const expr* expression) {
+        if (!is_app(expression)) {
+            return false;
+        }
+        const app *n = to_app(expression);
+        return n->get_num_args() == 0 && n->get_family_id() == null_family_id && n->get_decl_kind() == null_decl_kind;
     }
 
     bool is_str_variable(const expr* expression, const seq_util& m_util_s) {
-        if(m_util_s.str.is_string(expression)) { // Filter away string literals first.
-            return false;
-        }
-
-        // TODO: we are not sure if this is correct, we just hope
-        if (m_util_s.is_string(expression->get_sort()) &&
-            is_app(expression) && to_app(expression)->get_num_args() == 0) {
-            return true;
-        }
-
-        return false;
+        return m_util_s.is_string(expression->get_sort()) && is_variable(expression);
     }
 
     std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to) {
@@ -114,7 +107,7 @@ namespace smt::noodler::util {
             return;
         }
 
-        if(is_variable(ex, m_util_s)) {
+        if(is_variable(ex)) {
             std::string var = ex->get_decl()->get_name().str();
             BasicTerm bvar(BasicTermType::Variable, var);
             terms.emplace_back(bvar);

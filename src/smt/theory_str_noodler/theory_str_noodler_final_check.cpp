@@ -318,7 +318,7 @@ namespace smt::noodler {
             return;
         }
 
-        if(util::is_variable(ex, m_util_s)) { // Skip variables.
+        if(util::is_variable(ex)) { // Skip variables.
             return;
         }
 
@@ -404,7 +404,7 @@ namespace smt::noodler {
             extract_symbols(to_app(left), alphabet);
             extract_symbols(to_app(right), alphabet);
             return;
-        } else if(util::is_variable(ex_app, m_util_s)) { // Handle variable.
+        } else if(util::is_variable(ex_app)) { // Handle variable.
             util::throw_error("variable should not occur here");
         } else {
             // When ex is not string literal, variable, nor regex, recursively traverse the AST to find symbols.
