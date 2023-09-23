@@ -885,12 +885,6 @@ namespace smt::noodler {
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
-        // try underapproximation (if enabled) to solve
-        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment) && solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
-            STRACE("str", tout << "Sat from underapproximation" << std::endl;);
-            return FC_DONE;
-        }
-
         // try Nielsen transformation (if enabled) to solve
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
             STRACE("str", tout << "Trying nielsen" << std::endl);
@@ -917,6 +911,15 @@ namespace smt::noodler {
                     // we could not decide if there is solution, continue with noodler decision procedure
                     break;
                 }
+            }
+        }
+
+        // try underapproximation (if enabled) to solve
+        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment)) {
+            STRACE("str", tout << "Try underapproximation" << std::endl);
+            if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
+                STRACE("str", tout << "Sat from underapproximation" << std::endl;);
+                return FC_DONE;
             }
         }
 
