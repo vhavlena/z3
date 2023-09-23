@@ -136,7 +136,7 @@ namespace smt::noodler {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
 
-            mata::nfa::Nfa cmp = mata::nfa::complement(*(*this).at(t), mata_alphabet, {{"algorithm", "classical"}, {"minimize", "true"}});
+            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
             if(!cmp.is_lang_empty())
                 len = cmp.num_of_states() - 1;
             else 
