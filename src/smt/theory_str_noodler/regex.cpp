@@ -218,7 +218,9 @@ namespace smt::noodler::regex {
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
-            nfa = mata::nfa::minimize(nfa);
+            // somewhat simulates Hopcroft's minimization
+            nfa = mata::nfa::determinize(nfa);
+            nfa = mata::nfa::reduce(nfa);
         }
 
         STRACE("str-create_nfa",
