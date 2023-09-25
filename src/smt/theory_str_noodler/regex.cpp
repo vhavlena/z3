@@ -117,7 +117,7 @@ namespace smt::noodler::regex {
                 body_nfa.final.insert(new_state);
 
                 body_nfa.unify_initial();
-                mata::nfa::reduce(body_nfa);
+                body_nfa = mata::nfa::reduce(body_nfa);
 
                 if (is_high_set) {
                     // if high is set, we repeat body_nfa another high-low times
