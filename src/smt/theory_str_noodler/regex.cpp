@@ -133,9 +133,8 @@ namespace smt::noodler::regex {
                             body_nfa.delta.add(final, mata::nfa::EPSILON, initial);
                         }
                     }
+                    nfa = mata::nfa::concatenate(nfa, body_nfa, true);
                     nfa = mata::nfa::remove_epsilon(nfa);
-                    nfa.concatenate(body_nfa);
-                    nfa.trim();
                 }
             }
 
