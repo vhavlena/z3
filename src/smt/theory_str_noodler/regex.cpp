@@ -30,6 +30,7 @@ namespace smt::noodler::regex {
             nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
                 nfa.concatenate(conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
+                nfa.trim();
             }
         } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
             util::throw_error("antimirov union is unsupported");
@@ -105,6 +106,7 @@ namespace smt::noodler::regex {
                 // we need to repeat body_nfa at least low times
                 for (unsigned i = 0; i < low; ++i) {
                     nfa.concatenate(body_nfa);
+                    nfa.trim();
                 }
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
@@ -121,6 +123,7 @@ namespace smt::noodler::regex {
                     // if high is set, we repeat body_nfa another high-low times
                     for (unsigned i = 0; i < high - low; ++i) {
                         nfa.concatenate(body_nfa);
+                        nfa.trim();
                     }
                 } else {
                     // if high is not set, we can repeat body_nfa unlimited more times
@@ -132,6 +135,7 @@ namespace smt::noodler::regex {
                     }
                     nfa.concatenate(body_nfa);
                     nfa = mata::nfa::remove_epsilon(nfa);
+                    nfa.trim();
                 }
             }
 
