@@ -29,7 +29,7 @@ Notes:
 #include "smt/params/smt_params.h"
 #include "smt/smt_types.h"
 #include "smt/theory_opt.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 
 namespace opt {
 
@@ -110,6 +110,8 @@ namespace opt {
         void get_levels(ptr_vector<expr> const& vars, unsigned_vector& depth) override; 
         expr_ref_vector get_trail(unsigned max_level) override { return m_context.get_trail(max_level); }
         expr_ref_vector cube(expr_ref_vector&, unsigned) override { return expr_ref_vector(m); }
+        expr* congruence_root(expr* e) override { return e; }
+        expr* congruence_next(expr* e) override { return e; }
         void set_phase(expr* e) override { m_context.set_phase(e); }
         phase* get_phase() override { return m_context.get_phase(); }
         void set_phase(phase* p) override { m_context.set_phase(p); }

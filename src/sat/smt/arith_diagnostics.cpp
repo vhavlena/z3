@@ -23,6 +23,17 @@ Author:
 
 namespace arith {
 
+
+    void arith_proof_hint_builder::set_type(euf::solver& ctx, hint_type ty) {
+        ctx.push(value_trail<unsigned>(m_eq_tail));
+        ctx.push(value_trail<unsigned>(m_lit_tail));
+        m_ty = ty;
+        reset();
+    }
+
+    arith_proof_hint* arith_proof_hint_builder::mk(euf::solver& s) {
+        return new (s.get_region()) arith_proof_hint(m_ty, m_num_le, m_lit_head, m_lit_tail, m_eq_head, m_eq_tail);
+    }
     
     std::ostream& solver::display(std::ostream& out) const { 
         lp().display(out);
@@ -83,9 +94,7 @@ namespace arith {
     }
 
     void solver::explain_assumptions(lp::explanation const& e) {
-        unsigned i = 0;
         for (auto const & ev : e) {
-            ++i;
             auto idx = ev.ci();
             if (UINT_MAX == idx)
                 continue;
@@ -122,6 +131,19 @@ namespace arith {
         if (lit != sat::null_literal)
             m_arith_hint.add_lit(rational(1), ~lit);
         return m_arith_hint.mk(ctx);
+    }
+
+    arith_proof_hint const* solver::explain_conflict(sat::literal_vector const& core, euf::enode_pair_vector const& eqs) {
+        arith_proof_hint* hint = nullptr;
+        if (ctx.use_drat()) {
+            m_arith_hint.set_type(ctx, hint_type::farkas_h);
+            for (auto lit : core)
+                m_arith_hint.add_lit(rational::one(), lit);
+            for (auto const& [a,b] : eqs)
+                m_arith_hint.add_eq(a, b);
+            hint = m_arith_hint.mk(ctx);
+        }
+        return hint;
     }
 
     arith_proof_hint const* solver::explain_implied_eq(lp::explanation const& e, euf::enode* a, euf::enode* b) {

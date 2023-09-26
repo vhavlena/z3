@@ -67,7 +67,7 @@ namespace euf {
         m_qmodel = mdl;
     }
 
-    void solver::update_model(model_ref& mdl) {
+    void solver::update_model(model_ref& mdl, bool validate) {
         TRACE("model", tout << "create model\n";);
         if (m_qmodel) {
             mdl = m_qmodel;
@@ -87,7 +87,8 @@ namespace euf {
         for (auto* mb : m_solvers)
             mb->finalize_model(*mdl);
         TRACE("model", tout << "created model " << *mdl << "\n";);
-        validate_model(*mdl);
+        if (validate)
+            validate_model(*mdl);
     }
 
     bool solver::include_func_interp(func_decl* f) {
@@ -347,6 +348,8 @@ namespace euf {
             if (has_quantifiers(e))
                 continue;
             if (!is_relevant(n))
+                continue;
+            if (n->bool_var() == sat::null_bool_var)
                 continue;
             bool tt = l_true == s().value(n->bool_var());
             if (tt && !mdl.is_false(e))

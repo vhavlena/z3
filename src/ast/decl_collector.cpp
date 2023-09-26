@@ -24,7 +24,7 @@ Revision History:
 void decl_collector::visit_sort(sort * n) {
     SASSERT(!m_visited.is_marked(n));
     family_id fid = n->get_family_id();
-    if (m().is_uninterp(n))
+    if (m.is_uninterp(n))
         m_sorts.push_back(n);
     else if (fid == m_dt_fid) {
         m_sorts.push_back(n);
@@ -32,9 +32,8 @@ void decl_collector::visit_sort(sort * n) {
             m_todo.push_back(cnstr);
             ptr_vector<func_decl> const & cnstr_acc = *m_dt_util.get_constructor_accessors(cnstr);
             unsigned num_cas = cnstr_acc.size();
-            for (unsigned j = 0; j < num_cas; j++) {
-                m_todo.push_back(cnstr_acc.get(j));
-            }
+            for (unsigned j = 0; j < num_cas; j++) 
+                m_todo.push_back(cnstr_acc.get(j));            
         }
     }
     for (unsigned i = n->get_num_parameters(); i-- > 0; ) {
@@ -44,19 +43,24 @@ void decl_collector::visit_sort(sort * n) {
 }
 
 bool decl_collector::is_bool(sort * s) {
-    return m().is_bool(s);
+    return m.is_bool(s);
 }
 
 void decl_collector::visit_func(func_decl * n) {
     func_decl* g;
+
     if (!m_visited.is_marked(n)) {
         family_id fid = n->get_family_id();
-        if (fid == null_family_id) 
+        if (should_declare(n))
             m_decls.push_back(n);
         else if (fid == m_rec_fid) {
-            m_rec_decls.push_back(n);
-            recfun::util u(m());
-            m_todo.push_back(u.get_def(n).get_rhs());
+            recfun::util u(m);
+            if (u.has_def(n)) {
+                m_rec_decls.push_back(n);
+                m_todo.push_back(u.get_def(n).get_rhs());
+            }
+            else 
+                m_decls.push_back(n);            
         }
         else if (m_ar_util.is_as_array(n, g)) 
             m_todo.push_back(g);
@@ -65,12 +69,17 @@ void decl_collector::visit_func(func_decl * n) {
     }
 }
 
+bool decl_collector::should_declare(func_decl* f) const {
+    return f->get_family_id() == null_family_id || m.is_model_value(f);
+}
+
+
 decl_collector::decl_collector(ast_manager & m):
-    m_manager(m),
+    m(m),
     m_trail(m),
     m_dt_util(m),
     m_ar_util(m) {
-    m_basic_fid = m_manager.get_basic_family_id();
+    m_basic_fid = m.get_basic_family_id();
     m_dt_fid = m_dt_util.get_family_id();
     recfun::util rec_util(m);
     m_rec_fid = rec_util.get_family_id();
@@ -79,7 +88,7 @@ decl_collector::decl_collector(ast_manager & m):
 void decl_collector::visit(ast* n) {
     if (m_visited.is_marked(n)) 
         return;
-    datatype_util util(m());
+    datatype_util util(m);
     m_todo.push_back(n);
     while (!m_todo.empty()) {
         n = m_todo.back();
@@ -97,13 +106,11 @@ void decl_collector::visit(ast* n) {
             case AST_QUANTIFIER: {
                 quantifier * q = to_quantifier(n);
                 unsigned num_decls = q->get_num_decls();
-                for (unsigned i = 0; i < num_decls; ++i) {
-                    m_todo.push_back(q->get_decl_sort(i));
-                }
+                for (unsigned i = 0; i < num_decls; ++i) 
+                    m_todo.push_back(q->get_decl_sort(i));                
                 m_todo.push_back(q->get_expr());
-                for (unsigned i = 0; i < q->get_num_patterns(); ++i) {
-                    m_todo.push_back(q->get_pattern(i));
-                }
+                for (unsigned i = 0; i < q->get_num_patterns(); ++i) 
+                    m_todo.push_back(q->get_pattern(i));                
                 break;
             }
             case AST_SORT: 
@@ -111,9 +118,8 @@ void decl_collector::visit(ast* n) {
                 break;
             case AST_FUNC_DECL: {
                 func_decl * d = to_func_decl(n);
-                for (sort* srt : *d) {
-                    m_todo.push_back(srt);
-                }
+                for (sort* srt : *d) 
+                    m_todo.push_back(srt);                
                 m_todo.push_back(d->get_range());
                 visit_func(d);
                 break;

@@ -25,22 +25,25 @@ Notes:
 #include "util/union_find.h"
 #include "util/obj_hashtable.h"
 
+class bool_rewriter;
+
 class hoist_rewriter {
-    ast_manager &  m_manager;
-    expr_ref_vector                 m_args1, m_args2;
+    ast_manager &                   m;
+    expr_ref_vector                 m_args1, m_args2, m_refs;
     obj_hashtable<expr>             m_preds1, m_preds2;
     basic_union_find                m_uf1, m_uf2, m_uf0;
     ptr_vector<expr>                m_es;
     svector<std::pair<expr*,expr*>> m_eqs;
     u_map<expr*>                    m_roots;
     expr_safe_replace               m_subst;
-    obj_map<expr, unsigned> m_expr2var;
-    ptr_vector<expr>        m_var2expr;
-    expr_mark               m_mark;
-
-    br_status mk_or(unsigned num_args, expr * const * args, expr_ref & result);
+    obj_map<expr, unsigned>         m_expr2var;
+    ptr_vector<expr>                m_var2expr;
+    expr_mark                       m_mark;
+    bool                            m_elim_and = false;
 
     bool is_and(expr* e, expr_ref_vector* args);
+    expr_ref mk_and(expr_ref_vector const& args);
+    expr_ref mk_or(expr_ref_vector const& args);
 
     bool is_var(expr* e) { return m_expr2var.contains(e); }
     expr* mk_expr(unsigned v) { return m_var2expr[v]; }
@@ -50,14 +53,16 @@ class hoist_rewriter {
 
     expr_ref hoist_predicates(obj_hashtable<expr> const& p, unsigned num_args, expr* const* args);
 
+
 public:
     hoist_rewriter(ast_manager & m, params_ref const & p = params_ref());
-    ast_manager& m() const { return m_manager; }
-    family_id get_fid() const { return m().get_basic_family_id(); }
-    bool is_eq(expr * t) const { return m().is_eq(t); }       
+    family_id get_fid() const { return m.get_basic_family_id(); }
+    bool is_eq(expr * t) const { return m.is_eq(t); }       
     void updt_params(params_ref const & p) {}
     static void get_param_descrs(param_descrs & r) {}
     br_status mk_app_core(func_decl * f, unsigned num_args, expr * const * args, expr_ref & result);    
+    br_status mk_or(unsigned num_args, expr * const * args, expr_ref & result);    
+    void set_elim_and(bool b) { m_elim_and = b; }
 };
 
 struct hoist_rewriter_cfg : public default_rewriter_cfg {

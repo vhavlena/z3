@@ -33,7 +33,7 @@ Notes:
 #include "ast/datatype_decl_plugin.h"
 #include "ast/recfun_decl_plugin.h"
 #include "ast/rewriter/seq_rewriter.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "solver/solver.h"
 #include "solver/check_logic.h"
 #include "solver/progress_callback.h"
@@ -318,7 +318,7 @@ protected:
     void register_builtin_ops(decl_plugin * p);
     void load_plugin(symbol const & name, bool install_names, svector<family_id>& fids);
     void init_manager_core(bool new_manager);
-    void init_manager();
+
     void init_external_manager();
     void reset_cmds();
     void finalize_cmds();
@@ -414,7 +414,9 @@ public:
     sexpr_manager & sm() const { if (!m_sexpr_manager) const_cast<cmd_context*>(this)->m_sexpr_manager = alloc(sexpr_manager); return *m_sexpr_manager; }
 
     proof_cmds* get_proof_cmds() { return m_proof_cmds.get(); }
+    void init_manager();
     solver* get_solver() { return m_solver.get(); }
+    void set_solver(solver* s) { m_solver = s; }
     void set_proof_cmds(proof_cmds* pc) { m_proof_cmds = pc; }
 
     void set_solver_factory(solver_factory * s);
@@ -521,7 +523,7 @@ public:
 
     ptr_vector<expr> const& assertions() const { return m_assertions; }
     ptr_vector<expr> const& assertion_names() const { return m_assertion_names; }
-    expr_ref_vector tracked_assertions();
+    vector<std::pair<expr*,expr*>> tracked_assertions();
     void reset_tracked_assertions();
 
     /**

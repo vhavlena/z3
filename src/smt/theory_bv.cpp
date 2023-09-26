@@ -811,6 +811,7 @@ namespace smt {
         init_bits(e, bits);                                                                
     }
 
+    MK_UNARY(internalize_neg,       mk_neg);
     MK_UNARY(internalize_not,       mk_not);
     MK_UNARY(internalize_redand,    mk_redand);
     MK_UNARY(internalize_redor,     mk_redor);
@@ -895,6 +896,7 @@ namespace smt {
         }
         switch (term->get_decl_kind()) {
         case OP_BV_NUM:         internalize_num(term); return true;
+        case OP_BNEG:           internalize_neg(term); return true;
         case OP_BADD:           internalize_add(term); return true;
         case OP_BSUB:           internalize_sub(term); return true;
         case OP_BMUL:           internalize_mul(term); return true;
@@ -944,6 +946,9 @@ namespace smt {
                 internalize_bv2int(term); 
             }
             return params().m_bv_enable_int2bv2int;
+        case OP_BSREM:        return false;
+        case OP_BUREM:        return false;
+        case OP_BSMOD:        return false;
         default:
             TRACE("bv_op", tout << "unsupported operator: " << mk_ll_pp(term, m) << "\n";);
             UNREACHABLE();
@@ -1318,7 +1323,7 @@ namespace smt {
         SASSERT(consequent.var() != antecedent.var());
         TRACE("bv_bit_prop", tout << "assigning: " << consequent << " @ " << ctx.get_scope_level();
               tout << " using "; ctx.display_literal(tout, antecedent); 
-              tout << " #" << get_enode(v1)->get_owner_id() << " #" << get_enode(v2)->get_owner_id() << " idx: " << idx << "\n";
+              tout << " " << enode_pp(get_enode(v1), ctx) << " " << enode_pp(get_enode(v2), ctx) << " idx: " << idx << "\n";
               tout << "propagate_eqc: " << propagate_eqc << "\n";);
         if (consequent == false_literal) {
             m_stats.m_num_conflicts++;
@@ -1358,6 +1363,9 @@ namespace smt {
             // So, we need to propagate the assignment to other bits.
             bool_var bv = consequent.var();
             atom * a    = get_bv2a(bv);
+            CTRACE("bv", !a, tout << ctx.literal2expr(literal(bv, false)) << "\n");
+            if (!a)
+                return;
             SASSERT(a->is_bit());
             bit_atom * b = static_cast<bit_atom*>(a);
             var_pos_occ * curr = b->m_occs;
@@ -1376,7 +1384,7 @@ namespace smt {
     }
 
     void theory_bv::relevant_eh(app * n) {
-        TRACE("arith", tout << "relevant: #" << n->get_id() << " " << ctx.e_internalized(n) << ": " << mk_pp(n, m) << "\n";);
+        TRACE("arith", tout << "relevant: #" << n->get_id() << " " << ctx.e_internalized(n) << ": " << mk_bounded_pp(n, m) << "\n";);
         TRACE("bv", tout << "relevant: #" << n->get_id() << " " << ctx.e_internalized(n) << ": " << mk_pp(n, m) << "\n";);
         if (m.is_bool(n)) {
             bool_var v = ctx.get_bool_var(n);
@@ -1489,6 +1497,7 @@ namespace smt {
         m_approximates_large_bvs(false) {
         memset(m_eq_activity, 0, sizeof(m_eq_activity));
         memset(m_diseq_activity, 0, sizeof(m_diseq_activity));
+        m_bb.set_flat_and_or(false);
     }
 
     theory_bv::~theory_bv() {

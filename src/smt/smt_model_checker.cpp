@@ -28,6 +28,7 @@ Revision History:
 #include "ast/rewriter/rewriter_def.h"
 #include "ast/ast_pp.h"
 #include "ast/array_decl_plugin.h"
+#include "ast/special_relations_decl_plugin.h"
 #include "ast/ast_smt2_pp.h"
 #include "smt/smt_model_checker.h"
 #include "smt/smt_context.h"
@@ -82,22 +83,18 @@ namespace smt {
         app* fresh_term;
         if (is_app(val) && to_app(val)->get_num_args() > 0) {
             ptr_buffer<expr> args;
-            for (expr* arg : *to_app(val)) {
+            for (expr* arg : *to_app(val)) 
                 args.push_back(get_type_compatible_term(arg));
-            }
             fresh_term = m.mk_app(to_app(val)->get_decl(), args.size(), args.data());
         }
         else {
             expr * sk_term = get_term_from_ctx(val);
-            if (sk_term != nullptr) {
+            if (sk_term != nullptr) 
                 return sk_term;
-            }
 
-            for (expr* f : m_fresh_exprs) {
-                if (f->get_sort() == val->get_sort()) {
+            for (expr* f : m_fresh_exprs) 
+                if (f->get_sort() == val->get_sort()) 
                     return f;
-                }
-            }
             fresh_term = m.mk_fresh_const("sk", val->get_sort());
         }
         m_fresh_exprs.push_back(fresh_term);
@@ -106,13 +103,16 @@ namespace smt {
     }
 
     void model_checker::init_value2expr() {
+        
         if (m_value2expr.empty()) {
             // populate m_value2expr
             for (auto const& kv : *m_root2value) {
                 enode * n   = kv.m_key;
                 expr  * val = kv.m_value;
                 n = n->get_eq_enode_with_min_gen();
-                m_value2expr.insert(val, n->get_expr());
+                expr* e = n->get_expr();
+                if (!m.is_value(e))
+                    m_value2expr.insert(val, e);
             }
         }
     }
@@ -359,7 +359,7 @@ namespace smt {
         
         TRACE("model_checker", tout << "[complete] model-checker result: " << to_sat_str(r) << "\n";);
         if (r != l_true) {
-            return r == l_false; // quantifier is satisfied by m_curr_model
+            return is_safe_for_mbqi(q) && r == l_false; // quantifier is satisfied by m_curr_model
         }
 
         model_ref complete_cex;
@@ -399,19 +399,41 @@ namespace smt {
         return false;
     }
 
+    bool model_checker::is_safe_for_mbqi(quantifier * q) const {
+        special_relations_util sp(m);
+        if (!sp.has_special_relation())
+            return true;
+        ast_fast_mark1 visited;
+        struct proc {
+            special_relations_util& sp;
+            bool found = false;
+            proc(special_relations_util& sp):sp(sp) {}
+            void operator()(app* f) {
+                found |= sp.is_special_relation(f);
+            }
+            void operator()(expr* e) {}
+        };
+        proc p(sp);
+        quick_for_each_expr(p, visited, q);
+        return !p.found;
+    }
+
+
     void model_checker::init_aux_context() {
         if (!m_fparams) {
             m_fparams = alloc(smt_params, m_context->get_fparams());
             m_fparams->m_relevancy_lvl = 0; // no relevancy since the model checking problems are quantifier free
             m_fparams->m_case_split_strategy = CS_ACTIVITY; // avoid warning messages about smt.case_split >= 3.
             m_fparams->m_axioms2files = false;
-            m_fparams->m_lemmas2console = false;            
+            m_fparams->m_lemmas2console = false;
+            m_fparams->m_proof_log = symbol::null;
         }
         if (!m_aux_context) {
             symbol logic;
             params_ref p;
             p.set_bool("solver.axioms2files", false);
             p.set_bool("solver.lemmas2console", false);
+            p.set_sym("solver.proof.log", symbol::null);
             m_aux_context = m_context->mk_fresh(&logic, m_fparams.get(), p);
         }
     }

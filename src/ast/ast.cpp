@@ -1673,6 +1673,7 @@ bool ast_manager::are_distinct(expr* a, expr* b) const {
 }
 
 void ast_manager::add_lambda_def(func_decl* f, quantifier* q) {
+    TRACE("model", tout << "add lambda def " << mk_pp(q, *this) << "\n");
     m_lambda_defs.insert(f, q);
     f->get_info()->set_lambda(true);
     inc_ref(q);
@@ -2250,7 +2251,9 @@ app * ast_manager::mk_app(func_decl * decl, unsigned num_args, expr * const * ar
     if (type_error) {
         std::ostringstream buffer;
         buffer << "Wrong number of arguments (" << num_args
-               << ") passed to function " << mk_pp(decl, *this);
+               << ") passed to function " << mk_pp(decl, *this) << " ";
+        for (unsigned i = 0; i < num_args; ++i)
+            buffer << "\narg: " << mk_pp(args[i], *this) << "\n";
         throw ast_exception(std::move(buffer).str());
     }
     app * r = nullptr;
@@ -2318,6 +2321,14 @@ func_decl * ast_manager::mk_fresh_func_decl(symbol const & prefix, symbol const 
     SASSERT(skolem == d->is_skolem());
     return d;
 }
+
+bool ast_manager::is_parametric_function(func_decl* f, func_decl *& g) const {
+    // is-as-array
+    // is-map
+    // is-transitive-closure
+    return false;
+}
+
 
 sort * ast_manager::mk_fresh_sort(char const * prefix) {
     string_buffer<32> buffer;
@@ -3293,7 +3304,7 @@ proof * ast_manager::mk_redundant_del(expr* e) {
     return mk_clause_trail_elem(nullptr, e, PR_REDUNDANT_DEL);
 }
 
-proof * ast_manager::mk_clause_trail(unsigned n, proof* const* ps) {    
+proof * ast_manager::mk_clause_trail(unsigned n, expr* const* ps) {    
     ptr_buffer<expr> args;
     args.append(n, (expr**) ps);
     return mk_app(basic_family_id, PR_CLAUSE_TRAIL, 0, nullptr, args.size(), args.data());

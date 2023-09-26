@@ -69,9 +69,12 @@ namespace q {
             [&](euf::enode* n) {
             m_mam->add_node(n, false);
         };
-        ctx.get_egraph().set_on_merge(_on_merge);
-        if (!ctx.relevancy_enabled())
-            ctx.get_egraph().set_on_make(_on_make);
+        
+        if (ctx.get_config().m_ematching) {
+            ctx.get_egraph().set_on_merge(_on_merge);
+            if (!ctx.relevancy_enabled())
+                ctx.get_egraph().set_on_make(_on_make);
+        }
         m_mam = mam::mk(ctx, *this);
     }
 
@@ -383,7 +386,7 @@ namespace q {
         sat::literal_vector lits;
         lits.push_back(~j.m_clause.m_literal);
         for (unsigned i = 0; i < j.m_clause.size(); ++i) 
-            lits.push_back(instantiate(j.m_clause, j.m_binding, j.m_clause[i])); 
+            lits.push_back(instantiate(j.m_clause, j.m_generation, j.m_binding, j.m_clause[i])); 
         m_qs.log_instantiation(lits, &j);
         euf::th_proof_hint* ph = nullptr;
         if (ctx.use_drat()) 
@@ -418,11 +421,12 @@ namespace q {
         m_qs.log_instantiation(~c.m_literal, lit);
     }
 
-    sat::literal ematch::instantiate(clause& c, euf::enode* const* binding, lit const& l) {
+    sat::literal ematch::instantiate(clause& c, unsigned generation, euf::enode* const* binding, lit const& l) {
         expr_ref_vector _binding(m);
         for (unsigned i = 0; i < c.num_decls(); ++i)
             _binding.push_back(binding[i]->get_expr());
         var_subst subst(m);
+        euf::solver::scoped_generation sg(ctx, generation + 1);
         auto sub = [&](expr* e) {
             expr_ref r = subst(e, _binding);
             //ctx.rewrite(r);
