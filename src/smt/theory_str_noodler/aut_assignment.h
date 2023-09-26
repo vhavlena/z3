@@ -20,67 +20,67 @@ namespace smt::noodler {
     /**
      * hints for using AutAssignment:
      *   - use at() instead of [] operator for getting the value, use [] only for assigning
-     *   - if you want to assign some NFA, use std::make_shared<Mata::Nfa::Nfa>(NFA)
+     *   - if you want to assign some NFA, use std::make_shared<mata::nfa::Nfa>(NFA)
      */
-    class AutAssignment : public std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>> {
+    class AutAssignment : public std::unordered_map<BasicTerm, std::shared_ptr<mata::nfa::Nfa>> {
 
     private:
         /// Union of all alphabets of automata in the aut assignment
-        std::set<Mata::Symbol> alphabet;
+        std::set<mata::Symbol> alphabet;
 
         void update_alphabet() {
             this->alphabet.clear();
             for (const auto& pr : *this) {
-                auto alph_symbols = pr.second->alphabet == nullptr ? Mata::Nfa::create_alphabet(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
+                auto alph_symbols = pr.second->alphabet == nullptr ? mata::nfa::create_alphabet(*(pr.second)).get_alphabet_symbols() : pr.second->alphabet->get_alphabet_symbols();
                 this->alphabet.insert(alph_symbols.begin(), alph_symbols.end());
             }
         }
 
     public:
-        using std::unordered_map<BasicTerm, std::shared_ptr<Mata::Nfa::Nfa>>::unordered_map;
+        using std::unordered_map<BasicTerm, std::shared_ptr<mata::nfa::Nfa>>::unordered_map;
 
         // used for tests, do not use normally
-        AutAssignment(std::map<BasicTerm, Mata::Nfa::Nfa> val) {
+        AutAssignment(std::map<BasicTerm, mata::nfa::Nfa> val) {
             for (const auto &key_value : val) {
-                this->operator[](key_value.first) = std::make_shared<Mata::Nfa::Nfa>(key_value.second);
+                this->operator[](key_value.first) = std::make_shared<mata::nfa::Nfa>(key_value.second);
             }
             update_alphabet();
         };
 
-        Mata::Nfa::Nfa sigma_star_automaton() const {
-            Mata::Nfa::Nfa nfa{};
+        mata::nfa::Nfa sigma_star_automaton() const {
+            mata::nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {0};
-            for (const Mata::Symbol& symb : this->alphabet) {
+            for (const mata::Symbol& symb : this->alphabet) {
                 nfa.delta.add(0, symb, 0);
             }
             return nfa;
         }
 
-        Mata::Nfa::Nfa sigma_automaton() const {
-            Mata::Nfa::Nfa nfa{};
+        mata::nfa::Nfa sigma_automaton() const {
+            mata::nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {1};
-            for (const Mata::Symbol& symb : this->alphabet) {
+            for (const mata::Symbol& symb : this->alphabet) {
                 nfa.delta.add(0, symb, 1);
             }
             return nfa;
         }
 
-        Mata::Nfa::Nfa sigma_eps_automaton() const {
-            Mata::Nfa::Nfa nfa{};
+        mata::nfa::Nfa sigma_eps_automaton() const {
+            mata::nfa::Nfa nfa{};
             nfa.initial = {0};
             nfa.final = {0,1};
-            for (const Mata::Symbol& symb : this->alphabet) {
+            for (const mata::Symbol& symb : this->alphabet) {
                 nfa.delta.add(0, symb, 1);
             }
             return nfa;
         }
 
-        Mata::Nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
-            Mata::Nfa::Nfa ret = Mata::Nfa::Builder::create_empty_string_nfa();
+        mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
+            mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
-                ret = Mata::Nfa::concatenate(ret, *(this->at(t)));  // fails when not found
+                ret = mata::nfa::concatenate(ret, *(this->at(t)));  // fails when not found
             }
             return ret;
         }
@@ -89,14 +89,14 @@ namespace smt::noodler {
          * @brief Checks if the automaton for @p t is equal to language containing only empty word.
          */
         bool is_epsilon(const BasicTerm &t) const {
-            return Mata::Strings::is_lang_eps(*(this->at(t)));
+            return mata::strings::is_lang_eps(*(this->at(t)));
         }
 
         /**
          * @brief Checks if the automaton for @p t contains empty word in its language.
          */
         bool contains_epsilon(const BasicTerm &t) const {
-            return Mata::Nfa::is_in_lang(*(this->at(t)), {{}, {}});
+            return this->at(t)->is_in_lang({});
         }
 
         // adds all mappings of variables from other to this assignment except those which already exists in this assignment
@@ -111,7 +111,7 @@ namespace smt::noodler {
             }
         }
 
-        const std::set<Mata::Symbol> get_alphabet(bool recompute=false) {
+        const std::set<mata::Symbol> get_alphabet(bool recompute=false) {
             if(recompute) update_alphabet();
             return this->alphabet;
         }
@@ -131,17 +131,17 @@ namespace smt::noodler {
          * @return true Is complement of a word
          */
         bool is_co_finite(const BasicTerm& t, int& len) const {
-            Mata::OnTheFlyAlphabet mata_alphabet{};
+            mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : this->alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
 
-            auto cmp = Mata::Nfa::minimize(Mata::Nfa::complement(*(*this).at(t), mata_alphabet));
-            if(!Mata::Nfa::is_lang_empty(cmp))
-                len = cmp.size() - 1;
+            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
+            if(!cmp.is_lang_empty())
+                len = cmp.num_of_states() - 1;
             else 
                 len = -1;
-            return cmp.size() == cmp.get_num_of_trans() + 1;
+            return cmp.num_of_states() == cmp.delta.num_of_transitions() + 1;
         }
 
         /**
@@ -154,9 +154,9 @@ namespace smt::noodler {
          * @return True -> is surely singleton, False -> inconclusive
          */
         bool is_singleton(const BasicTerm& t) const {
-            Mata::Nfa::Nfa aut = *this->at(t);
+            mata::nfa::Nfa aut = *this->at(t);
             aut.trim();
-            return aut.size() == aut.get_num_of_trans() + 1 && aut.initial.size() == 1 && aut.final.size() == 1;
+            return aut.num_of_states() == aut.delta.num_of_transitions() + 1 && aut.initial.size() == 1 && aut.final.size() == 1;
         }
 
         /**
@@ -167,7 +167,7 @@ namespace smt::noodler {
          * @return True->fixed length
          */
         bool fixed_length(const BasicTerm& t, int& n) const {
-            auto lengths = Mata::Strings::get_word_lengths(*this->at(t));
+            auto lengths = mata::strings::get_word_lengths(*this->at(t));
             if(lengths.size() != 1) {
                 return false;
             }
@@ -184,7 +184,7 @@ namespace smt::noodler {
          */
         bool is_sat() const {
             for (const auto& pr : *this) {
-                if(Mata::Nfa::is_lang_empty(*pr.second))
+                if(pr.second->is_lang_empty())
                     return false;
             }
             return true;
@@ -195,7 +195,7 @@ namespace smt::noodler {
          */
         void reduce() {
              for (auto& pr : *this) {
-                pr.second = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::reduce(*pr.second));
+                pr.second = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(*pr.second));
             }
         }
 
@@ -227,8 +227,8 @@ namespace smt::noodler {
          * @param t Basic term to be restricted
          * @param restr_nfa Language restriction represented by an NFA.
          */
-        void restrict_lang(const BasicTerm& t, const Mata::Nfa::Nfa& restr_nfa) {
-            (*this)[t] = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::intersection(restr_nfa, *this->at(t)));
+        void restrict_lang(const BasicTerm& t, const mata::nfa::Nfa& restr_nfa) {
+            (*this)[t] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(restr_nfa, *this->at(t)));
         }
 
         /**
@@ -241,7 +241,7 @@ namespace smt::noodler {
          * @param word Word to accept.
          * @return NFA.
          */
-        static Mata::Nfa::Nfa create_word_nfa(const zstring& word);
+        static mata::nfa::Nfa create_word_nfa(const zstring& word);
 
     };
 

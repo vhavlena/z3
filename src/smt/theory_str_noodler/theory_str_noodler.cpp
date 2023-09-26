@@ -846,15 +846,15 @@ namespace smt::noodler {
                  && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
             ) {
                 // start with minterm representing symbols not ocurring in the regex
-                std::set<Mata::Symbol> symbols_in_regex{get_dummy_symbol()};
+                std::set<mata::Symbol> symbols_in_regex{get_dummy_symbol()};
                 extract_symbols(std::get<1>(reg_data), symbols_in_regex);
 
-                Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
+                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
 
-                Mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
-                Mata::Nfa::Nfa sigma_star = Mata::Nfa::Builder::create_sigma_star_nfa(&alph);
+                mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
+                mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&alph);
 
-                if(Mata::Nfa::are_equivalent(nfa, sigma_star)) {
+                if(mata::nfa::are_equivalent(nfa, sigma_star)) {
                     // x should not belong in sigma*, so it is unsat
                     block_curr_len(expr_ref(this->m.mk_false(), this->m));
                     STRACE("str", tout << "Membership " << mk_pp(std::get<0>(reg_data), m) << " not in " << mk_pp(std::get<1>(reg_data), m) << " is unsat" << std::endl;);
@@ -875,7 +875,7 @@ namespace smt::noodler {
         );
 
         // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
-        std::set<Mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
+        std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
 
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};

@@ -8,7 +8,7 @@
 #include "aut_assignment.h"
 
 namespace {
-    using Mata::Nfa::Nfa;
+    using mata::nfa::Nfa;
 }
 
 namespace smt::noodler::regex {
@@ -30,6 +30,7 @@ namespace smt::noodler::regex {
             nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
                 nfa.concatenate(conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
+                nfa.trim();
             }
         } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
             util::throw_error("antimirov union is unsupported");
@@ -54,7 +55,7 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_empty(expression)) { // Handle empty language.
             // Do nothing, as nfa is initialized empty
         } else if (m_util_s.re.is_epsilon(expression)) { // Handle epsilon.
-            nfa = Mata::Nfa::Builder::create_empty_string_nfa();
+            nfa = mata::nfa::builder::create_empty_string_nfa();
         } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
             nfa.initial.insert(0);
             nfa.final.insert(1);
@@ -71,7 +72,7 @@ namespace smt::noodler::regex {
             SASSERT(expression->get_num_args() > 0);
             nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet, determinize);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa = Mata::Nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
+                nfa = mata::nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
             }
         } else if (m_util_s.re.is_loop(expression)) { // Handle loop.
             unsigned low, high;
@@ -87,11 +88,11 @@ namespace smt::noodler::regex {
 
             Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet, determinize);
 
-            if (Mata::Nfa::is_lang_empty(body_nfa)) {
+            if (body_nfa.is_lang_empty()) {
                 // for the case that body of the loop represents empty language...
                 if (low == 0) {
                     // ...we either return empty string if we have \emptyset{0,h}
-                    nfa = Mata::Nfa::Builder::create_empty_string_nfa();
+                    nfa = mata::nfa::builder::create_empty_string_nfa();
                 } else {
                     // ... or empty language
                     nfa = std::move(body_nfa);
@@ -100,38 +101,40 @@ namespace smt::noodler::regex {
                 body_nfa.unify_final();
                 body_nfa.unify_initial();
 
-                body_nfa = Mata::Nfa::reduce(body_nfa);
-                nfa = Mata::Nfa::Builder::create_empty_string_nfa();
+                body_nfa = mata::nfa::reduce(body_nfa);
+                nfa = mata::nfa::builder::create_empty_string_nfa();
                 // we need to repeat body_nfa at least low times
                 for (unsigned i = 0; i < low; ++i) {
                     nfa.concatenate(body_nfa);
+                    nfa.trim();
                 }
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
                 // unlimited times (if it is not set), but we have to accept after each loop,
                 // so we add an empty word into body_nfa
-                State new_state = nfa.add_state();
+                mata::nfa::State new_state = nfa.add_state();
                 body_nfa.initial.insert(new_state);
                 body_nfa.final.insert(new_state);
 
                 body_nfa.unify_initial();
-                Mata::Nfa::reduce(body_nfa);
+                body_nfa = mata::nfa::reduce(body_nfa);
 
                 if (is_high_set) {
                     // if high is set, we repeat body_nfa another high-low times
                     for (unsigned i = 0; i < high - low; ++i) {
                         nfa.concatenate(body_nfa);
+                        nfa.trim();
                     }
                 } else {
                     // if high is not set, we can repeat body_nfa unlimited more times
                     // so we do star operation on body_nfa and add it to end of nfa
                     for (const auto& final : body_nfa.final) {
                         for (const auto& initial : body_nfa.initial) {
-                            body_nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                            body_nfa.delta.add(final, mata::nfa::EPSILON, initial);
                         }
                     }
-                    nfa.concatenate(body_nfa);
-                    nfa = Mata::Nfa::remove_epsilon(nfa);
+                    nfa = mata::nfa::concatenate(nfa, body_nfa, true);
+                    nfa = mata::nfa::remove_epsilon(nfa);
                 }
             }
 
@@ -171,9 +174,9 @@ namespace smt::noodler::regex {
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             
-            Mata::Nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
-            Mata::Nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
-            nfa = Mata::Nfa::uni(aut1, aut2);
+            mata::nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
+            mata::nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
+            nfa = mata::nfa::uni(aut1, aut2);
             
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
@@ -182,13 +185,13 @@ namespace smt::noodler::regex {
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
-                    nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                    nfa.delta.add(final, mata::nfa::EPSILON, initial);
                 }
             }
             nfa.remove_epsilon();
 
             // Make new initial final in order to accept empty string as is required by kleene-star.
-            State new_state = nfa.add_state();
+            mata::nfa::State new_state = nfa.add_state();
             nfa.initial.insert(new_state);
             nfa.final.insert(new_state);
 
@@ -199,7 +202,7 @@ namespace smt::noodler::regex {
             nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
-                    nfa.delta.add(final, Mata::Nfa::EPSILON, initial);
+                    nfa.delta.add(final, mata::nfa::EPSILON, initial);
                 }
             }
             nfa.remove_epsilon();
@@ -214,11 +217,11 @@ namespace smt::noodler::regex {
 
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
-        if(nfa.size() < 1000) {
-            nfa = Mata::Nfa::reduce(nfa);
+        if(nfa.num_of_states() < 1000) {
+            nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
-            nfa = Mata::Nfa::minimize(nfa);
+            nfa = mata::nfa::minimize(nfa);
         }
 
         STRACE("str-create_nfa",
@@ -230,11 +233,11 @@ namespace smt::noodler::regex {
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
             STRACE("str-create_nfa", tout << "Complemented NFA:" << std::endl;);
-            Mata::OnTheFlyAlphabet mata_alphabet{};
+            mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
-            nfa = Mata::Nfa::complement(nfa, mata_alphabet, { 
+            nfa = mata::nfa::complement(nfa, mata_alphabet, { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });

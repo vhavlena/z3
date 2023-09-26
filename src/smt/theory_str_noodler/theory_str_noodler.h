@@ -274,7 +274,7 @@ namespace smt::noodler {
         /**
          * @brief Get all symbols used in relevant word (dis)equations and memberships
          */
-        std::set<Mata::Symbol> get_symbols_from_relevant();
+        std::set<mata::Symbol> get_symbols_from_relevant();
         /**
          * Get automata assignment for formula @p instance using relevant memberships in m_membership_todo_rel.
          * As a side effect updates mapping of variables (BasicTerm) to the corresponding z3 expr.
@@ -283,7 +283,7 @@ namespace smt::noodler {
          */
         [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
                 const Formula& instance,
-                const std::set<Mata::Symbol>& noodler_alphabet
+                const std::set<mata::Symbol>& noodler_alphabet
         );
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
@@ -295,7 +295,7 @@ namespace smt::noodler {
          * Side effect: string variables in conversions which are not mapped in the automata
          * assignment @p ass will be mapped to sigma* after this.
          */
-        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> get_conversions_as_basicterms(AutAssignment &ass, const std::set<Mata::Symbol>& noodler_alphabet);
+        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them

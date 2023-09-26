@@ -8,7 +8,7 @@
 #include "aut_assignment.h"
 
 namespace {
-    using Mata::Nfa::Nfa;
+    using mata::nfa::Nfa;
 }
 
 namespace smt::noodler::util {

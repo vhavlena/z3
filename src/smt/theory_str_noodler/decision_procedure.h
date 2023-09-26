@@ -58,8 +58,8 @@ namespace smt::noodler {
      * symbol however needs to have special semantics, for example to_code should
      * interpret is as anything but used symbols.
      */
-    inline Mata::Symbol get_dummy_symbol() { static const Mata::Symbol DUMMY_SYMBOL = zstring::max_char() + 1; return DUMMY_SYMBOL; }
-    inline bool is_dummy_symbol(Mata::Symbol sym) { return sym == get_dummy_symbol(); }
+    inline mata::Symbol get_dummy_symbol() { static const mata::Symbol DUMMY_SYMBOL = zstring::max_char() + 1; return DUMMY_SYMBOL; }
+    inline bool is_dummy_symbol(mata::Symbol sym) { return sym == get_dummy_symbol(); }
 
     /**
      * @brief Abstract decision procedure. Defines interface for decision

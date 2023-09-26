@@ -266,7 +266,7 @@ namespace smt::noodler {
             /********************************************************************************************************/
             /****************************************** Process left side *******************************************/
             /********************************************************************************************************/
-            std::vector<std::shared_ptr<Mata::Nfa::Nfa>> left_side_automata;
+            std::vector<std::shared_ptr<mata::nfa::Nfa>> left_side_automata;
             STRACE("str-nfa", tout << "Left automata:" << std::endl);
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
@@ -289,14 +289,14 @@ namespace smt::noodler {
             // Each right side automaton corresponds to either concatenation of non-length-aware vars (vector of
             // basic terms) or one lenght-aware var (vector of one basic term). Division then contains for each right
             // side automaton the variables whose concatenation it represents.
-            std::vector<std::shared_ptr<Mata::Nfa::Nfa>> right_side_automata;
+            std::vector<std::shared_ptr<mata::nfa::Nfa>> right_side_automata;
             std::vector<std::vector<BasicTerm>> right_side_division;
 
             assert(!right_side_vars.empty()); // empty case was processed at the beginning
             auto right_var_it = right_side_vars.begin();
             auto right_side_end = right_side_vars.end();
 
-            std::shared_ptr<Mata::Nfa::Nfa> next_aut = element_to_process.aut_ass[*right_var_it];
+            std::shared_ptr<mata::nfa::Nfa> next_aut = element_to_process.aut_ass[*right_var_it];
             std::vector<BasicTerm> next_division{ *right_var_it };
             bool last_was_length = (element_to_process.length_sensitive_vars.count(*right_var_it) > 0);
             bool is_there_length_on_right = last_was_length;
@@ -304,7 +304,7 @@ namespace smt::noodler {
 
             STRACE("str-nfa", tout << "Right automata:" << std::endl);
             for (; right_var_it != right_side_end; ++right_var_it) {
-                std::shared_ptr<Mata::Nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
+                std::shared_ptr<mata::nfa::Nfa> right_var_aut = element_to_process.aut_ass.at(*right_var_it);
                 if (element_to_process.length_sensitive_vars.count(*right_var_it) > 0) {
                     // current right_var is length-aware
                     right_side_automata.push_back(next_aut);
@@ -340,7 +340,7 @@ namespace smt::noodler {
                     } else {
                         // if last var was not length-aware, we combine it (and possibly the non-length-aware vars before)
                         // with the current one
-                        next_aut = std::make_shared<Mata::Nfa::Nfa>(Mata::Nfa::concatenate(*next_aut, *right_var_aut));
+                        next_aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::concatenate(*next_aut, *right_var_aut));
                         next_division.push_back(*right_var_it);
                         // TODO should we reduce size here?
                     }
@@ -370,7 +370,7 @@ namespace smt::noodler {
                 assert(right_side_automata.size() == 1); // there should be exactly one element in right_side_automata as we do not have length variables
                 // TODO probably we should try shortest words, it might work correctly
                 if (is_inclusion_to_process_on_cycle // we do not test inclusion if we have node that is not on cycle, because we will not go back to it (TODO: should we really not test it?)
-                    && Mata::Nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *right_side_automata[0])) {
+                    && mata::nfa::is_included(element_to_process.aut_ass.get_automaton_concat(left_side_vars), *right_side_automata[0])) {
                     // TODO can I push to front? I think I can, and I probably want to, so I can immediately test if it is not sat (if element_to_process.inclusions_to_process is empty), or just to get to sat faster
                     worklist.push_front(element_to_process);
                     // we continue as there is no need for noodlification, inclusion already holds
@@ -416,7 +416,7 @@ namespace smt::noodler {
              * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
              * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
              **/
-            auto noodles = Mata::Strings::SegNfa::noodlify_for_equation(left_side_automata, 
+            auto noodles = mata::strings::seg_nfa::noodlify_for_equation(left_side_automata, 
                                                                         right_side_automata,
                                                                         false, 
                                                                         {{"reduce", "true"}});
@@ -655,7 +655,7 @@ namespace smt::noodler {
                  * chars in solution. The only difference is that if result is not a valid
                  * code point, then argument must be an empty string.
                  */
-                Mata::Nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
+                mata::nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
                 std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
 
                 // Disjunction representing that result is equal to code point of one of the chars of some var_i
@@ -663,7 +663,7 @@ namespace smt::noodler {
                 for (const BasicTerm& var : substituted_vars) {
                     // disjunction that will say that var!to_code is equal to code point of one of the chars in var
                     LenNode to_code_disjunction = LenNode(LenFormulaType::OR, {});
-                    for (Mata::Symbol s : Mata::Strings::get_one_symbol_words(*solution.aut_ass.at(var))) { // iterate trough chars of var
+                    for (mata::Symbol s : mata::strings::get_accepted_symbols(*solution.aut_ass.at(var))) { // iterate trough chars of var
                         if (!is_dummy_symbol(s)) {
                             // var!to_code == s
                             to_code_disjunction.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
@@ -672,7 +672,7 @@ namespace smt::noodler {
                             // ...valid code point (0 <= var!to_code <= max_char) and...
                             std::vector<LenNode> minterm_to_code{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), zstring::max_char()})};
                             // ...it is not equal to code point of some symbol in the alphabet
-                            for (Mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
+                            for (mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
                                 if (!is_dummy_symbol(s2)) {
                                     minterm_to_code.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
                                 }
@@ -883,7 +883,7 @@ namespace smt::noodler {
     std::vector<Predicate> DecisionProcedure::replace_disequality(Predicate diseq) {
 
         // automaton accepting empty word or exactly one symbol
-        std::shared_ptr<Mata::Nfa::Nfa> sigma_eps_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
+        std::shared_ptr<mata::nfa::Nfa> sigma_eps_automaton = std::make_shared<mata::nfa::Nfa>(init_aut_ass.sigma_eps_automaton());
 
         // function that will take a1 and a2 and create the "to_code(a1) != to_code(a2)" part of the arithmetic formula
         auto create_to_code_ineq = [this](const BasicTerm& var1, const BasicTerm& var2) {
@@ -911,7 +911,7 @@ namespace smt::noodler {
             auto autl = init_aut_ass.at(a1);
             auto autr = init_aut_ass.at(a2);
 
-            if(Mata::Nfa::is_included(*autl, *sigma_eps_automaton) && Mata::Nfa::is_included(*autr, *sigma_eps_automaton)) {
+            if(mata::nfa::is_included(*autl, *sigma_eps_automaton) && mata::nfa::is_included(*autr, *sigma_eps_automaton)) {
                 // create to_code(a1) != to_code(a2)
                 create_to_code_ineq(a1, a2);
                 STRACE("str-dis", tout << "from disequation " << diseq << " no new equations were created" << std::endl;);
@@ -920,7 +920,7 @@ namespace smt::noodler {
         }
 
         // automaton accepting everything
-        std::shared_ptr<Mata::Nfa::Nfa> sigma_star_automaton = std::make_shared<Mata::Nfa::Nfa>(init_aut_ass.sigma_star_automaton());
+        std::shared_ptr<mata::nfa::Nfa> sigma_star_automaton = std::make_shared<mata::nfa::Nfa>(init_aut_ass.sigma_star_automaton());
 
         BasicTerm x1 = util::mk_noodler_var_fresh("diseq_start");
         init_aut_ass[x1] = sigma_star_automaton;
@@ -974,18 +974,18 @@ namespace smt::noodler {
             Concat right = pred.get_params()[1];
             if(left.size() == 1 && right.size() == 1) {
                 if(this->init_aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
-                    Mata::Nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
-                    for(unsigned i = 0; i < nfa_copy.size(); i++) {
+                    mata::nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
+                    for(unsigned i = 0; i < nfa_copy.num_of_states(); i++) {
                         nfa_copy.initial.insert(i);
                         nfa_copy.final.insert(i);
                     }
 
-                    Mata::OnTheFlyAlphabet mata_alphabet{};
+                    mata::OnTheFlyAlphabet mata_alphabet{};
                     for (const auto& symbol : this->init_aut_ass.get_alphabet()) {
                         mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
                     }
 
-                    Mata::Nfa::Nfa complement = Mata::Nfa::complement(nfa_copy, mata_alphabet);
+                    mata::nfa::Nfa complement = mata::nfa::complement(nfa_copy, mata_alphabet);
                     this->init_aut_ass.restrict_lang(right[0], complement);
                     continue;
                 }
