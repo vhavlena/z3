@@ -17,13 +17,14 @@ Notes:
 
 --*/
 #include "tactic/tactical.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "ast/rewriter/rewriter_def.h"
 #include "ast/arith_decl_plugin.h"
 #include "ast/bv_decl_plugin.h"
 #include "ast/recfun_decl_plugin.h"
 #include "ast/array_decl_plugin.h"
 #include "ast/datatype_decl_plugin.h"
+#include "ast/seq_decl_plugin.h"
 #include "tactic/core/collect_occs.h"
 #include "ast/ast_smt2_pp.h"
 #include "ast/ast_ll_pp.h"
@@ -44,6 +45,7 @@ class elim_uncnstr_tactic : public tactic {
         bv_util                m_bv_util;
         array_util             m_ar_util;
         datatype_util          m_dt_util;
+        seq_util               m_seq_util;
         app_ref_vector         m_fresh_vars;
         obj_map<app, app*>     m_cache;
         app_ref_vector         m_cache_domain;
@@ -60,6 +62,7 @@ class elim_uncnstr_tactic : public tactic {
             m_bv_util(m),
             m_ar_util(m),
             m_dt_util(m),
+            m_seq_util(m),
             m_fresh_vars(m),
             m_cache_domain(m),
             m_max_memory(max_memory),
@@ -121,7 +124,7 @@ class elim_uncnstr_tactic : public tactic {
             SASSERT(uncnstr(v));
             SASSERT(to_app(v)->get_num_args() == 0);
             if (m_mc)
-                m_mc->add(to_app(v)->get_decl(), def);
+                m_mc->add(v, def);
         }
         
         void add_defs(unsigned num, expr * const * args, expr * u, expr * identity) {
@@ -270,7 +273,36 @@ class elim_uncnstr_tactic : public tactic {
             }
             return nullptr;
         }
-        
+
+        /**
+         * if (c, x, x') -> fresh
+         * x := fresh
+         * x' := fresh
+         * 
+         * if (x, x', e) -> fresh
+         * x := true
+         * x' := fresh
+         * 
+         * if (x, t, x') -> fresh
+         * x := false
+         * x' := fresh
+         * 
+         * not x -> fresh
+         * x := not fresh
+         * 
+         * x & x' -> fresh
+         * x := fresh
+         * x' := true
+         * 
+         * x or x' -> fresh
+         * x := fresh
+         * x' := false
+         *
+         * x = t -> fresh
+         * x := if(fresh, t, diff(t))
+         * where diff is a diagnonalization function available in domains of size > 1.
+         *
+         */
         app * process_basic_app(func_decl * f, unsigned num, expr * const * args) {
             SASSERT(f->get_family_id() == m().get_basic_family_id());
             switch (f->get_decl_kind()) {
@@ -434,6 +466,10 @@ class elim_uncnstr_tactic : public tactic {
             }
             return nullptr;
         }
+
+        /**
+         * similar as for bit-vectors
+         */
         
         app * process_arith_app(func_decl * f, unsigned num, expr * const * args) {
             
@@ -466,7 +502,7 @@ class elim_uncnstr_tactic : public tactic {
                     add_defs(num, args, r, m_bv_util.mk_numeral(rational(1), s));
                 return r;
             }
-            // c * v (c is even) case
+            // c * v (c is odd) case
             unsigned bv_size;
             rational val;
             rational inv;
@@ -595,7 +631,46 @@ class elim_uncnstr_tactic : public tactic {
             }
             return nullptr;
         }
-        
+
+        /**
+         * x + t -> fresh
+         * x := fresh - t
+         * 
+         * x * x' * x'' -> fresh
+         * x := fresh
+         * x', x'' := 1
+         * 
+         * c * x -> fresh, c is odd
+         * x := fresh*c^-1
+         *
+         * x[sz-1:0] -> fresh
+         * x := fresh
+         * 
+         * x[hi:lo] -> fresh
+         * x := fresh1 ++ fresh ++ fresh2
+         * 
+         * x udiv x', x sdiv x' -> fresh
+         * x' := 1
+         * x := fresh
+         * 
+         * x ++ x' ++ x'' -> fresh
+         * x   := fresh[hi1:lo1]
+         * x'  := fresh[hi2:lo2]
+         * x'' := fresh[hi3:lo3]
+         * 
+         * x <= t -> fresh or t == MAX
+         * x := if(fresh, t, t + 1)
+         * t <= x -> fresh or t == MIN
+         * x := if(fresh, t, t - 1)
+         * 
+         * ~x -> fresh
+         * x := ~fresh
+         * 
+         * x | y -> fresh
+         * x := fresh
+         * y := 0
+         * 
+         */        
         app * process_bv_app(func_decl * f, unsigned num, expr * const * args) {
             SASSERT(f->get_family_id() == m_bv_util.get_family_id());
             switch (f->get_decl_kind()) {
@@ -646,6 +721,15 @@ class elim_uncnstr_tactic : public tactic {
                 return nullptr;
             }
         }
+
+        /**
+         * F[select(x, i)] -> F[fresh]
+         * x := const(fresh)
+
+         * F[store(x, ..., x')] -> F[fresh]
+         * x' := select(x, ...)
+         * x := fresh
+         */
         
         app * process_array_app(func_decl * f, unsigned num, expr * const * args) {
             SASSERT(f->get_family_id() == m_ar_util.get_family_id());
@@ -676,7 +760,11 @@ class elim_uncnstr_tactic : public tactic {
                 return nullptr;
             }
         }
-        
+
+        /**
+         *   head(x) -> fresh
+         *   x := cons(fresh, arb)
+         */
         app * process_datatype_app(func_decl * f, unsigned num, expr * const * args) {
             if (m_dt_util.is_accessor(f)) {
                 SASSERT(num == 1);
@@ -707,6 +795,44 @@ class elim_uncnstr_tactic : public tactic {
             }
             return nullptr;
         }
+
+        // x ++ y -> z, x -> z, y -> eps
+        app * process_seq_app(func_decl * f, unsigned num, expr * const * args) {
+            switch (f->get_decl_kind()) {
+            case _OP_STRING_CONCAT:
+            case OP_SEQ_CONCAT: {
+                app * r = nullptr;
+                expr* x, *y;
+                if (uncnstr(args[0]) && num == 2 &&
+                    args[1]->get_ref_count() == 1 && 
+                    m_seq_util.str.is_concat(args[1], x, y) &&
+                    uncnstr(x)) {
+                    if (!mk_fresh_uncnstr_var_for(f, num, args, r))
+                        return r;
+
+                    if (m_mc) {
+                        add_def(args[0], r);
+                        add_def(x, m_seq_util.str.mk_empty(args[0]->get_sort()));
+                    }
+                    r = m_seq_util.str.mk_concat(r, y);                        
+                    return r;
+
+                }
+                if (!uncnstr(num, args))
+                    return nullptr;
+                if (!mk_fresh_uncnstr_var_for(f, num, args, r))
+                    return r;
+
+                expr_ref id(m_seq_util.str.mk_empty(args[0]->get_sort()), m());
+                add_defs(num, args, r, id);
+                
+                return r;
+            }
+            default:
+                return nullptr;
+            }            
+        }
+
         
         br_status reduce_app(func_decl * f, unsigned num, expr * const * args, expr_ref & result, proof_ref & result_pr) {
             if (num == 0)
@@ -732,7 +858,8 @@ class elim_uncnstr_tactic : public tactic {
                 u = process_array_app(f, num, args);
             else if (fid == m_dt_util.get_family_id())
                 u = process_datatype_app(f, num, args);
-            
+            else if (fid == m_seq_util.get_family_id())
+                u = process_seq_app(f, num, args);
             if (u == nullptr)
                 return BR_FAILED;
             
@@ -771,9 +898,8 @@ class elim_uncnstr_tactic : public tactic {
     
     void init_mc(bool produce_models) {
         m_mc = nullptr;
-        if (produce_models) {
-            m_mc = alloc(mc, m(), "elim_uncstr");
-        }
+        if (produce_models) 
+            m_mc = alloc(mc, m(), "elim_uncstr");        
     }
     
     void init_rw(bool produce_proofs) {
@@ -783,11 +909,12 @@ class elim_uncnstr_tactic : public tactic {
     void run(goal_ref const & g, goal_ref_buffer & result) {
         bool produce_proofs = g->proofs_enabled();
         TRACE("goal", g->display(tout););
+        statistics_report sreport([&](statistics& st) { collect_statistics(st); });
         tactic_report report("elim-uncnstr", *g);
         m_vars.reset();
         collect_occs p;
         p(*g, m_vars);
-        if (m_vars.empty() || recfun::util(m()).has_defs()) {
+        if (m_vars.empty() || recfun::util(m()).has_rec_defs()) {
             result.push_back(g.get());
             // did not increase depth since it didn't do anything.
             return;
@@ -875,7 +1002,6 @@ public:
     void operator()(goal_ref const & g, 
                     goal_ref_buffer & result) override {
         run(g, result);
-        report_tactic_progress(":num-elim-apps", m_num_elim_apps);
     }
     
     void cleanup() override {
@@ -885,7 +1011,7 @@ public:
     }
 
     void collect_statistics(statistics & st) const override {
-        st.update("eliminated applications", m_num_elim_apps);
+        st.update("elim-unconstrained", m_num_elim_apps);
     }
     
     void reset_statistics() override {

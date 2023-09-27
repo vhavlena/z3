@@ -5,54 +5,19 @@ Module Name:
 
     tseitin_cnf_tactic.cpp
 
-Abstract:
-
-    Puts an assertion set in CNF.
-    Auxiliary variables are used to avoid blowup.
-
-    Features:
-    
-    - Efficient encoding is used for commonly used patterns such as:
-       (iff a (iff b c))
-       (or (not (or a b)) (not (or a c)) (not (or b c)))
-
-    - Efficient encoding is used for chains of if-then-elses 
-
-    - Distributivity is applied to non-shared nodes if the blowup is acceptable.
-    
-    - The features above can be disabled/enabled using parameters.
-
-    - The assertion-set is only modified if the resultant set of clauses
-    is "acceptable".
-
-    Notes: 
-    
-    - Term-if-then-else expressions are not handled by this strategy.
-    This kind of expression should be processed by other strategies.
-
-    - Quantifiers are treated as "theory" atoms. They are viewed
-    as propositional variables by this strategy.
-    
-    - The assertion set may contain free variables. 
-
-    - This strategy assumes the assertion_set_rewriter was
-    used before invoking it.
-    In particular, it is more effective when "and" operators
-    were eliminated.
-
-    TODO: add proof production
-
 Author:
 
     Leonardo (leonardo) 2011-12-29
 
 Notes:
 
+    TODO: add proof production
+
 --*/
 #include "ast/ast_pp.h"
 #include "tactic/tactical.h"
 #include "tactic/goal_shared_occs.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "ast/rewriter/bool_rewriter.h"
 #include "tactic/core/simplify_tactic.h"
 
@@ -176,6 +141,7 @@ class tseitin_cnf_tactic : public tactic {
                 sign = !sign;
                 goto start;
             case OP_OR:
+            // case OP_AND:
                 l = nullptr;
                 m_cache.find(to_app(n), l);
                 SASSERT(l != 0);
@@ -222,6 +188,7 @@ class tseitin_cnf_tactic : public tactic {
                     goto start;
                 }
             case OP_OR:
+            // case OP_AND:
                 visited = false;
                 push_frame(to_app(n));
                 return;
@@ -232,10 +199,10 @@ class tseitin_cnf_tactic : public tactic {
                     push_frame(to_app(n));
                 }
                 return;
-            case OP_AND:
             case OP_XOR:
             case OP_IMPLIES:
             case OP_DISTINCT:
+            case OP_AND:
                 throw_op_not_handled();
             default:
                 return;
@@ -652,6 +619,43 @@ class tseitin_cnf_tactic : public tactic {
             }
             return DONE;
         }
+
+        mres match_and(app * t, bool first, bool root) {
+            if (!m.is_and(t))
+                return NO;
+            if (first) {
+                bool visited = true;
+                for (expr* a : *t) 
+                    visit(a, visited);
+                if (!visited)
+                    return CONT;
+            }
+            expr_ref_buffer lits(m); 
+            expr_ref l(m), nl(m);
+            app_ref k(m), nk(m);
+            if (root) {
+                for (expr* arg : *t) {
+                    get_lit(arg, false, l);
+                    expr* lits[1] = { l };
+                    mk_clause(1, lits);
+                }
+            }
+            else {
+                k = mk_fresh();
+                nk = m.mk_not(k);
+                cache_result(t, k);
+                
+                for (expr* arg : *t) {
+                    get_lit(arg, false, l);
+                    mk_clause(nk, l);
+                    inv(l, nl);
+                    lits.push_back(nl);
+                }
+                lits.push_back(k);
+                mk_clause(lits.size(), lits.data());
+            }
+            return DONE;               
+        }
         
         mres match_or(app * t, bool first, bool root) {
             if (!m.is_or(t))
@@ -813,6 +817,7 @@ class tseitin_cnf_tactic : public tactic {
                 fr.m_first = false;
                 TRY(match_or_3and);
                 TRY(match_or);
+                TRY(match_and);
                 TRY(match_iff3);
                 // TRY(match_iff_or);
                 TRY(match_iff);
@@ -900,11 +905,11 @@ public:
 
     void collect_param_descrs(param_descrs & r) override {
         insert_max_memory(r);
-        r.insert("common_patterns", CPK_BOOL, "(default: true) minimize the number of auxiliary variables during CNF encoding by identifing commonly used patterns");
-        r.insert("distributivity", CPK_BOOL, "(default: true) minimize the number of auxiliary variables during CNF encoding by applying distributivity over unshared subformulas");
-        r.insert("distributivity_blowup", CPK_UINT, "(default: 32) maximum overhead for applying distributivity during CNF encoding");
-        r.insert("ite_chaing", CPK_BOOL, "(default: true) minimize the number of auxiliary variables during CNF encoding by identifing if-then-else chains");                                                       
-        r.insert("ite_extra", CPK_BOOL, "(default: true) add redundant clauses (that improve unit propagation) when encoding if-then-else formulas");
+        r.insert("common_patterns", CPK_BOOL, "minimize the number of auxiliary variables during CNF encoding by identifing commonly used patterns", "true");
+        r.insert("distributivity", CPK_BOOL, "minimize the number of auxiliary variables during CNF encoding by applying distributivity over unshared subformulas", "true");
+        r.insert("distributivity_blowup", CPK_UINT, "maximum overhead for applying distributivity during CNF encoding", "32");
+        r.insert("ite_chaing", CPK_BOOL, "minimize the number of auxiliary variables during CNF encoding by identifing if-then-else chains", "true");                                                       
+        r.insert("ite_extra", CPK_BOOL, "add redundant clauses (that improve unit propagation) when encoding if-then-else formulas", "true");
     }
     
     void operator()(goal_ref const & in, goal_ref_buffer & result) override {

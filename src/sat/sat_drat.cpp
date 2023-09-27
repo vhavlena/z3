@@ -372,7 +372,7 @@ namespace sat {
                     }
                 }
                 CTRACE("sat_drat", num_true == 0 && num_undef == 1, display(tout););
-                SASSERT(num_true != 0 || num_undef != 1);
+                VERIFY(num_true != 0 || num_undef != 1);
             }
         }
     }
@@ -445,10 +445,6 @@ namespace sat {
             return false;
         case justification::BINARY:
             return contains(c, j.get_literal());
-#if ENABLE_TERNARY
-        case justification::TERNARY:
-            return contains(c, j.get_literal1(), j.get_literal2());
-#endif
         case justification::CLAUSE:
             return contains(s.get_clause(j));
         default:

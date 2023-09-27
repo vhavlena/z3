@@ -31,6 +31,7 @@ add_executable(test-z3
   datalog_parser.cpp
   ddnf.cpp
   diff_logic.cpp
+  distribution.cpp
   dl_context.cpp
   dl_product_relation.cpp
   dl_query.cpp

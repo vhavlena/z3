@@ -10,6 +10,32 @@ Version 4.next
     - native word level bit-vector solving.
   - introduction of simple induction lemmas to handle a limited repertoire of induction proofs.
 
+
+Version 4.12.2
+==============
+- remove MSF (Microsoft Solver Foundation) plugin
+- updated propagate-ineqs tactic and implementing it as a simplifier, bound_simplifier.
+  It now eliminates occurrences of "mod" operators when bounds information
+  implies that the modulus is redundant. This tactic is useful for
+  benchmarks created by converting bit-vector semantics to integer 
+  reasoning.
+- add API function Z3_mk_real_int64 to take two int64 as arguments. The Z3_mk_real function takes integers.
+- Add _simplifiers_ as optional incremental pre-processing to solvers.
+  They are exposed over the SMTLIB API using the command [`set-simplifier`](https://microsoft.github.io/z3guide/docs/strategies/simplifiers).
+  Simplifiers are similar to tactics, but they operate on solver state that can be incrementally updated. 
+  The exposed simplifiers cover all the pre-processing techniques used internally with some additional simplifiers, such as `solve-eqs`
+  and `elim-predicates` that go beyond incremental pre-processing used internally. The advantage of using `solve-eqs` during pre-processing
+  can be significant. Incremental pre-processing simplification using `solve-eqs` and other simplifiers that change interpretations 
+  was not possible before.
+- Optimize added to JS API, thanks to gbagan
+- SMTLIB2 proposal for bit-vector overflow predicates added, thanks to aehyvari 
+- bug fixes, thanks to Clemens Eisenhofer, hgvk94, Lev Nachmanson, and others
+
+
+Version 4.12.1
+==============
+- change macos build to use explicit reference to Macos version 11. Hosted builds are migrating to macos-12 and it broke a user Issue #6539.
+
 Version 4.12.0
 ==============
 - add clause logging API.
@@ -112,6 +138,8 @@ Version 4.12.0
     theory clauses. 
   - integration of pre-processing proofs with logging proofs. There is 
     currently no supported bridge to create a end-to-end proof objects.
+- experimental API for accessing E-graphs. Exposed over Python. This API should be considered temporary
+and subject to be changed depending on use cases or removed. The functions are `Z3_solver_congruence_root`, `Z3_solver_congruence_next`.
 
 
 Version 4.11.2

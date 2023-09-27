@@ -26,11 +26,11 @@ Notes:
 #include "smt/smt_solver.h"
 #include "tactic/tactic.h"
 #include "tactic/tactical.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "solver/solver2tactic.h"
 #include "solver/solver.h"
 #include "solver/mus.h"
-#include "solver/parallel_tactic.h"
+#include "solver/parallel_tactical.h"
 #include "solver/parallel_params.hpp"
 
 typedef obj_map<expr, expr *> expr2expr_map;

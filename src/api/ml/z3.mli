@@ -1881,8 +1881,14 @@ sig
   (** create string sort *)
   val mk_string_sort : context -> Sort.sort
 
+  (** create char sort *)
+  val mk_char_sort : context -> Sort.sort
+
   (** test if sort is a string sort (a sequence of 8-bit bit-vectors) *)
   val is_string_sort : context -> Sort.sort -> bool 
+
+  (** test if sort is a char sort *)
+  val is_char_sort : context -> Sort.sort -> bool
 
   (** create a string literal *)
   val mk_string : context -> string -> Expr.expr
@@ -1936,6 +1942,7 @@ sig
   (** retrieve integer expression encoded in string *)
   val mk_str_to_int : context -> Expr.expr -> Expr.expr
 
+
   (** compare strings less-than-or-equal *)
   val mk_str_le : context -> Expr.expr -> Expr.expr -> Expr.expr
 
@@ -1944,6 +1951,18 @@ sig
 
   (** convert an integer expression to a string *)
   val mk_int_to_str : context -> Expr.expr -> Expr.expr 
+
+  (** [mk_string_to_code ctx s] convert a unit length string [s] to integer code *)
+  val mk_string_to_code : context -> Expr.expr -> Expr.expr
+
+  (** [mk_string_from_code ctx c] convert code [c] to a string *)
+  val mk_string_from_code : context -> Expr.expr -> Expr.expr
+
+  (** [mk_ubv_to_str ctx ubv] convert a unsigned bitvector [ubv] to a string  *)
+  val mk_ubv_to_str : context -> Expr.expr -> Expr.expr
+
+  (** [mk_sbv_to_str ctx sbv] convert a signed bitvector [sbv] to a string  *)
+  val mk_sbv_to_str : context -> Expr.expr -> Expr.expr
 
   (** create regular expression that accepts the argument sequence *)
   val mk_seq_to_re : context -> Expr.expr -> Expr.expr 
@@ -1983,6 +2002,24 @@ sig
 
   (** the regular expression that accepts all sequences *)
   val mk_re_full : context -> Sort.sort -> Expr.expr 
+
+  (** [mk_char ctx i] converts an integer to a character *)
+  val mk_char : context -> int -> Expr.expr
+
+  (** [mk_char_le ctx lc rc] compares two characters *)
+  val mk_char_le : context -> Expr.expr -> Expr.expr -> Expr.expr
+
+  (** [mk_char_to_int ctx c] converts the character [c] to an integer *)
+  val mk_char_to_int : context -> Expr.expr -> Expr.expr
+
+  (** [mk_char_to_bv ctx c] converts the character [c] to a bitvector *)
+  val mk_char_to_bv : context -> Expr.expr -> Expr.expr
+
+  (** [mk_char_from_bv ctx bv] converts the bitvector [bv] to a character *)
+  val mk_char_from_bv : context -> Expr.expr -> Expr.expr
+
+  (** [mk_char_is_digit ctx c] checks if the character [c] is a digit *)
+  val mk_char_is_digit: context -> Expr.expr -> Expr.expr
 
 end
 
@@ -3102,6 +3139,38 @@ sig
   val interrupt : context -> unit
 end
 
+module Simplifier :
+sig
+  type simplifier
+
+  (** A string containing a description of parameters accepted by the simplifier. *)
+  val get_help : simplifier -> string
+
+  (** Retrieves parameter descriptions for Simplifiers. *)
+  val get_param_descrs : simplifier -> Params.ParamDescrs.param_descrs
+
+  (** The number of supported simplifiers. *)
+  val get_num_simplifiers : context -> int
+
+  (** The names of all supported simplifiers. *)
+  val get_simplifier_names : context -> string list
+
+  (** Returns a string containing a description of the simplifier with the given name. *)
+  val get_simplifier_description : context -> string -> string
+
+  (** Creates a new Simplifier. *)
+  val mk_simplifier : context -> string -> simplifier
+
+  (** Create a simplifier that applies one simplifier to a Goal and
+      then another one to every subgoal produced by the first one. *)
+  val and_then : context -> simplifier -> simplifier -> simplifier list -> simplifier
+
+  (** Create a simplifier that applies a simplifier using the given set of parameters. *)
+  val using_params : context -> simplifier -> Params.params -> simplifier
+  val with_ : context -> simplifier -> Params.params -> simplifier
+
+end
+
 (** Objects that track statistical information. *)
 module Statistics :
 sig
@@ -3264,6 +3333,9 @@ sig
       The solver supports the commands [Push] and [Pop], but it
       will always solve each check from scratch. *)
   val mk_solver_t : context -> Tactic.tactic -> solver
+
+  (** Create a solver with simplifying pre-processing **)
+  val add_simplifier : context -> solver -> Simplifier.simplifier -> solver
 
   (** Create a clone of the current solver with respect to a context. *)
   val translate : solver -> context -> solver

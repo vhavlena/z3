@@ -180,13 +180,13 @@ public:
     */
     void del_eh(ast_manager & m, family_id fid);
 
-    int get_int() const { return std::get<int>(m_val); }
-    ast * get_ast() const { return std::get<ast*>(m_val); }
-    symbol get_symbol() const { return std::get<symbol>(m_val); }
-    rational const & get_rational() const { return *std::get<rational*>(m_val); }
-    zstring const& get_zstring() const { return *std::get<zstring*>(m_val); }
-    double get_double() const { return std::get<double>(m_val); }
-    unsigned get_ext_id() const { return std::get<unsigned>(m_val); }
+    int get_int() const { SASSERT(is_int()); return std::get<int>(m_val); }
+    ast * get_ast() const { SASSERT(is_ast()); return std::get<ast*>(m_val); }
+    symbol get_symbol() const { SASSERT(is_symbol()); return std::get<symbol>(m_val); }
+    rational const & get_rational() const { SASSERT(is_rational()); return *std::get<rational*>(m_val); }
+    zstring const& get_zstring() const { SASSERT(is_zstring()); return *std::get<zstring*>(m_val); }
+    double get_double() const { SASSERT(is_double()); return std::get<double>(m_val); }
+    unsigned get_ext_id() const { SASSERT(is_external()); return std::get<unsigned>(m_val); }
 
     bool operator==(parameter const & p) const;
     bool operator!=(parameter const & p) const { return !operator==(p); }
@@ -1387,6 +1387,7 @@ inline bool is_app_of(expr const * n, family_id fid, decl_kind k) { return n->ge
 inline bool is_sort_of(sort const * s, family_id fid, decl_kind k) { return s->is_sort_of(fid, k); }
 inline bool is_uninterp_const(expr const * n) { return n->get_kind() == AST_APP && to_app(n)->get_num_args() == 0 && to_app(n)->get_family_id() == null_family_id; }
 inline bool is_uninterp(expr const * n) { return n->get_kind() == AST_APP && to_app(n)->get_family_id() == null_family_id; }
+inline bool is_uninterp(func_decl const * n) { return n->get_family_id() == null_family_id; }
 inline bool is_decl_of(func_decl const * d, family_id fid, decl_kind k) { return d->get_family_id() == fid && d->get_decl_kind() == k; }
 inline bool is_ground(expr const * n) { return is_app(n) && to_app(n)->is_ground(); }
 inline bool is_non_ground(expr const * n) { return ( ! is_ground(n)); }
@@ -1630,6 +1631,7 @@ public:
     void add_lambda_def(func_decl* f, quantifier* q);
     quantifier* is_lambda_def(func_decl* f);
     quantifier* is_lambda_def(app* e) { return is_lambda_def(e->get_decl()); }
+    obj_map<func_decl, quantifier*> const& lambda_defs() const { return m_lambda_defs; }
 
     symbol const& lambda_def_qid() const { return m_lambda_def; }
 
@@ -1921,6 +1923,8 @@ public:
     func_decl * mk_fresh_func_decl(char const * prefix, unsigned arity, sort * const * domain, sort * range, bool skolem = true) {
         return mk_fresh_func_decl(symbol(prefix), symbol::null, arity, domain, range, skolem);
     }
+
+    bool is_parametric_function(func_decl* f, func_decl *& g) const;
 
     app * mk_fresh_const(char const * prefix, sort * s, bool skolem = true) { 
         return mk_const(mk_fresh_func_decl(prefix, 0, nullptr, s, skolem)); 
@@ -2333,7 +2337,7 @@ public:
     proof * mk_th_assumption_add(proof* pr, expr* e);
     proof * mk_th_lemma_add(proof* pr, expr* e);
     proof * mk_redundant_del(expr* e);
-    proof * mk_clause_trail(unsigned n, proof* const* ps);
+    proof * mk_clause_trail(unsigned n, expr* const* ps);
 
     proof * mk_def_axiom(expr * ax);
     proof * mk_unit_resolution(unsigned num_proofs, proof * const * proofs);

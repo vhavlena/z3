@@ -690,15 +690,6 @@ namespace pb {
                 inc_coeff(consequent, offset);
                 process_antecedent(js.get_literal(), offset);
                 break;
-#if ENABLE_TERNARY
-            case sat::justification::TERNARY:
-                inc_bound(offset); 
-                SASSERT (consequent != sat::null_literal);
-                inc_coeff(consequent, offset);				
-                process_antecedent(js.get_literal1(), offset);
-                process_antecedent(js.get_literal2(), offset);
-                break;
-#endif
             case sat::justification::CLAUSE: {
                 inc_bound(offset); 
                 sat::clause & c = s().get_clause(js);
@@ -1019,16 +1010,6 @@ namespace pb {
                 inc_coeff(consequent, 1);
                 process_antecedent(js.get_literal());
                 break;
-#if ENABLE_TERNARY
-            case sat::justification::TERNARY:
-                SASSERT(consequent != sat::null_literal);
-                round_to_one(consequent.var());
-                inc_bound(1);
-                inc_coeff(consequent, 1);
-                process_antecedent(js.get_literal1());
-                process_antecedent(js.get_literal2());
-                break;
-#endif
             case sat::justification::CLAUSE: {
                 sat::clause & c = s().get_clause(js);
                 unsigned i = 0;
@@ -1491,8 +1472,8 @@ namespace pb {
         return p;
     }
 
-    void solver::add_pb_ge(bool_var v, svector<wliteral> const& wlits, unsigned k) {
-        literal lit = v == sat::null_bool_var ? sat::null_literal : literal(v, false);
+    void solver::add_pb_ge(bool_var v, bool sign, svector<wliteral> const& wlits, unsigned k) {
+        literal lit = v == sat::null_bool_var ? sat::null_literal : literal(v, sign);
         add_pb_ge(lit, wlits, k, m_is_redundant);
     }
 
@@ -2058,7 +2039,7 @@ namespace pb {
             for (unsigned sz = m_constraints.size(), i = 0; i < sz; ++i) simplify(*m_constraints[i]);
             for (unsigned sz = m_learned.size(), i = 0; i < sz; ++i) simplify(*m_learned[i]);
             init_use_lists();
-            remove_unused_defs();
+            // remove_unused_defs();
             set_non_external();
             elim_pure();
             for (unsigned sz = m_constraints.size(), i = 0; i < sz; ++i) subsumption(*m_constraints[i]);
@@ -2547,8 +2528,13 @@ namespace pb {
     }
 
     void solver::remove_unused_defs() {
-        if (incremental_mode()) return;
+        if (incremental_mode()) 
+            return;
         // remove constraints where indicator literal isn't used.
+        NOT_IMPLEMENTED_YET();
+        // TODO: #6675
+        // need to add this inequality to the model reconstruction
+        // stack in order to produce correct models.
         for (constraint* cp : m_constraints) {
             constraint& c = *cp;
             literal lit = c.lit();
@@ -2810,7 +2796,6 @@ namespace pb {
     bool solver::subsumes(card& c1, card& c2, literal_vector & comp) {
         if (c2.lit() != sat::null_literal) return false; 
 
-        unsigned c2_exclusive = 0;
         unsigned common = 0;
         comp.reset();
         for (literal l : c2) {
@@ -2819,9 +2804,6 @@ namespace pb {
             }
             else if (is_visited(~l)) {
                 comp.push_back(l);
-            }
-            else {
-                ++c2_exclusive;
             }
         }
 
@@ -2876,19 +2858,20 @@ namespace pb {
 
     void solver::subsumes(pbc& p1, literal lit) {
         for (constraint* c : m_cnstr_use_list[lit.index()]) {
-            if (c == &p1 || c->was_removed()) continue;
-            bool s = false;
+            if (c == &p1 || c->was_removed() || c->lit() != sat::null_literal)
+                continue;
+            bool sub = false;
             switch (c->tag()) {
             case pb::tag_t::card_t:
-                s = subsumes(p1, c->to_card()); 
+                sub = subsumes(p1, c->to_card()); 
                 break;
             case pb::tag_t::pb_t:
-                s = subsumes(p1, c->to_pb()); 
+                sub = subsumes(p1, c->to_pb()); 
                 break;
             default: 
                 break;
             }
-            if (s) {
+            if (sub) {
                 ++m_stats.m_num_pb_subsumes;                
                 set_non_learned(p1);
                 remove_constraint(*c, "subsumed");
@@ -3424,16 +3407,13 @@ namespace pb {
 
         unsigned slack = 0;
         unsigned max_level = 0;
-        unsigned num_max_level = 0;
         for (wliteral wl : m_wlits) {
             if (value(wl.second) != l_false) ++slack;
             unsigned level = lvl(wl.second);
             if (level > max_level) {
                 max_level = level;
-                num_max_level = 1;
             }
             else if (max_level == level) {
-                ++num_max_level;
             }
         }
         if (m_overflow) 
@@ -3476,15 +3456,6 @@ namespace pb {
             ineq.push(lit, offset);
             ineq.push(js.get_literal(), offset);
             break;
-#if ENABLE_TERNARY
-        case sat::justification::TERNARY:
-            SASSERT(lit != sat::null_literal);
-            ineq.reset(offset);
-            ineq.push(lit, offset);
-            ineq.push(js.get_literal1(), offset);
-            ineq.push(js.get_literal2(), offset);
-            break;
-#endif
         case sat::justification::CLAUSE: {
             ineq.reset(offset);
             sat::clause & c = s().get_clause(js);

@@ -20,6 +20,7 @@ Notes:
 
 #include "ast/ast.h"
 #include "ast/rewriter/rewriter.h"
+#include "ast/rewriter/hoist_rewriter.h"
 #include "util/params.h"
 
 /**
@@ -50,15 +51,19 @@ Notes:
 */
 class bool_rewriter {
     ast_manager &  m_manager;
-    bool           m_flat_and_or;
-    bool           m_local_ctx;
-    bool           m_elim_and;
-    bool           m_blast_distinct;
+    hoist_rewriter m_hoist;
+    bool           m_flat_and_or = false;
+    bool           m_local_ctx = false;
+    bool           m_elim_and = false;
+    bool           m_blast_distinct = false;
+    bool           m_order_eq = false;
     unsigned       m_blast_distinct_threshold;
     bool           m_ite_extra_rules;
     unsigned       m_local_ctx_limit;
     unsigned       m_local_ctx_cost;
     bool           m_elim_ite;
+    ptr_vector<expr> m_todo1, m_todo2;
+    unsigned_vector m_counts1, m_counts2;
 
     br_status mk_flat_and_core(unsigned num_args, expr * const * args, expr_ref & result);
     br_status mk_flat_or_core(unsigned num_args, expr * const * args, expr_ref & result);
@@ -78,7 +83,9 @@ class bool_rewriter {
     void push_new_arg(expr* arg, expr_ref_vector& new_args, expr_fast_mark1& neg_lits, expr_fast_mark2& pos_lits);
 
 public:
-    bool_rewriter(ast_manager & m, params_ref const & p = params_ref()):m_manager(m), m_local_ctx_cost(0) { updt_params(p); }
+    bool_rewriter(ast_manager & m, params_ref const & p = params_ref()):m_manager(m), m_hoist(m), m_local_ctx_cost(0) { 
+        updt_params(p); 
+    }
     ast_manager & m() const { return m_manager; }
     family_id get_fid() const { return m().get_basic_family_id(); }
     bool is_eq(expr * t) const { return m().is_eq(t); }
@@ -88,6 +95,7 @@ public:
     bool elim_and() const { return m_elim_and; }
     void set_elim_and(bool f) { m_elim_and = f; }
     void reset_local_ctx_cost() { m_local_ctx_cost = 0; }
+    void set_order_eq(bool f) { m_order_eq = f; }
     
     void updt_params(params_ref const & p);
 

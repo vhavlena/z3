@@ -47,7 +47,7 @@ Notes:
 #include "model/model_v2_pp.h"
 #include "model/model_params.hpp"
 #include "tactic/tactic_exception.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "solver/smt_logics.h"
 #include "cmd_context/basic_cmds.h"
 #include "cmd_context/cmd_context.h"
@@ -361,7 +361,7 @@ void cmd_context::insert_macro(symbol const& s, unsigned arity, sort*const* doma
         vars.push_back(m().mk_var(i, domain[i]));
         rvars.push_back(m().mk_var(i, domain[arity - i - 1]));
     }
-    recfun::promise_def d = p.ensure_def(s, arity, domain, t->get_sort());
+    recfun::promise_def d = p.ensure_def(s, arity, domain, t->get_sort(), false);
 
     // recursive functions have opposite calling convention from macros!
     var_subst sub(m(), true);
@@ -546,6 +546,7 @@ cmd_context::cmd_context(bool main_ctx, ast_manager * m, symbol const & l):
     install_basic_cmds(*this);
     install_ext_basic_cmds(*this);
     install_core_tactic_cmds(*this);
+    install_core_simplifier_cmds(*this);
     m_mcs.push_back(nullptr);
     SASSERT(m != 0 || !has_manager());
     if (m_main_ctx) {
@@ -559,8 +560,7 @@ cmd_context::~cmd_context() {
     }
     pop(m_scopes.size());
     finalize_cmds();
-    finalize_tactic_cmds();
-    finalize_probes();
+    finalize_tactic_manager();
     m_proof_cmds = nullptr;
     reset(true);
     m_mcs.reset();
@@ -984,7 +984,7 @@ recfun::decl::plugin& cmd_context::get_recfun_plugin() {
 
 recfun::promise_def cmd_context::decl_rec_fun(const symbol &name, unsigned int arity, sort *const *domain, sort *range) {        
     SASSERT(logic_has_recfun());
-    return get_recfun_plugin().mk_def(name, arity, domain, range);
+    return get_recfun_plugin().mk_def(name, arity, domain, range, false);
 }
 
 void cmd_context::insert_rec_fun(func_decl* f, expr_ref_vector const& binding, svector<symbol> const& ids, expr* rhs) {
@@ -1085,7 +1085,12 @@ func_decl * cmd_context::find_func_decl(symbol const & s, unsigned num_indices, 
             throw cmd_exception("invalid function declaration reference, invalid builtin reference ", s);
         return f;
     }
-    throw cmd_exception("invalid function declaration reference, unknown function ", s);
+    if (num_indices > 0 && m_func_decls.find(s, fs)) 
+        f = fs.find(m(), arity, domain, range);
+    if (f) 
+        return f;
+
+    throw cmd_exception("invalid function declaration reference, unknown indexed function ", s);
 }
 
 psort_decl * cmd_context::find_psort_decl(symbol const & s) const {
@@ -1134,12 +1139,10 @@ bool cmd_context::try_mk_builtin_app(symbol const & s, unsigned num_args, expr *
         fid = d2.m_fid;
         k   = d2.m_decl;
     }
-    if (num_indices == 0) {
-        result = m().mk_app(fid, k, 0, nullptr, num_args, args, range);
-    }
-    else {
-        result = m().mk_app(fid, k, num_indices, indices, num_args, args, range);
-    }
+    if (num_indices == 0) 
+        result = m().mk_app(fid, k, 0, nullptr, num_args, args, range);    
+    else 
+        result = m().mk_app(fid, k, num_indices, indices, num_args, args, range);    
     CHECK_SORT(result.get());
     return nullptr != result.get();
 }
@@ -1234,7 +1237,10 @@ bool cmd_context::try_mk_pdecl_app(symbol const & s, unsigned num_args, expr * c
     if (num_args != 1)
         return false;
 
-    for (auto* a : dt.plugin().get_accessors(s)) {        
+    if (!dt.is_datatype(args[0]->get_sort()))
+        return false;
+
+    for (auto* a : dt.plugin().get_accessors(s)) {     
         fn = a->instantiate(args[0]->get_sort());
         r = m().mk_app(fn, num_args, args);
         return true;
@@ -1976,23 +1982,28 @@ void cmd_context::complete_model(model_ref& md) const {
         }
     }
 
-    for (auto kd : m_func_decls) {
-        symbol const & k = kd.m_key;
-        func_decls & v = kd.m_value;
+    for (auto& [k, v] : m_func_decls) {
         IF_VERBOSE(12, verbose_stream() << "(model.completion " << k << ")\n"; );
         for (unsigned i = 0; i < v.get_num_entries(); i++) {
             func_decl * f = v.get_entry(i);
-            if (!md->has_interpretation(f)) {
-                sort * range = f->get_range();
-                expr * some_val = m().get_some_value(range);
-                if (f->get_arity() > 0) {
-                    func_interp * fi = alloc(func_interp, m(), f->get_arity());
-                    fi->set_else(some_val);
-                    md->register_decl(f, fi);
-                }
-                else
-                    md->register_decl(f, some_val);
+            
+            if (md->has_interpretation(f))
+                continue;
+            macro_decls decls;
+            expr* body = nullptr;
+                
+            if (m_macros.find(k, decls)) 
+                body = decls.find(f->get_arity(), f->get_domain());
+            sort * range = f->get_range();
+            if (!body)
+                body = m().get_some_value(range);
+            if (f->get_arity() > 0) {
+                func_interp * fi = alloc(func_interp, m(), f->get_arity());
+                fi->set_else(body);
+                md->register_decl(f, fi);
             }
+            else
+                md->register_decl(f, body);
         }
     }
 }
@@ -2198,21 +2209,18 @@ void cmd_context::display_statistics(bool show_total_time, double total_time) {
 }
 
 
-expr_ref_vector cmd_context::tracked_assertions() {
-    expr_ref_vector result(m());
+vector<std::pair<expr*,expr*>> cmd_context::tracked_assertions() {
+    vector<std::pair<expr*,expr*>> result;
     if (assertion_names().size() == assertions().size()) {
         for (unsigned i = 0; i < assertions().size(); ++i) {
             expr* an  = assertion_names()[i];
             expr* asr = assertions()[i];
-            if (an) 
-                result.push_back(m().mk_implies(an, asr));
-            else 
-                result.push_back(asr);
+            result.push_back({ asr, an });
         }
     }
     else {
         for (expr * e : assertions()) 
-            result.push_back(e);
+            result.push_back({ e, nullptr});
     }
     return result;
 }

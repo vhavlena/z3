@@ -24,6 +24,7 @@ namespace arith {
     solver::solver(euf::solver& ctx, theory_id id) :
         th_euf_solver(ctx, symbol("arith"), id),
         m_model_eqs(DEFAULT_HASHTABLE_INITIAL_CAPACITY, var_value_hash(*this), var_value_eq(*this)),
+        m_local_search(*this),
         m_resource_limit(*this),
         m_bp(*this),
         a(m),
@@ -100,8 +101,7 @@ namespace arith {
             return false;
 
         switch (lbl) {
-        case l_false:
-            TRACE("arith", tout << "propagation conflict\n";);
+        case l_false:            
             get_infeasibility_explanation_and_set_conflict();
             break;
         case l_true:
@@ -381,9 +381,9 @@ namespace arith {
 
 
     void solver::assert_bound(bool is_true, api_bound& b) {
-        TRACE("arith", tout << b << "\n";);
         lp::constraint_index ci = b.get_constraint(is_true);
         lp().activate(ci);
+        TRACE("arith", tout << b << " " << is_infeasible() << "\n";);
         if (is_infeasible()) 
             return;
         lp::lconstraint_kind k = bound2constraint_kind(b.is_int(), b.get_bound_kind(), is_true);
@@ -893,11 +893,11 @@ namespace arith {
             theory_var other = m_model_eqs.insert_if_not_there(v);
             TRACE("arith", tout << "insert: v" << v << " := " << get_value(v) << " found: v" << other << "\n";);
             if (!is_equal(other, v))
-                m_assume_eq_candidates.push_back(std::make_pair(v, other));
+                m_assume_eq_candidates.push_back({ v, other });
         }
 
         if (m_assume_eq_candidates.size() > old_sz)
-            ctx.push(restore_size_trail<std::pair<theory_var, theory_var>, false>(m_assume_eq_candidates, old_sz));
+            ctx.push(restore_vector(m_assume_eq_candidates, old_sz));
 
         return delayed_assume_eqs();
     }
@@ -971,6 +971,7 @@ namespace arith {
         }
 
         auto st = sat::check_result::CR_DONE;
+        bool int_undef = false;
 
         TRACE("arith", ctx.display(tout););
 
@@ -984,9 +985,7 @@ namespace arith {
             return sat::check_result::CR_CONTINUE;
         case l_undef:
             TRACE("arith", tout << "check-lia giveup\n";);
-            if (ctx.get_config().m_arith_ignore_int) 
-                return sat::check_result::CR_GIVEUP;
-            
+            int_undef = true;            
             st = sat::check_result::CR_CONTINUE;
             break;
         }
@@ -1012,6 +1011,8 @@ namespace arith {
         }
         if (!check_delayed_eqs()) 
             return sat::check_result::CR_CONTINUE;
+        if (ctx.get_config().m_arith_ignore_int && int_undef)
+            return sat::check_result::CR_GIVEUP;
         if (m_not_handled != nullptr) {
             TRACE("arith", tout << "unhandled operator " << mk_pp(m_not_handled, m) << "\n";);
             return sat::check_result::CR_GIVEUP;
@@ -1064,6 +1065,7 @@ namespace arith {
         TRACE("pcs", tout << lp().constraints(););
         auto status = lp().find_feasible_solution();
         TRACE("arith_verbose", display(tout););
+        TRACE("arith", tout << status << "\n");
         switch (status) {
         case lp::lp_status::INFEASIBLE:
             return l_false;
@@ -1195,26 +1197,31 @@ namespace arith {
     void solver::set_conflict_or_lemma(literal_vector const& core, bool is_conflict) {
         reset_evidence();
         m_core.append(core);
-
-        ++m_num_conflicts;
-        ++m_stats.m_conflicts;
         for (auto ev : m_explanation)
             set_evidence(ev.ci());
+        
         TRACE("arith",
             tout << "Lemma - " << (is_conflict ? "conflict" : "propagation") << "\n";
-            for (literal c : m_core) tout << literal2expr(c) << "\n";
+            for (literal c : m_core) tout << c << ": " << literal2expr(c) << "\n";
             for (auto p : m_eqs) tout << ctx.bpp(p.first) << " == " << ctx.bpp(p.second) << "\n";);
-        DEBUG_CODE(
-            if (is_conflict) {
-                for (literal c : m_core) VERIFY(s().value(c) == l_true);
-                for (auto p : m_eqs) VERIFY(p.first->get_root() == p.second->get_root());
-            });
-        for (auto const& eq : m_eqs)
-            m_core.push_back(ctx.mk_literal(m.mk_eq(eq.first->get_expr(), eq.second->get_expr())));
-        for (literal& c : m_core)
-            c.neg();
 
-        add_redundant(m_core, explain(hint_type::farkas_h));
+        if (is_conflict) {
+            DEBUG_CODE(
+                for (literal c : m_core) VERIFY(s().value(c) == l_true);
+                for (auto p : m_eqs) VERIFY(p.first->get_root() == p.second->get_root()));                       
+            ++m_num_conflicts;
+            ++m_stats.m_conflicts;
+            auto* hint = explain_conflict(m_core, m_eqs);
+            ctx.set_conflict(euf::th_explain::conflict(*this, m_core, m_eqs, hint));
+        }
+        else {
+            for (auto const& eq : m_eqs)
+                m_core.push_back(ctx.mk_literal(m.mk_eq(eq.first->get_expr(), eq.second->get_expr())));
+            for (literal& c : m_core)
+                c.neg();
+            
+            add_redundant(m_core, explain(hint_type::farkas_h));
+        }
     }
 
     bool solver::is_infeasible() const {

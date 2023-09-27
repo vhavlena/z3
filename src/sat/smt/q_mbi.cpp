@@ -107,7 +107,7 @@ namespace q {
                 if (ctx.values2root().find(e, n) && n->class_generation() <= generation_min)
                     eqs.push_back(m.mk_eq(sk, e));
         }
-        m_solver->assert_expr(mk_or(eqs));
+        assert_expr(mk_or(eqs));
     }
 
     expr_ref mbqi::replace_model_value(expr* e) {
@@ -168,9 +168,11 @@ namespace q {
         while (true) {
             ::solver::scoped_push _sp(*m_solver);
             add_universe_restriction(*qb);
-            m_solver->assert_expr(qb->mbody);
+            assert_expr(qb->mbody);
             ++m_stats.m_num_checks;
+            IF_VERBOSE(2, verbose_stream() << "(mbqi.check)\n");
             lbool r = m_solver->check_sat(0, nullptr);
+            IF_VERBOSE(2, verbose_stream() << "(mbqi.check " << r << ")\n");
             if (r == l_undef)
                 return r;
             if (r == l_true) {
@@ -212,14 +214,17 @@ namespace q {
         add_domain_eqs(mdl0, qb);
         for (; i < m_max_cex; ++i) {
             ++m_stats.m_num_checks;
-            if (l_true != m_solver->check_sat(0, nullptr))
+            IF_VERBOSE(2, verbose_stream() << "(mbqi.check)\n");
+            lbool r = m_solver->check_sat(0, nullptr);
+            IF_VERBOSE(2, verbose_stream() << "(mbqi.check " << r << ")\n");
+            if (l_true != r)
                 break;
             m_solver->get_model(mdl1);
             auto proj = solver_project(*mdl1, qb, eqs, true);
             if (!proj)
                 break;
             add_instantiation(q, proj);
-            m_solver->assert_expr(m.mk_not(mk_and(eqs)));
+            assert_expr(m.mk_not(mk_and(eqs)));
         }
         return i > 0;
     }
@@ -352,8 +357,7 @@ namespace q {
                     return expr_ref(m);                    
             }
             else if (!(*p)(*m_model, vars, fmls)) {
-                TRACE("q", tout << "theory projection failed\n");
-                return expr_ref(m);
+                TRACE("q", tout << "theory projection failed - use value\n");
             }
         }
         for (app* v : vars) {
@@ -392,7 +396,7 @@ namespace q {
             if (!m_model->eval_expr(bounds, mbounds, true))
                 return;
             mbounds = subst(mbounds, qb.vars);
-            m_solver->assert_expr(mbounds);
+            assert_expr(mbounds);
             qb.domain_eqs.push_back(vbounds);
         }
 
@@ -425,10 +429,17 @@ namespace q {
                 continue;
             expr_ref meq = mk_or(meqs);
             expr_ref veq = mk_or(veqs);
-            m_solver->assert_expr(meq);
+            assert_expr(meq);
             qb.domain_eqs.push_back(veq);
         }
     }
+
+    void mbqi::assert_expr(expr* e) {
+        expr_ref _e(e, m);
+        TRACE("q", tout << _e << "\n");
+        m_solver->assert_expr(e);
+    }
+
 
     /*
     * Add bounds to sub-terms under uninterpreted functions for projection.
@@ -624,12 +635,12 @@ namespace q {
         if (m_model)
             return;
         m_model = alloc(model, m);
-        ctx.update_model(m_model);
+        ctx.update_model(m_model, false);
     }
 
     void mbqi::init_solver() {
         if (!m_solver)
-            m_solver = mk_smt2_solver(m, m_no_drat_params);
+            m_solver = mk_smt2_solver(m, m_no_drat_params, symbol::null);
     }
 
     void mbqi::init_search() {

@@ -39,7 +39,7 @@ Notes:
 #include "tactic/arith/card2bv_tactic.h"
 #include "tactic/arith/eq2bv_tactic.h"
 #include "tactic/bv/dt2bv_tactic.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "ackermannization/ackermannize_bv_tactic.h"
 #include "sat/sat_solver/inc_sat_solver.h"
 #include "sat/sat_params.hpp"
@@ -453,8 +453,8 @@ namespace opt {
     lbool context::execute_maxsat(symbol const& id, bool committed, bool scoped) {
         model_ref tmp;
         maxsmt& ms = *m_maxsmts.find(id);
-        if (scoped) get_solver().push();            
-        lbool result = ms();
+        if (scoped) get_solver().push();         
+        lbool result = ms(committed);
         if (result != l_false && (ms.get_model(tmp, m_labels), tmp.get())) {
             ms.get_model(m_model, m_labels);
         }

@@ -28,6 +28,7 @@ Revision History:
 #include "util/rlimit.h"
 #include "util/scoped_ptr_vector.h"
 #include "util/scoped_limit_trail.h"
+#include "util/visit_helper.h"
 #include "sat/sat_types.h"
 #include "sat/sat_clause.h"
 #include "sat/sat_watched.h"
@@ -158,10 +159,11 @@ namespace sat {
         unsigned                m_search_next_toggle;
         unsigned                m_phase_counter; 
         unsigned                m_best_phase_size;
+        backoff                 m_local_search_lim;
         unsigned                m_rephase_lim;
         unsigned                m_rephase_inc;
-        unsigned                m_reorder_lim;
-        unsigned                m_reorder_inc;
+        backoff                 m_rephase;
+        backoff                 m_reorder;
         var_queue               m_case_split_queue;
         unsigned                m_qhead;
         unsigned                m_scope_lvl;
@@ -176,8 +178,7 @@ namespace sat {
         std::string             m_reason_unknown;
         bool                    m_trim = false;
 
-        svector<unsigned>       m_visited;
-        unsigned                m_visited_ts;
+        visit_helper            m_visited;
 
         struct scope {
             unsigned m_trail_lim;
@@ -237,6 +238,7 @@ namespace sat {
         friend class lut_finder;
         friend class npn3_finder;
         friend class proof_trim;
+        friend struct backoff;
     public:
         solver(params_ref const & p, reslimit& l);
         ~solver() override;
@@ -305,11 +307,6 @@ namespace sat {
         void mk_bin_clause(literal l1, literal l2, sat::status st);
         void mk_bin_clause(literal l1, literal l2, bool learned) { mk_bin_clause(l1, l2, learned ? sat::status::redundant() : sat::status::asserted()); }
         bool propagate_bin_clause(literal l1, literal l2);
-#if ENABLE_TERNARY
-        clause * mk_ter_clause(literal * lits, status st);
-        bool attach_ter_clause(clause & c, status st);
-        bool propagate_ter_clause(clause& c);
-#endif
         clause * mk_nary_clause(unsigned num_lits, literal * lits, status st);
         bool has_variables_to_reinit(clause const& c) const;
         bool has_variables_to_reinit(literal l1, literal l2) const;
@@ -337,6 +334,7 @@ namespace sat {
                 s.m_checkpoint_enabled = true;
             }
         };
+
         unsigned select_watch_lit(clause const & cls, unsigned starting_at) const;
         unsigned select_learned_watch_lit(clause const & cls) const;
         bool simplify_clause(unsigned & num_lits, literal * lits) const;
@@ -345,16 +343,14 @@ namespace sat {
         void detach_bin_clause(literal l1, literal l2, bool learned);
         void detach_clause(clause & c);
         void detach_nary_clause(clause & c);
-        void detach_ter_clause(clause & c);
         void push_reinit_stack(clause & c);
         void push_reinit_stack(literal l1, literal l2);
-
-        void init_ts(unsigned n, svector<unsigned>& v, unsigned& ts);
-        void init_visited();
-        void mark_visited(literal l) { m_visited[l.index()] = m_visited_ts; }
+        
+        void init_visited(unsigned lim = 1) { m_visited.init_visited(2 * num_vars(), lim); }
+        bool is_visited(sat::bool_var v) const { return is_visited(literal(v, false)); }
+        bool is_visited(literal lit) const { return m_visited.is_visited(lit.index()); }
+        void mark_visited(literal lit) { m_visited.mark_visited(lit.index()); }
         void mark_visited(bool_var v) { mark_visited(literal(v, false)); }
-        bool is_visited(bool_var v) const { return is_visited(literal(v, false)); }
-        bool is_visited(literal l) const { return m_visited[l.index()] == m_visited_ts; }
         bool all_distinct(literal_vector const& lits);
         bool all_distinct(clause const& cl);
 
@@ -492,6 +488,7 @@ namespace sat {
         // -----------------------
     public:
         lbool check(unsigned num_lits = 0, literal const* lits = nullptr);
+        lbool check(literal_vector const& lits) { return check(lits.size(), lits.data()); }
 
         // retrieve model if solver return sat
         model const & get_model() const { return m_model; }
@@ -595,7 +592,9 @@ namespace sat {
         lbool do_ddfw_search(unsigned num_lits, literal const* lits);
         lbool do_prob_search(unsigned num_lits, literal const* lits);
         lbool invoke_local_search(unsigned num_lits, literal const* lits);
+        void  bounded_local_search();
         lbool do_unit_walk();
+        struct scoped_ls; 
 
         // -----------------------
         //

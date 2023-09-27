@@ -37,7 +37,7 @@ Notes:
 #include "model/model_evaluator.h"
 #include "model/model_v2_pp.h"
 #include "tactic/tactic.h"
-#include "tactic/generic_model_converter.h"
+#include "ast/converters/generic_model_converter.h"
 #include "sat/sat_cut_simplifier.h"
 #include "sat/sat_drat.h"
 #include "sat/tactic/goal2sat.h"
@@ -99,7 +99,7 @@ struct goal2sat::imp : public sat::sat_internalizer {
         sat_params sp(p);
         m_ite_extra  = p.get_bool("ite_extra", true);
         m_max_memory = megabytes_to_bytes(p.get_uint("max_memory", UINT_MAX));
-        m_euf = sp.euf();
+        m_euf = sp.euf() || sp.smt();
     }
 
     void throw_op_not_handled(std::string const& s) {
@@ -276,11 +276,16 @@ struct goal2sat::imp : public sat::sat_internalizer {
         m_cache_trail.push_back(t);
     }
 
+    sat::literal get_cached(app* t) const override {
+        sat::literal lit = sat::null_literal;
+        m_app2lit.find(t, lit);
+        return lit;
+    }
+
     bool is_cached(app* t, sat::literal l) const override {
-        if (!m_app2lit.contains(t))
-            return false;
-        SASSERT(m_app2lit[t] == l);
-        return true;
+        sat::literal lit = get_cached(t);
+        SASSERT(lit == sat::null_literal || l == lit);
+        return l == lit;
     }
     
     void convert_atom(expr * t, bool root, bool sign) {       
@@ -987,7 +992,7 @@ struct goal2sat::imp : public sat::sat_internalizer {
     void update_model(model_ref& mdl) {
         auto* ext = dynamic_cast<euf::solver*>(m_solver.get_extension());
         if (ext)
-            ext->update_model(mdl);
+            ext->update_model(mdl, true);
     }
 
     void user_push() {
@@ -1060,14 +1065,19 @@ void goal2sat::operator()(goal const & g, params_ref const & p, sat::solver_core
     (*m_imp)(g);    
 }
 
-void goal2sat::operator()(ast_manager& m, unsigned n, expr* const* fmls, params_ref const & p, sat::solver_core & t, atom2bool_var & map, dep2asm_map& dep2asm, bool default_external) {
-    init(m, p, t, map, dep2asm, default_external);
+void goal2sat::operator()(unsigned n, expr* const* fmls) {
+    SASSERT(m_imp);
     (*m_imp)(n, fmls);
 }
 
-void goal2sat::assumptions(ast_manager& m, unsigned n, expr* const* fmls, params_ref const & p, sat::solver_core & t, atom2bool_var & map, dep2asm_map& dep2asm, bool default_external) {
-    init(m, p, t, map, dep2asm, default_external);
+void goal2sat::assumptions(unsigned n, expr* const* fmls) {
+    SASSERT(m_imp);
     m_imp->assumptions(n, fmls);
+}
+
+sat::literal goal2sat::internalize(expr* a) {
+    SASSERT(m_imp);
+    return m_imp->internalize(a);
 }
 
 

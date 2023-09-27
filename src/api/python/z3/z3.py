@@ -763,8 +763,6 @@ class FuncDeclRef(AstRef):
         >>> f.domain(1)
         Real
         """
-        if z3_debug():
-            _z3_assert(i < self.arity(), "Index out of bounds")
         return _to_sort_ref(Z3_get_domain(self.ctx_ref(), self.ast, i), self.ctx)
 
     def range(self):
@@ -834,8 +832,6 @@ class FuncDeclRef(AstRef):
         """
         args = _get_args(args)
         num = len(args)
-        if z3_debug():
-            _z3_assert(num == self.arity(), "Incorrect number of arguments to %s" % self)
         _args = (Ast * num)()
         saved = []
         for i in range(num):
@@ -1194,7 +1190,7 @@ def _coerce_expr_merge(s, a):
         else:
             if z3_debug():
                 _z3_assert(s1.ctx == s.ctx, "context mismatch")
-                _z3_assert(False, "sort mismatch")
+                _z3_assert(False, "sort mismatch")        
     else:
         return s
 
@@ -1207,6 +1203,11 @@ def _coerce_exprs(a, b, ctx=None):
         a = StringVal(a, b.ctx)
     if isinstance(b, str) and isinstance(a, SeqRef):
         b = StringVal(b, a.ctx)
+    if isinstance(a, float) and isinstance(b, ArithRef):
+        a = RealVal(a, b.ctx)
+    if isinstance(b, float) and isinstance(a, ArithRef):
+        b = RealVal(b, a.ctx)
+
     s = None
     s = _coerce_expr_merge(s, a)
     s = _coerce_expr_merge(s, b)
@@ -1464,7 +1465,9 @@ def FreshConst(sort, prefix="c"):
 
 def Var(idx, s):
     """Create a Z3 free variable. Free variables are used to create quantified formulas.
-
+    A free variable with index n is bound when it occurs within the scope of n+1 quantified
+    declarations.
+    
     >>> Var(0, IntSort())
     Var(0)
     >>> eq(Var(0, IntSort()), Var(0, BoolSort()))
@@ -1552,13 +1555,15 @@ class BoolRef(ExprRef):
     def __mul__(self, other):
         """Create the Z3 expression `self * other`.
         """
-        if other == 1:
-            return self
-        if other == 0:
-            return 0
+        if isinstance(other, int) and other == 1:
+            return If(self, 1, 0)
+        if isinstance(other, int) and other == 0:
+            return IntVal(0, self.ctx)
+        if isinstance(other, BoolRef):
+            other = If(other, 1, 0)
         return If(self, other, 0)
 
-
+    
 def is_bool(a):
     """Return `True` if `a` is a Z3 Boolean expression.
 
@@ -3168,12 +3173,8 @@ def _to_int_str(val):
             return "1"
         else:
             return "0"
-    elif _is_int(val):
+    else:
         return str(val)
-    elif isinstance(val, str):
-        return val
-    if z3_debug():
-        _z3_assert(False, "Python value cannot be used as a Z3 integer")
 
 
 def IntVal(val, ctx=None):
@@ -4588,10 +4589,10 @@ class ArrayRef(ExprRef):
 
 def _array_select(ar, arg):
     if isinstance(arg, tuple):
-        args = [ar.domain_n(i).cast(arg[i]) for i in range(len(arg))]
+        args = [ar.sort().domain_n(i).cast(arg[i]) for i in range(len(arg))]
         _args, sz = _to_ast_array(args)
         return _to_expr_ref(Z3_mk_select_n(ar.ctx_ref(), ar.as_ast(), sz, _args), ar.ctx)
-    arg = ar.domain().cast(arg)
+    arg = ar.sort().domain().cast(arg)
     return _to_expr_ref(Z3_mk_select(ar.ctx_ref(), ar.as_ast(), arg.as_ast()), ar.ctx)
 
     
@@ -7232,6 +7233,22 @@ class Solver(Z3PPObject):
         cube are likely more useful to cube on."""
         return self.cube_vs
 
+    def root(self, t):
+        t = _py2expr(t, self.ctx)
+        """Retrieve congruence closure root of the term t relative to the current search state
+        The function primarily works for SimpleSolver. Terms and variables that are
+        eliminated during pre-processing are not visible to the congruence closure.
+        """
+        return _to_expr_ref(Z3_solver_congruence_root(self.ctx.ref(), self.solver, t.ast), self.ctx)
+
+    def next(self, t):
+        t = _py2expr(t, self.ctx)
+        """Retrieve congruence closure sibling of the term t relative to the current search state
+        The function primarily works for SimpleSolver. Terms and variables that are
+        eliminated during pre-processing are not visible to the congruence closure.
+        """
+        return _to_expr_ref(Z3_solver_congruence_next(self.ctx.ref(), self.solver, t.ast), self.ctx)
+
     def proof(self):
         """Return a proof for the last `check()`. Proof construction must be enabled."""
         return _to_expr_ref(Z3_solver_get_proof(self.ctx.ref(), self.solver), self.ctx)
@@ -8150,6 +8167,62 @@ class ApplyResult(Z3PPObject):
 
 #########################################
 #
+# Simplifiers
+#
+#########################################
+
+class Simplifier:
+    """Simplifiers act as pre-processing utilities for solvers.
+    Build a custom simplifier and add it to a solver"""
+
+    def __init__(self, simplifier, ctx=None):
+        self.ctx = _get_ctx(ctx)
+        self.simplifier = None
+        if isinstance(simplifier, SimplifierObj):
+            self.simplifier = simplifier
+        elif isinstance(simplifier, list):
+            simps = [Simplifier(s, ctx) for s in simplifier]
+            self.simplifier = simps[0].simplifier
+            for i in range(1, len(simps)):
+                self.simplifier = Z3_simplifier_and_then(self.ctx.ref(), self.simplifier, simps[i].simplifier)
+            Z3_simplifier_inc_ref(self.ctx.ref(), self.simplifier)
+            return
+        else:
+            if z3_debug():
+                _z3_assert(isinstance(simplifier, str), "simplifier name expected")
+            try:
+                self.simplifier = Z3_mk_simplifier(self.ctx.ref(), str(simplifier))
+            except Z3Exception:
+                raise Z3Exception("unknown simplifier '%s'" % simplifier)
+        Z3_simplifier_inc_ref(self.ctx.ref(), self.simplifier)
+
+    def __deepcopy__(self, memo={}):
+        return Simplifier(self.simplifier, self.ctx)
+
+    def __del__(self):
+        if self.simplifier is not None and self.ctx.ref() is not None and Z3_simplifier_dec_ref is not None:
+            Z3_simplifier_dec_ref(self.ctx.ref(), self.simplifier)
+
+    def using_params(self, *args, **keys):
+        """Return a simplifier that uses the given configuration options"""
+        p = args2params(args, keys, self.ctx)
+        return Simplifier(Z3_simplifier_using_params(self.ctx.ref(), self.simplifier, p.params), self.ctx)
+
+    def add(self, solver):
+        """Return a solver that applies the simplification pre-processing specified by the simplifier"""
+        return Solver(Z3_solver_add_simplifier(self.ctx.ref(), solver.solver, self.simplifier), self.ctx)
+
+    def help(self):
+        """Display a string containing a description of the available options for the `self` simplifier."""
+        print(Z3_simplifier_get_help(self.ctx.ref(), self.simplifier))
+
+    def param_descrs(self):
+        """Return the parameter description set."""
+        return ParamDescrsRef(Z3_simplifier_get_param_descrs(self.ctx.ref(), self.simplifier), self.ctx)
+        
+    
+#########################################
+#
 # Tactics
 #
 #########################################
@@ -8832,7 +8905,7 @@ def substitute_vars(t, *m):
     return _to_expr_ref(Z3_substitute_vars(t.ctx.ref(), t.as_ast(), num, _to), t.ctx)
 
 def substitute_funs(t, *m):
-    """Apply subistitution m on t, m is a list of pairs of a function and expression (from, to)
+    """Apply substitution m on t, m is a list of pairs of a function and expression (from, to)
     Every occurrence in to of the function from is replaced with the expression to.
     The expression to can have free variables, that refer to the arguments of from.
     For examples, see 
@@ -8995,7 +9068,7 @@ def PbGe(args, k):
 
 
 def PbEq(args, k, ctx=None):
-    """Create a Pseudo-Boolean inequality k constraint.
+    """Create a Pseudo-Boolean equality k constraint.
 
     >>> a, b, c = Bools('a b c')
     >>> f = PbEq(((a,1),(b,3),(c,2)), 3)
@@ -10079,7 +10152,7 @@ def FPs(names, fpsort, ctx=None):
     >>> x.ebits()
     8
     >>> fpMul(RNE(), fpAdd(RNE(), x, y), z)
-    fpMul(RNE(), fpAdd(RNE(), x, y), z)
+    x + y * z
     """
     ctx = _get_ctx(ctx)
     if isinstance(names, str):
@@ -10186,9 +10259,9 @@ def fpAdd(rm, a, b, ctx=None):
     >>> x = FP('x', s)
     >>> y = FP('y', s)
     >>> fpAdd(rm, x, y)
-    fpAdd(RNE(), x, y)
-    >>> fpAdd(RTZ(), x, y) # default rounding mode is RTZ
     x + y
+    >>> fpAdd(RTZ(), x, y) # default rounding mode is RTZ
+    fpAdd(RTZ(), x, y)
     >>> fpAdd(rm, x, y).sort()
     FPSort(8, 24)
     """
@@ -10203,7 +10276,7 @@ def fpSub(rm, a, b, ctx=None):
     >>> x = FP('x', s)
     >>> y = FP('y', s)
     >>> fpSub(rm, x, y)
-    fpSub(RNE(), x, y)
+    x - y
     >>> fpSub(rm, x, y).sort()
     FPSort(8, 24)
     """
@@ -10218,7 +10291,7 @@ def fpMul(rm, a, b, ctx=None):
     >>> x = FP('x', s)
     >>> y = FP('y', s)
     >>> fpMul(rm, x, y)
-    fpMul(RNE(), x, y)
+    x * y
     >>> fpMul(rm, x, y).sort()
     FPSort(8, 24)
     """
@@ -10233,7 +10306,7 @@ def fpDiv(rm, a, b, ctx=None):
     >>> x = FP('x', s)
     >>> y = FP('y', s)
     >>> fpDiv(rm, x, y)
-    fpDiv(RNE(), x, y)
+    x / y
     >>> fpDiv(rm, x, y).sort()
     FPSort(8, 24)
     """
@@ -11266,7 +11339,7 @@ def Range(lo, hi, ctx=None):
     return ReRef(Z3_mk_re_range(lo.ctx_ref(), lo.ast, hi.ast), lo.ctx)
 
 def Diff(a, b, ctx=None):
-    """Create the difference regular epression
+    """Create the difference regular expression
     """
     return ReRef(Z3_mk_re_diff(a.ctx_ref(), a.ast, b.ast), a.ctx)
 
