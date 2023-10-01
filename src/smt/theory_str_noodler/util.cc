@@ -437,9 +437,11 @@ namespace smt::noodler::util {
             for (const auto& symbol : alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
-            STRACE("str-gen_nfa_compl",
-                nfa.print_to_mata(tout);
-            );
+            if(nfa.size() > 100) {
+                STRACE("str-gen_nfa_compl",
+                    nfa.print_to_mata(tout);
+                );
+            }
             nfa = Mata::Nfa::complement(nfa, mata_alphabet, { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
