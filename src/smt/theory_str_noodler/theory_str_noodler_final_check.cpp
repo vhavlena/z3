@@ -125,7 +125,7 @@ namespace smt::noodler {
                     print_var_name = variable_name;
                 } else if (print_var_name == variable_name) {
                     STRACE("str-gen_nfa_inter",
-                        aut_ass_it->second->print_to_mata(tout);
+                        nfa.print_to_mata(tout);
                     );
                 }
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
