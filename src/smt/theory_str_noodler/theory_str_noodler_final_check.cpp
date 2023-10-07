@@ -100,6 +100,7 @@ namespace smt::noodler {
             const std::set<Mata::Symbol>& noodler_alphabet
     ) {
         AutAssignment aut_assignment{};
+        std::string print_var_name = "";
         aut_assignment.set_alphabet(noodler_alphabet);
         for (const auto &word_equation: m_membership_todo_rel) {
             const expr_ref& variable{ std::get<0>(word_equation) };
@@ -114,6 +115,19 @@ namespace smt::noodler {
             Nfa nfa{ util::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
             auto aut_ass_it{ aut_assignment.find(variable_term) };
             if (aut_ass_it != aut_assignment.end()) {
+                if(print_var_name.length() == 0) {
+                    STRACE("str-gen_nfa_inter",
+                        nfa.print_to_mata(tout);
+                    );
+                    STRACE("str-gen_nfa_inter",
+                        aut_ass_it->second->print_to_mata(tout);
+                    );
+                    print_var_name = variable_name;
+                } else if (print_var_name == variable_name) {
+                    STRACE("str-gen_nfa_inter",
+                        aut_ass_it->second->print_to_mata(tout);
+                    );
+                }
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
                 aut_ass_it->second = std::make_shared<Nfa>(
