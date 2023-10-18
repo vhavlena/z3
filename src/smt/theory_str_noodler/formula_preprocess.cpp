@@ -740,15 +740,16 @@ namespace smt::noodler {
      * @brief Gather information about a concatenation for equation separation.
      *
      * @param concat Concatenation
-     * @param res vector where i-th position contains a pair (S,n) where S is a set of variables
-     *  preceeding position i in @p concat and n is a length of all literals preceeding @p concat.
+     * @param res vector where i-th position contains a pair (M,n) where M is a map mapping variables to 
+     * the number of their occurrences (multimap) preceeding position i in @p concat and n is a length of all 
+     * literals preceeding @p concat.
      */
     void FormulaPreprocessor::get_concat_gather(const Concat& concat, SepEqsGather& res) const {
-        std::pair<std::set<BasicTerm>, unsigned> prev = { std::set<BasicTerm>(), 0 };
+        std::pair<std::map<BasicTerm, unsigned>, unsigned> prev = { std::map<BasicTerm,unsigned>(), 0 };
         for(const BasicTerm& t : concat) {
-            std::pair<std::set<BasicTerm>, unsigned> new_val(prev);
+            std::pair<std::map<BasicTerm, unsigned>, unsigned> new_val(prev);
             if(t.is_variable()) {
-                new_val.first.insert(t);
+                new_val.first[t]++;
             } else if(t.is_literal()) {
                 new_val.second += t.get_name().length();
             } else {
@@ -807,7 +808,6 @@ namespace smt::noodler {
     void FormulaPreprocessor::separate_eqs() {
         std::set<Predicate> add_eqs;
         std::set<size_t> rem_ids;
-        std::map<Predicate, std::set<size_t>> deps; // local dependencies
 
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_equation())
@@ -817,21 +817,14 @@ namespace smt::noodler {
             get_concat_gather(pr.second.get_left_side(), gather_left);
             get_concat_gather(pr.second.get_right_side(), gather_right);
             separate_eq(pr.second, gather_left, gather_right, res);
-
             if(res.size() > 1) {
-                // update dependencies of added predicates
-                for(const Predicate& p : res) {
-                    map_set_insert(deps, p, pr.first);
-                }
                 add_eqs.insert(res.begin(), res.end());
                 rem_ids.insert(pr.first);
             }
         }
 
         for(const Predicate& p : add_eqs) {
-            int index = this->formula.add_predicate(p);
-            // update dependencies
-            this->dependency[index] = deps[p];
+            this->formula.add_predicate(p);
         }
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
