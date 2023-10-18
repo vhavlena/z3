@@ -566,6 +566,21 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check whether all predicates match the given type.
+         * 
+         * @param tp Predicate type
+         * @return true <-> All predicates are of type @p tp
+         */
+        bool all_of_type(PredicateType tp) {
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() != tp) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
          * @brief Replace in all predicates
          * 
          * @param find What to find

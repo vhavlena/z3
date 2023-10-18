@@ -51,7 +51,7 @@ namespace smt::noodler {
             for(const Formula& fle : instances) {
                 bool is_sat;
                 // create Nielsen graph and trim it
-                NielsenGraph graph = generate_from_formula(fle, is_sat);
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -201,10 +201,11 @@ namespace smt::noodler {
      * @brief Generate Nielsen graph from a formula.
      * 
      * @param init Initial node (formula)
+     * @param early_termination Stop generating graph when the final node is reached?
      * @param[out] is_sat Contains the Nielsen graph an accepting node?
      * @return NielsenGraph 
      */
-    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool & is_sat) const {
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
         std::deque<std::pair<size_t, Formula>> worklist;
@@ -230,6 +231,9 @@ namespace smt::noodler {
             if(index >= predicates.size()) {
                 is_sat = true;
                 graph.add_fin(pr.second);
+                if(early_termination) {
+                    return graph;
+                }
                 continue;
             }
 

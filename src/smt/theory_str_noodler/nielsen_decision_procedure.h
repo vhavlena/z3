@@ -279,7 +279,7 @@ namespace smt::noodler {
             return pred.get_left_side().size() == 0 && pred.get_right_side().size() == 0;
         }
         std::set<NielsenLabel> get_rules_from_pred(const Predicate& pred) const;
-        NielsenGraph generate_from_formula(const Formula& formula, bool & is_sat) const;
+        NielsenGraph generate_from_formula(const Formula& formula, bool early_termination, bool & is_sat) const;
         Formula trim_formula(const Formula& formula) const;
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
 
@@ -325,8 +325,8 @@ namespace smt::noodler {
              init_aut_ass{ init_aut_ass },
              m_params(par) { 
             
-            // Nielsen currently supports only quadratic equations (no inequalities and not(contains))
-            if(!this->formula.is_quadratic()) {
+            // Nielsen currently supports only equations (no inequalities and not(contains))
+            if(!this->formula.all_of_type(PredicateType::Equation)) {
                 util::throw_error("Nielsen supports quadratic equations only");
             }
         }
