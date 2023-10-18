@@ -421,9 +421,6 @@ namespace smt::noodler {
         if(!this->m_membership_todo_rel.empty() || !this->m_not_contains_todo_rel.empty() || !this->m_conversion_todo.empty()) {
             return false;
         }
-        if(!instance.is_quadratic()) {
-            return false;
-        }
         Graph incl = Graph::create_inclusion_graph(instance);
         return incl.is_cyclic();
     }
