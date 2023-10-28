@@ -640,6 +640,7 @@ namespace smt::noodler {
                 BasicTerm fresh_var = util::mk_noodler_var_fresh("regular_seq");
                 this->formula.replace(pr.first, Concat({fresh_var}));
                 update_reg_constr(fresh_var, pr.first);
+                this->add_to_len_formula(Predicate(PredicateType::Equation, std::vector<Concat>({Concat({fresh_var}), pr.first})).get_formula_eq());
                 new_eqs.insert(Predicate(PredicateType::Equation, std::vector<Concat>({Concat({fresh_var}), pr.first})));
             }
         }

@@ -868,6 +868,8 @@ namespace smt::noodler {
                 lengths = len_node_to_z3_formula(dec_proc.get_lengths());
                 if (check_len_sat(lengths) == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
+                    // save the current assignment to catch it during the loop protection
+                    block_curr_len(lengths, true, false);
                     return FC_DONE;
                 } else {
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
@@ -1659,8 +1661,6 @@ namespace smt::noodler {
         expr_ref qx = mk_str_var_fresh("nprefix_rightx");
         expr_ref qy = mk_str_var_fresh("nprefix_righty");
 
-        expr_ref len_x_gt_len_y{m_util_a.mk_gt(m_util_a.mk_sub(m_util_s.str.mk_length(x),m_util_s.str.mk_length(y)), m_util_a.mk_int(0)),m};
-        literal len_y_gt_len_x = mk_literal(len_x_gt_len_y);
         expr_ref pmx(m_util_s.str.mk_concat(p, mx), m);
         string_theory_propagation(pmx);
         expr_ref pmxqx(m_util_s.str.mk_concat(pmx, qx), m);
@@ -1670,6 +1670,14 @@ namespace smt::noodler {
         expr_ref pmyqy(m_util_s.str.mk_concat(pmy, qy), m);
         string_theory_propagation(pmyqy);
 
+        expr_ref len_x_gt_len_y(m);
+        zstring s;
+        if(m_util_s.str.is_string(x, s)) {
+            len_x_gt_len_y = expr_ref{m_util_a.mk_ge(m_util_s.str.mk_length(y), m_util_a.mk_int(s.length())),m};
+        } else {
+            len_x_gt_len_y = expr_ref{m_util_a.mk_ge(m_util_s.str.mk_length(y), m_util_s.str.mk_length(x)),m};
+        }
+
         literal x_eq_pmq = mk_eq(x,pmxqx,false);
         literal y_eq_pmq = mk_eq(y,pmyqy,false);
         literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
@@ -1678,6 +1686,7 @@ namespace smt::noodler {
         expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
 
         literal lit_e = mk_literal(e);
+        literal len_y_gt_len_x = mk_literal(m.mk_not(len_x_gt_len_y));
         // not(e) && |x| <= |y| -> x = p.mx.qx
         add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
         // not(e) && |x| <= |y| -> y = p.my.qy
