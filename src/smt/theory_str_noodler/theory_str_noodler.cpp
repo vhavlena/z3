@@ -925,7 +925,9 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         context &ctx = get_context();
         expr_ref ex{e, m};
-        // m_rewrite(ex);
+        // simplify the expression. This was commented before and it caused 
+        // problems at some point, I am not pretty sure of what kind.
+        m_rewrite(ex);
         if (!ctx.e_internalized(ex)) {
             ctx.internalize(ex, false);
         }
@@ -1800,6 +1802,18 @@ namespace smt::noodler {
 
         axiomatized_persist_terms.insert(e);
         STRACE("str", tout  << "handle contains " << mk_pp(e, m) << std::endl;);
+
+        // if contains is of the form (str.contains (str.substr value2 0 (+ n (str.indexof value2 "A" 0))) "A"), derive simpler constraints
+        expr * ind = nullptr;
+        if(expr_cases::is_contains_index(e, ind, m, m_util_s, m_util_a)) {
+            expr_ref ind_eq(m.mk_eq( ind, m_util_a.mk_int(-1) ), m);
+            expr_ref ind_leq(m_util_a.mk_le( ind, m_util_a.mk_int(-1) ), m);
+            literal not_e = mk_literal(mk_not({e, m}));
+            add_axiom({~mk_eq(ind, m_util_a.mk_int(-1), false), ~mk_literal(e) });
+            add_axiom({mk_eq(ind, m_util_a.mk_int(-1), false), mk_literal(e) });
+            return;
+        }
+
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
