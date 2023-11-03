@@ -425,6 +425,16 @@ namespace smt::noodler {
          * @return lbool Outcome of the heuristic procedure.
          */
         lbool run_mult_membership_heur();
+        
+        /**
+         * @brief Wrapper for running the length-based decision procedure.
+         * 
+         * @param instance Formula instance
+         * @param aut_assignment Current automata assignment
+         * @param init_length_sensitive_vars Length sensitive variables
+         * @return lbool Outcome of the procedure
+         */
+        lbool run_length_proc(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
         /**
          * @brief Wrapper for running the loop protection.

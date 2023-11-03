@@ -97,7 +97,6 @@ namespace smt::noodler {
              formula { form },
              init_aut_ass{ init_aut_ass },
              m_params(par) { 
-
             /**
              * TODO
              */
