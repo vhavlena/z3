@@ -363,6 +363,13 @@ namespace smt::noodler {
          */
         lbool run_membership_heur();
 
+        /**
+         * @brief Wrapper for running the loop protection.
+         * 
+         * @return lbool Outcome of the loop protection
+         */
+        lbool run_loop_protection();
+
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
