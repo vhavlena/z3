@@ -552,6 +552,8 @@ namespace smt::noodler {
                         block_curr_len(len_formula, false);
                         STRACE("str", tout << "loop-protection: unsat " << std::endl;);
                         return l_false;
+                    } else { // returns SAT
+                        return l_true;
                     }
                 }
             }
