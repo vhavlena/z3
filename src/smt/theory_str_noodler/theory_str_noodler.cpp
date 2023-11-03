@@ -866,6 +866,16 @@ namespace smt::noodler {
             }
         }
 
+        // try length-based decision procedure (if enabled) to solve
+        if(m_params.m_try_length_proc && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
+            lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
         // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment, conversions)) {
             STRACE("str", tout << "Try underapproximation" << std::endl);
