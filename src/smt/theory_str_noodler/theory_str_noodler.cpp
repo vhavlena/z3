@@ -781,49 +781,11 @@ namespace smt::noodler {
         // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
         // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
-            expr_ref refine = construct_refinement();
-            if(refine != nullptr) {
-                bool found = false;
-                /**
-                 * Variable denoting that the only stored instance in @p axiomatized_instances was obtained by unsat from initial lengths. In that case 
-                 * if we get SAT from lengths, we do not surely know if it is indeed sat and we need to call the decision procedure again (now it 
-                 * should proceed to the main decision procedure and obtain lengths different from the initial assignment).
-                 */
-                bool init_only = true;
-                expr_ref len_formula(this->m);
-
-                for(const auto& pr : this->axiomatized_instances) {
-                    if(pr.first == refine) {
-                        len_formula = pr.second.lengths;
-                        init_only = init_only && pr.second.initial_length;
-                        found = true;
-
-                        /**
-                         * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
-                         * is not sufficient for SAT solver to get another solution. We hence find unsat core of 
-                         * the current assignment with the len_formula and add this unsat core as 
-                         * a theory lemma.
-                         */
-                        STRACE("str", tout << "loop-protection: found " << std::endl;);
-                        expr_ref unsat_core(m.mk_true(), m);
-                        if(check_len_sat(len_formula, &unsat_core) == l_false) {
-                            unsat_core = m.mk_not(unsat_core);
-                            ctx.internalize(unsat_core.get(), true);
-                            add_axiom({mk_literal(unsat_core)});
-                            block_curr_len(len_formula, false);
-                            STRACE("str", tout << "loop-protection: unsat " << std::endl;);
-                            return FC_CONTINUE;
-                        } 
-                    }
-                }
-                if(found && !init_only) {
-                    /**
-                     * If all stored items are SAT and the lengths were obtained from the main decision 
-                     * procedure --> it is safe to say SAT.
-                     */
-                    STRACE("str", tout << "loop-protection: sat " << std::endl;);
-                    return FC_DONE;
-                }
+            lbool result = run_loop_protection();
+            if(result == l_true) {
+                return FC_DONE;
+            } else if (result == l_false) {
+                return FC_CONTINUE;
             }
         }
 
@@ -831,38 +793,11 @@ namespace smt::noodler {
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
         if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
-            STRACE("str", tout << "Trying heuristic for the case we only have 'x (not)in RE'" << std::endl);
-            const auto& reg_data = this->m_membership_todo_rel[0];
-            // Heuristic: Get info about the regular expression. If the membership is negated and the regex is not universal for sure --> return FC_DONE.
-            // If the membership is in the positive form and the regex is not empty --> regurn FC_DONE.
-            regex::RegexInfo regInfo = regex::get_regex_info(to_app(std::get<1>(reg_data)), m_util_s, m);
-            if(!std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.universal == l_false) {
+            lbool result = run_membership_heur();
+            if(result == l_true) {
                 return FC_DONE;
-            }
-            if(std::get<2>(reg_data) && !this->len_vars.contains(std::get<0>(reg_data)) && regInfo.empty == l_false) {
-                return FC_DONE;
-            }
-            if(!std::get<2>(reg_data) // membership is negated
-                 && !this->len_vars.contains(std::get<0>(reg_data)) // x is not length variable
-            ) {
-                // start with minterm representing symbols not ocurring in the regex
-                std::set<mata::Symbol> symbols_in_regex{get_dummy_symbol()};
-                extract_symbols(std::get<1>(reg_data), symbols_in_regex);
-
-                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
-
-                mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
-                mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&alph);
-
-                if(mata::nfa::are_equivalent(nfa, sigma_star)) {
-                    // x should not belong in sigma*, so it is unsat
-                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
-                    STRACE("str", tout << "Membership " << mk_pp(std::get<0>(reg_data), m) << " not in " << mk_pp(std::get<1>(reg_data), m) << " is unsat" << std::endl;);
-                    return FC_CONTINUE;
-                } else {
-                    // otherwise x should not belong in some nfa that is not sigma*, so it is sat
-                    return FC_DONE;
-                }
+            } else if(result == l_false) {
+                return FC_CONTINUE;
             }
         }
 
@@ -887,30 +822,11 @@ namespace smt::noodler {
 
         // try Nielsen transformation (if enabled) to solve
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
-            STRACE("str", tout << "Trying nielsen" << std::endl);
-            NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
-            nproc.preprocess();
-            expr_ref block_len(m.mk_false(), m);
-            nproc.init_computation();
-            while (true) {
-                lbool result = nproc.compute_next_solution();
-                if (result == l_true) {
-                    expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths());
-                    if (check_len_sat(lengths) == l_true) {
-                        return FC_DONE;
-                    } else {
-                        STRACE("str", tout << "nielsen len unsat" <<  mk_pp(lengths, m) << std::endl;);
-                        block_len = m.mk_or(block_len, lengths);
-                    }
-                } else if (result == l_false) {
-                    // we did not find a solution (with satisfiable length constraints)
-                    // we need to block current assignment
-                    block_curr_len(block_len);
-                    return FC_CONTINUE;
-                } else {
-                    // we could not decide if there is solution, continue with noodler decision procedure
-                    break;
-                }
+            lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
             }
         }
 

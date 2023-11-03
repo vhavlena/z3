@@ -346,6 +346,30 @@ namespace smt::noodler {
          */
         bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const;
 
+        /**
+         * @brief Wrapper for running the Nielsen transformation.
+         * 
+         * @param instance Formula instance
+         * @param aut_assignment Current automata assignment
+         * @param init_length_sensitive_vars Length sensitive variables
+         * @return lbool Outcome of the procedure
+         */
+        lbool run_nielsen(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
+
+        /**
+         * @brief Wrapper for running the membership query heuristics.
+         * 
+         * @return lbool Outcome of the heuristic procedure.
+         */
+        lbool run_membership_heur();
+
+        /**
+         * @brief Wrapper for running the loop protection.
+         * 
+         * @return lbool Outcome of the loop protection
+         */
+        lbool run_loop_protection();
+
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
