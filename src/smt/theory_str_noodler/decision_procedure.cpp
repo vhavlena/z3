@@ -419,10 +419,10 @@ namespace smt::noodler {
             auto noodles = mata::strings::seg_nfa::noodlify_for_equation(left_side_automata, 
                                                                         right_side_automata,
                                                                         false, 
-                                                                        {{"reduce", "true"}});
+                                                                        {{"reduce", "forward"}});
 
             for (const auto &noodle : noodles) {
-                STRACE("str", tout << "Processing noodle" << std::endl; );
+                STRACE("str", tout << "Processing noodle" << (is_trace_enabled("str-nfa") ? " with automata:" : "") << std::endl;);
                 SolvingState new_element = element_to_process;
 
                 /* Explanation of the next code on an example:
@@ -447,6 +447,7 @@ namespace smt::noodler {
                     left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
                     right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
                     new_element.aut_ass[new_var] = noodle[i].first; // we assign the automaton to new_var
+                    STRACE("str-nfa", tout << new_var << std::endl << *noodle[i].first;);
                 }
 
                 // Each variable that occurs in the left side or is length-aware needs to be substituted, we use this map for that 
