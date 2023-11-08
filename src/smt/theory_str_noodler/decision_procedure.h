@@ -339,7 +339,7 @@ namespace smt::noodler {
         /**
          * @brief Construct constraints to get rid of not_contains predicates.
          */
-        void replace_not_contains();
+        lbool replace_not_contains();
 
     public:
         

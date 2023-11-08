@@ -436,6 +436,9 @@ namespace smt::noodler {
          * 3) singleton meaning that the variable is string literal. 
          */
         for(const Predicate& pred : instance.get_predicates()) {
+            if(!pred.is_eq_or_ineq()) {
+                return false;
+            }
             for(const BasicTerm& var : pred.get_vars()) {
                 
                 if(aut_ass.at(var)->num_of_states() <= 1) {

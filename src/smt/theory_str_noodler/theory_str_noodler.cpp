@@ -1378,6 +1378,9 @@ namespace smt::noodler {
         literal a_emp = mk_eq_empty(a);
         literal s_emp = mk_eq_empty(s);
 
+        // if s = t -> the result is unchanged
+        add_axiom({mk_eq(s, t, false), mk_eq(v, a,false)});
+
         zstring str_a;
         // str.replace "A" s t where a = "A"
         if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {

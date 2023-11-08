@@ -829,8 +829,15 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
 
+        if (!this->init_aut_ass.is_sat()) {
+            // some automaton in the assignment is empty => we won't find solution
+            return l_false;
+        }
+
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        replace_not_contains();
+        if(replace_not_contains() == l_false) {
+            return l_false;
+        }
 
         // there remains some not contains --> return undef
         if(this->not_contains.get_predicates().size() > 0) {
@@ -969,7 +976,7 @@ namespace smt::noodler {
      * lit is a literal by a regular constraint x notin Alit' where  Alit' was obtained from A(lit) by setting all 
      * states initial and final. 
      */
-    void DecisionProcedure::replace_not_contains() {
+    lbool DecisionProcedure::replace_not_contains() {
         Formula remain_not_contains{};
         for(const Predicate& pred : this->not_contains.get_predicates()) {
             Concat left = pred.get_params()[0];
@@ -992,9 +999,13 @@ namespace smt::noodler {
                     continue;
                 }
             }
+            if(right.size() == 1 && this->init_aut_ass.is_epsilon(right[0])) {
+                return l_false;
+            }
             remain_not_contains.add_predicate(pred);
         }
         this->not_contains = remain_not_contains;
+        return l_undef;
     }
 
 } // Namespace smt::noodler.
