@@ -1390,6 +1390,15 @@ namespace smt::noodler {
             // add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
             // s != eps && s != a -> v = a
             add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
+            
+
+            // The following axioms are redundant in the sense of completeness, but in the nested replace calls 
+            // they can relate the contains predicate from the general replace (and thence the SAT solver can help a lot).
+            literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
+            add_axiom({~cnt, mk_eq(v, t,false)});
+            add_axiom({cnt, s_emp, mk_eq(v, a,false)});
+            ctx.force_phase(cnt);
+
             // replace(a,s,t) = v
             add_axiom({mk_eq(v, r, false)});
             predicate_replace.insert(r, v.get());
