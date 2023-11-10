@@ -73,8 +73,8 @@ We provide a full support for `str.contains`, but a limited support for its nega
 We also do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
-- Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. Solving String Constraints with Lengths by Stabilization. In *Proc. of OOPSLA'23*, Cascais, Portugal. 2023. ACM.
-- F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://link.springer.com/chapter/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, Lübeck, Germany, volume 14000 of LNCS, pages 403–423, 2023. Springer-Verlag.
+- Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Cascais, Portugal, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
+- F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://doi.org/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, Lübeck, Germany, volume 14000 of LNCS, pages 403–423, 2023. Springer.
 
 
 ## Z3-Noodler source files
