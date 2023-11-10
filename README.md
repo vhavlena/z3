@@ -63,7 +63,6 @@ The following functions/predicates of the [SMTLIB Strings theory](https://smtlib
 str.<
 str.<=
 str.replace_all
-str.replace_re
 str.replace_re_all
 str.to_int
 str.from_int
