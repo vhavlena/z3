@@ -70,6 +70,7 @@ str.from_int
 ```
 
 We provide a full support for `str.contains`, but a limited support for its negated version.
+We also do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
 - Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. Solving String Constraints with Lengths by Stabilization. In *Proc. of OOPSLA'23*, Cascais, Portugal. 2023. ACM.
