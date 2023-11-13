@@ -284,6 +284,15 @@ namespace smt::noodler {
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
 
         /**
+         * @brief Check if the predicate is length-unsatisfiable. It counts number of occurrences 
+         * of each variable and sum of lengths of all predicates. Resolves based on this map.
+         * 
+         * @param pred Predicate to be checked
+         * @return false -> unsatisfiable
+         */
+        static bool is_length_unsat(const Predicate& pred);
+
+        /**
          * @brief Create a counter system from the Nielsen graph.
          * 
          * Returns false if the counter system cannot be created.

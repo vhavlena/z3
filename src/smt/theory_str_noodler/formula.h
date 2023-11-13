@@ -423,6 +423,15 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Count number of variables and sum of lengths of all literals 
+         * (represented by literal "" in the map).
+         * 
+         * @param side Side of the term
+         * @return std::map<BasicTerm, unsigned> Number of variables / sum of lits lengths
+         */
+        std::map<BasicTerm, unsigned> variable_count(const Predicate::EquationSideType side) const;
+
+        /**
          * @brief Split literals into literals consisting of a single symbol.
          * 
          * @return Predicate Modified predicate where each literal is a symbol.

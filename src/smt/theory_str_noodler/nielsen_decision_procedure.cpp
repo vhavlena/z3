@@ -216,11 +216,15 @@ namespace smt::noodler {
         while(!worklist.empty()) {
             std::pair<size_t, Formula> pr = worklist.front();
             size_t index = pr.first;
+            if(generated.find(pr.second) != generated.end()) {
+                worklist.pop_front();
+                continue;
+            }
             generated.insert(pr.second);
             worklist.pop_front();
 
             std::vector<Predicate> predicates = pr.second.get_predicates();
-            if(is_pred_unsat(predicates[index])) {
+            if(is_pred_unsat(predicates[index]) || is_length_unsat(predicates[index])) {
                 continue;
             }
             for(; index < predicates.size(); index++) {
@@ -240,7 +244,9 @@ namespace smt::noodler {
             std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
-                graph.add_edge(pr.second, rpl, label);
+                if(!early_termination) {
+                    graph.add_edge(pr.second, rpl, label);
+                }
                 if(generated.find(rpl) == generated.end()) {
                     worklist.push_back({index, rpl});
                 }
@@ -252,7 +258,7 @@ namespace smt::noodler {
 
     /**
      * @brief Trim formula. Trim each predicate in the formula. A predicate is trimmed 
-     * if it does not contain the same BasicTerm at the beginning of sides.
+     * if it does not contain the same BasicTerm at the beginning or end of sides.
      * 
      * @param formula Formula
      * @return Formula Trimmed formula
@@ -269,9 +275,20 @@ namespace smt::noodler {
                     break;
                 }
             }
+            auto it1 = params[0].end() - 1, it2 = params[1].end() - 1;
+            if(i >= len) {
+                it1 = params[0].end();
+                it2 = params[1].end();
+            }
+            for(; it1 != params[0].begin() + i && it2 != params[1].begin() + i; it1--, it2--) {
+                if(*it1 != *it2) {
+                    it1++; it2++;
+                    break;
+                }
+            }
             std::vector<Concat> sides({
-                Concat(params[0].begin()+i, params[0].end()),
-                Concat(params[1].begin()+i, params[1].end())
+                Concat(params[0].begin()+i, it1),
+                Concat(params[1].begin()+i, it2)
             });
             ret.add_predicate(Predicate(PredicateType::Equation, sides));
         }
@@ -295,6 +312,9 @@ namespace smt::noodler {
             return true;
         }
         if(left.size() > 0 && right.size() > 0 && right[0].is_literal() && left[0].is_literal() && right[0] != left[0]) {
+            return true;
+        }
+        if(left.size() > 0 && right.size() > 0 && right[right.size() - 1].is_literal() && left[left.size() - 1].is_literal() && right[right.size() - 1] != left[left.size() - 1]) {
             return true;
         }
         return false;
@@ -576,6 +596,28 @@ namespace smt::noodler {
             conjuncts.push_back(LenNode(LenFormulaType::EQ, {lterm, prev_var}));
         }
         return true;
+    }
+
+    bool NielsenDecisionProcedure::is_length_unsat(const Predicate& pred) {
+        std::map<BasicTerm, unsigned> occurLeft = pred.variable_count(Predicate::EquationSideType::Left);
+        std::map<BasicTerm, unsigned> occurRight = pred.variable_count(Predicate::EquationSideType::Right);
+        BasicTerm litTerm(BasicTermType::Literal, "");
+
+        bool allLeft = true;
+        bool allRight = true;
+        for(const auto& t : pred.get_vars()) {
+            if(occurLeft[t] > occurRight[t]) allLeft = false;
+            if(occurLeft[t] < occurRight[t]) allRight = false;
+        }
+
+        if(allLeft && occurLeft[litTerm] < occurRight[litTerm]) {
+            return true;
+        }
+        if(allRight && occurRight[litTerm] < occurLeft[litTerm]) {
+            return true;
+        }
+
+        return false;
     }
 
 } // Namespace smt::noodler.
