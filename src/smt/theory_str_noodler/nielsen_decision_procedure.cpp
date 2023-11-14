@@ -275,20 +275,15 @@ namespace smt::noodler {
                     break;
                 }
             }
-            auto it1 = params[0].end() - 1, it2 = params[1].end() - 1;
-            if(i >= len) {
-                it1 = params[0].end();
-                it2 = params[1].end();
-            }
-            for(; it1 != params[0].begin() + i && it2 != params[1].begin() + i; it1--, it2--) {
-                if(*it1 != *it2) {
-                    it1++; it2++;
+            int left = params[0].size() - 1, right = params[1].size() - 1;
+            for(; left >= 0 && right >= 0 && left > i && right > i; left--, right--) {
+                if(params[0][left] != params[1][right]) {
                     break;
                 }
             }
             std::vector<Concat> sides({
-                Concat(params[0].begin()+i, it1),
-                Concat(params[1].begin()+i, it2)
+                Concat(params[0].begin()+i, params[0].begin() + left + 1),
+                Concat(params[1].begin()+i, params[1].begin() + right + 1)
             });
             ret.add_predicate(Predicate(PredicateType::Equation, sides));
         }
