@@ -372,6 +372,19 @@ namespace smt::noodler {
          */
         lbool run_loop_protection();
 
+        /**
+         * @brief Run length-based satisfiability checking.
+         * 
+         * @param instance Current instance converted to Formula
+         * @param aut_ass Current automata assignment
+         * @param init_length_sensitive_vars Length sensitive variables
+         * @param conversions String <-> Int conversions
+         * @return lbool Outcome of the procedure.
+         */
+        lbool run_length_sat(const Formula& instance, const AutAssignment& aut_ass,
+                                const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                                std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions);
+
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
 }
