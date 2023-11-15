@@ -334,9 +334,10 @@ namespace smt::noodler {
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.
          * 
          * @param instance Current instance converted to Formula
+         * @param init_length_sensitive_vars Length variables
          * @return true <-> suitable for Nielsen-based decision procedure
          */
-        bool is_nielsen_suitable(const Formula& instance) const;
+        bool is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) const;
 
         /**
          * @brief Check if the current instance is suitable for underapproximation.

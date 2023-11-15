@@ -417,10 +417,15 @@ namespace smt::noodler {
         }
     }
 
-    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance) const {
+    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) const {
         if(!this->m_membership_todo_rel.empty() || !this->m_not_contains_todo_rel.empty() || !this->m_conversion_todo.empty()) {
             return false;
         }
+
+        if(init_length_sensitive_vars.size() > 0 && !instance.is_quadratic()) {
+            return false;
+        }
+
         Graph incl = Graph::create_inclusion_graph(instance);
         return incl.is_cyclic();
     }
