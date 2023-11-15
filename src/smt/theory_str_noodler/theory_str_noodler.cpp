@@ -388,7 +388,7 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_replace_all(n)) { // str.replace_all
             util::throw_error("str.replace_all is not supported");
         } else if(m_util_s.str.is_replace_re(n)) { // str.replace_re
-            util::throw_error("str.replace_re is not supported");
+            handle_replace_re(n);
         } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
             util::throw_error("str.replace_re_all is not supported");
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
@@ -1420,6 +1420,43 @@ namespace smt::noodler {
         tightest_prefix(s, x, {~cnt, a_emp, s_emp});
 
         predicate_replace.insert(r, v.get());
+    }
+
+    /**
+     * @brief Handling of str.replace(s,R,t) = v ... s where to replace, R regex what to find, t replacement.
+     * Translates to the following theory axioms:
+     * replace(s,R,t) = v
+     * s \not\in \Sigma*R\Sigma* -> v = s
+     * (s = x.y.z && x \not\in \Sigma*R\Sigma* && y \in R) -> v = x.t.z
+     *
+     * @param e replace_re term
+     */
+    void theory_str_noodler::handle_replace_re(expr *e) {
+        STRACE("str", tout << "handle-replace: " << mk_pp(e, m) << '\n';);
+
+        if(axiomatized_persist_terms.contains(e))
+            return;
+        axiomatized_persist_terms.insert(e);
+
+        context& ctx = get_context();
+        expr *s = nullptr, *R = nullptr, *t = nullptr;
+        VERIFY(m_util_s.str.is_replace_re(e, s, R, t));
+        expr_ref v = mk_str_var_fresh("replace_re");
+        expr_ref x = mk_str_var_fresh("replace_re_left");
+        expr_ref y = mk_str_var_fresh("replace_re_middle");
+        expr_ref z = mk_str_var_fresh("replace_re_right");
+        expr_ref xyz = mk_concat(x, mk_concat(y, z));
+        expr_ref xtz = mk_concat(x, mk_concat(t, z));
+        expr_ref sigma_star(m_util_s.re.mk_full_seq(R->get_sort()), m);
+        expr_ref SRS(m_util_s.re.mk_concat(sigma_star, m_util_s.re.mk_concat(R, sigma_star)), m);
+
+        // s \not\in \Sigma*R\Sigma* -> v = s
+        add_axiom({mk_literal(m_util_s.re.mk_in_re(s, SRS)), mk_eq(v, s, false)});
+        // (s = x.y.z && x \not\in \Sigma*R\Sigma* && y \in R) -> v = x.t.z
+        add_axiom({mk_literal(m.mk_not(m.mk_eq(s, xyz))), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_literal(m_util_s.re.mk_in_re(x, SRS)), mk_eq(v, xtz, false)});
+        
+        add_axiom({mk_eq(v, e, false)});
+        predicate_replace.insert(e, v.get());
     }
 
     /**

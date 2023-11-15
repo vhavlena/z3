@@ -207,6 +207,7 @@ namespace smt::noodler {
         void handle_substr_int(expr *e);
         void handle_index_of(expr *e);
         void handle_replace(expr *e);
+        void handle_replace_re(expr *e);
         void handle_prefix(expr *e);
         void handle_suffix(expr *e);
         void handle_not_prefix(expr *e);
