@@ -288,7 +288,7 @@ namespace smt::noodler {
          * of each variable and sum of lengths of all predicates. Resolves based on this map.
          * 
          * @param pred Predicate to be checked
-         * @return false -> unsatisfiable
+         * @return true -> unsatisfiable
          */
         static bool is_length_unsat(const Predicate& pred);
 
