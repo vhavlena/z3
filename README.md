@@ -60,8 +60,6 @@ cd build/
 ## Limitations
 The following functions/predicates of the [SMTLIB Strings theory](https://smtlib.cs.uiowa.edu/theories-UnicodeStrings.shtml) are not supported at the moment.
 ```
-str.<
-str.<=
 str.replace_all
 str.replace_re_all
 str.to_int
