@@ -51,7 +51,7 @@ namespace smt::noodler {
             for(const Formula& fle : instances) {
                 bool is_sat;
                 // create Nielsen graph and trim it
-                NielsenGraph graph = generate_from_formula(fle, is_sat);
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -201,10 +201,11 @@ namespace smt::noodler {
      * @brief Generate Nielsen graph from a formula.
      * 
      * @param init Initial node (formula)
+     * @param early_termination Stop generating graph when the final node is reached?
      * @param[out] is_sat Contains the Nielsen graph an accepting node?
      * @return NielsenGraph 
      */
-    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool & is_sat) const {
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
         std::deque<std::pair<size_t, Formula>> worklist;
@@ -215,11 +216,15 @@ namespace smt::noodler {
         while(!worklist.empty()) {
             std::pair<size_t, Formula> pr = worklist.front();
             size_t index = pr.first;
+            if(generated.find(pr.second) != generated.end()) {
+                worklist.pop_front();
+                continue;
+            }
             generated.insert(pr.second);
             worklist.pop_front();
 
             std::vector<Predicate> predicates = pr.second.get_predicates();
-            if(is_pred_unsat(predicates[index])) {
+            if(is_pred_unsat(predicates[index]) || is_length_unsat(predicates[index])) {
                 continue;
             }
             for(; index < predicates.size(); index++) {
@@ -230,13 +235,18 @@ namespace smt::noodler {
             if(index >= predicates.size()) {
                 is_sat = true;
                 graph.add_fin(pr.second);
+                if(early_termination) {
+                    return graph;
+                }
                 continue;
             }
 
             std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
-                graph.add_edge(pr.second, rpl, label);
+                if(!early_termination) {
+                    graph.add_edge(pr.second, rpl, label);
+                }
                 if(generated.find(rpl) == generated.end()) {
                     worklist.push_back({index, rpl});
                 }
@@ -248,7 +258,7 @@ namespace smt::noodler {
 
     /**
      * @brief Trim formula. Trim each predicate in the formula. A predicate is trimmed 
-     * if it does not contain the same BasicTerm at the beginning of sides.
+     * if it does not contain the same BasicTerm at the beginning or end of sides.
      * 
      * @param formula Formula
      * @return Formula Trimmed formula
@@ -265,9 +275,15 @@ namespace smt::noodler {
                     break;
                 }
             }
+            int left = params[0].size() - 1, right = params[1].size() - 1;
+            for(; left >= 0 && right >= 0 && left > i && right > i; left--, right--) {
+                if(params[0][left] != params[1][right]) {
+                    break;
+                }
+            }
             std::vector<Concat> sides({
-                Concat(params[0].begin()+i, params[0].end()),
-                Concat(params[1].begin()+i, params[1].end())
+                Concat(params[0].begin()+i, params[0].begin() + left + 1),
+                Concat(params[1].begin()+i, params[1].begin() + right + 1)
             });
             ret.add_predicate(Predicate(PredicateType::Equation, sides));
         }
@@ -291,6 +307,9 @@ namespace smt::noodler {
             return true;
         }
         if(left.size() > 0 && right.size() > 0 && right[0].is_literal() && left[0].is_literal() && right[0] != left[0]) {
+            return true;
+        }
+        if(left.size() > 0 && right.size() > 0 && right[right.size() - 1].is_literal() && left[left.size() - 1].is_literal() && right[right.size() - 1] != left[left.size() - 1]) {
             return true;
         }
         return false;
@@ -572,6 +591,28 @@ namespace smt::noodler {
             conjuncts.push_back(LenNode(LenFormulaType::EQ, {lterm, prev_var}));
         }
         return true;
+    }
+
+    bool NielsenDecisionProcedure::is_length_unsat(const Predicate& pred) {
+        std::map<BasicTerm, unsigned> occurLeft = pred.variable_count(Predicate::EquationSideType::Left);
+        std::map<BasicTerm, unsigned> occurRight = pred.variable_count(Predicate::EquationSideType::Right);
+        BasicTerm litTerm(BasicTermType::Literal, "");
+
+        bool allLeft = true;
+        bool allRight = true;
+        for(const auto& t : pred.get_vars()) {
+            if(occurLeft[t] > occurRight[t]) allLeft = false;
+            if(occurLeft[t] < occurRight[t]) allRight = false;
+        }
+
+        if(allLeft && occurLeft[litTerm] < occurRight[litTerm]) {
+            return true;
+        }
+        if(allRight && occurRight[litTerm] < occurLeft[litTerm]) {
+            return true;
+        }
+
+        return false;
     }
 
 } // Namespace smt::noodler.

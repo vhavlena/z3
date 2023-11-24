@@ -423,6 +423,15 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Count number of variables and sum of lengths of all literals 
+         * (represented by literal "" in the map).
+         * 
+         * @param side Side of the term
+         * @return std::map<BasicTerm, unsigned> Number of variables / sum of lits lengths
+         */
+        std::map<BasicTerm, unsigned> variable_count(const Predicate::EquationSideType side) const;
+
+        /**
          * @brief Split literals into literals consisting of a single symbol.
          * 
          * @return Predicate Modified predicate where each literal is a symbol.
@@ -561,6 +570,21 @@ namespace smt::noodler {
             for(const auto& pr : occur_map) {
                 if(pr.second > 2)
                     return false;
+            }
+            return true;
+        }
+
+        /**
+         * @brief Check whether all predicates match the given type.
+         * 
+         * @param tp Predicate type
+         * @return true <-> All predicates are of type @p tp
+         */
+        bool all_of_type(PredicateType tp) {
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() != tp) {
+                    return false;
+                }
             }
             return true;
         }

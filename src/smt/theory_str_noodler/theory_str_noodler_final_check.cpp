@@ -417,13 +417,15 @@ namespace smt::noodler {
         }
     }
 
-    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance) const {
+    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) const {
         if(!this->m_membership_todo_rel.empty() || !this->m_not_contains_todo_rel.empty() || !this->m_conversion_todo.empty()) {
             return false;
         }
-        if(!instance.is_quadratic()) {
+
+        if(init_length_sensitive_vars.size() > 0 && !instance.is_quadratic()) {
             return false;
         }
+
         Graph incl = Graph::create_inclusion_graph(instance);
         return incl.is_cyclic();
     }
@@ -565,5 +567,20 @@ namespace smt::noodler {
             }
         }
         return l_undef;
+    }
+
+    lbool theory_str_noodler::run_length_sat(const Formula& instance, const AutAssignment& aut_ass,
+                                const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
+                                std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions) {
+
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_ass, init_length_sensitive_vars, m_params, conversions };
+        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
+        if(check_len_sat(lengths) == l_false) {
+            STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);
+            block_curr_len(lengths, true, true);
+            return l_false;
+        } else {
+            return l_true;
+        }
     }
 }

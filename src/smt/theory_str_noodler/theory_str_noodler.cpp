@@ -820,8 +820,19 @@ namespace smt::noodler {
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
 
+
+        // There is only one symbol in the equation. The system is SAT iff lengths are SAT
+        if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) { // dummy symbol + 1
+            lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
         // try Nielsen transformation (if enabled) to solve
-        if(m_params.m_try_nielsen && is_nielsen_suitable(instance)) {
+        if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
             lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
                 return FC_DONE;

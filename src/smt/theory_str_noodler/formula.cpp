@@ -169,6 +169,21 @@ namespace smt::noodler {
         }
     }
 
+    std::map<BasicTerm, unsigned> Predicate::variable_count(const Predicate::EquationSideType side) const {
+        std::map<BasicTerm, unsigned> occurr;
+        BasicTerm litTerm(BasicTermType::Literal, "");
+        unsigned lits = 0;
+        for(const BasicTerm& b : this->get_side(side)) {
+            if(b.is_variable()) {
+                occurr[b]++;
+            } else {
+                lits += b.get_name().length();
+            }
+        }
+        occurr[litTerm] = lits;
+        return occurr;
+    }
+
     std::string BasicTerm::to_string() const {
         switch (type) {
             case BasicTermType::Literal: {

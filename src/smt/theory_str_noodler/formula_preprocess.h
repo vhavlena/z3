@@ -225,7 +225,7 @@ namespace smt::noodler {
     using VarMap = std::map<BasicTerm, std::set<VarNode>>;
     using VarNodeSymDiff = std::pair<std::set<VarNode>, std::set<VarNode>>;
     using Concat = std::vector<BasicTerm>;
-    using SepEqsGather = std::vector<std::pair<std::set<BasicTerm>, unsigned>>;
+    using SepEqsGather = std::vector<std::pair<std::map<BasicTerm, unsigned>, unsigned>>;
     using Dependency = std::map<size_t, std::set<size_t>>;
 
     /**
