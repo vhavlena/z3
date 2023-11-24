@@ -1379,7 +1379,7 @@ namespace smt::noodler {
         literal s_emp = mk_eq_empty(s);
 
         // if s = t -> the result is unchanged
-        add_axiom({mk_eq(s, t, false), mk_eq(v, a,false)});
+        add_axiom({~mk_eq(s, t, false), mk_eq(v, a,false)});
 
         zstring str_a;
         // str.replace "A" s t where a = "A"
@@ -2101,6 +2101,11 @@ namespace smt::noodler {
             }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
             //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
+        }
+
+        for(const auto& nc : this->m_not_contains_todo_rel) {
+            app_ref nc_app(m_util_s.str.mk_contains(nc.first, nc.second), m);
+            refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
         }
 
         return expr_ref(refinement, m);

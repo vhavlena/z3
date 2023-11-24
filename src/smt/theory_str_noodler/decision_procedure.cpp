@@ -787,7 +787,9 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.remove_regular();
-        prep_handler.skip_len_sat();
+        if(this->not_contains.get_predicates().empty()) {
+            prep_handler.skip_len_sat();
+        }
         prep_handler.generate_identities();
         prep_handler.propagate_variables();
         prep_handler.refine_languages();

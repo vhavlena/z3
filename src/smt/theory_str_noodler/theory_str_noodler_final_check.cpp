@@ -297,6 +297,11 @@ namespace smt::noodler {
             }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
         }
+
+        for(const auto& nc : this->m_not_contains_todo_rel) {
+            app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
+            refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
+        }
         
         if(m_params.m_loop_protect && add_axiomatized) {
             this->axiomatized_instances.push_back({expr_ref(refinement, this->m), stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
