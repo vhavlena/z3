@@ -1968,7 +1968,7 @@ namespace smt::noodler {
         // to solve a nonlinear problem (?). If I use to_code(v1) + k = to_code(v2) where k > 0, it works well.
         expr_ref vark = mk_int_var_fresh("lex_add");
         expr_ref to_code_lt(m.mk_eq(m_util_a.mk_add(to_code_left, vark), to_code_right), m);
-        // k >= 0
+        // k >= 1
         add_axiom({mk_literal(m_util_a.mk_ge(vark, m_util_a.mk_int(1)))});
         
         literal lit_x_eps = mk_literal(x_eps);
