@@ -477,10 +477,8 @@ namespace smt::noodler {
             } else {
                 assign_not_contains(e);
             }
-        } else if(m_util_s.str.is_le(e)) {
-            handle_lex_leq(e);
-        } else if(m_util_s.str.is_lt(e)) {
-            handle_lex_lt(e);
+        } else if(m_util_s.str.is_le(e) || m_util_s.str.is_lt(e)) {
+            // handled in relevant_eh
         } else if (m_util_s.str.is_in_re(e)) {
             // INFO the problem from previous cannot occur here - Vojta
             handle_in_re(e, is_true);
@@ -1898,6 +1896,7 @@ namespace smt::noodler {
      * Translates to the following axiom
      * 
      * x <= y -> x = y | x < y
+     * not(x <= y) -> y > x
      * @param e str.<= predicate
      */
     void theory_str_noodler::handle_lex_leq(expr *e) {
@@ -1915,16 +1914,21 @@ namespace smt::noodler {
         literal lit_e_lt = mk_literal(e_lt);
         literal lit_e = mk_literal(e);
         literal lit_x_y = mk_literal(x_y);
+        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y, x));
         // x <= y -> x = y | x < y
         add_axiom({~lit_e, lit_e_lt, lit_x_y});
+        // not(x <= y) -> y > x
+        add_axiom({lit_e, lit_e_switch});
     }
 
     /**
      * @brief Handle str.<
      * Translates to the following theory axioms.
      * 
+     * not(x < y) -> x = y | y < x
      * x = eps & y != eps -> x < y
      * x < y & x != eps -> x = u.v1.w1
+     * x < y & x != eps -> y = u.v2.w2
      * x < y & x != eps -> v1 in re.allchar
      * x < y & x != eps -> v2 in re.allchar
      * x < y & x != eps -> to_code(v1) + k = to_code(v2) & k >= 1
@@ -1973,6 +1977,10 @@ namespace smt::noodler {
         
         literal lit_x_eps = mk_literal(x_eps);
         literal lit_y_eps = mk_literal(y_eps);
+        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y,x));
+
+        // not(x < y) -> x = y | y < x
+        add_axiom({lit_e, mk_eq(x,y,false), lit_e_switch});
 
         // x = eps & y != eps -> x < y
         add_axiom({~lit_x_eps, lit_y_eps, lit_e});
