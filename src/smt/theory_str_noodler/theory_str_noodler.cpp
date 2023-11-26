@@ -928,6 +928,10 @@ namespace smt::noodler {
         // simplify the expression. This was commented before and it caused 
         // problems at some point, I am not pretty sure of what kind.
         m_rewrite(ex);
+
+        // since ex might be different to e, propagate basic string axioms
+        string_theory_propagation(ex, true);
+
         if (!ctx.e_internalized(ex)) {
             ctx.internalize(ex, false);
         }
