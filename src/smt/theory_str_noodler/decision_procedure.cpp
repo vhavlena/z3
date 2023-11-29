@@ -786,6 +786,7 @@ namespace smt::noodler {
         }
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
+        prep_handler.infer_alignment();
         prep_handler.remove_regular();
         if(this->not_contains.get_predicates().empty()) {
             prep_handler.skip_len_sat();
@@ -810,6 +811,7 @@ namespace smt::noodler {
             }   
         );
         prep_handler.generate_equiv(len_eq_vars);
+        prep_handler.common_prefix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
         prep_handler.remove_regular();

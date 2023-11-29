@@ -1180,6 +1180,194 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Infer equalities from required alignments. For instance for 
+     * X = Y1 "A" Y2
+     * X = Z1 "A" Z2 where "A" not in L(Y1) and "A" not in L(Z1)
+     * infer Y1 = Z1.
+     * 
+     * Works also for a propagated case, for instance
+     * X = Y1 "A" Y2
+     * X = W Z2 
+     * W = Z1 "A" Z3 where "A" not in L(Y1) and "A" not in L(Z1)
+     */
+    void FormulaPreprocessor::infer_alignment() {
+        using VarSeparator = std::map<BasicTerm, std::set<BasicTerm>>;
+        // separators for each variable: map of literals -> set of basic terms: 
+        // for each literal (L) contains terms (T) that preceeds that literal: there is equation ... = T L
+        std::map<BasicTerm, VarSeparator> separators {};
+
+        bool changed = true;
+        while(changed) {
+            changed = false;
+            for(const auto& pr : this->formula.get_predicates()) {
+                if(!pr.second.is_equation()) continue;
+                if(pr.second.get_left_side().size() != 1) continue;
+
+                // base case
+                const Concat& side = pr.second.get_right_side();
+                const BasicTerm& left_var = pr.second.get_left_side()[0];
+                if(pr.second.get_left_side().size() == 1) {
+                    changed = changed || add_var_separator(side, separators[left_var]);
+                }
+
+                // propagation of var separators
+                // for the case X = Y .... -> add separators from Y to X
+                if(side.size() > 0 && side[0] != left_var) {
+                    changed = changed || propagate_var_separators(left_var, side[0], separators);
+                }
+            }
+        }
+
+        // construct new equations from computed separators
+        for(const auto& pr : separators) {
+            for(const auto& a : pr.second) {
+                if(a.second.size() <=  1) continue;
+                BasicTerm fst = *a.second.begin();
+                for(const BasicTerm& dest : a.second) {
+                    if(dest != fst) {
+                        this->formula.add_predicate(Predicate( PredicateType::Equation, {Concat{fst}, Concat{dest}}));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Propagate variable separators. Add separators from variable @p src to the variable @p dest. 
+     * 
+     * @param dest Variable to be updated
+     * @param src Variable whose separators are copied to @p dest.
+     * @param separators Separators
+     * @return true <-> the propagation added a new element to @p separators.
+     */
+    bool FormulaPreprocessor::propagate_var_separators(const BasicTerm& dest, const BasicTerm& src, std::map<BasicTerm, std::map<BasicTerm, std::set<BasicTerm>>>& separators) {
+        bool changed = false;
+        for(const auto& var_sep: separators[src]) {
+            std::set<BasicTerm>& st = separators[dest][var_sep.first];
+            size_t before = st.size();
+            st.insert(var_sep.second.begin(), var_sep.second.end());
+            changed = changed || st.size() != before;
+        }
+        return changed;
+    }
+
+    /**
+     * @brief Add a new separator to @p container (separators of a variable).
+     * 
+     * @param side Equations side to be used for the update
+     * @param container Separators of a variable
+     * @return true <-> a new element was added to @p container.
+     */
+    bool FormulaPreprocessor::add_var_separator(const Concat& side, std::map<BasicTerm, std::set<BasicTerm>>& container) {
+        if(side.size() < 2) {
+            return false;
+        }
+        if(!side[1].is_literal()) {
+            return false;
+        }
+        if(this->aut_ass.are_disjoint(side[0], side[1])) {
+            if(container[side[1]].contains(side[0])) {
+                return false;
+            }
+            container[side[1]].insert(side[0]);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @brief Propagate equations from a common prefix. For instance for
+     * X = W1 W2 Y
+     * X = W1 W2 W3 W4
+     * infer Y = W3 W4.
+     * 
+     * Works also for a propagated case, for instance
+     * X = W1 W2 Y
+     * X = K W3 W4
+     * K = W1 W2
+     * infer Y = W3 W4
+     */
+    void FormulaPreprocessor::common_prefix_propagation() {
+        TermReplaceMap replace_map = construct_replace_map();
+        // for(const auto& pr : this->formula.get_predicates()) {
+        //     if(!pr.second.is_equation()) continue;
+        //     if(pr.second.get_left_side().size() != 1) continue;
+
+        //     const BasicTerm &var = pr.second.get_left_side()[0];
+        //     replace_map[var].insert(pr.second.get_right_side());
+        // }
+
+        size_t i = 0;
+        for(const auto& pr1 : this->formula.get_predicates()) {
+            if(!pr1.second.is_equation()) continue;
+
+            Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
+
+            for(const auto& pr2 : this->formula.get_predicates()) {
+                if(!pr2.second.is_equation()) continue;
+                if(pr1 == pr2) continue;
+                if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
+                
+
+                Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
+                // compute the common prefix
+                for(i = 0; i < std::min(c1.size(), c2.size()); i++) {
+                    if(c1[i] != c2[i]) break;
+                }
+                // i is the first mismatching index
+                if(c1.size() == i + 1) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin() + i, c2.end()) });
+                    this->formula.add_predicate(new_pred);
+                } else if (c2.size() == i + 1) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[i]}, Concat(c1.begin() + i, c1.end()) });
+                    this->formula.add_predicate(new_pred);
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Construct replace map. Replace map contains all items of the form X -> {W1 W2, W3, ...} if 
+     * there are quations X = W1 W2, X = W3, ... 
+     * 
+     * @return TermReplaceMap Constructed replace map
+     */
+    TermReplaceMap FormulaPreprocessor::construct_replace_map() const {
+        TermReplaceMap replace_map {};
+        for(const auto& pr : this->formula.get_predicates()) {
+            if(!pr.second.is_equation()) continue;
+            if(pr.second.get_left_side().size() != 1) continue;
+
+            const BasicTerm &var = pr.second.get_left_side()[0];
+            replace_map[var].insert(pr.second.get_right_side());
+        }
+        return replace_map;
+    }
+
+    /**
+     * @brief Flatten the given concatenation @p con according to the replace map. In particular, 
+     * replace all variables in @p con with the corresponding item in @p replace_map. 
+     * Applicable only if there is exactly one corresponding guy in @p replace_map (i.e., does not work 
+     * recursively).
+     * 
+     * @param con Conjunction to be flattened.
+     * @param replace_map Replace map
+     * @return Concat Conjunction with subtituted terms.
+     */
+    Concat FormulaPreprocessor::flatten_concat(const Concat& con, TermReplaceMap& replace_map) {
+        Concat ret {};
+        for(const BasicTerm& bt : con) {
+            if(replace_map[bt].size() == 1) {
+                const Concat& rpl = *replace_map[bt].begin();
+                ret.insert(ret.end(), rpl.begin(), rpl.end());
+            } else {
+                ret.push_back(bt);
+            }
+        }
+        return ret;
+    }
+
+    /**
      * @brief Underapproximates the languages. Replace co-finite languages with length constraints while 
      * setting their languages to \Sigma^*.
      */
@@ -1260,14 +1448,42 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Heuristicaly check if @p con1 and @p con2 can be unified, meaning that if we replace 
+     * variables with their replacements, can we get that @p con1  == @p con2 ? 
+     * 
+     * @param con1 First conjunction
+     * @param con2 Second conjunction
+     * @return true -> they can be unified
+     */
+    bool FormulaPreprocessor::can_unify(const Concat& con1, const Concat& con2) {
+        TermReplaceMap replace_map = construct_replace_map();
+
+        // TODO: make as a parameter (although not sure what to do with that)
+        int max_unifs = 4;
+        Concat tmp1 = con1;
+        Concat tmp2 = con2;
+        for(int i = 0; i < max_unifs; i++) {
+            tmp2 = con2;
+            for(int j = 0; j < max_unifs; j++) {
+                if(tmp1 == tmp2) {
+                    return true;
+                }
+                tmp2 = flatten_concat(tmp2, replace_map);
+            }
+            tmp1 = flatten_concat(tmp1, replace_map);
+        }
+        return false;
+    }
+
+    /**
      * @brief Check if the instance is clearly unsatisfiable. It checks trivial (dis)equations
      * of the form x != x, ab = cd (x is term, a,b,c,d are constants).
      * 
      * @return True --> unsat for sure.
      */
-    bool FormulaPreprocessor::contains_unsat_eqs_or_diseqs() const {
-        for(const auto& pr : this->formula.get_predicates()) {
-            if(pr.second.is_inequation() && pr.second.get_left_side() == pr.second.get_right_side()) {
+    bool FormulaPreprocessor::contains_unsat_eqs_or_diseqs() {
+        for(const auto& pr : this->formula.get_predicates()) {            
+            if(pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side())) {
                 return true;
             }
             if(pr.second.is_equation() && pr.second.is_str_const()) {

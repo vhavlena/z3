@@ -160,6 +160,19 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if the given terms have disjoint languages.
+         * 
+         * @param t1 First term
+         * @param t2 Second term
+         * @return true <-> L(t1) and L(t2) are disjoint.
+         */
+        bool are_disjoint(const BasicTerm &t1, const BasicTerm& t2) const {
+            mata::nfa::Nfa aut_t1 = *this->at(t1);
+            mata::nfa::Nfa aut_t2 = *this->at(t2);
+            return  mata::nfa::intersection(aut_t1, aut_t2).is_lang_empty();
+        }
+
+        /**
          * @brief Check if the language of the basic term has a fixed length
          * 
          * @param t BasicTerm
