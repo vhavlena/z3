@@ -1926,7 +1926,7 @@ namespace smt::noodler {
      * Translates to the following theory axioms.
      * 
      * not(x < y) -> x = y | y < x
-     * x = eps & y != eps -> x < y
+     * x < y & x = eps -> y != eps
      * x < y & x != eps -> x = u.v1.w1
      * x < y & x != eps -> y = u.v2.w2
      * x < y & x != eps -> v1 in re.allchar
@@ -1982,8 +1982,8 @@ namespace smt::noodler {
         // not(x < y) -> x = y | y < x
         add_axiom({lit_e, mk_eq(x,y,false), lit_e_switch});
 
-        // x = eps & y != eps -> x < y
-        add_axiom({~lit_x_eps, lit_y_eps, lit_e});
+        // x < y & x = eps -> y != eps
+        add_axiom({~lit_e, ~lit_x_eps, ~lit_y_eps});
         // x < y & x != eps -> x = u.v1.w1
         add_axiom({~lit_e, lit_x_eps, lit_x_px});
         // x < y & x != eps -> y = u.v2.w2
