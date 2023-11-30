@@ -365,9 +365,9 @@ namespace smt::noodler {
                 enforce_length(arg);
             }
         } else if(m_util_s.str.is_lt(n)) { // str.<
-            util::throw_error("str.< is not supported");
+            handle_lex_lt(n);
         } else if(m_util_s.str.is_le(n)) { // str.<=
-            util::throw_error("str.<= is not supported");
+            handle_lex_leq(n);
         } else if (m_util_s.str.is_at(n)) { // str.at
             handle_char_at(n);
         } else if (m_util_s.str.is_extract(n)) { // str.substr
@@ -477,6 +477,8 @@ namespace smt::noodler {
             } else {
                 assign_not_contains(e);
             }
+        } else if(m_util_s.str.is_le(e) || m_util_s.str.is_lt(e)) {
+            // handled in relevant_eh
         } else if (m_util_s.str.is_in_re(e)) {
             // INFO the problem from previous cannot occur here - Vojta
             handle_in_re(e, is_true);
@@ -1898,6 +1900,111 @@ namespace smt::noodler {
         if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() == 1)) {
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
+    }
+
+    /**
+     * @brief Handle str.<=
+     * Translates to the following axiom
+     * 
+     * x <= y -> x = y | x < y
+     * not(x <= y) -> y > x
+     * @param e str.<= predicate
+     */
+    void theory_str_noodler::handle_lex_leq(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+
+        axiomatized_persist_terms.insert(e);
+        STRACE("str", tout  << "handle str.<= " << mk_pp(e, m) << std::endl;);
+
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_le(e, x, y));
+      
+        expr_ref e_lt(m_util_s.str.mk_lex_lt(x, y), m);
+        expr_ref x_y(m.mk_eq(x,y), m);
+        literal lit_e_lt = mk_literal(e_lt);
+        literal lit_e = mk_literal(e);
+        literal lit_x_y = mk_literal(x_y);
+        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y, x));
+        // x <= y -> x = y | x < y
+        add_axiom({~lit_e, lit_e_lt, lit_x_y});
+        // not(x <= y) -> y > x
+        add_axiom({lit_e, lit_e_switch});
+    }
+
+    /**
+     * @brief Handle str.<
+     * Translates to the following theory axioms.
+     * 
+     * not(x < y) -> x = y | y < x
+     * x < y & x = eps -> y != eps
+     * x < y & x != eps -> x = u.v1.w1
+     * x < y & x != eps -> y = u.v2.w2
+     * x < y & x != eps -> v1 in re.allchar
+     * x < y & x != eps -> v2 in re.allchar
+     * x < y & x != eps -> to_code(v1) + k = to_code(v2) & k >= 1
+     * @param e str.< predicate
+     */
+    void theory_str_noodler::handle_lex_lt(expr *e) {
+        if(axiomatized_persist_terms.contains(e))
+            return;
+
+        axiomatized_persist_terms.insert(e);
+        STRACE("str", tout  << "handle str.< " << mk_pp(e, m) << std::endl;);
+
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_lt(e, x, y));
+        expr_ref eps(m_util_s.str.mk_string(""), m);
+        expr_ref x_eps(m.mk_eq(x, eps), m);
+        expr_ref y_eps(m.mk_eq(y, eps), m);
+
+        expr_ref lex_pre = mk_str_var_fresh("lex_pre");
+        expr_ref lex_in_left = mk_str_var_fresh("lex_in_left");
+        expr_ref lex_in_right = mk_str_var_fresh("lex_in_right");
+        expr_ref lex_post_left = mk_str_var_fresh("lex_post_left");
+        expr_ref lex_post_right = mk_str_var_fresh("lex_post_right");
+        expr_ref px(m_util_s.str.mk_concat(m_util_s.str.mk_concat(lex_pre, lex_in_left), lex_post_left), m);
+        expr_ref py(m_util_s.str.mk_concat(m_util_s.str.mk_concat(lex_pre, lex_in_right), lex_post_right), m);
+        string_theory_propagation(px);
+        string_theory_propagation(py);
+
+        expr_ref x_px(m.mk_eq(x, px), m);
+        expr_ref y_py(m.mk_eq(y, py), m);
+        literal lit_e = mk_literal(e);
+        literal lit_x_px = mk_literal(x_px);
+        literal lit_y_py = mk_literal(y_py);
+        
+        expr_ref re_in_left(m_util_s.re.mk_in_re(lex_in_left, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref re_in_right(m_util_s.re.mk_in_re(lex_in_right, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref to_code_left(m_util_s.str.mk_to_code(lex_in_left), m);
+        expr_ref to_code_right(m_util_s.str.mk_to_code(lex_in_right), m);
+  
+        // This is a dirty hack. If I add axiom to_code(v1) < to_code(v2), the LIA solver starts 
+        // to solve a nonlinear problem (?). If I use to_code(v1) + k = to_code(v2) where k > 0, it works well.
+        expr_ref vark = mk_int_var_fresh("lex_add");
+        expr_ref to_code_lt(m.mk_eq(m_util_a.mk_add(to_code_left, vark), to_code_right), m);
+        // k >= 1
+        add_axiom({mk_literal(m_util_a.mk_ge(vark, m_util_a.mk_int(1)))});
+        
+        literal lit_x_eps = mk_literal(x_eps);
+        literal lit_y_eps = mk_literal(y_eps);
+        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y,x));
+
+        // not(x < y) -> x = y | y < x
+        add_axiom({lit_e, mk_eq(x,y,false), lit_e_switch});
+
+        // x < y & x = eps -> y != eps
+        add_axiom({~lit_e, ~lit_x_eps, ~lit_y_eps});
+        // x < y & x != eps -> x = u.v1.w1
+        add_axiom({~lit_e, lit_x_eps, lit_x_px});
+        // x < y & x != eps -> y = u.v2.w2
+        add_axiom({~lit_e, lit_x_eps, lit_y_py});
+        // x < y & x != eps -> v1 in re.allchar
+        add_axiom({~lit_e, lit_x_eps, mk_literal(re_in_left)});
+        // x < y & x != eps -> v2 in re.allchar
+        add_axiom({~lit_e, lit_x_eps, mk_literal(re_in_right)});
+        // x < y & x != eps -> to_code(v1) + k = to_code(v2) & k >= 1
+        add_axiom({~lit_e, lit_x_eps,  mk_literal(to_code_lt)});
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
