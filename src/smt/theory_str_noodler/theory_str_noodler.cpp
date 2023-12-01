@@ -142,7 +142,7 @@ namespace smt::noodler {
 
     }
 
-    void theory_str_noodler::string_theory_propagation(expr *expr, bool init, bool neg) {
+    void theory_str_noodler::string_theory_propagation(expr *expr, bool init, bool neg, bool var_lengths) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
@@ -169,9 +169,8 @@ namespace smt::noodler {
         sort *str_sort = m_util_s.str.mk_string_sort();
 
         if (expr_sort == str_sort) {
-
             enode *n = ctx.get_enode(expr);
-            propagate_basic_string_axioms(n);
+            propagate_basic_string_axioms(n, var_lengths);
             if (is_app(expr) && m_util_s.str.is_concat(to_app(expr))) {
                 propagate_concat_axiom(n);
             }
@@ -181,7 +180,7 @@ namespace smt::noodler {
             app *term = to_app(expr);
             unsigned num_args = term->get_num_args();
             for (unsigned i = 0; i < num_args; i++) {
-                string_theory_propagation(term->get_arg(i), init, neg);
+                string_theory_propagation(term->get_arg(i), init, neg, var_lengths);
             }
         }
 
@@ -236,7 +235,7 @@ namespace smt::noodler {
 
     }
 
-    void theory_str_noodler::propagate_basic_string_axioms(enode *str) {
+    void theory_str_noodler::propagate_basic_string_axioms(enode *str, bool var_lengths) {
         context &ctx = get_context();
         ast_manager &m = get_manager();
 
@@ -339,6 +338,9 @@ namespace smt::noodler {
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
                 add_axiom(m.mk_or(m.mk_not(lhs), rhs));
+                if(var_lengths) {
+                    add_axiom(m.mk_or(m.mk_not(rhs), lhs));
+                }
             }
 
         } else {
@@ -1155,8 +1157,8 @@ namespace smt::noodler {
              this->len_vars.insert(v);
         }
 
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
+        string_theory_propagation(xe, false, false, true);
+        string_theory_propagation(xey, false, false, true);
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
@@ -1307,8 +1309,8 @@ namespace smt::noodler {
         literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
+        string_theory_propagation(xe, false, false, true);
+        string_theory_propagation(xey, false, false, true);
 
         // create axioms in_substri is Sigma
         for(const expr_ref& val : vars) {

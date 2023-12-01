@@ -1045,13 +1045,19 @@ namespace smt::noodler {
 
             if(pr.second.get_left_side().size() == 1) {
                 BasicTerm var = pr.second.get_left_side()[0];
-                if(ineq_vars.find(var) != ineq_vars.end())
+                if(ineq_vars.find(var) != ineq_vars.end()) {
                     update_reg_constr(var, pr.second.get_right_side());
+                } else if(pr.second.get_right_side().size() == 1) {
+                    update_reg_constr(var, pr.second.get_right_side());
+                }
             }
             if(pr.second.get_right_side().size() == 1) {
                 BasicTerm var = pr.second.get_right_side()[0];
-                if(ineq_vars.find(var) != ineq_vars.end())
+                if(ineq_vars.find(var) != ineq_vars.end()) {
                     update_reg_constr(var, pr.second.get_left_side());
+                } else if(pr.second.get_left_side().size() == 1) {
+                    update_reg_constr(var, pr.second.get_left_side());
+                }
             }
         }
 
@@ -1354,7 +1360,7 @@ namespace smt::noodler {
      * @param replace_map Replace map
      * @return Concat Conjunction with subtituted terms.
      */
-    Concat FormulaPreprocessor::flatten_concat(const Concat& con, TermReplaceMap& replace_map) {
+    Concat FormulaPreprocessor::flatten_concat(const Concat& con, TermReplaceMap& replace_map) const {
         Concat ret {};
         for(const BasicTerm& bt : con) {
             if(replace_map[bt].size() == 1) {
@@ -1455,7 +1461,7 @@ namespace smt::noodler {
      * @param con2 Second conjunction
      * @return true -> they can be unified
      */
-    bool FormulaPreprocessor::can_unify(const Concat& con1, const Concat& con2) {
+    bool FormulaPreprocessor::can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const {
         TermReplaceMap replace_map = construct_replace_map();
 
         // TODO: make as a parameter (although not sure what to do with that)
@@ -1465,7 +1471,7 @@ namespace smt::noodler {
         for(int i = 0; i < max_unifs; i++) {
             tmp2 = con2;
             for(int j = 0; j < max_unifs; j++) {
-                if(tmp1 == tmp2) {
+                if(check(tmp1, tmp2)) {
                     return true;
                 }
                 tmp2 = flatten_concat(tmp2, replace_map);
@@ -1482,8 +1488,11 @@ namespace smt::noodler {
      * @return True --> unsat for sure.
      */
     bool FormulaPreprocessor::contains_unsat_eqs_or_diseqs() {
+        auto check = [](const Concat& c1, const Concat& c2) -> bool {
+            return c1 == c2;
+        };
         for(const auto& pr : this->formula.get_predicates()) {            
-            if(pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side())) {
+            if(pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side(), check)) {
                 return true;
             }
             if(pr.second.is_equation() && pr.second.is_str_const()) {
@@ -1499,6 +1508,26 @@ namespace smt::noodler {
             }
         }
         return false;
+    }
+
+    /**
+     * @brief Check if we can unify @p left and @p right in the sense of contains 
+     * (check if @p right is sublist of @p left ). Unifies according to equations.
+     * 
+     * @param left First concatenation
+     * @param right Second concatenation
+     * @return true <-> can be sublist-unified 
+     */
+    bool FormulaPreprocessor::can_unify_contain(const Concat& left, const Concat& right) const {
+        auto check = [](const Concat& c1, const Concat& c2) -> bool {
+            for(auto it = c1.begin(); it != c1.end(); it++) {
+                if(std::equal(it, it+c2.size(), c2.begin(), c2.end())) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        return can_unify(left, right, check);
     }
 
 } // Namespace smt::noodler.

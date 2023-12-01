@@ -224,9 +224,17 @@ namespace smt::noodler {
         void set_conflict(const literal_vector& ls);
 
         expr_ref construct_refinement();
-        void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
+        /**
+         * @brief Introduce string axioms for a formula @p ex. 
+         * 
+         * @param ex Formula whose terms should be inspected.
+         * @param init Is it an initial string formula (formula from input)?
+         * @param neg Is the formula under negation?
+         * @param var_lengths Introduce lengths axioms for variables of the form x = eps -> |x| = 0? 
+         */
+        void string_theory_propagation(expr * ex, bool init = false, bool neg = false, bool var_lengths = false);
         void propagate_concat_axiom(enode * cat);
-        void propagate_basic_string_axioms(enode * str);
+        void propagate_basic_string_axioms(enode * str, bool var_lengths = false);
 
         /**
          * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,

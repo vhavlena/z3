@@ -780,10 +780,14 @@ namespace smt::noodler {
         FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
         // So-far just lightweight preprocessing
+        prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
         if (opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
         }
+        prep_handler.propagate_eps();
+        prep_handler.refine_languages();
+        prep_handler.refine_languages();
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
@@ -839,7 +843,7 @@ namespace smt::noodler {
         }
 
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        if(replace_not_contains() == l_false) {
+        if(replace_not_contains() == l_false || unify_not_contains(prep_handler) == l_false) {
             return l_false;
         }
 
@@ -986,6 +990,13 @@ namespace smt::noodler {
             Concat left = pred.get_params()[0];
             Concat right = pred.get_params()[1];
             if(left.size() == 1 && right.size() == 1) {
+                if(this->init_aut_ass.is_singleton(left[0]) && this->init_aut_ass.is_singleton(right[0])) {
+                    if(mata::nfa::are_equivalent(*this->init_aut_ass.at(left[0]), *this->init_aut_ass.at(right[0]))) {
+                        return l_false;
+                    }
+                }
+            }
+            if(left.size() == 1 && right.size() == 1) {
                 if(this->init_aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
                     mata::nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
                     for(unsigned i = 0; i < nfa_copy.num_of_states(); i++) {
@@ -1009,6 +1020,23 @@ namespace smt::noodler {
             remain_not_contains.add_predicate(pred);
         }
         this->not_contains = remain_not_contains;
+        return l_undef;
+    }
+
+    /**
+     * @brief Syntactically unify not contains terms. If they they are included (in the sense of vectors) the 
+     * not(contain) is unsatisfiable.
+     * 
+     * @param prep FormulaPreprocessor
+     * @return l_false -> unsatisfiable 
+     */
+    lbool DecisionProcedure::unify_not_contains(const FormulaPreprocessor& prep) {
+        for(const Predicate& pred : this->not_contains.get_predicates()) {
+            if(prep.can_unify_contain(pred.get_params()[0], pred.get_params()[1])) {
+                return l_false;
+            }
+
+        }
         return l_undef;
     }
 

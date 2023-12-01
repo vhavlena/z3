@@ -329,8 +329,8 @@ namespace smt::noodler {
         
         bool add_var_separator(const Concat& side, std::map<BasicTerm, std::set<BasicTerm>>& container);
         bool propagate_var_separators(const BasicTerm& dest, const BasicTerm& src, std::map<BasicTerm, std::map<BasicTerm, std::set<BasicTerm>>>& separators);
-        Concat flatten_concat(const Concat& con, std::map<BasicTerm, std::set<Concat>>& replace_map);
-        bool can_unify(const Concat& con1, const Concat& con2);
+        Concat flatten_concat(const Concat& con, std::map<BasicTerm, std::set<Concat>>& replace_map) const;
+        bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
 
@@ -375,6 +375,7 @@ namespace smt::noodler {
         void reduce_diseqalities();
 
         bool contains_unsat_eqs_or_diseqs();
+        bool can_unify_contain(const Concat& left, const Concat& right) const;
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
