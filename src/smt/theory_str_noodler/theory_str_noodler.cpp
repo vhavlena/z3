@@ -1126,7 +1126,7 @@ namespace smt::noodler {
         expr_ref y = mk_str_var_fresh("post_substr");
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
-        
+
         rational rl;
         expr * num_len;
         if(m_util_a.is_numeral(l, rl)) {
@@ -1157,8 +1157,8 @@ namespace smt::noodler {
              this->len_vars.insert(v);
         }
 
-        string_theory_propagation(xe, false, false, true);
-        string_theory_propagation(xey, false, false, true);
+        string_theory_propagation(xe);
+        string_theory_propagation(xey);
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
@@ -1309,8 +1309,8 @@ namespace smt::noodler {
         literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
-        string_theory_propagation(xe, false, false, true);
-        string_theory_propagation(xey, false, false, true);
+        string_theory_propagation(xe);
+        string_theory_propagation(xey);
 
         // create axioms in_substri is Sigma
         for(const expr_ref& val : vars) {
