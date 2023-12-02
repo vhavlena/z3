@@ -1027,6 +1027,16 @@ namespace smt::noodler {
         expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
 
         rational r;
+        
+        zstring str;
+        // handle the case str.at "A" i
+        if(m_util_s.str.is_string(s, str) && str.length() == 1) {
+            add_axiom({~mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, s, false)});
+            add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, emp, false)});
+            add_axiom({mk_eq(fresh, e, false)});
+            predicate_replace.insert(e, fresh.get());
+            return;
+        }
         if(m_util_a.is_numeral(i, r)) {
             int val = r.get_int32();
 
@@ -1386,6 +1396,8 @@ namespace smt::noodler {
 
         // if s = t -> the result is unchanged
         add_axiom({~mk_eq(s, t, false), mk_eq(v, a,false)});
+        // s = eps -> |v| = |a| + |t|
+        add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
 
         zstring str_a;
         // str.replace "A" s t where a = "A"
@@ -1674,6 +1686,18 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
+
+        zstring str;
+        // handle the case not(prefix "ABC" y)
+        if(m_util_s.str.is_string(x, str)) {
+            expr_ref re(m_util_s.re.mk_in_re(y, m_util_s.re.mk_concat(
+                m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
+                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr))
+            ) ), m);
+            literal lit_e = mk_literal(e);
+            add_axiom({lit_e, ~mk_literal(re)});
+            return;
+        }
 
         expr_ref p = mk_str_var_fresh("nprefix_left");
         expr_ref mx = mk_str_var_fresh("nprefix_midx");

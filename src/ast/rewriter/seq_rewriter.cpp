@@ -1843,13 +1843,14 @@ br_status seq_rewriter::mk_seq_index(expr* a, expr* b, expr* c, expr_ref& result
     default:
         break;
     }
-    if (is_zero && !as.empty() && str().is_unit(as.get(0))) {
-        expr_ref a1(str().mk_concat(as.size() - 1, as.data() + 1, as[0]->get_sort()), m());
-        expr_ref b1(str().mk_index(a1, b, c), m());
-        result = m().mk_ite(str().mk_prefix(b, a), zero(), 
-                            m().mk_ite(m_autil.mk_ge(b1, zero()), m_autil.mk_add(one(), b1), minus_one()));
-        return BR_REWRITE3;
-    }
+    // REWRITES
+    // if (is_zero && !as.empty() && str().is_unit(as.get(0))) {
+    //     expr_ref a1(str().mk_concat(as.size() - 1, as.data() + 1, as[0]->get_sort()), m());
+    //     expr_ref b1(str().mk_index(a1, b, c), m());
+    //     result = m().mk_ite(str().mk_prefix(b, a), zero(), 
+    //                         m().mk_ite(m_autil.mk_ge(b1, zero()), m_autil.mk_add(one(), b1), minus_one()));
+    //     return BR_REWRITE3;
+    // }
     expr_ref ra(a, m());
     if (str().is_unit(b) && m().is_value(b) && 
         reduce_by_char(ra, b, 4)) {
