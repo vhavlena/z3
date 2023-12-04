@@ -141,7 +141,7 @@ namespace smt::noodler {
                 len = cmp.num_of_states() - 1;
             else 
                 len = -1;
-            return cmp.num_of_states() == cmp.delta.num_of_transitions() + 1;
+            return (cmp.num_of_states() == cmp.delta.num_of_transitions() + 1) && (cmp.final.size() == 1);
         }
 
         /**

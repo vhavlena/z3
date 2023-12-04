@@ -229,7 +229,7 @@ namespace smt::noodler {
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions) {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
-        if (dec_proc.preprocess(PreprocessType::UNDERAPPROX) == l_false) {
+        if (dec_proc.preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt()) == l_false) {
             return l_false;
         }
 

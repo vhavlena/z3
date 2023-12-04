@@ -1152,7 +1152,21 @@ namespace smt::noodler {
                 for(size_t i = 0; i < std::min(pc1.get_right_side().size(), pc2.get_right_side().size()); i++) {
                     BasicTerm t1 = pc1.get_right_side()[i];
                     BasicTerm t2 = pc2.get_right_side()[i];
-                    if(same_length(ec, t1, t2)) {
+                    if(t1 == t2) {
+                        continue;
+                    } else if(same_length(ec, t1, t2)) {
+                        Predicate new_pred(PredicateType::Equation, {Concat({t1}), Concat({t2})});
+                        new_preds.insert(new_pred);
+                    } else {
+                        break;
+                    }
+                }
+                for(size_t i = std::min(pc1.get_right_side().size(), pc2.get_right_side().size()) - 1; i >= 0; i--) {
+                    BasicTerm t1 = pc1.get_right_side()[i];
+                    BasicTerm t2 = pc2.get_right_side()[i];
+                    if(t1 == t2) {
+                        continue;
+                    } else if(same_length(ec, t1, t2)) {
                         Predicate new_pred(PredicateType::Equation, {Concat({t1}), Concat({t2})});
                         new_preds.insert(new_pred);
                     } else {

@@ -1698,6 +1698,15 @@ namespace smt::noodler {
             add_axiom({lit_e, ~mk_literal(re)});
             return;
         }
+        // handle the case not(prefix x "ABC")
+        if(m_util_s.str.is_string(y, str)) {
+            literal lit_e = mk_literal(e);
+            for(size_t i = 0; i <= str.length(); i++) {
+                zstring substr = str.extract(0, i);
+                add_axiom({lit_e, mk_literal(m.mk_not(m.mk_eq(x, m_util_s.str.mk_string(substr))))});
+            }
+            return;
+        }
 
         expr_ref p = mk_str_var_fresh("nprefix_left");
         expr_ref mx = mk_str_var_fresh("nprefix_midx");
@@ -1745,6 +1754,8 @@ namespace smt::noodler {
         // update length variables
         util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
         util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        this->var_eqs.add(expr_ref(m_util_a.mk_int(1), m), expr_ref(my, m));
+        this->var_eqs.add(expr_ref(m_util_a.mk_int(1), m), expr_ref(mx, m));
     }
 
     /**
@@ -1790,6 +1801,28 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
+        zstring str;
+        // handle the case not(suffix "ABC" y)
+        if(m_util_s.str.is_string(x, str)) {
+            expr_ref re(m_util_s.re.mk_in_re(y, m_util_s.re.mk_concat(
+                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
+                m_util_s.re.mk_to_re(m_util_s.str.mk_string(str))
+            ) ), m);
+            literal lit_e = mk_literal(e);
+            add_axiom({lit_e, ~mk_literal(re)});
+            return;
+        }
+        // handle the case not(suffix x "ABC")
+        if(m_util_s.str.is_string(y, str)) {
+            literal lit_e = mk_literal(e);
+            str = str.reverse();
+            for(size_t i = 0; i <= str.length(); i++) {
+                zstring substr = str.extract(0, i);
+                add_axiom({lit_e, mk_literal(m.mk_not(m.mk_eq(x, m_util_s.str.mk_string(substr))))});
+            }
+            return;
+        }
+
         expr_ref q = mk_str_var_fresh("nsuffix_right");
         expr_ref mx = mk_str_var_fresh("nsuffix_midx");
         expr_ref my = mk_str_var_fresh("nsuffix_midy");
@@ -1829,6 +1862,9 @@ namespace smt::noodler {
         // update length variables
         util::get_str_variables(x, this->m_util_s, m, this->len_vars, &this->predicate_replace);
         util::get_str_variables(y, this->m_util_s, m, this->len_vars, &this->predicate_replace);
+        // my and mx are in the same length-equivalence class: 1
+        this->var_eqs.add(expr_ref(m_util_a.mk_int(1), m), my);
+        this->var_eqs.add(expr_ref(m_util_a.mk_int(1), m), mx);
     }
 
     /**
