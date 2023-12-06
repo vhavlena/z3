@@ -1162,7 +1162,7 @@ namespace smt::noodler {
                     }
                 }
 
-                size_t i = pc1.get_right_side().size() - 1, j = pc2.get_right_side().size() - 1;
+                int i = int(pc1.get_right_side().size() - 1), j = int(pc2.get_right_side().size() - 1);
                 for(; i >= 0 && j >= 0; i--, j--) {
                     BasicTerm t1 = pc1.get_right_side()[i];
                     BasicTerm t2 = pc2.get_right_side()[j];
