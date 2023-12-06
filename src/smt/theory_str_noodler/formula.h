@@ -523,6 +523,15 @@ namespace smt::noodler {
             this->predicates = new_predicates;
         } 
 
+        bool contains_type(PredicateType type) const {
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() == type) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /**
          * @brief Get union of variables from all predicates
          *

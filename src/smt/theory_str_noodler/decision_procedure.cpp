@@ -786,8 +786,10 @@ namespace smt::noodler {
             prep_handler.underapprox_languages();
         }
         prep_handler.propagate_eps();
-        prep_handler.refine_languages();
-        prep_handler.refine_languages();
+        if(this->formula.contains_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
+            prep_handler.refine_languages();
+            prep_handler.refine_languages();
+        }
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();

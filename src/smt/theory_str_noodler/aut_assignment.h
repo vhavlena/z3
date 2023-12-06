@@ -197,6 +197,9 @@ namespace smt::noodler {
          */
         bool is_sat() const {
             for (const auto& pr : *this) {
+                if(pr.second->final.size() == 0) {
+                    return false;
+                }
                 if(pr.second->is_lang_empty())
                     return false;
             }

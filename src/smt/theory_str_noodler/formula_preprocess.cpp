@@ -1161,9 +1161,11 @@ namespace smt::noodler {
                         break;
                     }
                 }
-                for(size_t i = std::min(pc1.get_right_side().size(), pc2.get_right_side().size()) - 1; i >= 0; i--) {
+
+                size_t i = pc1.get_right_side().size() - 1, j = pc2.get_right_side().size() - 1;
+                for(; i >= 0 && j >= 0; i--, j--) {
                     BasicTerm t1 = pc1.get_right_side()[i];
-                    BasicTerm t2 = pc2.get_right_side()[i];
+                    BasicTerm t2 = pc2.get_right_side()[j];
                     if(t1 == t2) {
                         continue;
                     } else if(same_length(ec, t1, t2)) {

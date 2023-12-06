@@ -1451,6 +1451,9 @@ br_status seq_rewriter::mk_seq_contains(expr* a, expr* b, expr_ref& result) {
         }
     }
 
+    // This is for Z3-Noodler as it may itroduce seq.unit functions, which are not supported
+    return BR_FAILED;
+
     unsigned offs = 0;
     unsigned sz = as.size();
     expr* b0 = bs.get(0);
