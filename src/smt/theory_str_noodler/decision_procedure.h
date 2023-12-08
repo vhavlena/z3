@@ -348,7 +348,7 @@ namespace smt::noodler {
          * @param prep FormulaPreprocessor
          * @return l_false -> unsatisfiable 
          */
-        lbool unify_not_contains(const FormulaPreprocessor& prep);
+        lbool can_unify_not_contains(const FormulaPreprocessor& prep);
 
     public:
         

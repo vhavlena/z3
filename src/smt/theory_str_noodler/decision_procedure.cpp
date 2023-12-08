@@ -787,6 +787,9 @@ namespace smt::noodler {
         }
         prep_handler.propagate_eps();
         if(this->formula.contains_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
+            // Refine languages is applied in the order given by the predicates. Single iteration 
+            // might not update crucial variables that could contradict the formula. 
+            // Two iterations seem to be a good trade-off since the automata could explode in the fixpoint.
             prep_handler.refine_languages();
             prep_handler.refine_languages();
         }
@@ -845,7 +848,7 @@ namespace smt::noodler {
         }
 
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        if(replace_not_contains() == l_false || unify_not_contains(prep_handler) == l_false) {
+        if(replace_not_contains() == l_false || can_unify_not_contains(prep_handler) == l_false) {
             return l_false;
         }
 
@@ -1026,13 +1029,13 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Syntactically unify not contains terms. If they they are included (in the sense of vectors) the 
+     * @brief Syntactically unify not contains terms. If they are included (in the sense of vectors) the 
      * not(contain) is unsatisfiable.
      * 
      * @param prep FormulaPreprocessor
      * @return l_false -> unsatisfiable 
      */
-    lbool DecisionProcedure::unify_not_contains(const FormulaPreprocessor& prep) {
+    lbool DecisionProcedure::can_unify_not_contains(const FormulaPreprocessor& prep) {
         for(const Predicate& pred : this->not_contains.get_predicates()) {
             if(prep.can_unify_contain(pred.get_params()[0], pred.get_params()[1])) {
                 return l_false;

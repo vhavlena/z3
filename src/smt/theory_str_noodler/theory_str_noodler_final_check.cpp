@@ -437,8 +437,9 @@ namespace smt::noodler {
         int ln = 0;
         /**
          * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
-         * language of the variable is 1) sigma star (approximated by the first condition) 2) co-finite (complement is a finite language), or 
-         * 3) singleton meaning that the variable is string literal. 
+         * 1) predicates are (dis)equations only and 2) language of the variable is a) sigma star (approximated by 
+         * the first condition) b) co-finite (complement is a finite language), or c) singleton meaning that the 
+         * variable is string literal. 
          */
         for(const Predicate& pred : instance.get_predicates()) {
             if(!pred.is_eq_or_ineq()) {

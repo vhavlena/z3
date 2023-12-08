@@ -1311,14 +1311,6 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::common_prefix_propagation() {
         TermReplaceMap replace_map = construct_replace_map();
-        // for(const auto& pr : this->formula.get_predicates()) {
-        //     if(!pr.second.is_equation()) continue;
-        //     if(pr.second.get_left_side().size() != 1) continue;
-
-        //     const BasicTerm &var = pr.second.get_left_side()[0];
-        //     replace_map[var].insert(pr.second.get_right_side());
-        // }
-
         size_t i = 0;
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation()) continue;
@@ -1480,7 +1472,8 @@ namespace smt::noodler {
     bool FormulaPreprocessor::can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const {
         TermReplaceMap replace_map = construct_replace_map();
 
-        // TODO: make as a parameter (although not sure what to do with that)
+        // TODO: make as a parameter (although not sure how to set it in an optimal way). Moreover this algorithm could be 
+        // rewrited using ideas of LL(1) parsing. Then this parameter becomes useless.
         int max_unifs = 4;
         Concat tmp1 = con1;
         Concat tmp2 = con2;
