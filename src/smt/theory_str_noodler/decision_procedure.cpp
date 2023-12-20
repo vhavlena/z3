@@ -786,6 +786,9 @@ namespace smt::noodler {
             prep_handler.underapprox_languages();
         }
         prep_handler.propagate_eps();
+        // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of 
+        // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of 
+        // pure equalitities it could create bigger automata, which may be problem later during the noodlification.
         if(this->formula.contains_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
             // Refine languages is applied in the order given by the predicates. Single iteration 
             // might not update crucial variables that could contradict the formula. 
@@ -797,6 +800,8 @@ namespace smt::noodler {
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
         prep_handler.remove_regular();
+        // Skip_len_sat is not compatible with not(contains) as the preprocessing may skip equations with variables 
+        // inside not(contains). (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
         if(this->not_contains.get_predicates().empty()) {
             prep_handler.skip_len_sat();
         }
@@ -1029,7 +1034,7 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Syntactically unify not contains terms. If they are included (in the sense of vectors) the 
+     * @brief Check if it is possible to syntactically unify not contains terms. If they are included (in the sense of vectors) the 
      * not(contain) is unsatisfiable.
      * 
      * @param prep FormulaPreprocessor

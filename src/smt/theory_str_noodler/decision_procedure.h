@@ -338,11 +338,12 @@ namespace smt::noodler {
 
         /**
          * @brief Construct constraints to get rid of not_contains predicates.
+         * @return l_false -> unsatisfiable constaint; l_undef if it is not evident
          */
         lbool replace_not_contains();
 
         /**
-         * @brief Syntactically unify not contains terms. If they they are included (in the sense of vectors) the 
+         * @brief Check if it is possible to syntactically unify not contains terms. If they they are included (in the sense of vectors) the 
          * not(contain) is unsatisfiable.
          * 
          * @param prep FormulaPreprocessor
