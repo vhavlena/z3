@@ -343,7 +343,7 @@ namespace smt::noodler {
         lbool replace_not_contains();
 
         /**
-         * @brief Check if it is possible to syntactically unify not contains terms. If they they are included (in the sense of vectors) the 
+         * @brief Check if it is possible to syntactically unify not contains terms. If they are included (in the sense of vectors) the 
          * not(contain) is unsatisfiable.
          * 
          * @param prep FormulaPreprocessor
