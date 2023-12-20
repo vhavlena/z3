@@ -347,7 +347,7 @@ namespace smt::noodler {
          * not(contain) is unsatisfiable.
          * 
          * @param prep FormulaPreprocessor
-         * @return l_false -> unsatisfiable 
+         * @return l_true -> can be unified 
          */
         lbool can_unify_not_contains(const FormulaPreprocessor& prep);
 

@@ -853,7 +853,7 @@ namespace smt::noodler {
         }
 
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        if(replace_not_contains() == l_false || can_unify_not_contains(prep_handler) == l_false) {
+        if(replace_not_contains() == l_false || can_unify_not_contains(prep_handler) == l_true) {
             return l_false;
         }
 
@@ -1038,12 +1038,12 @@ namespace smt::noodler {
      * not(contain) is unsatisfiable.
      * 
      * @param prep FormulaPreprocessor
-     * @return l_false -> unsatisfiable 
+     * @return l_true -> can be unified
      */
     lbool DecisionProcedure::can_unify_not_contains(const FormulaPreprocessor& prep) {
         for(const Predicate& pred : this->not_contains.get_predicates()) {
             if(prep.can_unify_contain(pred.get_params()[0], pred.get_params()[1])) {
-                return l_false;
+                return l_true;
             }
 
         }
