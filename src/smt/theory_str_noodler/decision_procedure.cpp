@@ -789,7 +789,7 @@ namespace smt::noodler {
         // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of 
         // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of 
         // pure equalitities it could create bigger automata, which may be problem later during the noodlification.
-        if(this->formula.contains_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
+        if(this->formula.contains_pred_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
             // Refine languages is applied in the order given by the predicates. Single iteration 
             // might not update crucial variables that could contradict the formula. 
             // Two iterations seem to be a good trade-off since the automata could explode in the fixpoint.
