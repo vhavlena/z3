@@ -800,9 +800,9 @@ namespace smt::noodler {
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
         prep_handler.remove_regular();
-        // Skip_len_sat is not compatible with not(contains) as the preprocessing may skip equations with variables 
-        // inside not(contains). (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
-        if(this->not_contains.get_predicates().empty()) {
+        // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
+        // inside not(contains)/conversion. (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
+        if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
             prep_handler.skip_len_sat();
         }
         prep_handler.generate_identities();

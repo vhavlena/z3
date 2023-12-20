@@ -433,7 +433,10 @@ namespace smt::noodler {
         return incl.is_cyclic();
     }
 
-    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const {
+    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass, const std::vector<TermConversion>& convs) const {
+        if(!convs.empty()) {
+            return false;
+        }
         int ln = 0;
         /**
          * Check each variable occurring within the instance. The instance is suitable for underapproximation if 

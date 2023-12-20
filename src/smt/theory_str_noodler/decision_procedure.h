@@ -30,6 +30,9 @@ namespace smt::noodler {
         FROM_INT,
     };
 
+    // Term conversion: to_int/from_int ...
+    using TermConversion = std::tuple<BasicTerm,BasicTerm,ConversionType>;
+
     inline std::string get_conversion_name(ConversionType type) {
         switch (type)
         {
@@ -307,7 +310,7 @@ namespace smt::noodler {
         Formula formula;
         AutAssignment init_aut_ass;
         // contains to/from_code/int conversions
-        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions;
+        std::vector<TermConversion> conversions;
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
@@ -370,7 +373,7 @@ namespace smt::noodler {
              Formula formula, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
              const theory_str_noodler_params &par,
-             std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions
+             std::vector<TermConversion> conversions
         ) : init_length_sensitive_vars(init_length_sensitive_vars),
             formula(formula),
             init_aut_ass(init_aut_ass),

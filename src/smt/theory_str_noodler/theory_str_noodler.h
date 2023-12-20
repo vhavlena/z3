@@ -304,7 +304,7 @@ namespace smt::noodler {
          * Side effect: string variables in conversions which are not mapped in the automata
          * assignment @p ass will be mapped to sigma* after this.
          */
-        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
+        std::vector<TermConversion> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them
@@ -351,9 +351,10 @@ namespace smt::noodler {
          * 
          * @param instance Current instance converted to Formula
          * @param aut_ass Current automata assignment
+         * @param convs String-Int conversions
          * @return true <-> suitable for underapproximation
          */
-        bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const;
+        bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass, const std::vector<TermConversion>& convs) const;
 
         /**
          * @brief Wrapper for running the Nielsen transformation.
