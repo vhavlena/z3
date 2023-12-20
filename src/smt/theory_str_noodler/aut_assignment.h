@@ -141,7 +141,7 @@ namespace smt::noodler {
                 len = cmp.num_of_states() - 1;
             else 
                 len = -1;
-            return cmp.num_of_states() == cmp.delta.num_of_transitions() + 1;
+            return (cmp.num_of_states() == cmp.delta.num_of_transitions() + 1) && (cmp.final.size() == 1);
         }
 
         /**
@@ -157,6 +157,19 @@ namespace smt::noodler {
             mata::nfa::Nfa aut = *this->at(t);
             aut.trim();
             return aut.num_of_states() == aut.delta.num_of_transitions() + 1 && aut.initial.size() == 1 && aut.final.size() == 1;
+        }
+
+        /**
+         * @brief Check if the given terms have disjoint languages.
+         * 
+         * @param t1 First term
+         * @param t2 Second term
+         * @return true <-> L(t1) and L(t2) are disjoint.
+         */
+        bool are_disjoint(const BasicTerm &t1, const BasicTerm& t2) const {
+            mata::nfa::Nfa aut_t1 = *this->at(t1);
+            mata::nfa::Nfa aut_t2 = *this->at(t2);
+            return  mata::nfa::intersection(aut_t1, aut_t2).is_lang_empty();
         }
 
         /**
@@ -184,6 +197,9 @@ namespace smt::noodler {
          */
         bool is_sat() const {
             for (const auto& pr : *this) {
+                if(pr.second->final.size() == 0) {
+                    return false;
+                }
                 if(pr.second->is_lang_empty())
                     return false;
             }

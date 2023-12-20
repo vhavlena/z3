@@ -229,7 +229,7 @@ namespace smt::noodler {
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> conversions) {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
-        if (dec_proc.preprocess(PreprocessType::UNDERAPPROX) == l_false) {
+        if (dec_proc.preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt()) == l_false) {
             return l_false;
         }
 
@@ -296,6 +296,11 @@ namespace smt::noodler {
                 ctx.internalize(in_app, false);
             }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
+        }
+
+        for(const auto& nc : this->m_not_contains_todo_rel) {
+            app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
+            refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
         }
         
         if(m_params.m_loop_protect && add_axiomatized) {
@@ -430,14 +435,21 @@ namespace smt::noodler {
         return incl.is_cyclic();
     }
 
-    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const {
+    bool theory_str_noodler::is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass, const std::vector<TermConversion>& convs) const {
+        if(!convs.empty()) {
+            return false;
+        }
         int ln = 0;
         /**
          * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
-         * language of the variable is 1) sigma star (approximated by the first condition) 2) co-finite (complement is a finite language), or 
-         * 3) singleton meaning that the variable is string literal. 
+         * 1) predicates are (dis)equations only and 2) language of the variable is a) sigma star (approximated by 
+         * the first condition) b) co-finite (complement is a finite language), or c) singleton meaning that the 
+         * variable is string literal. 
          */
         for(const Predicate& pred : instance.get_predicates()) {
+            if(!pred.is_eq_or_ineq()) {
+                return false;
+            }
             for(const BasicTerm& var : pred.get_vars()) {
                 
                 if(aut_ass.at(var)->num_of_states() <= 1) {

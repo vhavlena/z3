@@ -34,6 +34,7 @@ Eternal glory to Yu-Fang.
 #include "decision_procedure.h"
 #include "expr_solver.h"
 #include "util.h"
+#include "expr_cases.h"
 #include "regex.h"
 #include "var_union_find.h"
 #include "nielsen_decision_procedure.h"
@@ -226,9 +227,17 @@ namespace smt::noodler {
         void set_conflict(const literal_vector& ls);
 
         expr_ref construct_refinement();
-        void string_theory_propagation(expr * ex, bool init = false, bool neg = false);
+        /**
+         * @brief Introduce string axioms for a formula @p ex. 
+         * 
+         * @param ex Formula whose terms should be inspected.
+         * @param init Is it an initial string formula (formula from input)?
+         * @param neg Is the formula under negation?
+         * @param var_lengths Introduce lengths axioms for variables of the form x = eps -> |x| = 0? 
+         */
+        void string_theory_propagation(expr * ex, bool init = false, bool neg = false, bool var_lengths = false);
         void propagate_concat_axiom(enode * cat);
-        void propagate_basic_string_axioms(enode * str);
+        void propagate_basic_string_axioms(enode * str, bool var_lengths = false);
 
         /**
          * Creates theory axioms that hold iff either any of the negated assumption from @p neg_assumptions holds,
@@ -298,7 +307,7 @@ namespace smt::noodler {
          * Side effect: string variables in conversions which are not mapped in the automata
          * assignment @p ass will be mapped to sigma* after this.
          */
-        std::vector<std::tuple<BasicTerm,BasicTerm,ConversionType>> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
+        std::vector<TermConversion> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them
@@ -346,9 +355,10 @@ namespace smt::noodler {
          * 
          * @param instance Current instance converted to Formula
          * @param aut_ass Current automata assignment
+         * @param convs String-Int conversions
          * @return true <-> suitable for underapproximation
          */
-        bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass) const;
+        bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass, const std::vector<TermConversion>& convs) const;
 
         /**
          * @brief Wrapper for running the Nielsen transformation.

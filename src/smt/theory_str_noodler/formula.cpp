@@ -3,7 +3,6 @@
 
 namespace smt::noodler {
     std::set<BasicTerm> Predicate::get_vars() const {
-        assert(is_eq_or_ineq());
         std::set<BasicTerm> vars;
         for (const auto& side: params) {
             for (const auto &term: side) {

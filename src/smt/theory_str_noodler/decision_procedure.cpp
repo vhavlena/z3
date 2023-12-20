@@ -780,14 +780,31 @@ namespace smt::noodler {
         FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
         // So-far just lightweight preprocessing
+        prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
         if (opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
         }
+        prep_handler.propagate_eps();
+        // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of 
+        // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of 
+        // pure equalitities it could create bigger automata, which may be problem later during the noodlification.
+        if(this->formula.contains_pred_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
+            // Refine languages is applied in the order given by the predicates. Single iteration 
+            // might not update crucial variables that could contradict the formula. 
+            // Two iterations seem to be a good trade-off since the automata could explode in the fixpoint.
+            prep_handler.refine_languages();
+            prep_handler.refine_languages();
+        }
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
+        prep_handler.infer_alignment();
         prep_handler.remove_regular();
-        prep_handler.skip_len_sat();
+        // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
+        // inside not(contains)/conversion. (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
+        if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
+            prep_handler.skip_len_sat();
+        }
         prep_handler.generate_identities();
         prep_handler.propagate_variables();
         prep_handler.refine_languages();
@@ -808,6 +825,7 @@ namespace smt::noodler {
             }   
         );
         prep_handler.generate_equiv(len_eq_vars);
+        prep_handler.common_prefix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
         prep_handler.remove_regular();
@@ -820,6 +838,8 @@ namespace smt::noodler {
             prep_handler.remove_regular();
             prep_handler.skip_len_sat();
         }
+        prep_handler.reduce_regular_sequence(1);
+        prep_handler.remove_regular();
 
         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
@@ -827,8 +847,15 @@ namespace smt::noodler {
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
 
+        if (!this->init_aut_ass.is_sat()) {
+            // some automaton in the assignment is empty => we won't find solution
+            return l_false;
+        }
+
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        replace_not_contains();
+        if(replace_not_contains() == l_false || can_unify_not_contains(prep_handler) == l_true) {
+            return l_false;
+        }
 
         // there remains some not contains --> return undef
         if(this->not_contains.get_predicates().size() > 0) {
@@ -967,11 +994,18 @@ namespace smt::noodler {
      * lit is a literal by a regular constraint x notin Alit' where  Alit' was obtained from A(lit) by setting all 
      * states initial and final. 
      */
-    void DecisionProcedure::replace_not_contains() {
+    lbool DecisionProcedure::replace_not_contains() {
         Formula remain_not_contains{};
         for(const Predicate& pred : this->not_contains.get_predicates()) {
             Concat left = pred.get_params()[0];
             Concat right = pred.get_params()[1];
+            if(left.size() == 1 && right.size() == 1) {
+                if(this->init_aut_ass.is_singleton(left[0]) && this->init_aut_ass.is_singleton(right[0])) {
+                    if(mata::nfa::are_equivalent(*this->init_aut_ass.at(left[0]), *this->init_aut_ass.at(right[0]))) {
+                        return l_false;
+                    }
+                }
+            }
             if(left.size() == 1 && right.size() == 1) {
                 if(this->init_aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
                     mata::nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
@@ -990,9 +1024,30 @@ namespace smt::noodler {
                     continue;
                 }
             }
+            if(right.size() == 1 && this->init_aut_ass.is_epsilon(right[0])) {
+                return l_false;
+            }
             remain_not_contains.add_predicate(pred);
         }
         this->not_contains = remain_not_contains;
+        return l_undef;
+    }
+
+    /**
+     * @brief Check if it is possible to syntactically unify not contains terms. If they are included (in the sense of vectors) the 
+     * not(contain) is unsatisfiable.
+     * 
+     * @param prep FormulaPreprocessor
+     * @return l_true -> can be unified
+     */
+    lbool DecisionProcedure::can_unify_not_contains(const FormulaPreprocessor& prep) {
+        for(const Predicate& pred : this->not_contains.get_predicates()) {
+            if(prep.can_unify_contain(pred.get_params()[0], pred.get_params()[1])) {
+                return l_true;
+            }
+
+        }
+        return l_undef;
     }
 
 } // Namespace smt::noodler.

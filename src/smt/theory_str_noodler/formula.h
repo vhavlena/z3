@@ -533,6 +533,21 @@ namespace smt::noodler {
         } 
 
         /**
+         * @brief Does the Formula contain a predicate of a type @p type ?
+         * 
+         * @param type Type of the predicate.
+         * @return true <-> Formula contains predicate of type @p type.
+         */
+        bool contains_pred_type(PredicateType type) const {
+            for(const Predicate& pred : this->predicates) {
+                if(pred.get_type() == type) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
          * @brief Get union of variables from all predicates
          *
          * @return std::set<BasicTerm> Variables
