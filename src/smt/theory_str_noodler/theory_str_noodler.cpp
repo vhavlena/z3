@@ -826,7 +826,7 @@ namespace smt::noodler {
 
 
         // There is only one symbol in the equation. The system is SAT iff lengths are SAT
-        if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) { // dummy symbol + 1
+        if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
                 return FC_DONE;
