@@ -50,7 +50,7 @@ TEST_CASE("theory_str_noodler::util") {
         auto expr_hex_char2{ m_util_s.re.mk_to_re(m_util_s.str.mk_string("wy\x02")) };
         auto expr_concat{ m_util_s.re.mk_concat(expr_hex_char, m_util_s.re.mk_star(expr_hex_char2)) };
 
-        util::extract_symbols(expr_concat, m_util_s, m, alphabet);
+        noodler.extract_symbols(expr_concat, alphabet);
         CHECK(alphabet == std::set<uint32_t>{ '\x02', '\x45', '\x77', '\x78', '\x79', '\x7a' });
     }
 
