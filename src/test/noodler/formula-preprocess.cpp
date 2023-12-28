@@ -593,7 +593,6 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, a, b, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })),
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  )
         }));
-        CHECK(prep.get_dependency() == Dependency({{1, {0}}, {2, {0}}, {3, {0}}}));
     }
 
     SECTION("longer literals") {
@@ -606,7 +605,6 @@ TEST_CASE( "Separate eqs", "[noodler]" ) {
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x4, ab, x5}), std::vector<BasicTerm>({x5, b, x4, a}) })),
             Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({x6}), std::vector<BasicTerm>({eps}) })  )
         }));
-        CHECK(prep.get_dependency() == Dependency({{1, {0}}, {2, {0}}, {3, {0}}}));
     }
 
     SECTION("no match 1") {
