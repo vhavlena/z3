@@ -113,7 +113,7 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         REQUIRE(proc.solution.substitution_map.at(get_var('x')).size() == 1);
         CHECK(z_tmp_var == proc.solution.substitution_map.at(get_var('x'))[0]);
         REQUIRE(proc.solution.aut_ass.count(z_tmp_var) > 0);
-        CHECK(Mata::Nfa::are_equivalent(*(proc.solution.aut_ass.at(z_subst[0])), *regex_to_nfa("a")));
+        CHECK(mata::nfa::are_equivalent(*(proc.solution.aut_ass.at(z_subst[0])), *regex_to_nfa("a")));
 
         CHECK(proc.solution.substitution_map.count(get_var('u')) + proc.solution.substitution_map.count(get_var('y')) == 1);
         CHECK(proc.solution.aut_ass.count(get_var('u')) + proc.solution.aut_ass.count(get_var('y')) == 1);
@@ -184,8 +184,8 @@ TEST_CASE("Decision Procedure", "[noodler]") {
         REQUIRE(proc.compute_next_solution());
 
         proc.solution.flatten_substition_map();
-        CHECK(Mata::Nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('x'))), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('z'))), *regex_to_nfa("a")));
+        CHECK(mata::nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('x'))), *regex_to_nfa("a")));
+        CHECK(mata::nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('z'))), *regex_to_nfa("a")));
 
         // FIXME: Length formula len is different than formula from lambda. Hashes are not equal.
         // auto l_vars = { BasicTerm(BasicTermType::Variable, "x"), BasicTerm(BasicTermType::Variable, "z") };
@@ -239,9 +239,9 @@ TEST_CASE("Decision Procedure", "[noodler]") {
 
         REQUIRE(proc.compute_next_solution());
         proc.solution.flatten_substition_map();
-        CHECK(Mata::Nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('x'))), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('z'))), *regex_to_nfa("a")));
-        CHECK(Mata::Nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('r'))), *regex_to_nfa("aa")));
+        CHECK(mata::nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('x'))), *regex_to_nfa("a")));
+        CHECK(mata::nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('z'))), *regex_to_nfa("a")));
+        CHECK(mata::nfa::are_equivalent(proc.solution.aut_ass.get_automaton_concat(proc.solution.substitution_map.at(get_var('r'))), *regex_to_nfa("aa")));
 
         CHECK(proc.compute_next_solution() == lbool::l_false);
     }

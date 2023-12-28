@@ -84,7 +84,7 @@ TEST_CASE("Conversion to strings", "[noodler]") {
 }
 
 TEST_CASE("Mata integration", "[noodler]") {
-    auto nfa = Mata::Nfa::Nfa(3);
+    auto nfa = mata::nfa::Nfa(3);
     nfa.initial = { 0, 1};
     nfa.final = { 3, 1};
     nfa.delta.add(0, 42, 1);
