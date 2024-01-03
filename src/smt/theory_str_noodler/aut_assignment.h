@@ -124,24 +124,19 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Is language complement of a singleton?
+         * @brief Is language complement of a finite language?
          * 
          * @param t Variable whose language to be checked
-         * @param[out] len Length of the word missing in the language
-         * @return true Is complement of a word
+         * @return true Is complement of a finite language
          */
-        bool is_co_finite(const BasicTerm& t, int& len) const {
+        bool is_co_finite(const BasicTerm& t) const {
             mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : this->alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
 
             mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
-            if(!cmp.is_lang_empty())
-                len = cmp.num_of_states() - 1;
-            else 
-                len = -1;
-            return (cmp.num_of_states() == cmp.delta.num_of_transitions() + 1) && (cmp.final.size() == 1);
+            return cmp.trim().is_acyclic();
         }
 
         /**

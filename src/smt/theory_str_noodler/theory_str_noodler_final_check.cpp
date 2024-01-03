@@ -439,7 +439,6 @@ namespace smt::noodler {
         if(!convs.empty()) {
             return false;
         }
-        int ln = 0;
         /**
          * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
          * 1) predicates are (dis)equations only and 2) language of the variable is a) sigma star (approximated by 
@@ -455,7 +454,7 @@ namespace smt::noodler {
                 if(aut_ass.at(var)->num_of_states() <= 1) {
                     continue;
                 }
-                if(aut_ass.is_co_finite(var, ln)) {
+                if(aut_ass.is_co_finite(var)) {
                     continue;
                 }
                 if(aut_ass.is_singleton(var)) {

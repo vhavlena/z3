@@ -1381,12 +1381,9 @@ namespace smt::noodler {
     void FormulaPreprocessor::underapprox_languages() {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
-                int ln = 0;
-                if(this->aut_ass.is_co_finite(var, ln) && ln >= 0) {
-                    LenNode right = LenNode(BasicTerm(BasicTermType::Length, std::to_string(ln)));
-                    LenNode left = LenNode(var);
-                    LenNode eq = LenNode(LenFormulaType::EQ, {left, right});
-                    this->add_to_len_formula(LenNode(LenFormulaType::NOT, {eq}));
+                if(this->aut_ass.is_co_finite(var)) {
+                    LenNode lengths = this->aut_ass.get_lengths(var);
+                    this->add_to_len_formula(LenNode(LenFormulaType::NOT, {lengths}));
                     this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
                     this->len_variables.insert(var);
                 }
