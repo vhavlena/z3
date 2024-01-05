@@ -248,6 +248,15 @@ namespace smt::noodler {
         LenNode get_lengths(const BasicTerm& var) const;
 
         /**
+         * @brief Get the lengths formula representing all possible lengths of the automaton for @p var and corresponding NFA @p aut.
+         * 
+         * @param aut Automaton
+         * @param var Variable
+         * @return LenNode 
+         */
+        static LenNode get_lengths(const mata::nfa::Nfa& aut, const BasicTerm& var);
+
+        /**
          * Create NFA accepting a word in Z3 zstring representation.
          * @param word Word to accept.
          * @return NFA.

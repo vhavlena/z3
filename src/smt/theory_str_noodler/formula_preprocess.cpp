@@ -1382,7 +1382,13 @@ namespace smt::noodler {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 if(this->aut_ass.is_co_finite(var)) {
-                    LenNode lengths = this->aut_ass.get_lengths(var);
+                    auto alphabet =  this->aut_ass.get_alphabet(false);
+                    mata::OnTheFlyAlphabet mata_alphabet{};
+                    for (const auto& symbol : alphabet) {
+                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+                    }
+                    mata::nfa::Nfa aut_compl = mata::nfa::complement(*(this->aut_ass.at(var)), mata_alphabet);
+                    LenNode lengths = AutAssignment::get_lengths(aut_compl, var);
                     this->add_to_len_formula(LenNode(LenFormulaType::NOT, {lengths}));
                     this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
                     this->len_variables.insert(var);
