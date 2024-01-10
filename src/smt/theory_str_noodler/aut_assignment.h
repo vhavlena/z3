@@ -249,10 +249,6 @@ namespace smt::noodler {
 
         /**
          * @brief Get the lengths formula representing all possible lengths of the automaton for @p var and corresponding NFA @p aut.
-         * 
-         * @param aut Automaton
-         * @param var Variable
-         * @return LenNode 
          */
         static LenNode get_lengths(const mata::nfa::Nfa& aut, const BasicTerm& var);
 
@@ -262,6 +258,31 @@ namespace smt::noodler {
          * @return NFA.
          */
         static mata::nfa::Nfa create_word_nfa(const zstring& word);
+
+        /**
+         * @brief Complement the given automaton wrt the alphabet induced by the AutAssignment.
+         * 
+         * @param aut Automaton to be complemented
+         * @return mata::nfa::Nfa 
+         */
+        mata::nfa::Nfa complement_aut(mata::nfa::Nfa& aut) {
+            auto alphabet =  this->get_alphabet(false);
+            mata::OnTheFlyAlphabet mata_alphabet{};
+            for (const auto& symbol : alphabet) {
+                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+            }
+            return mata::nfa::complement(aut, mata_alphabet);
+        }
+
+        /**
+         * @brief Get complement of the term language wrt the alphabet induced by the AutAssignment. 
+         * 
+         * @param t Term 
+         * @return mata::nfa::Nfa 
+         */
+        mata::nfa::Nfa complement_lang(const BasicTerm& t) {
+            return complement_aut(*(this->at(t)));
+        }
 
     };
 

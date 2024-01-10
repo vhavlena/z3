@@ -1382,12 +1382,7 @@ namespace smt::noodler {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 if(this->aut_ass.is_co_finite(var)) {
-                    auto alphabet =  this->aut_ass.get_alphabet(false);
-                    mata::OnTheFlyAlphabet mata_alphabet{};
-                    for (const auto& symbol : alphabet) {
-                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-                    }
-                    mata::nfa::Nfa aut_compl = mata::nfa::complement(*(this->aut_ass.at(var)), mata_alphabet);
+                    mata::nfa::Nfa aut_compl = this->aut_ass.complement_lang(var);
                     LenNode lengths = AutAssignment::get_lengths(aut_compl, var);
                     this->add_to_len_formula(LenNode(LenFormulaType::NOT, {lengths}));
                     this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
@@ -1422,12 +1417,7 @@ namespace smt::noodler {
                     continue;
                 }
                 if(pr.second.get_right_side().size() < 1 || (pr.second.get_right_side().size() == 1 && pr.second.get_right_side()[0].is_literal())) {
-                    auto alphabet =  this->aut_ass.get_alphabet(false);
-                    mata::OnTheFlyAlphabet mata_alphabet{};
-                    for (const auto& symbol : alphabet) {
-                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-                    }
-                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), mata::nfa::complement(other, mata_alphabet)));
+                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), this->aut_ass.complement_aut(other)));
                     rem_ids.insert(pr.first);
                     continue;
                 }
@@ -1440,12 +1430,7 @@ namespace smt::noodler {
                     continue;
                 }
                 if(pr.second.get_left_side().size() < 1 || (pr.second.get_left_side().size() == 1 && pr.second.get_left_side()[0].is_literal())) {
-                    auto alphabet =  this->aut_ass.get_alphabet(false);
-                    mata::OnTheFlyAlphabet mata_alphabet{};
-                    for (const auto& symbol : alphabet) {
-                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-                    }
-                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), mata::nfa::complement(other, mata_alphabet)));
+                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), this->aut_ass.complement_aut(other)));
                     rem_ids.insert(pr.first);
                     continue;
                 }

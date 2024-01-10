@@ -1015,12 +1015,7 @@ namespace smt::noodler {
                         nfa_copy.final.insert(i);
                     }
 
-                    mata::OnTheFlyAlphabet mata_alphabet{};
-                    for (const auto& symbol : this->init_aut_ass.get_alphabet()) {
-                        mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-                    }
-
-                    mata::nfa::Nfa complement = mata::nfa::complement(nfa_copy, mata_alphabet);
+                    mata::nfa::Nfa complement = this->init_aut_ass.complement_aut(nfa_copy);
                     this->init_aut_ass.restrict_lang(right[0], complement);
                     continue;
                 }
