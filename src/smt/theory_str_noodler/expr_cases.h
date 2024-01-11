@@ -42,5 +42,8 @@ namespace smt::noodler::expr_cases {
  */
 bool is_contains_index(expr* e, expr*& ind, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a);
 
+
+bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& ind);
+
 }
 #endif

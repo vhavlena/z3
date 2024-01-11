@@ -1172,6 +1172,20 @@ namespace smt::noodler {
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
+        } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
+            expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
+            expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
+
+            literal l_gt_zero = mk_literal(m_util_a.mk_gt(l, zero));
+
+            string_theory_propagation(xey);
+            add_axiom({~l_gt_zero, mk_literal(substr_in)});
+            add_axiom({~l_gt_zero, mk_eq(xey, s, false)});
+            add_axiom({l_gt_zero, mk_eq(v, eps, false)});
+            this->predicate_replace.insert(e, v.get());
+            // update length variables
+            util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+            return;
         } else {
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
              add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
@@ -1398,6 +1412,23 @@ namespace smt::noodler {
         context& ctx = get_context();
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
+
+        expr* indexof = nullptr;
+        if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
+            expr_ref minus_one(m_util_a.mk_int(-1), m);
+            expr_ref v = mk_str_var_fresh("replace");
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
+            expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
+            expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
+
+            add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
+            add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
         expr_ref v = mk_str_var_fresh("replace");
         expr_ref x = mk_str_var_fresh("replace_left");
         expr_ref y = mk_str_var_fresh("replace_right");
