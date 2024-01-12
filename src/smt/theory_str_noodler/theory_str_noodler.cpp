@@ -1176,12 +1176,13 @@ namespace smt::noodler {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
 
-            literal l_gt_zero = mk_literal(m_util_a.mk_gt(l, zero));
-
+            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
             string_theory_propagation(xey);
-            add_axiom({~l_gt_zero, mk_literal(substr_in)});
-            add_axiom({~l_gt_zero, mk_eq(xey, s, false)});
-            add_axiom({l_gt_zero, mk_eq(v, eps, false)});
+            add_axiom({~l_ge_zero, mk_literal(substr_in)});
+            add_axiom({~l_ge_zero, mk_eq(xey, s, false)});
+            add_axiom({~l_ge_zero, mk_eq(le, l, false)});
+            add_axiom({l_ge_zero, mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, e, false)});
             this->predicate_replace.insert(e, v.get());
             // update length variables
             util::get_str_variables(s, this->m_util_s, m, this->len_vars);

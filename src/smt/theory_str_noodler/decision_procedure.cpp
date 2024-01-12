@@ -839,8 +839,7 @@ namespace smt::noodler {
             prep_handler.remove_regular();
             prep_handler.skip_len_sat();
         }
-        // TODO: remove
-        // prep_handler.reduce_regular_sequence(1);
+        prep_handler.reduce_regular_sequence(1);
         prep_handler.remove_regular();
 
         // Refresh the instance
