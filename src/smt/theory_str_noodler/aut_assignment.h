@@ -124,24 +124,19 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Is language complement of a singleton?
+         * @brief Is language complement of a finite language?
          * 
          * @param t Variable whose language to be checked
-         * @param[out] len Length of the word missing in the language
-         * @return true Is complement of a word
+         * @return true Is complement of a finite language
          */
-        bool is_co_finite(const BasicTerm& t, int& len) const {
+        bool is_co_finite(const BasicTerm& t) const {
             mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : this->alphabet) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
 
             mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
-            if(!cmp.is_lang_empty())
-                len = cmp.num_of_states() - 1;
-            else 
-                len = -1;
-            return (cmp.num_of_states() == cmp.delta.num_of_transitions() + 1) && (cmp.final.size() == 1);
+            return cmp.trim().is_acyclic();
         }
 
         /**
@@ -253,11 +248,41 @@ namespace smt::noodler {
         LenNode get_lengths(const BasicTerm& var) const;
 
         /**
+         * @brief Get the lengths formula representing all possible lengths of the automaton for @p var and corresponding NFA @p aut.
+         */
+        static LenNode get_lengths(const mata::nfa::Nfa& aut, const BasicTerm& var);
+
+        /**
          * Create NFA accepting a word in Z3 zstring representation.
          * @param word Word to accept.
          * @return NFA.
          */
         static mata::nfa::Nfa create_word_nfa(const zstring& word);
+
+        /**
+         * @brief Complement the given automaton wrt the alphabet induced by the AutAssignment.
+         * 
+         * @param aut Automaton to be complemented
+         * @return mata::nfa::Nfa 
+         */
+        mata::nfa::Nfa complement_aut(mata::nfa::Nfa& aut) {
+            auto alphabet =  this->get_alphabet(false);
+            mata::OnTheFlyAlphabet mata_alphabet{};
+            for (const auto& symbol : alphabet) {
+                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+            }
+            return mata::nfa::complement(aut, mata_alphabet);
+        }
+
+        /**
+         * @brief Get complement of the term language wrt the alphabet induced by the AutAssignment. 
+         * 
+         * @param t Term 
+         * @return mata::nfa::Nfa 
+         */
+        mata::nfa::Nfa complement_lang(const BasicTerm& t) {
+            return complement_aut(*(this->at(t)));
+        }
 
     };
 
