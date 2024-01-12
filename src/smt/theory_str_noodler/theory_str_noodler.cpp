@@ -1175,10 +1175,12 @@ namespace smt::noodler {
         } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
+            expr_ref ly(m_util_s.str.mk_length(y), m);
 
             literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
             string_theory_propagation(xey);
             add_axiom({~l_ge_zero, mk_literal(substr_in)});
+            add_axiom({~l_ge_zero, mk_eq(ly, m_util_a.mk_int(1), false)});
             add_axiom({~l_ge_zero, mk_eq(xey, s, false)});
             add_axiom({~l_ge_zero, mk_eq(le, l, false)});
             add_axiom({l_ge_zero, mk_eq(v, eps, false)});
@@ -1186,6 +1188,7 @@ namespace smt::noodler {
             this->predicate_replace.insert(e, v.get());
             // update length variables
             util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+            this->var_eqs.add(expr_ref(l, m), v);
             return;
         } else {
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
@@ -1414,22 +1417,6 @@ namespace smt::noodler {
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
 
-        expr* indexof = nullptr;
-        if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
-            expr_ref minus_one(m_util_a.mk_int(-1), m);
-            expr_ref v = mk_str_var_fresh("replace");
-            expr_ref eps(m_util_s.str.mk_string(""), m);
-            literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
-            expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
-            expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
-
-            add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
-            add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
-            return;
-        }
-
         expr_ref v = mk_str_var_fresh("replace");
         expr_ref x = mk_str_var_fresh("replace_left");
         expr_ref y = mk_str_var_fresh("replace_right");
@@ -1443,6 +1430,25 @@ namespace smt::noodler {
         add_axiom({~mk_eq(s, t, false), mk_eq(v, a,false)});
         // s = eps -> |v| = |a| + |t|
         add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
+
+        expr* indexof = nullptr;
+        if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
+            expr_ref minus_one(m_util_a.mk_int(-1), m);
+            expr_ref v = mk_str_var_fresh("replace");
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
+            expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
+            expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
+
+
+            // s = eps -> v = t.a
+            add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
+            add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
+            add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
 
         zstring str_a, str_b;
         // str.replace "A" s t where a = "A"
