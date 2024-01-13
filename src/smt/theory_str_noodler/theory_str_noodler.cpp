@@ -1172,7 +1172,7 @@ namespace smt::noodler {
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
+        } else if(false && m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
             expr_ref ly(m_util_s.str.mk_length(y), m);
