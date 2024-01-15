@@ -49,4 +49,16 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
     return false;
 } 
 
+bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& val, expr*& ind_find) {
+    expr * ind = nullptr, *ind_str = nullptr, *ind_start = nullptr;
+    if(m_util_a.is_add(e, val, ind) && m_util_s.str.is_index(ind, ind_str, ind_find, ind_start)) {
+        if(ind_str->hash() != index_str->hash()) {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+
 }

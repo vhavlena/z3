@@ -45,5 +45,9 @@ bool is_contains_index(expr* e, expr*& ind, ast_manager& m, seq_util& m_util_s, 
 
 bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& ind);
 
+
+bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& val, expr*& ind_find);
+
+
 }
 #endif

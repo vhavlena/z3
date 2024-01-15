@@ -1127,11 +1127,35 @@ namespace smt::noodler {
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
+        // expr_ref iplusl(m_util_a.mk_add(l, i), m);
+        // m_rewrite(iplusl);
+        // literal nopost = mk_literal(m_util_a.mk_ge(m_util_a.mk_sub(iplusl, ls), zero));
+
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
         literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+        
+        expr* num_val, *ind_val;
+        rational num_val_rat;
+        if(r.get_int32() == 0 && expr_cases::is_indexof_add(l, s, m, m_util_s, m_util_a, num_val, ind_val) && m_util_a.is_numeral(num_val, num_val_rat) && num_val_rat.get_int32() == 1) {
+            literal l_gt_zero = mk_literal(m_util_a.mk_le(l, zero));
+            expr_ref v = mk_str_var_fresh("substr");
+            expr_ref sub(m_util_a.mk_add(l, m_util_a.mk_int(-1)), m);
+            m_rewrite(sub);
+            expr_ref substr(m_util_s.str.mk_substr(s, i, sub), m);
+            expr_ref conc = mk_concat(substr, ind_val);
+            string_theory_propagation(conc);
+
+            add_axiom({l_gt_zero, mk_eq(e, conc, false)});
+            add_axiom({mk_eq(v, e, false)});
+
+            // add the replacement substr -> v
+            this->predicate_replace.insert(e, v.get());
+            util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+            return;
+        }
 
         expr_ref x(m_util_s.str.mk_string(""), m);
         expr_ref v = mk_str_var_fresh("substr");
@@ -1147,11 +1171,12 @@ namespace smt::noodler {
 
         expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref y = mk_str_var_fresh("post_substr");
-        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
         rational rl;
         expr * num_len;
+        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
+        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
+
         if(m_util_a.is_numeral(l, rl)) {
             int lval = rl.get_int32();
             expr_ref substr_re(m);
@@ -1172,7 +1197,7 @@ namespace smt::noodler {
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(false && m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
+        } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
             expr_ref ly(m_util_s.str.mk_length(y), m);
@@ -1214,6 +1239,8 @@ namespace smt::noodler {
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
         add_axiom({mk_eq(v, e, false)});
+
+        // add_axiom({~nopost, mk_eq(y, eps, false)});
 
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());
@@ -1340,10 +1367,11 @@ namespace smt::noodler {
         expr_ref lx(m_util_s.str.mk_length(x), m);
         expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
-
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
+        // expr_ref iplusl(m_util_a.mk_add(i, l), m);
+        // literal nopost = mk_literal(m_util_a.mk_ge(m_util_a.mk_sub(iplusl, ls), zero));
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
@@ -1378,6 +1406,8 @@ namespace smt::noodler {
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
         add_axiom({mk_eq(v, e, false)});
+
+        // add_axiom({~nopost, mk_eq(y, eps, false)});
 
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());
