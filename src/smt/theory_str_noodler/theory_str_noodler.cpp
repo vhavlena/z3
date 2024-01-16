@@ -1127,10 +1127,6 @@ namespace smt::noodler {
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
-        // expr_ref iplusl(m_util_a.mk_add(l, i), m);
-        // m_rewrite(iplusl);
-        // literal nopost = mk_literal(m_util_a.mk_ge(m_util_a.mk_sub(iplusl, ls), zero));
-
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
@@ -1239,8 +1235,6 @@ namespace smt::noodler {
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
         add_axiom({mk_eq(v, e, false)});
-
-        // add_axiom({~nopost, mk_eq(y, eps, false)});
 
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());
@@ -1370,8 +1364,6 @@ namespace smt::noodler {
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
-        // expr_ref iplusl(m_util_a.mk_add(i, l), m);
-        // literal nopost = mk_literal(m_util_a.mk_ge(m_util_a.mk_sub(iplusl, ls), zero));
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
@@ -1406,8 +1398,6 @@ namespace smt::noodler {
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
         // substr(s, i, n) = v
         add_axiom({mk_eq(v, e, false)});
-
-        // add_axiom({~nopost, mk_eq(y, eps, false)});
 
         // add the replacement substr -> v
         this->predicate_replace.insert(e, v.get());

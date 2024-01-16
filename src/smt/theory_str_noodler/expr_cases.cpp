@@ -39,7 +39,7 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
     if(m_util_s.str.is_extract(rpl_str, sub_str, sub_start, sub_len)) {
         expr*ind_str = nullptr, *ind_find = nullptr, *ind_start = nullptr, *add = nullptr;
         rational one(1);
-        if(m_util_a.is_zero(sub_start) && m_util_a.is_add(sub_len, add, ind) && m_util_a.is_numeral(add, one) && m_util_s.str.is_index(ind, ind_str, ind_find, ind_start)) {
+        if(m_util_a.is_zero(sub_start) && m_util_a.is_add(sub_len, add, ind) && m_util_a.is_numeral(add, one) && m_util_s.str.is_index(ind, ind_str, ind_find, ind_start) && one.get_int32() == 1) {
             if(ind_find->hash() != rpl_find->hash() || sub_str->hash() != ind_str->hash() || !m_util_a.is_zero(ind_start)) {
                 return false;
             }
