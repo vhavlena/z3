@@ -646,6 +646,8 @@ namespace smt::noodler {
                     }
                     break;
                 }
+                default:
+                    break;
             }
         }
 
@@ -788,15 +790,16 @@ namespace smt::noodler {
                     if (!aut->is_acyclic()) {
                         util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                     }
+
+                    std::vector<std::vector<mata::Word>> new_cases;
                     for (auto word : mata::nfa::get_words(*aut, aut->num_of_states())) {
-                        std::vector<std::vector<mata::Word>> new_cases;
                         for (const auto& old_case : cases) {
                             std::vector<mata::Word> new_case = old_case;
                             new_case.push_back(word);
                             new_cases.push_back(new_case);
                         }
-                        cases = new_cases;
                     }
+                    cases = new_cases;
                 }
 
                 LenNode cases_as_formula(LenFormulaType::OR);
