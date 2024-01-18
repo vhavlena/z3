@@ -134,6 +134,7 @@ namespace smt::noodler {
         NEQ, // not equal
         NOT,
         LEQ, // <=
+        LESS, // <
         LEAF, // int or variable (use LenNode(int) or LenNode(BasicTerm) constructors)
         AND,
         OR,
@@ -147,6 +148,7 @@ namespace smt::noodler {
         std::vector<struct LenNode> succ;
 
         LenNode(int k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, std::to_string(k)), succ() { };
+        LenNode(rational k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, k.to_string()), succ() { };
         LenNode(BasicTerm val) : type(LenFormulaType::LEAF), atom_val(val), succ() { };
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };
@@ -164,6 +166,8 @@ namespace smt::noodler {
             return os << "(not" << node.succ.at(0) << ")";
         case LenFormulaType::LEQ:
             return os << "(<= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
+        case LenFormulaType::LESS:
+            return os << "(< " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::EQ:
             return os << "(= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::NEQ:

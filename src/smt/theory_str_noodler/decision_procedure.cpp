@@ -621,104 +621,241 @@ namespace smt::noodler {
         STRACE("str-conversion",
             tout << "Creating formula for conversions" << std::endl;
         );
-        auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
 
+        // we will encode semantics of to_code/from_code (to_int/from_int) into special LIA to_code (to_int) vars
+        auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
+        auto to_int_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_int"); };
+
+        // the resulting formula will be conjunctions of the conjuncts in result_conjuncts
         std::vector<LenNode> result_conjuncts;
+
+        // we first collect all variables that substitute string variables used in to_code/from_code predicates
+        std::set<BasicTerm> code_vars;
         for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
             BasicTerm result = std::get<0>(transf);
             BasicTerm argument = std::get<1>(transf);
             ConversionType type = std::get<2>(transf);
+            switch (std::get<2>(transf))
+            {
+                case ConversionType::FROM_CODE:
+                    std::swap(result, argument);
+                case ConversionType::TO_CODE:
+                {
+                    for (const BasicTerm& var : solution.get_substituted_vars(argument)) {
+                        code_vars.insert(var);
+                    }
+                    break;
+                }
+            }
+        }
+
+
+        // TODO comment to_code vars
+        for (const BasicTerm& code_var : code_vars) {
+            // disjunction that will say that code_var!to_code is equal to code point of one of the chars in code_var when |code_var| = 1 or var!to_code=-1 if |code_var| != 1
+
+
+            LenNode char_case(LenFormulaType::AND, { {LenFormulaType::EQ, std::vector<LenNode>{code_var, 1}}, /* this is where we put the rest of the shit*/ });
+
+            std::set<mata::Symbol> real_symbols_of_code_var;
+            bool is_there_dummy_symbol = false;
+            for (mata::Symbol s : mata::strings::get_accepted_symbols(*solution.aut_ass.at(code_var))) { // iterate trough chars of code_var
+                if (!is_dummy_symbol(s)) {
+                    real_symbols_of_code_var.insert(s);
+                } else {
+                    is_there_dummy_symbol = true;
+                }
+            }
+
+            if (is_there_dummy_symbol) {
+                // TODO rewrite comments
+                // if s represents symbols not in the alphabet => var!to_code must be a code point of such a symbol which is not in alphabet, i.e. it is...
+                // ...valid code point (0 <= code_var!to_code <= max_char) and...
+                char_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{0, to_code_var(code_var)});
+                char_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{to_code_var(code_var), zstring::max_char()});
+                // ...it is not equal to code point of some symbol in the alphabet that is not in real_symbols_of_code_var
+                for (mata::Symbol s : solution.aut_ass.get_alphabet()) {
+                    if (!is_dummy_symbol(s) && !real_symbols_of_code_var.contains(s)) {
+                        char_case.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(code_var), s});
+                    }
+                }
+            } else {
+                // TODO rewrite cmoments
+                // Disjunction representing that result is equal to code point of one of the chars of some var_i
+                std::vector<LenNode> equal_to_one_of_symbols;
+                for (mata::Symbol s : real_symbols_of_code_var) {
+                    equal_to_one_of_symbols.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(code_var), s});
+                }
+                char_case.succ.emplace_back(LenFormulaType::OR, equal_to_one_of_symbols);
+            }
+
+
+            LenNode non_char_case(LenFormulaType::AND, { {LenFormulaType::NEQ, std::vector<LenNode>{code_var, 1}}, {LenFormulaType::EQ, std::vector<LenNode>{to_code_var(code_var),-1}} }); // TODO should I do !(0 <= to_code_var(code_var) <= MAX) instead of to_code_var(code_var) = -1?
+            
+            result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
+                non_char_case,
+                char_case
+            });
+        }
+
+        auto word_to_int = [](const mata::Word& word, const BasicTerm &var, bool start_with_one, bool handle_invalid_as_from_int) {
+            LenNode result(0);
+
+            bool is_invalid = true;
+
+            rational resulting_int = (start_with_one ? rational(1) : rational(0));
+
+            for (mata::Symbol s : word) {
+                is_invalid = false;
+                if (48 <= s && s <= 57) {
+                    // s is code point of a digit
+                    rational real_digit(s - 48);
+                    resulting_int = resulting_int*10 + real_digit;
+                } else {
+                    // it is possible that s is a dummy symbol, but we assume that all digits are explicitly in the alphabet, see theory_str_noodler::final_check_eh()
+                    // therefore s here always represents a non-digit symbol
+                    is_invalid = true;
+                    break;
+                }
+            }
+
+            if (!is_invalid) {
+                return LenNode(LenFormulaType::EQ, std::vector<LenNode>{var, resulting_int});
+            } else if (!handle_invalid_as_from_int) {
+                return LenNode(LenFormulaType::EQ, std::vector<LenNode>{var, -1});
+            } else {
+                return LenNode(LenFormulaType::LESS, std::vector<LenNode>{var, 0});
+            }
+        };
+
+        for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
+            ConversionType type = std::get<2>(transf);
+
+            BasicTerm string_var = 
+                ((type == ConversionType::TO_CODE || type == ConversionType::TO_INT) ? std::get<1>(transf) : std::get<0>(transf));
+            BasicTerm int_var = 
+                ((type == ConversionType::TO_CODE || type == ConversionType::TO_INT) ? std::get<0>(transf) : std::get<1>(transf));
+
+
+            STRACE("str-conversion",
+                tout << " procesing " << get_conversion_name(type) << " with string var " << string_var << " and int var " << int_var << std::endl;
+            );
+
             switch (type)
             {
-            case ConversionType::FROM_CODE:
-                STRACE("str-conversion",
-                    tout << " procesing from_code with result " << result << " and argument " << argument << " which is handled by" << std::flush;
-                );
-                std::swap(result, argument);
-                // fall trough, we do nearly the same thing
             case ConversionType::TO_CODE:
+            case ConversionType::FROM_CODE:
             {
-                STRACE("str-conversion",
-                    tout << " procesing to_code with result " << result << " and argument " << argument << std::endl;
-                );
-                /* Having result=to_code(argument) we need to take all var_1 ... var_n
-                 * substituting argument in solution. We need to have one of the |var_i| = 1
-                 * and all others |var_j| = 0; var_i will be then the char whose code point
-                 * we want to return. We keep this code point in int variable var_i!to_code,
-                 * where result = var_i!to_code (we do this, so that different conversions
-                 * are connected - they use the same !to_code variables).
-                 * If this does not happen (i.e. argument is not word of length one), the result
-                 * is equal to -1.
-                 * 
-                 * We also handle from_code here, we swapped arugment and result so we have
-                 * argument = from_code(result). We can do exactly the same, we compute the
-                 * code point from which we are constructing the char by checking possible
-                 * chars in solution. The only difference is that if result is not a valid
-                 * code point, then argument must be an empty string.
-                 */
-                mata::nfa::Nfa sigma_aut = solution.aut_ass.sigma_automaton();
-                std::vector<BasicTerm> substituted_vars = solution.get_substituted_vars(argument);
-
-                // Disjunction representing that result is equal to code point of one of the chars of some var_i
-                LenNode result_solution(LenFormulaType::OR, {});
-                for (const BasicTerm& var : substituted_vars) {
-                    // disjunction that will say that var!to_code is equal to code point of one of the chars in var
-                    LenNode to_code_disjunction = LenNode(LenFormulaType::OR, {});
-                    for (mata::Symbol s : mata::strings::get_accepted_symbols(*solution.aut_ass.at(var))) { // iterate trough chars of var
-                        if (!is_dummy_symbol(s)) {
-                            // var!to_code == s
-                            to_code_disjunction.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{to_code_var(var), s});
-                        } else {
-                            // if s represents symbols not in the alphabet => var!to_code must be a code point of such a symbol which is not in alphabet, i.e. it is...
-                            // ...valid code point (0 <= var!to_code <= max_char) and...
-                            std::vector<LenNode> minterm_to_code{LenNode(LenFormulaType::LEQ, {0, to_code_var(var)}), LenNode(LenFormulaType::LEQ, {to_code_var(var), zstring::max_char()})};
-                            // ...it is not equal to code point of some symbol in the alphabet
-                            for (mata::Symbol s2 : solution.aut_ass.get_alphabet()) {
-                                if (!is_dummy_symbol(s2)) {
-                                    minterm_to_code.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{to_code_var(var), s2});
-                                }
-                            }
-                            to_code_disjunction.succ.emplace_back(LenFormulaType::AND, minterm_to_code);
-                        }
-                    }
-                    result_solution.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
-                        to_code_disjunction, // var!to_code is equal to code point of one of its symbols TODO: do this only once for given var
-                        LenNode(LenFormulaType::EQ, {result, to_code_var(var)}), // result is equal to var!to_code
-                        LenNode(LenFormulaType::EQ, {var, 1}) // lenght of var is 1
-                    });
+                
+                // TODO explain shit?
+                LenNode equal_to_one_subst_var(LenFormulaType::OR);
+                for (const BasicTerm& subst_var : solution.get_substituted_vars(string_var)) {
+                    equal_to_one_subst_var.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_var, to_code_var(subst_var)});
                 }
 
-                // sum_of_substituted_vars = |var_1| + |var_2| + ... + |var_n|
-                LenNode sum_of_substituted_vars(LenFormulaType::PLUS, std::vector<LenNode>(substituted_vars.begin(), substituted_vars.end()));
-                // result is defined, i.e. exactly one |var_i| = 1 (by checking sum_of_substituted_vars = 1) and the result is the code point of one of the chars of var_i
-                LenNode result_is_defined(LenFormulaType::AND, {result_solution, LenNode(LenFormulaType::EQ, {sum_of_substituted_vars, 1})});
-
-                LenNode result_is_undefined(LenFormulaType::AND, {});
+                // TODO explain
+                LenNode invalid_value(LenFormulaType::AND);
                 if (type == ConversionType::TO_CODE) {
-                    // result is undefined, i.e. the argument is not a word of length one and result is then equal to -1
-                    result_is_undefined.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{sum_of_substituted_vars, 1});
-                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{result, -1});
+                    // |string_var| != 1 AND int_var = -1    
+                    invalid_value.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{string_var, 1});
+                    invalid_value.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_var, -1});
                 } else {
-                    // we have argument = from_code(result), if result is not valid code point (0 <= result <= max_char() does not hold), then argument must be empty word (length is equal to 0)
-                    result_is_undefined.succ.emplace_back(LenFormulaType::NOT, std::vector<LenNode>{LenNode(LenFormulaType::AND, {LenNode(LenFormulaType::LEQ, {0, result}), LenNode(LenFormulaType::LEQ, {result, zstring::max_char()})})});
-                    result_is_undefined.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{argument, 0});
+                    // |string_var| = 0 AND !(0 <= int_var <= max_char)
+                    invalid_value.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{string_var, 0});
+                    invalid_value.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{int_var, 0});
+                    invalid_value.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{zstring::max_char(), int_var});
                 }
+                
+                result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
+                    // TODO comment: |result| = 1 AND argument >=0 AND argument is equal to one of the code value of the substituted vars of result TODO explain that |result| = 1 forces exactly one substituted var to be ||=1 whose code value we want, others code value will be -1 ignored by |int_var| >= 0
+                    LenNode(LenFormulaType::AND, { {LenFormulaType::EQ, std::vector<LenNode>{string_var, 1}}, {LenFormulaType::LEQ, std::vector<LenNode>{0, int_var}}, equal_to_one_subst_var}),
+                    invalid_value
+                });
 
-                result_conjuncts.emplace_back(LenFormulaType::OR, std::vector<LenNode>{result_is_defined, result_is_undefined});
-
-                // TODO needs to get all the to_code vars, so that it can be properly handled by to_int
                 break;
             }
             case ConversionType::TO_INT:
             case ConversionType::FROM_INT:
-                //???
-                util::throw_error("unimplemented");
+            {
+
+                const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(string_var);
+
+                // each vector in cases should contain exactly one word from the language of automaton for each subst_var
+                std::vector<std::vector<mata::Word>> cases = {{}};
+                for (const BasicTerm& subst_var : solution.get_substituted_vars(string_var)) {
+                    // TODO split automaton to only-digit and not-only-digit part and do some smarter way with not-only-digit part
+                    auto aut = solution.aut_ass.at(subst_var);
+                    if (!aut->is_acyclic()) {
+                        util::throw_error("cannot process to_int/from_int for automaton with infinite language");
+                    }
+                    for (auto word : mata::nfa::get_words(*aut, aut->num_of_states())) {
+                        std::vector<std::vector<mata::Word>> new_cases;
+                        for (const auto& old_case : cases) {
+                            std::vector<mata::Word> new_case = old_case;
+                            new_case.push_back(word);
+                            new_cases.push_back(new_case);
+                        }
+                        cases = new_cases;
+                    }
+                }
+
+                LenNode cases_as_formula(LenFormulaType::OR);
+
+                for (const auto& one_case : cases) {
+                    assert(subst_vars.size() == one_case.size());
+
+                    mata::Word full_word;
+                    LenNode formula_for_case(LenFormulaType::AND);
+                    for (unsigned i = 0; i < subst_vars.size(); ++i) {
+                        const BasicTerm& subst_var = subst_vars[i];
+                        mata::Word word_of_subst_var = one_case[i];
+
+                        // |subst_var| = |word_of_subst_var|
+                        formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ subst_var, word_of_subst_var.size() });
+
+                        // subst_var!to_int = 1to_int(word_of_subst_var)
+                        // we add 1 at the beginning for the cases with 0s at the beginning of word_of_subst_var,
+                        // so that for example if word_of_subst_var="00013", it does not turn into 13 but into 100013
+                        formula_for_case.succ.push_back(word_to_int(word_of_subst_var, to_int_var(subst_var), true, false));
+
+                        // in the case that subst_var is also one of code vars, we need to force the exact value of code var here
+                        if (code_vars.contains(subst_var)) {
+                            if (word_of_subst_var.size() == 1) {
+                                mata::Symbol code_point = word_of_subst_var[0];
+                                if (48 <= code_point && code_point <= 57) {
+                                    // code point for a digit -> we need the exact value
+                                    formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ to_code_var(subst_var), code_point });
+                                } else {
+                                    // code point for something else (could be even a dummy symbol, but we assume digits are not represented by dummy symbol, see final_check_eh)
+                                    // -> we can just say that code var should not be equal to code point of digit, because it has the same semantics for all cases where we do not have digit
+                                    formula_for_case.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{ to_code_var(subst_var), 48 });
+                                    formula_for_case.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{ 57, to_code_var(subst_var) });
+                                }
+                            } else {
+                                formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ to_code_var(subst_var), -1 });
+                            }
+                        }
+
+                        // add word_of_subst_var to full_word
+                        full_word.insert(full_word.end(), word_of_subst_var.begin(), word_of_subst_var.end());
+                    }
+
+                    // int_var = to_int(word_of_subst_var1 word_of_subst_var2 ... word_of_subst_varN)
+                    formula_for_case.succ.push_back(word_to_int(full_word, int_var, false, type == ConversionType::FROM_INT));
+
+                    cases_as_formula.succ.push_back(formula_for_case);
+
+                }
+
+                result_conjuncts.push_back(cases_as_formula);
+
                 break;
-            
+            }
             default:
                 UNREACHABLE();
             }
         }
+
         STRACE("str-conversion",
             tout << "Formula for conversions: " << LenNode(LenFormulaType::AND, result_conjuncts) << std::endl;
         );

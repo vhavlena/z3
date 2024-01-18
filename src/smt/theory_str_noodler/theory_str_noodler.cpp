@@ -397,14 +397,7 @@ namespace smt::noodler {
             handle_is_digit(n);
         } else if (
             m_util_s.str.is_stoi(n) || // str.to_int
-            m_util_s.str.is_itos(n) // str.from_int
-        ) {
-            // handle_conversion can handle to/from_int, but decision procedure cannot.
-            // We throw error here so that we get to unknown faster. After decision
-            // procedure gets support for it, remove this and let it fall trough with
-            // is/from_code to handle_conversion
-            util::throw_error("str.to_int and str.from_int is not supported (yet)");
-        } else if (
+            m_util_s.str.is_itos(n) || // str.from_int
             m_util_s.str.is_to_code(n) || // str.to_code
             m_util_s.str.is_from_code(n) // str.from_code
         ) {
@@ -815,6 +808,12 @@ namespace smt::noodler {
 
         // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
         std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
+        // For the case that it is possible we have to_int/from_int, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle to_int/from_int
+        if (!m_conversion_todo.empty()) {
+            for (mata::Symbol s = 48; s <= 57; ++s) {
+                symbols_in_formula.insert(s);
+            }
+        }
 
         // Create automata assignment for the formula
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
