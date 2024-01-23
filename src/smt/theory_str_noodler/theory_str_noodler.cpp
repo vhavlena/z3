@@ -1135,7 +1135,7 @@ namespace smt::noodler {
         
         expr* num_val, *ind_val;
         rational num_val_rat;
-        if(r.get_int32() == 0 && expr_cases::is_indexof_add(l, s, m, m_util_s, m_util_a, num_val, ind_val) && m_util_a.is_numeral(num_val, num_val_rat) && num_val_rat.get_int32() == 1) {
+        if(r.is_zero() && expr_cases::is_indexof_add(l, s, m, m_util_s, m_util_a, num_val, ind_val) && m_util_a.is_numeral(num_val, num_val_rat) && num_val_rat.is_one()) {
             literal l_gt_zero = mk_literal(m_util_a.mk_le(l, zero));
             expr_ref v = mk_str_var_fresh("substr");
             expr_ref sub(m_util_a.mk_add(l, m_util_a.mk_int(-1)), m);
