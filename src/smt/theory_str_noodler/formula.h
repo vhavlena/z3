@@ -147,8 +147,8 @@ namespace smt::noodler {
         BasicTerm atom_val;
         std::vector<struct LenNode> succ;
 
-        LenNode(int k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, std::to_string(k)), succ() { };
-        LenNode(rational k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, k.to_string()), succ() { };
+        LenNode(rational k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, zstring(k)), succ() { };
+        LenNode(int k) : LenNode(rational(k)) { };
         LenNode(BasicTerm val) : type(LenFormulaType::LEAF), atom_val(val), succ() { };
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };

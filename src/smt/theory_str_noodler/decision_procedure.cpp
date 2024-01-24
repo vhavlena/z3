@@ -788,6 +788,7 @@ namespace smt::noodler {
                     // TODO split automaton to only-digit and not-only-digit part and do some smarter way with not-only-digit part
                     auto aut = solution.aut_ass.at(subst_var);
                     if (!aut->is_acyclic()) {
+                        STRACE("str-conversion", tout << "failing NFA:" << *aut << std::endl;);
                         util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                     }
 
