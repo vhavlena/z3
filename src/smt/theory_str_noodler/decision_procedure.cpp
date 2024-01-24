@@ -617,31 +617,34 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
+    /**
+     * Creates a LIA formula that encodes to_code/from_code/to_int/from_int functions.
+     * 
+     * 
+     * 
+     * @return LenNode 
+     */
     LenNode DecisionProcedure::get_formula_for_conversions() {
         STRACE("str-conversion",
             tout << "Creating formula for conversions" << std::endl;
         );
 
-        // we will encode semantics of to_code/from_code (to_int/from_int) into special LIA to_code (to_int) vars
+        // we will encode semantics of to_code/from_code (to_int/from_int) into special LIA to_code/to_int vars
         auto to_code_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); };
         auto to_int_var = [](const BasicTerm& var) -> BasicTerm { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_int"); };
 
         // the resulting formula will be conjunctions of the conjuncts in result_conjuncts
         std::vector<LenNode> result_conjuncts;
 
-        // we first collect all variables that substitute string variables used in to_code/from_code predicates
+        // collect all variables that substitute string variables used in to_code/from_code predicates
         std::set<BasicTerm> code_vars;
-        for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
-            BasicTerm result = std::get<0>(transf);
-            BasicTerm argument = std::get<1>(transf);
-            ConversionType type = std::get<2>(transf);
-            switch (std::get<2>(transf))
+        for (const TermConversion& conv : conversions) {
+            switch (conv.type)
             {
                 case ConversionType::FROM_CODE:
-                    std::swap(result, argument);
                 case ConversionType::TO_CODE:
                 {
-                    for (const BasicTerm& var : solution.get_substituted_vars(argument)) {
+                    for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
                         code_vars.insert(var);
                     }
                     break;
@@ -655,8 +658,6 @@ namespace smt::noodler {
         // TODO comment to_code vars
         for (const BasicTerm& code_var : code_vars) {
             // disjunction that will say that code_var!to_code is equal to code point of one of the chars in code_var when |code_var| = 1 or var!to_code=-1 if |code_var| != 1
-
-
             LenNode char_case(LenFormulaType::AND, { {LenFormulaType::EQ, std::vector<LenNode>{code_var, 1}}, /* this is where we put the rest of the shit*/ });
 
             std::set<mata::Symbol> real_symbols_of_code_var;
@@ -730,20 +731,15 @@ namespace smt::noodler {
             }
         };
 
-        for (const std::tuple<BasicTerm, BasicTerm, ConversionType>& transf : conversions) {
-            ConversionType type = std::get<2>(transf);
-
-            BasicTerm string_var = 
-                ((type == ConversionType::TO_CODE || type == ConversionType::TO_INT) ? std::get<1>(transf) : std::get<0>(transf));
-            BasicTerm int_var = 
-                ((type == ConversionType::TO_CODE || type == ConversionType::TO_INT) ? std::get<0>(transf) : std::get<1>(transf));
-
+        for (const TermConversion& conv : conversions) {
+            const BasicTerm& string_var = conv.string_var;
+            const BasicTerm& int_var = conv.int_var;
 
             STRACE("str-conversion",
-                tout << " procesing " << get_conversion_name(type) << " with string var " << string_var << " and int var " << int_var << std::endl;
+                tout << " procesing " << get_conversion_name(conv.type) << " with string var " << string_var << " and int var " << int_var << std::endl;
             );
 
-            switch (type)
+            switch (conv.type)
             {
             case ConversionType::TO_CODE:
             case ConversionType::FROM_CODE:
@@ -757,7 +753,7 @@ namespace smt::noodler {
 
                 // TODO explain
                 LenNode invalid_value(LenFormulaType::AND);
-                if (type == ConversionType::TO_CODE) {
+                if (conv.type == ConversionType::TO_CODE) {
                     // |string_var| != 1 AND int_var = -1    
                     invalid_value.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{string_var, 1});
                     invalid_value.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_var, -1});
@@ -845,7 +841,7 @@ namespace smt::noodler {
                     }
 
                     // int_var = to_int(word_of_subst_var1 word_of_subst_var2 ... word_of_subst_varN)
-                    formula_for_case.succ.push_back(word_to_int(full_word, int_var, false, type == ConversionType::FROM_INT));
+                    formula_for_case.succ.push_back(word_to_int(full_word, int_var, false, conv.type == ConversionType::FROM_INT));
 
                     cases_as_formula.succ.push_back(formula_for_case);
 
@@ -1065,8 +1061,8 @@ namespace smt::noodler {
                 BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!ineq_to_code");
 
                 // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
-                conversions.emplace_back(var1_to_code, var1, ConversionType::TO_CODE);
-                conversions.emplace_back(var2_to_code, var2, ConversionType::TO_CODE);
+                conversions.emplace_back(ConversionType::TO_CODE, var1, var1_to_code);
+                conversions.emplace_back(ConversionType::TO_CODE, var2, var2_to_code);
 
                 // add to_code(var1) != to_code(var2) to the len formula for disequations
                 disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::NEQ, {var1_to_code, var2_to_code}));

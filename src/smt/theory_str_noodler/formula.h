@@ -646,6 +646,41 @@ namespace smt::noodler {
     }
     static bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
 
+    // Conversions of strings to ints/code values and vice versa
+    enum class ConversionType {
+        TO_CODE,
+        FROM_CODE,
+        TO_INT,
+        FROM_INT,
+    };
+
+    // Term conversion: to_int/from_int/to_code/from_code
+    struct TermConversion {
+        ConversionType type;
+        BasicTerm string_var;
+        BasicTerm int_var;
+
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm int_var) : type(type), string_var(std::move(string_var)), int_var(std::move(int_var)) {}
+    };
+
+    inline std::string get_conversion_name(ConversionType type) {
+        switch (type)
+        {
+        case ConversionType::TO_CODE:
+            return "to_code";
+        case ConversionType::FROM_CODE:
+            return "from_code";
+        case ConversionType::TO_INT:
+            return "to_int";
+        case ConversionType::FROM_INT:
+            return "from_int";
+        
+        default:
+            UNREACHABLE();
+            return "";
+        }
+    }
+
 } // Namespace smt::noodler.
 
 namespace std {

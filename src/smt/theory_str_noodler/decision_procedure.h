@@ -22,35 +22,6 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
-    // Conversions of strings to ints/code values and vice versa
-    enum class ConversionType {
-        TO_CODE,
-        FROM_CODE,
-        TO_INT,
-        FROM_INT,
-    };
-
-    // Term conversion: to_int/from_int ...
-    using TermConversion = std::tuple<BasicTerm,BasicTerm,ConversionType>;
-
-    inline std::string get_conversion_name(ConversionType type) {
-        switch (type)
-        {
-        case ConversionType::TO_CODE:
-            return "to_code";
-        case ConversionType::FROM_CODE:
-            return "from_code";
-        case ConversionType::TO_INT:
-            return "to_int";
-        case ConversionType::FROM_INT:
-            return "from_int";
-        
-        default:
-            UNREACHABLE();
-            return "";
-        }
-    }
-
     /**
      * @brief Get the value of the symbol representing all symbols not ocurring in the formula (i.e. a minterm)
      * 
