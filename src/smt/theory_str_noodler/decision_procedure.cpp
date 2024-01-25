@@ -848,7 +848,7 @@ namespace smt::noodler {
                     }
 
                     std::vector<std::vector<mata::Word>> new_cases;
-                    for (auto word : mata::nfa::get_words(*aut, aut->num_of_states())) {
+                    for (auto word : aut->get_words(aut->num_of_states())) {
                         for (const auto& old_case : cases) {
                             std::vector<mata::Word> new_case = old_case;
                             new_case.push_back(word);
@@ -912,7 +912,7 @@ namespace smt::noodler {
                     }
 
                     // add "|s| == |w| && i == to_int(w)" to C
-                    formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LeNNode>{ string_var, full_word.size() });
+                    formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ string_var, full_word.size() });
                     formula_for_case.succ.push_back(word_to_int(full_word, int_var, false, conv.type == ConversionType::FROM_INT));
 
                     cases_as_formula.succ.push_back(formula_for_case);
