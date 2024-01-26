@@ -63,7 +63,7 @@ The following functions/predicates of the [SMTLIB Strings theory](https://smtlib
 str.replace_all
 str.replace_re_all
 ```
-Furthermore, we do not support string variables as arguments of `str.to_re` and `re.range` and there is only a limited support for `str.to_int`, `str.from_int` and negated version of `str.contains` (non-negated is fully supported).
+Furthermore, we do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
 - Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Cascais, Portugal, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
