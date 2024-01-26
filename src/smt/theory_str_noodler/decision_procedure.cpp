@@ -884,7 +884,7 @@ namespace smt::noodler {
      * i = to_int(s)
      *  - same as to_code, we want to encode into LIA the possible values of i
      *  - again, s can be substituted: s = s_1 ... s_n, each s_i can be shared with variables from different to_int (or even to_code/from_code)
-     *  - for each s_i, we create an int variable int_version_of(s_i), encoding the possible values of s_i as int
+     *  - for each s_i, we create an int variable int_version_of(s_i), encoding the possible values of s_i as int (so that we can synch this value between different to_int...)
      *  - take each word w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i (we assume finite L_i, otherwise ERROR)
      *      - create conjunction C of following conjuncts
      *              |s_i| == |w_i| && int_version_of(s_i) = to_int('1'.w_i) [ && code_version_of(s_i) = to_code(w_i) ]
