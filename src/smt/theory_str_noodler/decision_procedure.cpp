@@ -719,7 +719,7 @@ namespace smt::noodler {
             return LenNode(LenFormulaType::EQ, std::vector<LenNode>{var, -1});
         } else {
             // var < 0
-            return LenNode(LenFormulaType::LESS, std::vector<LenNode>{var, 0});
+            return LenNode(LenFormulaType::LT, std::vector<LenNode>{var, 0});
         }
     };
 
@@ -738,8 +738,8 @@ namespace smt::noodler {
             // (|s| == 0 && c is not a valid code point)
             invalid_value.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{s, 0});
             // non-valid code point means that 'c < 0 || c > max_char'
-            invalid_value.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{c, 0});
-            invalid_value.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{zstring::max_char(), c});
+            invalid_value.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{c, 0});
+            invalid_value.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{zstring::max_char(), c});
         }
 
         // Now we create the second disjunct of (1):
@@ -830,8 +830,8 @@ namespace smt::noodler {
                             formula_for_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{ code_version_of(subst_var), zstring::max_char() });
                             // ...but not a digit
                             //      code_version_of(s_i) < 48 && 57 < code_version_of(s_i)
-                            formula_for_case.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{ code_version_of(subst_var), 48 });
-                            formula_for_case.succ.emplace_back(LenFormulaType::LESS, std::vector<LenNode>{ 57, code_version_of(subst_var) });
+                            formula_for_case.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
+                            formula_for_case.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
                         }
                     } else {
                         formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), -1 });

@@ -236,7 +236,7 @@ namespace smt::noodler::util {
             return expr_ref(m_util_a.mk_le(left, right), m);
         }
 
-        case LenFormulaType::LESS: {
+        case LenFormulaType::LT: {
             assert(node.succ.size() == 2);
             expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
             expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);

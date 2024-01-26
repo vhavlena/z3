@@ -134,7 +134,7 @@ namespace smt::noodler {
         NEQ, // not equal
         NOT,
         LEQ, // <=
-        LESS, // <
+        LT, // <
         LEAF, // int or variable (use LenNode(int) or LenNode(BasicTerm) constructors)
         AND,
         OR,
@@ -166,7 +166,7 @@ namespace smt::noodler {
             return os << "(not" << node.succ.at(0) << ")";
         case LenFormulaType::LEQ:
             return os << "(<= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
-        case LenFormulaType::LESS:
+        case LenFormulaType::LT:
             return os << "(< " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::EQ:
             return os << "(= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
