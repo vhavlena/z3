@@ -148,25 +148,6 @@ void smt::noodler::Graph::substitute_vars(const std::unordered_map<BasicTerm, st
 }
 
 Graph smt::noodler::Graph::create_inclusion_graph(const Formula& formula, std::deque<std::shared_ptr<GraphNode>> &out_node_order) {
-    // Assert block.
-    {
-        const auto &predicates{formula.get_predicates()};
-        for (const auto &predicate: formula.get_predicates()) {
-            assert(predicate.get_left_side() != predicate.get_right_side() &&
-                   "Two equal sides in one equation should never appear here in our algorithm"
-            );
-        }
-
-        for (auto predicate_iter{predicates.begin()}; predicate_iter != predicates.end(); ++predicate_iter) {
-            auto next_predicate_iter{predicate_iter};
-            next_predicate_iter++;
-            for (; next_predicate_iter != predicates.end(); ++next_predicate_iter) {
-                assert(*predicate_iter != *next_predicate_iter && "Two equal equations should never appear here in our algorithm");
-            }
-
-        }
-    }
-
     Graph splitting_graph{ create_simplified_splitting_graph(formula) };
     return create_inclusion_graph(splitting_graph, out_node_order);
 }
@@ -176,7 +157,10 @@ Graph smt::noodler::Graph::create_simplified_splitting_graph(const Formula& form
 
     // Add all nodes which are not already present in direct and switched form.
     for (const auto& predicate: formula.get_predicates()) {
-        assert(predicate.get_left_side() != predicate.get_right_side());
+        // we skip trivial equations of the form x = x
+        if(predicate.get_left_side() == predicate.get_right_side()) {
+            continue;
+        }
         graph.add_node(predicate);
         graph.add_node(predicate.get_switched_sides_predicate());
     }
