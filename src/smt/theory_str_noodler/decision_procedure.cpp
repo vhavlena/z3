@@ -765,21 +765,43 @@ namespace smt::noodler {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
+        // TODO fix comments of get_formula_for_conversions
+        LenNode result(LenFormulaType::OR);
+
         // s = s_1 ... s_n, subst_vars = <s_1, ..., s_n>
         const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(s);
+
+        // automaton representing all valid inputs (only digits)
+        // TODO[explain better] can be empty, because we will use it for substituted vars, and one of them can be empty, while other has only digit......
+        mata::nfa::Nfa only_digits(1, {0}, {0});
+        for (mata::Symbol digit = 48; digit <= 57; ++digit) {
+            only_digits.delta.add(0, digit, 0);
+        }
+        // automaton representing all non-valid inputs (contain non-digit)
+        mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
 
         // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
         std::vector<std::vector<mata::Word>> cases = {{}};
         for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) {
-            // TODO split automaton to only-digit and some-non-digit part and do something smarter with some-non-digit part
+            // subst_var = s_i
             auto aut = solution.aut_ass.at(subst_var);
-            if (!aut->is_acyclic()) {
+
+            // part containing only digits
+            mata::nfa::Nfa aut_valid_part = mata::nfa::intersection(*aut, only_digits);
+            // part containing some non-digit
+            mata::nfa::Nfa aut_non_valid_part = mata::nfa::intersection(*aut, contain_non_digit);
+
+            // |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
+            result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+
+            // we want to enumerate all words containing digits -> cannot be infinite language
+            if (aut_valid_part.is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << *aut << std::endl;);
                 util::throw_error("cannot process to_int/from_int for automaton with infinite language");
             }
 
             std::vector<std::vector<mata::Word>> new_cases;
-            for (auto word : aut->get_words(aut->num_of_states())) {
+            for (auto word : aut_valid_part.get_words(aut_valid_part.num_of_states())) {
                 for (const auto& old_case : cases) {
                     std::vector<mata::Word> new_case = old_case;
                     new_case.push_back(word);
@@ -788,8 +810,6 @@ namespace smt::noodler {
             }
             cases = new_cases;
         }
-
-        LenNode cases_as_formula(LenFormulaType::OR);
 
         for (const auto& one_case : cases) {
             assert(subst_vars.size() == one_case.size());
@@ -843,14 +863,14 @@ namespace smt::noodler {
             }
 
             // add "|s| == |w| && i == to_int(w)" to C
-            formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ s, full_word.size() });
+            formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ s, full_word.size() }); // TODO this is not needed, as we restricted lengtjs of s1...sn, and |s| = |s1| +...+|sn|
             formula_for_case.succ.push_back(word_to_int(full_word, i, false, conv.type == ConversionType::FROM_INT));
 
-            cases_as_formula.succ.push_back(formula_for_case);
+            result.succ.push_back(formula_for_case);
 
         }
 
-        return cases_as_formula;
+        return result;
     }
 
     /**
