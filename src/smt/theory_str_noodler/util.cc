@@ -172,7 +172,7 @@ namespace smt::noodler::util {
         switch(node.type) {
         case LenFormulaType::LEAF:
             if(node.atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(std::stoi(node.atom_val.get_name().encode())), m);
+                return expr_ref(m_util_a.mk_int(rational(node.atom_val.get_name().encode().c_str())), m);
             else if (node.atom_val.get_type() == BasicTermType::Literal) {
                 // for literal, get the exact length of it
                 return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
@@ -234,6 +234,13 @@ namespace smt::noodler::util {
             expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
             expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
             return expr_ref(m_util_a.mk_le(left, right), m);
+        }
+
+        case LenFormulaType::LT: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
+            expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
+            return expr_ref(m_util_a.mk_lt(left, right), m);
         }
 
         case LenFormulaType::NOT: {

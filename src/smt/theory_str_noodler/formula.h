@@ -134,6 +134,7 @@ namespace smt::noodler {
         NEQ, // not equal
         NOT,
         LEQ, // <=
+        LT, // <
         LEAF, // int or variable (use LenNode(int) or LenNode(BasicTerm) constructors)
         AND,
         OR,
@@ -146,7 +147,8 @@ namespace smt::noodler {
         BasicTerm atom_val;
         std::vector<struct LenNode> succ;
 
-        LenNode(int k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, std::to_string(k)), succ() { };
+        LenNode(rational k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, zstring(k)), succ() { };
+        LenNode(int k) : LenNode(rational(k)) { };
         LenNode(BasicTerm val) : type(LenFormulaType::LEAF), atom_val(val), succ() { };
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };
@@ -164,6 +166,8 @@ namespace smt::noodler {
             return os << "(not" << node.succ.at(0) << ")";
         case LenFormulaType::LEQ:
             return os << "(<= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
+        case LenFormulaType::LT:
+            return os << "(< " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::EQ:
             return os << "(= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::NEQ:
@@ -641,6 +645,41 @@ namespace smt::noodler {
        return lhs.get_predicates() < rhs.get_predicates();
     }
     static bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
+
+    // Conversions of strings to ints/code values and vice versa
+    enum class ConversionType {
+        TO_CODE,
+        FROM_CODE,
+        TO_INT,
+        FROM_INT,
+    };
+
+    // Term conversion: to_int/from_int/to_code/from_code
+    struct TermConversion {
+        ConversionType type;
+        BasicTerm string_var;
+        BasicTerm int_var;
+
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm int_var) : type(type), string_var(std::move(string_var)), int_var(std::move(int_var)) {}
+    };
+
+    inline std::string get_conversion_name(ConversionType type) {
+        switch (type)
+        {
+        case ConversionType::TO_CODE:
+            return "to_code";
+        case ConversionType::FROM_CODE:
+            return "from_code";
+        case ConversionType::TO_INT:
+            return "to_int";
+        case ConversionType::FROM_INT:
+            return "from_int";
+        
+        default:
+            UNREACHABLE();
+            return "";
+        }
+    }
 
 } // Namespace smt::noodler.
 

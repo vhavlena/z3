@@ -764,6 +764,7 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         st = lift_ites_throttled(f, num_args, args, result);
     }
     CTRACE("seq_verbose", st != BR_FAILED, tout << expr_ref(m().mk_app(f, num_args, args), m()) << " -> " << result << "\n";);
+    CTRACE("seq_verbose", st == BR_FAILED, tout << expr_ref(m().mk_app(f, num_args, args), m()) << " failed to rewrite\n";);
     SASSERT(st == BR_FAILED || result->get_sort() == f->get_range());
     return st;
 }
@@ -972,10 +973,13 @@ expr_ref seq_rewriter::mk_seq_butlast(expr* t) {
 br_status seq_rewriter::lift_ites_throttled(func_decl* f, unsigned n, expr* const* args, expr_ref& result) {
     expr* c = nullptr, * t = nullptr, * e = nullptr;
     for (unsigned i = 0; i < n; ++i)
-        if (m().is_ite(args[i], c, t, e) &&
-            lift_ites_filter(f, args[i]) &&
-            (get_depth(t) <= 2 || t->get_ref_count() == 1 ||
-                get_depth(e) <= 2 || e->get_ref_count() == 1)) {
+        if (m().is_ite(args[i], c, t, e) 
+            // for noodler we want to remove ites always, hopefully nothing will break by doing this
+            // &&
+            // lift_ites_filter(f, args[i]) &&
+            // (get_depth(t) <= 2 || t->get_ref_count() == 1 ||
+            //     get_depth(e) <= 2 || e->get_ref_count() == 1)
+           ) {
             ptr_buffer<expr> new_args;
             for (unsigned j = 0; j < n; ++j) new_args.push_back(args[j]);
             new_args[i] = t;
@@ -984,7 +988,7 @@ br_status seq_rewriter::lift_ites_throttled(func_decl* f, unsigned n, expr* cons
             expr_ref arg2(m().mk_app(f, new_args), m());
             result = m().mk_ite(c, arg1, arg2);
             TRACE("seq_verbose", tout << "lifting ite: " << mk_pp(result, m()) << std::endl;);
-            return BR_REWRITE2;
+            return BR_REWRITE_FULL;
         }
     return BR_FAILED;
 }
@@ -2543,20 +2547,22 @@ br_status seq_rewriter::mk_str_itos(expr* a, expr_ref& result) {
         }
         return BR_DONE;
     }
-    // itos(stoi(s)) -> if s = '0' or .... or s = '9' then s else ""
-    // when |s| <= 1
-    expr* b = nullptr;
-    
-    if (str().is_stoi(a, b) && max_length(b, r) && r <= 1) {
-        expr_ref_vector eqs(m());
-        for (unsigned i = 0; i < 10; ++i) {
-            zstring s('0' + i);
-            eqs.push_back(m().mk_eq(b, str().mk_string(s)));
-        }
-        result = m().mk_or(eqs);
-        result = m().mk_ite(result, b, str().mk_string(zstring()));
-        return BR_REWRITE2;
-    }
+
+    // not suitable for noodler, generates ite
+    // // itos(stoi(s)) -> if s = '0' or .... or s = '9' then s else ""
+    // // when |s| <= 1
+    // expr* b = nullptr;
+    // if (str().is_stoi(a, b) && max_length(b, r) && r <= 1) {
+    //     expr_ref_vector eqs(m());
+    //     for (unsigned i = 0; i < 10; ++i) {
+    //         zstring s('0' + i);
+    //         eqs.push_back(m().mk_eq(b, str().mk_string(s)));
+    //     }
+    //     result = m().mk_or(eqs);
+    //     result = m().mk_ite(result, b, str().mk_string(zstring()));
+    //     return BR_REWRITE2;
+    // }
+
     return BR_FAILED;
 }
 
@@ -2589,9 +2595,12 @@ br_status seq_rewriter::mk_str_stoi(expr* a, expr_ref& result) {
         return BR_DONE;
     }
     expr* b;
+    
     if (str().is_itos(a, b)) {
-        result = m().mk_ite(m_autil.mk_ge(b, zero()), b, minus_one());
-        return BR_DONE;
+        // we handle this inside noodler
+        // result = m().mk_ite(m_autil.mk_ge(b, zero()), b, minus_one());
+        // return BR_DONE;
+        return BR_FAILED;
     }
     if (str().is_ubv2s(a, b)) {
         bv_util bv(m());
@@ -2623,32 +2632,33 @@ br_status seq_rewriter::mk_str_stoi(expr* a, expr_ref& result) {
         result = minus_one();
         return BR_DONE;
     }
-    if (str().is_unit(as.back())) {
-        // if head = "" then tail else
-        // if tail < 0 then tail else 
-        // if stoi(head) >= 0 and then stoi(head)*10+tail else -1
-        expr_ref tail(str().mk_stoi(as.back()), m());
-        expr_ref head(str().mk_concat(as.size() - 1, as.data(), a->get_sort()), m());
-        expr_ref stoi_head(str().mk_stoi(head), m());
-        result = m().mk_ite(m_autil.mk_ge(stoi_head, zero()), 
-                            m_autil.mk_add(m_autil.mk_mul(m_autil.mk_int(10), stoi_head), tail),
-                            minus_one());
+    // the following seems to do some weird splitting with added ites, it would probably be a problem for noodler
+    // if (str().is_unit(as.back())) {
+    //     // if head = "" then tail else
+    //     // if tail < 0 then tail else 
+    //     // if stoi(head) >= 0 and then stoi(head)*10+tail else -1
+    //     expr_ref tail(str().mk_stoi(as.back()), m());
+    //     expr_ref head(str().mk_concat(as.size() - 1, as.data(), a->get_sort()), m());
+    //     expr_ref stoi_head(str().mk_stoi(head), m());
+    //     result = m().mk_ite(m_autil.mk_ge(stoi_head, zero()), 
+    //                         m_autil.mk_add(m_autil.mk_mul(m_autil.mk_int(10), stoi_head), tail),
+    //                         minus_one());
         
-        result = m().mk_ite(m_autil.mk_ge(tail, zero()), 
-                            result,
-                            tail);
-        result = m().mk_ite(str().mk_is_empty(head), 
-                            tail,
-                            result);
-        return BR_REWRITE_FULL;
-    }
-    if (str().is_unit(as.get(0), u) && m_util.is_const_char(u, ch) && '0' == ch) {
-        result = str().mk_concat(as.size() - 1, as.data() + 1, as[0]->get_sort());
-        result = m().mk_ite(str().mk_is_empty(result),
-                            zero(),
-                            str().mk_stoi(result));
-        return BR_REWRITE_FULL;
-    }
+    //     result = m().mk_ite(m_autil.mk_ge(tail, zero()), 
+    //                         result,
+    //                         tail);
+    //     result = m().mk_ite(str().mk_is_empty(head), 
+    //                         tail,
+    //                         result);
+    //     return BR_REWRITE_FULL;
+    // }
+    // if (str().is_unit(as.get(0), u) && m_util.is_const_char(u, ch) && '0' == ch) {
+    //     result = str().mk_concat(as.size() - 1, as.data() + 1, as[0]->get_sort());
+    //     result = m().mk_ite(str().mk_is_empty(result),
+    //                         zero(),
+    //                         str().mk_stoi(result));
+    //     return BR_REWRITE_FULL;
+    // }
 
     return BR_FAILED;
 }

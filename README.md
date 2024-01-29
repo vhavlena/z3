@@ -15,7 +15,7 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
 
 ### Dependencies
 
-1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.1.0`.
+1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.2.0`.
     ```shell
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
@@ -58,16 +58,12 @@ cd build/
 ```
 
 ## Limitations
-The following functions/predicates of the [SMTLIB Strings theory](https://smtlib.cs.uiowa.edu/theories-UnicodeStrings.shtml) are not supported at the moment.
+The following functions/predicates of the [SMTLIB Strings theory](https://smtlib.cs.uiowa.edu/theories-UnicodeStrings.shtml) are not supported at the moment:
 ```
 str.replace_all
 str.replace_re_all
-str.to_int
-str.from_int
 ```
-
-We provide a full support for `str.contains`, but a limited support for its negated version.
-We also do not support string variables as arguments of `str.to_re` and `re.range`.
+Furthermore, we do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
 - Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Cascais, Portugal, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
