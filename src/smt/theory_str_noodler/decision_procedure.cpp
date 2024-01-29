@@ -777,25 +777,31 @@ namespace smt::noodler {
         for (mata::Symbol digit = 48; digit <= 57; ++digit) {
             only_digits.delta.add(0, digit, 0);
         }
+        STRACE("str-conversion-int", tout << "only-digit NFA:" << only_digits << std::endl;);
         // automaton representing all non-valid inputs (contain non-digit)
         mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
+        STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << contain_non_digit << std::endl;);
 
         // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
         std::vector<std::vector<mata::Word>> cases = {{}};
-        for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) {
-            // subst_var = s_i
+        for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) { // s_i = subst_var
             auto aut = solution.aut_ass.at(subst_var);
+            STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << *aut << std::endl;);
 
             // part containing only digits
-            mata::nfa::Nfa aut_valid_part = mata::nfa::intersection(*aut, only_digits);
+            mata::nfa::Nfa aut_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim());
+            STRACE("str-conversion-int", tout << "only-digit NFA:" << aut_valid_part << std::endl;);
             // part containing some non-digit
-            mata::nfa::Nfa aut_non_valid_part = mata::nfa::intersection(*aut, contain_non_digit);
+            mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim());
+            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << aut_non_valid_part << std::endl;);
 
-            // |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
-            result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+            if (!aut_non_valid_part.is_lang_empty()) {
+                // |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1 TODO i < 0 for from_int, handle code var (cannot be digit)
+                result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+            }
 
             // we want to enumerate all words containing digits -> cannot be infinite language
-            if (aut_valid_part.is_acyclic()) {
+            if (!aut_valid_part.is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << *aut << std::endl;);
                 util::throw_error("cannot process to_int/from_int for automaton with infinite language");
             }
