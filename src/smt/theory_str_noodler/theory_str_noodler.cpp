@@ -146,6 +146,10 @@ namespace smt::noodler {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
+        if (propgated_string_theory.contains(expr))
+            return;
+        propgated_string_theory.insert(expr);
+
         context &ctx = get_context();
 
         if (!ctx.e_internalized(expr)) {
