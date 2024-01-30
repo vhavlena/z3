@@ -765,14 +765,13 @@ namespace smt::noodler {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
-        // TODO fix comments of get_formula_for_conversions
         LenNode result(LenFormulaType::OR);
 
         // s = s_1 ... s_n, subst_vars = <s_1, ..., s_n>
         const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(s);
 
         // automaton representing all valid inputs (only digits)
-        // TODO[explain better] can be empty, because we will use it for substituted vars, and one of them can be empty, while other has only digit......
+        // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
         mata::nfa::Nfa only_digits(1, {0}, {0});
         for (mata::Symbol digit = 48; digit <= 57; ++digit) {
             only_digits.delta.add(0, digit, 0);
@@ -796,8 +795,19 @@ namespace smt::noodler {
             STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << aut_non_valid_part << std::endl;);
 
             if (!aut_non_valid_part.is_lang_empty()) {
-                // |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1 TODO i < 0 for from_int, handle code var (cannot be digit)
+                // aut_non_valid_part is language of words that contain at least one non-digit
+                //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
+                //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
+                // we therefore create following formula:
+                //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
                 result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+                if (code_subst_vars.contains(subst_var)) {
+                    // s_i is used in some to_code/from_code
+                    // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
+                    //      .. && !(48 <= code_version_of(s_i) <= 57)
+                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
+                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
+                }
             }
 
             // we want to enumerate all words containing digits -> cannot be infinite language
@@ -824,7 +834,7 @@ namespace smt::noodler {
             LenNode formula_for_case(LenFormulaType::AND); // conjunct C
             for (unsigned i = 0; i < subst_vars.size(); ++i) {
                 const BasicTerm& subst_var = subst_vars[i]; // var s_i
-                mata::Word word_of_subst_var = one_case[i]; // word w_i
+                mata::Word word_of_subst_var = one_case[i]; // word w_i (must contain only digits, from the way it was constructed)
 
                 // creating formula
                 //   |s_i| == |w_i| && int_version_of(s_i) = to_int('1'.w_i) [ && code_version_of(s_i) = to_code(w_i) ]
@@ -840,36 +850,17 @@ namespace smt::noodler {
                 if (code_subst_vars.contains(subst_var)) {
                     // in the case that s_i is also one of the code vars, we need to force the exact value of code var, i.e., we add the optional part
                     //      code_version_of(s_i) = to_code(w_i)
-                    if (word_of_subst_var.size() == 1) {
-                        mata::Symbol code_point = word_of_subst_var[0];
-                        if (48 <= code_point && code_point <= 57) {
-                            // code point for a digit -> we need the exact value
-                            //      code_version_of(s_i) == w_i[0]
-                            formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), code_point });
-                        } else {
-                            // code point for something else (could be even a dummy symbol, but we assume digits are not represented by dummy symbol, see the assumptions)
-                            // -> we can just say that code var should be valid and not be equal to code point of digit, because it has the same semantics for all cases where we do not have digit
-                            
-                            // code_version_of(s_i) is valid...
-                            //      0 <= code_version_of(s_i) <= max_char
-                            formula_for_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{ 0, code_version_of(subst_var) });
-                            formula_for_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{ code_version_of(subst_var), zstring::max_char() });
-                            // ...but not a digit
-                            //      code_version_of(s_i) < 48 && 57 < code_version_of(s_i)
-                            formula_for_case.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
-                            formula_for_case.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
-                        }
-                    } else {
-                        formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), -1 });
-                    }
+                    if (word_of_subst_var.size() == 1) { // |w_i| = 1
+                        mata::Symbol code_point = word_of_subst_var[0]; // this must be a code point of a digit, as w_i can only contain digits
+                        formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), code_point });
+                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the forula from function get_formula_for_code_subst_vars()
                 }
 
                 // add w_i to the end of w
                 full_word.insert(full_word.end(), word_of_subst_var.begin(), word_of_subst_var.end());
             }
 
-            // add "|s| == |w| && i == to_int(w)" to C
-            formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ s, full_word.size() }); // TODO this is not needed, as we restricted lengtjs of s1...sn, and |s| = |s1| +...+|sn|
+            // add "i == to_int(w)" to C (we do not need to add |s| = |w|, that should come from |s| = |s1| + ... + |sn| and in C we talk about lengths of s_1,...,s_n)
             formula_for_case.succ.push_back(word_to_int(full_word, i, false, conv.type == ConversionType::FROM_INT));
 
             result.succ.push_back(formula_for_case);
@@ -911,7 +902,7 @@ namespace smt::noodler {
      *  - same as to_code, we want to encode into LIA the possible values of i
      *  - again, s can be substituted: s = s_1 ... s_n, each s_i can be shared with variables from different to_int (or even to_code/from_code)
      *  - for each s_i, we create an int variable int_version_of(s_i), encoding the possible values of s_i as int (so that we can synch this value between different to_int...)
-     *  - take each word w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i (we assume finite L_i, otherwise ERROR)
+     *  - take each word w = w_1 ... w_n, where w_i is the word containing only digits from the language of the automaton for s_i (we assume there are only finite number of such words, otherwise ERROR)
      *      - create conjunction C of following conjuncts
      *              |s_i| == |w_i| && int_version_of(s_i) = to_int('1'.w_i) [ && code_version_of(s_i) = to_code(w_i) ]
      *          - last part in [] is optional, happens only if s_i substitutes some s used in to_code/from_code
@@ -922,7 +913,7 @@ namespace smt::noodler {
      *              |s| == |w| && i == to_int(w)                                                                                            (2)
      *          - again, to_int(w) returns -1 for non-valid input (w is empt/contains non-digits)
      *      - the cases where w/w_i 
-     *  - final LIA formula is taken as a disjunction of all the conjunctions from the previous step
+     *  - final LIA formula is taken as a disjunction of all the conjunctions from the previous step + for each s_i we also need to sort the part of its language with words containing some non-digit, see get_formula_for_int_conversion()
      * 
      * s = from_int(i)
      *  - similarly to from_code, we want to restrict the values of the argument i from the possible valuations of result s
