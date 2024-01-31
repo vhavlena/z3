@@ -776,23 +776,23 @@ namespace smt::noodler {
         for (mata::Symbol digit = 48; digit <= 57; ++digit) {
             only_digits.delta.add(0, digit, 0);
         }
-        STRACE("str-conversion-int", tout << "only-digit NFA:" << only_digits << std::endl;);
+        STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
         // automaton representing all non-valid inputs (contain non-digit)
         mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
-        STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << contain_non_digit << std::endl;);
+        STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << contain_non_digit << std::endl;);
 
         // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
         std::vector<std::vector<mata::Word>> cases = {{}};
         for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) { // s_i = subst_var
             auto aut = solution.aut_ass.at(subst_var);
-            STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << *aut << std::endl;);
+            STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << std::endl << *aut << std::endl;);
 
             // part containing only digits
             mata::nfa::Nfa aut_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim());
-            STRACE("str-conversion-int", tout << "only-digit NFA:" << aut_valid_part << std::endl;);
+            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
             // part containing some non-digit
             mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim());
-            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << aut_non_valid_part << std::endl;);
+            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << aut_non_valid_part << std::endl;);
 
             if (!aut_non_valid_part.is_lang_empty()) {
                 // aut_non_valid_part is language of words that contain at least one non-digit
@@ -812,7 +812,7 @@ namespace smt::noodler {
 
             // we want to enumerate all words containing digits -> cannot be infinite language
             if (!aut_valid_part.is_acyclic()) {
-                STRACE("str-conversion", tout << "failing NFA:" << *aut << std::endl;);
+                STRACE("str-conversion", tout << "failing NFA:" << std::endl << aut_valid_part << std::endl;);
                 util::throw_error("cannot process to_int/from_int for automaton with infinite language");
             }
 
