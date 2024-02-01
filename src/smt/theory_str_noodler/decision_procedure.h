@@ -373,6 +373,8 @@ namespace smt::noodler {
 
     public:
         
+        bool is_underapproximation = false;
+        
         /**
          * Initialize a new decision procedure that can solve word equations
          * (equalities of concatenations of string variables) with regular constraints
