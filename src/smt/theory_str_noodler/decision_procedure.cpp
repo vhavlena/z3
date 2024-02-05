@@ -810,15 +810,18 @@ namespace smt::noodler {
                 }
             }
 
+            unsigned max_length_of_words = aut_valid_part.num_of_states();
+
             // we want to enumerate all words containing digits -> cannot be infinite language
             if (!aut_valid_part.is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << std::endl << aut_valid_part << std::endl;);
                 // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                 is_underapproximation = true;
+                max_length_of_words = 3; // there are 10^max_length_if_words possible cases, we put limit so there is not MEMOUT
             }
 
             std::vector<std::vector<mata::Word>> new_cases;
-            for (auto word : aut_valid_part.get_words(aut_valid_part.num_of_states())) {
+            for (auto word : aut_valid_part.get_words(max_length_of_words)) {
                 for (const auto& old_case : cases) {
                     std::vector<mata::Word> new_case = old_case;
                     new_case.push_back(word);
