@@ -784,23 +784,33 @@ namespace smt::noodler {
         // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
         std::vector<std::vector<mata::Word>> cases = {{}};
         for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) { // s_i = subst_var
-            auto aut = solution.aut_ass.at(subst_var);
+            std::shared_ptr<mata::nfa::Nfa> aut = solution.aut_ass.at(subst_var);
             STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << std::endl << *aut << std::endl;);
 
             // part containing only digits
-            mata::nfa::Nfa aut_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim());
-            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
+            std::shared_ptr<mata::nfa::Nfa> aut_valid_part;
             // part containing some non-digit
-            mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim());
+            std::shared_ptr<mata::nfa::Nfa> aut_non_valid_part;
+
+            if (conv.type == ConversionType::TO_INT) {
+                aut_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim()));
+                aut_non_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim()));
+            } else {
+                // for from_int, we assume that s is restricted to language of "valid numbers + empty string", which means that
+                // s_i should also be restricted to this language => 'aut intersected with only_digits == aut'
+                aut_valid_part = aut;
+            }
+
+            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
             STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << aut_non_valid_part << std::endl;);
 
-            if (!aut_non_valid_part.is_lang_empty()) {
+            if (!aut_non_valid_part->is_lang_empty()) {
                 // aut_non_valid_part is language of words that contain at least one non-digit
                 //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
                 //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
                 // we therefore create following formula:
                 //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
-                result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+                result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(*aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
                 if (code_subst_vars.contains(subst_var)) {
                     // s_i is used in some to_code/from_code
                     // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
@@ -810,10 +820,10 @@ namespace smt::noodler {
                 }
             }
 
-            unsigned max_length_of_words = aut_valid_part.num_of_states();
+            unsigned max_length_of_words = aut_valid_part->num_of_states();
 
             // we want to enumerate all words containing digits -> cannot be infinite language
-            if (!aut_valid_part.is_acyclic()) {
+            if (!aut_valid_part->is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << std::endl << aut_valid_part << std::endl;);
                 // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                 is_underapproximation = true;
@@ -823,7 +833,7 @@ namespace smt::noodler {
             }
 
             std::vector<std::vector<mata::Word>> new_cases;
-            for (auto word : aut_valid_part.get_words(max_length_of_words)) {
+            for (auto word : aut_valid_part->get_words(max_length_of_words)) {
                 for (const auto& old_case : cases) {
                     std::vector<mata::Word> new_case = old_case;
                     new_case.push_back(word);
