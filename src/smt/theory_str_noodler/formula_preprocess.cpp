@@ -1520,4 +1520,18 @@ namespace smt::noodler {
         return can_unify(left, right, check);
     }
 
+
+    void FormulaPreprocessor::check_conversions_validity(std::vector<TermConversion>& conversions) {
+        mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
+        mata::nfa::Nfa only_digits_aut = aut_ass.digit_automaton();
+
+        for (const auto& conv : conversions) {
+            if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,       *aut_ass.at(conv.string_var))).is_lang_empty()) ||
+                (conv.type == ConversionType::TO_INT  && mata::nfa::reduce(mata::nfa::intersection(only_digits_aut, *aut_ass.at(conv.string_var))).is_lang_empty()))
+                {
+                    len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.int_var, -1});
+                }
+        }
+    }
+
 } // Namespace smt::noodler.

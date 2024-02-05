@@ -377,6 +377,8 @@ namespace smt::noodler {
         bool contains_unsat_eqs_or_diseqs();
         bool can_unify_contain(const Concat& left, const Concat& right) const;
 
+        void check_conversions_validity(std::vector<TermConversion>& conversions);
+
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.
          *
