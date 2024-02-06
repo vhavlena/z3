@@ -590,6 +590,7 @@ namespace smt::noodler {
         m_word_diseq_todo.push_scope();
         m_membership_todo.push_scope();
         m_not_contains_todo.push_scope();
+        m_conversion_todo.push_scope();
         STRACE("str", tout << "push_scope: " << m_scope_level << '\n';);
     }
 
@@ -603,6 +604,7 @@ namespace smt::noodler {
         m_word_diseq_todo.pop_scope(num_scopes);
         m_membership_todo.pop_scope(num_scopes);
         m_not_contains_todo.pop_scope(num_scopes);
+        m_conversion_todo.pop_scope(num_scopes);
         m_rewrite.reset();
         STRACE("str",
             tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
@@ -894,6 +896,7 @@ namespace smt::noodler {
                 // we need to block current assignment
                 STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
                 if (dec_proc.is_underapproximation) {
+                    STRACE("str", tout << "there was underapproximating - giving up" << std::endl);
                     return FC_GIVEUP;
                 }
                 if(m.is_false(block_len)) {

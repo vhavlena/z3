@@ -798,8 +798,8 @@ namespace smt::noodler {
                 aut_valid_part = aut;
             }
 
-            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
-            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << aut_non_valid_part << std::endl;);
+            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
+            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << *aut_non_valid_part << std::endl;);
 
             if (!aut_non_valid_part->is_lang_empty()) {
                 // aut_non_valid_part is language of words that contain at least one non-digit
@@ -821,7 +821,7 @@ namespace smt::noodler {
 
             // we want to enumerate all words containing digits -> cannot be infinite language
             if (!aut_valid_part->is_acyclic()) {
-                STRACE("str-conversion", tout << "failing NFA:" << std::endl << aut_valid_part << std::endl;);
+                STRACE("str-conversion", tout << "failing NFA:" << std::endl << *aut_valid_part << std::endl;);
                 // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                 is_underapproximation = true;
                 if (max_length_of_words > 3) {
