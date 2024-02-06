@@ -866,7 +866,7 @@ namespace smt::noodler {
                     if (word_of_subst_var.size() == 1) { // |w_i| = 1
                         mata::Symbol code_point = word_of_subst_var[0]; // this must be a code point of a digit, as w_i can only contain digits
                         formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), code_point });
-                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the forula from function get_formula_for_code_subst_vars()
+                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the formula from function get_formula_for_code_subst_vars()
                 }
 
                 // add w_i to the end of w
