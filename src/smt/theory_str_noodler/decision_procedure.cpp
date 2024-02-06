@@ -772,7 +772,10 @@ namespace smt::noodler {
 
         // automaton representing all valid inputs (only digits)
         // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
-        mata::nfa::Nfa only_digits = solution.aut_ass.digit_automaton();
+        mata::nfa::Nfa only_digits(1, {0}, {0});
+        for (mata::Symbol digit = 48; digit <= 57; ++digit) {
+            only_digits.delta.add(0, digit, 0);
+        }
         STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
         // automaton representing all non-valid inputs (contain non-digit)
         mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
@@ -825,7 +828,9 @@ namespace smt::noodler {
                 // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                 is_underapproximation = true;
                 if (max_length_of_words > 3) {
-                    max_length_of_words = 3; // there are 10^max_length_if_words possible cases, we put limit so there is not MEMOUT
+                    // there are 10^max_length_of_words possible cases, we put limit so there is not MEMOUT
+                    // but (experimentally) it seems to be better to reduce it even more if the automaton has less states
+                    max_length_of_words = 3;
                 }
             }
 
@@ -1093,7 +1098,7 @@ namespace smt::noodler {
         prep_handler.reduce_regular_sequence(1);
         prep_handler.remove_regular();
 
-        prep_handler.check_conversions_validity(conversions);
+        prep_handler.conversions_validity(conversions);
 
         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();

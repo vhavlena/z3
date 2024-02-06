@@ -77,17 +77,6 @@ namespace smt::noodler {
             return nfa;
         }
 
-        /**
-         * @brief Get NFA that accepts strings with only digits (also empty string)
-         */
-        mata::nfa::Nfa digit_automaton() const {
-            mata::nfa::Nfa only_digits(1, {0}, {0});
-            for (mata::Symbol digit = 48; digit <= 57; ++digit) {
-                only_digits.delta.add(0, digit, 0);
-            }
-            return only_digits;
-        }
-
         mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
