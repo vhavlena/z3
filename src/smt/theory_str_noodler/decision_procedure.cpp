@@ -794,30 +794,29 @@ namespace smt::noodler {
 
             if (conv.type == ConversionType::TO_INT) {
                 aut_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim()));
+                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
                 aut_non_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim()));
+                STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << *aut_non_valid_part << std::endl;);
+                if (!aut_non_valid_part->is_lang_empty()) {
+                    // aut_non_valid_part is language of words that contain at least one non-digit
+                    //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
+                    //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
+                    // we therefore create following formula:
+                    //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
+                    result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(*aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+                    if (code_subst_vars.contains(subst_var)) {
+                        // s_i is used in some to_code/from_code
+                        // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
+                        //      .. && !(48 <= code_version_of(s_i) <= 57)
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
+                    }
+                }
             } else {
                 // for from_int, we assume that s is restricted to language of "valid numbers + empty string", which means that
                 // s_i should also be restricted to this language => 'aut intersected with only_digits == aut'
                 aut_valid_part = aut;
-            }
-
-            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
-            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << *aut_non_valid_part << std::endl;);
-
-            if (!aut_non_valid_part->is_lang_empty()) {
-                // aut_non_valid_part is language of words that contain at least one non-digit
-                //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
-                //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
-                // we therefore create following formula:
-                //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
-                result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(*aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
-                if (code_subst_vars.contains(subst_var)) {
-                    // s_i is used in some to_code/from_code
-                    // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
-                    //      .. && !(48 <= code_version_of(s_i) <= 57)
-                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
-                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
-                }
+                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
             }
 
             unsigned max_length_of_words = aut_valid_part->num_of_states();
