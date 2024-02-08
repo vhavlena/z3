@@ -592,10 +592,12 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
-    LenNode DecisionProcedure::get_lengths() {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
+        LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
+
         if (solution.length_sensitive_vars.empty()) {
             // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
-            return LenNode(LenFormulaType::TRUE);
+            return {LenNode(LenFormulaType::TRUE), precision};
         }
 
         // start with formula for disequations
@@ -612,9 +614,11 @@ namespace smt::noodler {
         solution.flatten_substition_map();
 
         // add formula for conversions
-        conjuncts.push_back(get_formula_for_conversions());
+        auto conv_form_with_precision = get_formula_for_conversions();
+        conjuncts.push_back(conv_form_with_precision.first);
+        precision = conv_form_with_precision.second;
 
-        return LenNode(LenFormulaType::AND, conjuncts);
+        return {LenNode(LenFormulaType::AND, conjuncts), precision};
     }
 
     std::set<BasicTerm> DecisionProcedure::get_vars_substituted_in_code_conversions() {
@@ -761,11 +765,12 @@ namespace smt::noodler {
     }
 
     // see the comment of get_formula_for_conversions for explanation
-    LenNode DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars) {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars) {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
         LenNode result(LenFormulaType::OR);
+        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
         // s = s_1 ... s_n, subst_vars = <s_1, ..., s_n>
         const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(s);
@@ -825,7 +830,7 @@ namespace smt::noodler {
             if (!aut_valid_part->is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << std::endl << *aut_valid_part << std::endl;);
                 // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
-                is_underapproximation = true;
+                res_precision = LenNodePrecision::UNDERAPPROX;
                 if (max_length_of_words > 3) {
                     // there are 10^max_length_of_words possible cases, we put limit so there is not MEMOUT
                     // but (experimentally) it seems to be better to reduce it even more if the automaton has less states
@@ -884,7 +889,7 @@ namespace smt::noodler {
 
         }
 
-        return result;
+        return {result, res_precision};
     }
 
     /**
@@ -937,13 +942,14 @@ namespace smt::noodler {
      *  - we do the same thing as to_int, but instead of 'i == to_int(w)' in (2) for non-valid w, we put 'i < 0'
      *  - we assume (as in from_code) that s is restricted to only possible outputs of from_int, mainly that w cannot start with 0 and the only non-valid w is empty string
      */
-    LenNode DecisionProcedure::get_formula_for_conversions() {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_conversions() {
         STRACE("str-conversion",
             tout << "Creating formula for conversions" << std::endl;
         );
 
         // the resulting formula 
         LenNode result(LenFormulaType::AND);
+        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
         // collect all code variables, i.e. those that substitute string variables used in to_code/from_code predicates
         std::set<BasicTerm> code_subst_vars = get_vars_substituted_in_code_conversions();
@@ -966,7 +972,11 @@ namespace smt::noodler {
             case ConversionType::TO_INT:
             case ConversionType::FROM_INT:
             {
-                result.succ.push_back(get_formula_for_int_conversion(conv, code_subst_vars));
+                auto int_conv_formula_with_precision = get_formula_for_int_conversion(conv, code_subst_vars);
+                result.succ.push_back(int_conv_formula_with_precision.first);
+                if (int_conv_formula_with_precision.second != LenNodePrecision::PRECISE) {
+                    res_precision = int_conv_formula_with_precision.second;
+                }
                 break;
             }
             default:
@@ -977,7 +987,7 @@ namespace smt::noodler {
         STRACE("str-conversion",
             tout << "Formula for conversions: " << result << std::endl;
         );
-        return result;
+        return {result, res_precision};
     }
 
     /**

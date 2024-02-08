@@ -25,7 +25,7 @@ namespace smt::noodler {
     /**
      * @brief Length formula precision
      */
-    enum struct LenNodePrecisionType {
+    enum struct LenNodePrecision {
         PRECISE,
         UNDERAPPROX,
         OVERAPPROX,
@@ -91,9 +91,10 @@ namespace smt::noodler {
          * running compute_next_solution(), the solution is actually solution if the length
          * constraints hold.
          * 
-         * 
+         * The second elemnt of the resulting pair marks whether the lennode is precise or
+         * over/underapproximation.
          */
-        virtual std::tuple<LenNode, LenNodePrecisionType> get_lengths() {
+        virtual std::pair<LenNode, LenNodePrecision> get_lengths() {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -312,7 +313,7 @@ namespace smt::noodler {
         /**
          * @brief Gets the formula encoding to_code/from_code/to_int/from_int conversions
          */
-        LenNode get_formula_for_conversions();
+        std::pair<LenNode, LenNodePrecision> get_formula_for_conversions();
 
         /**
          * Returns the code var version of @p var used to encode to_code/from_code in get_formula_for_conversions
@@ -360,7 +361,7 @@ namespace smt::noodler {
         /**
          * @brief Get the formula encoding to_int/from_int conversion
          */
-        LenNode get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars);
 
         /**
          * Formula containing all not_contains predicate (nothing else)
@@ -383,8 +384,6 @@ namespace smt::noodler {
         lbool can_unify_not_contains(const FormulaPreprocessor& prep);
 
     public:
-        
-        bool is_underapproximation = false;
 
         /**
          * Initialize a new decision procedure that can solve word equations
@@ -430,7 +429,7 @@ namespace smt::noodler {
 
         LenNode get_initial_lengths() override;
 
-        LenNode get_lengths() override;
+        std::pair<LenNode, LenNodePrecision> get_lengths() override;
     };
 }
 
