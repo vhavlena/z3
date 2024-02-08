@@ -23,6 +23,15 @@ namespace smt::noodler {
     };
 
     /**
+     * @brief Length formula precision
+     */
+    enum struct LenNodePrecisionType {
+        PRECISE,
+        UNDERAPPROX,
+        OVERAPPROX,
+    };
+
+    /**
      * @brief Get the value of the symbol representing all symbols not ocurring in the formula (i.e. a minterm)
      * 
      * Dummy symbol represents all symbols not occuring in the problem. It is needed,
@@ -81,8 +90,10 @@ namespace smt::noodler {
          * Get length constraints for the solution. Assumes that we have some solution from
          * running compute_next_solution(), the solution is actually solution if the length
          * constraints hold.
+         * 
+         * 
          */
-        virtual LenNode get_lengths() {
+        virtual std::tuple<LenNode, LenNodePrecisionType> get_lengths() {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -374,7 +385,7 @@ namespace smt::noodler {
     public:
         
         bool is_underapproximation = false;
-        
+
         /**
          * Initialize a new decision procedure that can solve word equations
          * (equalities of concatenations of string variables) with regular constraints

@@ -492,6 +492,8 @@ namespace smt::noodler {
         expr_ref l{get_enode(x)->get_expr(), m};
         expr_ref r{get_enode(y)->get_expr(), m};
 
+        STRACE("str", tout << "new_eq: " << l <<  " = " << r << std::endl;);
+
         app* equation = m.mk_eq(l, r);
 
         // TODO explain what is happening here
@@ -526,8 +528,6 @@ namespace smt::noodler {
                 }
             }
         }
-
-        STRACE("str", tout << "new_eq: " << l <<  " = " << r << std::endl;);
     }
 
     void theory_str_noodler::new_diseq_eh(theory_var x, theory_var y) {
