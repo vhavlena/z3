@@ -1045,6 +1045,12 @@ namespace smt::noodler {
     lbool DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
         FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
+        // we collect variables used in conversions, some preprocessing rules cannot be applied for them
+        std::set<BasicTerm> conv_vars;
+        for (const auto &conv : conversions) {
+            conv_vars.insert(conv.string_var);
+        }
+
         // So-far just lightweight preprocessing
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -1065,7 +1071,7 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
         // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
         // inside not(contains)/conversion. (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
@@ -1077,7 +1083,7 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities();
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -1094,18 +1100,18 @@ namespace smt::noodler {
         prep_handler.common_prefix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
         prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
             prep_handler.skip_len_sat();
             prep_handler.reduce_regular_sequence(3);
-            prep_handler.remove_regular();
+            prep_handler.remove_regular(conv_vars);
             prep_handler.skip_len_sat();
         }
         prep_handler.reduce_regular_sequence(1);
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
 
         prep_handler.conversions_validity(conversions);
 
