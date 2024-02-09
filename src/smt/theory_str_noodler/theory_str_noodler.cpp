@@ -146,10 +146,6 @@ namespace smt::noodler {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         STRACE("str", tout << mk_pp(expr, get_manager()) << std::endl;);
 
-        if (propgated_string_theory.contains(expr))
-            return;
-        propgated_string_theory.insert(expr);
-
         context &ctx = get_context();
 
         if (!ctx.e_internalized(expr)) {
@@ -168,6 +164,12 @@ namespace smt::noodler {
         if(init && m.is_eq(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
+
+        // Check if we already axiomatized the expr
+        if (propagated_string_theory.contains(expr)) {
+            return;
+        }     
+        propagated_string_theory.insert(expr);
 
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
@@ -601,6 +603,7 @@ namespace smt::noodler {
     void theory_str_noodler::pop_scope_eh(const unsigned num_scopes) {
         // remove all axiomatized terms
         axiomatized_terms.reset();
+        propagated_string_theory.reset();
         m_scope_level -= num_scopes;
         m_word_eq_todo.pop_scope(num_scopes);
         m_lang_eq_todo.pop_scope(num_scopes);
