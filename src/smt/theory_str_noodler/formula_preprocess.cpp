@@ -305,7 +305,7 @@ namespace smt::noodler {
      * 
      * @param disallowed_vars - if any of these var occurs in equation, it cannot be removed
      */
-    void FormulaPreprocessor::remove_regular(const std::set<BasicTerm>& disallowed_vars) {
+    void FormulaPreprocessor::remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars) {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
         std::deque<std::pair<size_t, Predicate>> worklist(regs.begin(), regs.end());
@@ -318,7 +318,7 @@ namespace smt::noodler {
 
             assert(pr.second.get_left_side().size() == 1);
 
-            bool contains_disallowed = !set_disjoint(this->len_variables, pr.second.get_vars());
+            bool contains_disallowed = !set_disjoint(disallowed_vars, pr.second.get_vars());
             if (contains_disallowed) {
                 continue;
             }

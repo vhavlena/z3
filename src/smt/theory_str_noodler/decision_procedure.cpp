@@ -1046,7 +1046,7 @@ namespace smt::noodler {
         FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
         // we collect variables used in conversions, some preprocessing rules cannot be applied for them
-        std::set<BasicTerm> conv_vars;
+        std::unordered_set<BasicTerm> conv_vars;
         for (const auto &conv : conversions) {
             conv_vars.insert(conv.string_var);
         }
