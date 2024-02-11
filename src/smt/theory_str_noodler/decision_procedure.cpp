@@ -1097,6 +1097,7 @@ namespace smt::noodler {
         );
         prep_handler.generate_equiv(len_eq_vars);
         prep_handler.common_prefix_propagation();
+        prep_handler.common_suffix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
         prep_handler.remove_regular(conv_vars);

@@ -1344,6 +1344,49 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Propagate equations from a common suffix. For instance for
+     * X = Y W1 W2
+     * X = W3 W4 W1 W2
+     * infer Y = W3 W4.
+     * 
+     * Works also for a propagated case, for instance
+     * X = Y W1 W2
+     * X = W3 W4 K
+     * K = W1 W2
+     * infer Y = W3 W4
+     */
+    void FormulaPreprocessor::common_suffix_propagation() {
+        TermReplaceMap replace_map = construct_replace_map();
+        int i = 0, j = 0;
+        for(const auto& pr1 : this->formula.get_predicates()) {
+            if(!pr1.second.is_equation()) continue;
+
+            Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
+
+            for(const auto& pr2 : this->formula.get_predicates()) {
+                if(!pr2.second.is_equation()) continue;
+                if(pr1 == pr2) continue;
+                if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
+                
+
+                Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
+                // compute the common prefix
+                for(i = c1.size() - 1, j = c2.size() - 1; i >= 0 && j >= 0; i--, j--) {
+                    if(c1[i] != c2[j]) break;
+                }
+                // i is the first mismatching index
+                if(i == 0) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin(), c2.begin() + j + 1) });
+                    this->formula.add_predicate(new_pred);
+                } else if (j == 0) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[j]}, Concat(c1.begin(), c1.begin() + i + 1) });
+                    this->formula.add_predicate(new_pred);
+                }
+            }
+        }
+    }
+
+    /**
      * @brief Construct replace map. Replace map contains all items of the form X -> {W1 W2, W3, ...} if 
      * there are quations X = W1 W2, X = W3, ... 
      * 
