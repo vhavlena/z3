@@ -360,8 +360,11 @@ namespace smt::noodler {
 
         /**
          * @brief Get the formula encoding to_int/from_int conversion
+         * 
+         * @param underapproximating_length For the case that we need to underapproximate, this variable sets
+         * the length up to which we underapproximate
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length = 3);
 
         /**
          * Formula containing all not_contains predicate (nothing else)

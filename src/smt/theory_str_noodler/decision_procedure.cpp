@@ -765,7 +765,7 @@ namespace smt::noodler {
     }
 
     // see the comment of get_formula_for_conversions for explanation
-    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars) {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length) {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
@@ -829,12 +829,11 @@ namespace smt::noodler {
             // we want to enumerate all words containing digits -> cannot be infinite language
             if (!aut_valid_part->is_acyclic()) {
                 STRACE("str-conversion", tout << "failing NFA:" << std::endl << *aut_valid_part << std::endl;);
-                // util::throw_error("cannot process to_int/from_int for automaton with infinite language");
                 res_precision = LenNodePrecision::UNDERAPPROX;
-                if (max_length_of_words > 3) {
+                if (max_length_of_words > underapproximating_length) {
                     // there are 10^max_length_of_words possible cases, we put limit so there is not MEMOUT
                     // but (experimentally) it seems to be better to reduce it even more if the automaton has less states
-                    max_length_of_words = 3;
+                    max_length_of_words = underapproximating_length;
                 }
             }
 
