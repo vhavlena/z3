@@ -91,7 +91,7 @@ namespace smt::noodler {
          * running compute_next_solution(), the solution is actually solution if the length
          * constraints hold.
          * 
-         * The second elemnt of the resulting pair marks whether the lennode is precise or
+         * The second element of the resulting pair marks whether the lennode is precise or
          * over/underapproximation.
          */
         virtual std::pair<LenNode, LenNodePrecision> get_lengths() {
