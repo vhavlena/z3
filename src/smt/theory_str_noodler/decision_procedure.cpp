@@ -705,8 +705,8 @@ namespace smt::noodler {
 
         for (mata::Symbol s : word) {
             is_invalid = false; // word is not empty, it might not be invalid
-            if (48 <= s && s <= 57) { // s is a code point of digit
-                rational real_digit(s - 48);
+            if (AutAssignment::DIGIT_SYMBOL_START <= s && s <= AutAssignment::DIGIT_SYMBOL_END) { // s is a code point of digit
+                rational real_digit(s - AutAssignment::DIGIT_SYMBOL_START);
                 resulting_int = resulting_int*10 + real_digit;
             } else {
                 // it is possible that s is a dummy symbol, but we assume that all digits are explicitly in the alphabet, see the assumptions
@@ -778,7 +778,7 @@ namespace smt::noodler {
         // automaton representing all valid inputs (only digits)
         // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
         mata::nfa::Nfa only_digits(1, {0}, {0});
-        for (mata::Symbol digit = 48; digit <= 57; ++digit) {
+        for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
             only_digits.delta.add(0, digit, 0);
         }
         STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
@@ -812,9 +812,9 @@ namespace smt::noodler {
                     if (code_subst_vars.contains(subst_var)) {
                         // s_i is used in some to_code/from_code
                         // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
-                        //      .. && !(48 <= code_version_of(s_i) <= 57)
-                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
-                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
+                        //      .. && !(AutAssignment::DIGIT_SYMBOL_START <= code_version_of(s_i) <= AutAssignment::DIGIT_SYMBOL_END)
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), AutAssignment::DIGIT_SYMBOL_START });
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ AutAssignment::DIGIT_SYMBOL_END, code_version_of(subst_var) });
                     }
                 }
             } else {
