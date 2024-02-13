@@ -1541,11 +1541,7 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::conversions_validity(std::vector<TermConversion>& conversions) {
         mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
-        mata::nfa::Nfa only_digits_aut(2, {0}, {1});
-        for (mata::Symbol digit = 48; digit <= 57; ++digit) {
-            only_digits_aut.delta.add(0, digit, 1);
-            only_digits_aut.delta.add(1, digit, 1);
-        }
+        mata::nfa::Nfa only_digits_aut = AutAssignment::digit_automaton();
 
         for (const auto& conv : conversions) {
             if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,       *aut_ass.at(conv.string_var))).is_lang_empty()) ||
