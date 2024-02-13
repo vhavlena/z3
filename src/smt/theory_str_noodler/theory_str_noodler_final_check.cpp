@@ -235,7 +235,7 @@ namespace smt::noodler {
 
         dec_proc.init_computation();
         while(dec_proc.compute_next_solution() == l_true) {
-            expr_ref lengths = len_node_to_z3_formula(dec_proc.get_lengths());
+            expr_ref lengths = len_node_to_z3_formula(dec_proc.get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
                 return l_true;
             }
@@ -475,7 +475,7 @@ namespace smt::noodler {
         while (true) {
             lbool result = nproc.compute_next_solution();
             if (result == l_true) {
-                expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths());
+                expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
                     return l_true;
                 } else {

@@ -592,10 +592,12 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, conjuncts);
     }
 
-    LenNode DecisionProcedure::get_lengths() {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
+        LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
+
         if (solution.length_sensitive_vars.empty()) {
             // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
-            return LenNode(LenFormulaType::TRUE);
+            return {LenNode(LenFormulaType::TRUE), precision};
         }
 
         // start with formula for disequations
@@ -612,9 +614,11 @@ namespace smt::noodler {
         solution.flatten_substition_map();
 
         // add formula for conversions
-        conjuncts.push_back(get_formula_for_conversions());
+        auto conv_form_with_precision = get_formula_for_conversions();
+        conjuncts.push_back(conv_form_with_precision.first);
+        precision = conv_form_with_precision.second;
 
-        return LenNode(LenFormulaType::AND, conjuncts);
+        return {LenNode(LenFormulaType::AND, conjuncts), precision};
     }
 
     std::set<BasicTerm> DecisionProcedure::get_vars_substituted_in_code_conversions() {
@@ -701,8 +705,8 @@ namespace smt::noodler {
 
         for (mata::Symbol s : word) {
             is_invalid = false; // word is not empty, it might not be invalid
-            if (48 <= s && s <= 57) { // s is a code point of digit
-                rational real_digit(s - 48);
+            if (AutAssignment::DIGIT_SYMBOL_START <= s && s <= AutAssignment::DIGIT_SYMBOL_END) { // s is a code point of digit
+                rational real_digit(s - AutAssignment::DIGIT_SYMBOL_START);
                 resulting_int = resulting_int*10 + real_digit;
             } else {
                 // it is possible that s is a dummy symbol, but we assume that all digits are explicitly in the alphabet, see the assumptions
@@ -761,11 +765,12 @@ namespace smt::noodler {
     }
 
     // see the comment of get_formula_for_conversions for explanation
-    LenNode DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars) {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length) {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
         LenNode result(LenFormulaType::OR);
+        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
         // s = s_1 ... s_n, subst_vars = <s_1, ..., s_n>
         const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(s);
@@ -773,7 +778,7 @@ namespace smt::noodler {
         // automaton representing all valid inputs (only digits)
         // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
         mata::nfa::Nfa only_digits(1, {0}, {0});
-        for (mata::Symbol digit = 48; digit <= 57; ++digit) {
+        for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
             only_digits.delta.add(0, digit, 0);
         }
         STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
@@ -784,40 +789,56 @@ namespace smt::noodler {
         // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
         std::vector<std::vector<mata::Word>> cases = {{}};
         for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) { // s_i = subst_var
-            auto aut = solution.aut_ass.at(subst_var);
+            std::shared_ptr<mata::nfa::Nfa> aut = solution.aut_ass.at(subst_var);
             STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << std::endl << *aut << std::endl;);
 
             // part containing only digits
-            mata::nfa::Nfa aut_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim());
-            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
+            std::shared_ptr<mata::nfa::Nfa> aut_valid_part;
             // part containing some non-digit
-            mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim());
-            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << aut_non_valid_part << std::endl;);
+            std::shared_ptr<mata::nfa::Nfa> aut_non_valid_part;
 
-            if (!aut_non_valid_part.is_lang_empty()) {
-                // aut_non_valid_part is language of words that contain at least one non-digit
-                //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
-                //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
-                // we therefore create following formula:
-                //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
-                result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
-                if (code_subst_vars.contains(subst_var)) {
-                    // s_i is used in some to_code/from_code
-                    // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
-                    //      .. && !(48 <= code_version_of(s_i) <= 57)
-                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), 48 });
-                    result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ 57, code_version_of(subst_var) });
+            if (conv.type == ConversionType::TO_INT) {
+                aut_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim()));
+                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
+                aut_non_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim()));
+                STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << *aut_non_valid_part << std::endl;);
+                if (!aut_non_valid_part->is_lang_empty()) {
+                    // aut_non_valid_part is language of words that contain at least one non-digit
+                    //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
+                    //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
+                    // we therefore create following formula:
+                    //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
+                    result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(*aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
+                    if (code_subst_vars.contains(subst_var)) {
+                        // s_i is used in some to_code/from_code
+                        // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
+                        //      .. && !(AutAssignment::DIGIT_SYMBOL_START <= code_version_of(s_i) <= AutAssignment::DIGIT_SYMBOL_END)
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), AutAssignment::DIGIT_SYMBOL_START });
+                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ AutAssignment::DIGIT_SYMBOL_END, code_version_of(subst_var) });
+                    }
+                }
+            } else {
+                // for from_int, we assume that s is restricted to language of "valid numbers + empty string", which means that
+                // s_i should also be restricted to this language => 'aut intersected with only_digits == aut'
+                aut_valid_part = aut;
+                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
+            }
+
+            unsigned max_length_of_words = aut_valid_part->num_of_states();
+
+            // we want to enumerate all words containing digits -> cannot be infinite language
+            if (!aut_valid_part->is_acyclic()) {
+                STRACE("str-conversion", tout << "failing NFA:" << std::endl << *aut_valid_part << std::endl;);
+                res_precision = LenNodePrecision::UNDERAPPROX;
+                if (max_length_of_words > underapproximating_length) {
+                    // there are 10^max_length_of_words possible cases, we put limit so there is not MEMOUT
+                    // but (experimentally) it seems to be better to reduce it even more if the automaton has less states
+                    max_length_of_words = underapproximating_length;
                 }
             }
 
-            // we want to enumerate all words containing digits -> cannot be infinite language
-            if (!aut_valid_part.is_acyclic()) {
-                STRACE("str-conversion", tout << "failing NFA:" << std::endl << aut_valid_part << std::endl;);
-                util::throw_error("cannot process to_int/from_int for automaton with infinite language");
-            }
-
             std::vector<std::vector<mata::Word>> new_cases;
-            for (auto word : aut_valid_part.get_words(aut_valid_part.num_of_states())) {
+            for (auto word : aut_valid_part->get_words(max_length_of_words)) {
                 for (const auto& old_case : cases) {
                     std::vector<mata::Word> new_case = old_case;
                     new_case.push_back(word);
@@ -853,7 +874,7 @@ namespace smt::noodler {
                     if (word_of_subst_var.size() == 1) { // |w_i| = 1
                         mata::Symbol code_point = word_of_subst_var[0]; // this must be a code point of a digit, as w_i can only contain digits
                         formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), code_point });
-                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the forula from function get_formula_for_code_subst_vars()
+                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the formula from function get_formula_for_code_subst_vars()
                 }
 
                 // add w_i to the end of w
@@ -867,7 +888,7 @@ namespace smt::noodler {
 
         }
 
-        return result;
+        return {result, res_precision};
     }
 
     /**
@@ -920,13 +941,14 @@ namespace smt::noodler {
      *  - we do the same thing as to_int, but instead of 'i == to_int(w)' in (2) for non-valid w, we put 'i < 0'
      *  - we assume (as in from_code) that s is restricted to only possible outputs of from_int, mainly that w cannot start with 0 and the only non-valid w is empty string
      */
-    LenNode DecisionProcedure::get_formula_for_conversions() {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_conversions() {
         STRACE("str-conversion",
             tout << "Creating formula for conversions" << std::endl;
         );
 
         // the resulting formula 
         LenNode result(LenFormulaType::AND);
+        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
         // collect all code variables, i.e. those that substitute string variables used in to_code/from_code predicates
         std::set<BasicTerm> code_subst_vars = get_vars_substituted_in_code_conversions();
@@ -949,7 +971,11 @@ namespace smt::noodler {
             case ConversionType::TO_INT:
             case ConversionType::FROM_INT:
             {
-                result.succ.push_back(get_formula_for_int_conversion(conv, code_subst_vars));
+                auto int_conv_formula_with_precision = get_formula_for_int_conversion(conv, code_subst_vars);
+                result.succ.push_back(int_conv_formula_with_precision.first);
+                if (int_conv_formula_with_precision.second != LenNodePrecision::PRECISE) {
+                    res_precision = int_conv_formula_with_precision.second;
+                }
                 break;
             }
             default:
@@ -960,7 +986,7 @@ namespace smt::noodler {
         STRACE("str-conversion",
             tout << "Formula for conversions: " << result << std::endl;
         );
-        return result;
+        return {result, res_precision};
     }
 
     /**
@@ -1018,6 +1044,12 @@ namespace smt::noodler {
     lbool DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
         FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
 
+        // we collect variables used in conversions, some preprocessing rules cannot be applied for them
+        std::unordered_set<BasicTerm> conv_vars;
+        for (const auto &conv : conversions) {
+            conv_vars.insert(conv.string_var);
+        }
+
         // So-far just lightweight preprocessing
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -1038,7 +1070,7 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
         // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
         // inside not(contains)/conversion. (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
@@ -1050,7 +1082,7 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities();
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -1067,18 +1099,20 @@ namespace smt::noodler {
         prep_handler.common_prefix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
         prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
             prep_handler.skip_len_sat();
             prep_handler.reduce_regular_sequence(3);
-            prep_handler.remove_regular();
+            prep_handler.remove_regular(conv_vars);
             prep_handler.skip_len_sat();
         }
         prep_handler.reduce_regular_sequence(1);
-        prep_handler.remove_regular();
+        prep_handler.remove_regular(conv_vars);
+
+        prep_handler.conversions_validity(conversions);
 
         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();

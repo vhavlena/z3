@@ -58,10 +58,16 @@ namespace smt::noodler {
 
     template<typename T>
     bool set_disjoint(const std::unordered_set<T>& t1, const std::set<T>& t2) {
-        std::set<T> inter;
-        for(const auto& t : t2) {
-            if(t1.find(t) != t1.end())
-                return false;
+        if (t1.size() < t2.size()) {
+            for(const auto& t : t1) {
+                if(t2.contains(t))
+                    return false;
+            }
+        } else {
+            for(const auto& t : t2) {
+                if(t1.contains(t))
+                    return false;
+            }
         }
         return true;
     }
@@ -357,7 +363,7 @@ namespace smt::noodler {
 
         Formula get_modified_formula() const;
 
-        void remove_regular();
+        void remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars);
         void propagate_variables();
         void propagate_eps();
         void generate_identities();
@@ -376,6 +382,8 @@ namespace smt::noodler {
 
         bool contains_unsat_eqs_or_diseqs();
         bool can_unify_contain(const Concat& left, const Concat& right) const;
+
+        void conversions_validity(std::vector<TermConversion>& conversions);
 
         /**
          * @brief Replace all occurrences of find with replace. Warning: do not modify the automata assignment.

@@ -344,7 +344,7 @@ namespace smt::noodler {
         LenNode get_initial_lengths() override {
             return LenNode(LenFormulaType::TRUE);
         }
-        LenNode get_lengths() override;
+        std::pair<LenNode, LenNodePrecision> get_lengths() override;
         void init_computation() override;
 
         lbool preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) override;

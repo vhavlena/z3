@@ -10,9 +10,9 @@
 
 namespace smt::noodler {
 
-    LenNode NielsenDecisionProcedure::get_lengths() {
+    std::pair<LenNode, LenNodePrecision> NielsenDecisionProcedure::get_lengths() {
         STRACE("str", tout << "Nielsen lengths: " << length_formula_for_solution << std::endl;);
-        return std::move(length_formula_for_solution);
+        return {std::move(length_formula_for_solution), LenNodePrecision::PRECISE};
     }
 
     /**

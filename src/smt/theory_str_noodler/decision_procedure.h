@@ -23,6 +23,15 @@ namespace smt::noodler {
     };
 
     /**
+     * @brief Length formula precision
+     */
+    enum struct LenNodePrecision {
+        PRECISE,
+        UNDERAPPROX,
+        OVERAPPROX,
+    };
+
+    /**
      * @brief Get the value of the symbol representing all symbols not ocurring in the formula (i.e. a minterm)
      * 
      * Dummy symbol represents all symbols not occuring in the problem. It is needed,
@@ -81,8 +90,11 @@ namespace smt::noodler {
          * Get length constraints for the solution. Assumes that we have some solution from
          * running compute_next_solution(), the solution is actually solution if the length
          * constraints hold.
+         * 
+         * The second element of the resulting pair marks whether the lennode is precise or
+         * over/underapproximation.
          */
-        virtual LenNode get_lengths() {
+        virtual std::pair<LenNode, LenNodePrecision> get_lengths() {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -301,7 +313,7 @@ namespace smt::noodler {
         /**
          * @brief Gets the formula encoding to_code/from_code/to_int/from_int conversions
          */
-        LenNode get_formula_for_conversions();
+        std::pair<LenNode, LenNodePrecision> get_formula_for_conversions();
 
         /**
          * Returns the code var version of @p var used to encode to_code/from_code in get_formula_for_conversions
@@ -348,8 +360,11 @@ namespace smt::noodler {
 
         /**
          * @brief Get the formula encoding to_int/from_int conversion
+         * 
+         * @param underapproximating_length For the case that we need to underapproximate, this variable sets
+         * the length up to which we underapproximate
          */
-        LenNode get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length = 3);
 
         /**
          * Formula containing all not_contains predicate (nothing else)
@@ -372,7 +387,7 @@ namespace smt::noodler {
         lbool can_unify_not_contains(const FormulaPreprocessor& prep);
 
     public:
-        
+
         /**
          * Initialize a new decision procedure that can solve word equations
          * (equalities of concatenations of string variables) with regular constraints
@@ -417,7 +432,7 @@ namespace smt::noodler {
 
         LenNode get_initial_lengths() override;
 
-        LenNode get_lengths() override;
+        std::pair<LenNode, LenNodePrecision> get_lengths() override;
     };
 }
 

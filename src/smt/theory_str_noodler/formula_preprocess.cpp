@@ -298,12 +298,14 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where
+     * Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where
      * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable
      * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system
      * provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X) is the automaton assigned to variable X.
+     * 
+     * @param disallowed_vars - if any of these var occurs in equation, it cannot be removed
      */
-    void FormulaPreprocessor::remove_regular() {
+    void FormulaPreprocessor::remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars) {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
         std::deque<std::pair<size_t, Predicate>> worklist(regs.begin(), regs.end());
@@ -312,7 +314,14 @@ namespace smt::noodler {
             std::pair<size_t, Predicate> pr = worklist.front();
             worklist.pop_front();
 
+            STRACE("str-prep-remove_regular", tout << "Remove regular:" << pr.second << std::endl;);
+
             assert(pr.second.get_left_side().size() == 1);
+
+            bool contains_disallowed = !set_disjoint(disallowed_vars, pr.second.get_vars());
+            if (contains_disallowed) {
+                continue;
+            }
 
             // if right side contains len vars (except when we have X = Y), we must do splitting => cannot remove
             bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
@@ -332,6 +341,7 @@ namespace smt::noodler {
             }
 
             this->formula.remove_predicate(pr.first);
+            STRACE("str-prep-remove_regular", tout << "removed" << std::endl;);
 
             // check if by removing the regular equation, some other equations did not become regular
             // we only need to check this for left_var, as the variables from the right side do not occur
@@ -1518,6 +1528,28 @@ namespace smt::noodler {
             return false;
         };
         return can_unify(left, right, check);
+    }
+
+
+    /**
+     * @brief Adds restrictions from conversions to the len_formula, so that (underapproximating) unsat check can be better
+     * 
+     * Specifically, it checks if for to_code(x)/to_int(x) there is any valid word in the language of automaton for x, i.e,
+     * some one-symbol word for to_code(x) or some word containing only digits for to_int(x).
+     * 
+     * @param conversions 
+     */
+    void FormulaPreprocessor::conversions_validity(std::vector<TermConversion>& conversions) {
+        mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
+        mata::nfa::Nfa only_digits_aut = AutAssignment::digit_automaton();
+
+        for (const auto& conv : conversions) {
+            if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,       *aut_ass.at(conv.string_var))).is_lang_empty()) ||
+                (conv.type == ConversionType::TO_INT  && mata::nfa::reduce(mata::nfa::intersection(only_digits_aut, *aut_ass.at(conv.string_var))).is_lang_empty()))
+                {
+                    len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.int_var, -1});
+                }
+        }
     }
 
 } // Namespace smt::noodler.

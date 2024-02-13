@@ -77,6 +77,23 @@ namespace smt::noodler {
             return nfa;
         }
 
+        // represents code point of digit 0
+        static const mata::Symbol DIGIT_SYMBOL_START = 48;
+        // represents code point of digit 9
+        static const mata::Symbol DIGIT_SYMBOL_END = 57;
+
+        /**
+         * @brief Returns automaton that accept non-empty words containing only symbols encoding digits (symbols from 48 to 57)
+         */
+        static mata::nfa::Nfa digit_automaton() {
+            mata::nfa::Nfa only_digits_aut(2, {0}, {1});
+            for (mata::Symbol digit = DIGIT_SYMBOL_START; digit <= DIGIT_SYMBOL_END; ++digit) {
+                only_digits_aut.delta.add(0, digit, 1);
+                only_digits_aut.delta.add(1, digit, 1);
+            }
+            return only_digits_aut;
+        }
+
         mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {
