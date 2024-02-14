@@ -165,6 +165,12 @@ namespace smt::noodler {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
 
+        // Check if we already axiomatized the expr
+        if (propagated_string_theory.contains(expr)) {
+            return;
+        }     
+        propagated_string_theory.insert(expr);
+
         sort *expr_sort = expr->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
 
@@ -597,6 +603,7 @@ namespace smt::noodler {
     void theory_str_noodler::pop_scope_eh(const unsigned num_scopes) {
         // remove all axiomatized terms
         axiomatized_terms.reset();
+        propagated_string_theory.reset();
         m_scope_level -= num_scopes;
         m_word_eq_todo.pop_scope(num_scopes);
         m_lang_eq_todo.pop_scope(num_scopes);
