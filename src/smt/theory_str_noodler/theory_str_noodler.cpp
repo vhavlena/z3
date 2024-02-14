@@ -2022,9 +2022,13 @@ namespace smt::noodler {
 
         axiomatized_persist_terms.insert(e);
         STRACE("str", tout  << "handle contains " << mk_pp(e, m) << std::endl;);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y));
 
         // if contains is of the form (str.contains (str.substr value2 0 (+ n (str.indexof value2 "A" 0))) "A"), derive simpler constraints
         expr * ind = nullptr;
+        zstring str;
         if(expr_cases::is_contains_index(e, ind, m, m_util_s, m_util_a)) {
             expr_ref ind_eq(m.mk_eq( ind, m_util_a.mk_int(-1) ), m);
             expr_ref ind_leq(m_util_a.mk_le( ind, m_util_a.mk_int(-1) ), m);
@@ -2032,11 +2036,18 @@ namespace smt::noodler {
             add_axiom({~mk_eq(ind, m_util_a.mk_int(-1), false), ~mk_literal(e) });
             add_axiom({mk_eq(ind, m_util_a.mk_int(-1), false), mk_literal(e) });
             return;
+        // if constains is of the form (str.constains str (str.at )) rewrite to a regular constaint
+        } else if (m_util_s.str.is_at(y) && m_util_s.str.is_string(x, str) && str.length() > 0) {
+            expr_ref re(m_util_s.re.mk_to_re(m_util_s.str.mk_string("")), m);
+            for(size_t i = 0; i < str.length(); i++) {
+                re = m_util_s.re.mk_union(re, m_util_s.re.mk_to_re(m_util_s.str.mk_string(str[i])));
+            }
+            expr_ref in_re(m_util_s.re.mk_in_re(y, re), m);
+            literal not_e = mk_literal(mk_not({e, m}));
+            add_axiom({not_e, mk_literal(in_re)});
+            return;
         }
 
-        ast_manager &m = get_manager();
-        expr *x = nullptr, *y = nullptr;
-        VERIFY(m_util_s.str.is_contains(e, x, y));
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");
         expr_ref pys(m_util_s.str.mk_concat(m_util_s.str.mk_concat(p, y), s), m);
