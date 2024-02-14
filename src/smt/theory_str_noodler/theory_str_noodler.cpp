@@ -1234,6 +1234,12 @@ namespace smt::noodler {
             this->var_eqs.add(expr_ref(l, m), v);
             return;
         } else {
+            expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
+            m_rewrite(post_bound); // simplify
+            // if i + l >= |s|, we can set post_substr to eps
+            if(m.is_true(post_bound)) {
+                y = expr_ref(m_util_s.str.mk_string(""), m);
+            }
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
              add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
              // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
