@@ -5330,6 +5330,28 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
     bool changed = false;
     if (reduce_eq_empty(l, r, result)) 
         return BR_REWRITE_FULL;
+    
+    // TODO move to function + call also with swapped argumnets (but I do not think it is needed)
+    expr* s;
+    rational n;
+    if (m_util.str.is_stoi(l, s) && m_autil.is_numeral(r, n)) {
+        result =
+            // m().mk_and(
+                // m().mk_eq(l ,r), // TODO do we need to give arith solver this info? it gets stuck if we keep this
+                m_util.re.mk_in_re(
+                    s,
+                    m_util.re.mk_concat(
+                        m_util.re.mk_star(m_util.re.mk_to_re(m_util.str.mk_string("0"))),
+                        m_util.re.mk_to_re(m_util.str.mk_string(zstring(n)))
+                    )
+                )
+            // )
+        ;
+        TRACE("seq_verbose", tout << result << "\n";);
+        return BR_DONE; // TODO is s reduced? should we rewrite some stuff?
+    }
+
+    // TODO do the same shit with lengths
 
     if (!reduce_eq(l, r, new_eqs, changed)) {
         result = m().mk_false();
