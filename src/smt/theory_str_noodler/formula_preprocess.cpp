@@ -1357,6 +1357,7 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::common_suffix_propagation() {
         TermReplaceMap replace_map = construct_replace_map();
+        std::set<size_t> rem_ids;
         int i = 0, j = 0;
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation()) continue;
@@ -1378,11 +1379,20 @@ namespace smt::noodler {
                 if(i == 0) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin(), c2.begin() + j + 1) });
                     this->formula.add_predicate(new_pred);
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr2.first);
+                    }
                 } else if (j == 0) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[j]}, Concat(c1.begin(), c1.begin() + i + 1) });
                     this->formula.add_predicate(new_pred);
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr1.first);
+                    }
                 }
             }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
         }
     }
 
