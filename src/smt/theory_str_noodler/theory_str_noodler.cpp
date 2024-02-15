@@ -1311,6 +1311,9 @@ namespace smt::noodler {
             expr_ref at(m_util_s.str.mk_at(s, i), m);
             add_axiom({mk_eq(v, e, false)});
             add_axiom({mk_eq(v, at, false)});
+            // set an additional constraint that v in eps union sigma
+            expr_ref re(m_util_s.re.mk_in_re(v, m_util_s.re.mk_union( m_util_s.re.mk_to_re(m_util_s.str.mk_string("")),  m_util_s.re.mk_full_char(nullptr))) , m);
+            add_axiom({mk_literal(re)});
             this->predicate_replace.insert(e, v.get());
             return;
         }
@@ -1801,6 +1804,16 @@ namespace smt::noodler {
         ast_manager &m = get_manager();
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
+
+        expr * sub_str = nullptr, *sub_ind = nullptr, *sub_len = nullptr;
+        rational val;
+        zstring str;
+        // handle the special case of the form (str.prefix "a" (str.substr s 5 2)) --> (str.at s 5) == "a"
+        if(m_util_s.str.is_string(x, str) && str.length() == 1 && m_util_s.str.is_extract(y, sub_str, sub_ind, sub_len) && m_util_a.is_numeral(sub_ind) && m_util_a.is_numeral(sub_len, val) && val.get_int32() >= 1) {
+            add_axiom({~mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), mk_literal(e) });
+            add_axiom({mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), ~mk_literal(e) });
+            return;
+        }
 
         expr_ref fresh = mk_str_var_fresh("prefix");
         expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);

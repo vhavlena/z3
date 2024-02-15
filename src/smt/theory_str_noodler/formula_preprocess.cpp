@@ -1314,9 +1314,11 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::common_prefix_propagation() {
         TermReplaceMap replace_map = construct_replace_map();
+        std::set<size_t> rem_ids;
         size_t i = 0;
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation()) continue;
+            if(pr1.second.get_right_side().size() == 1) continue;
 
             Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
 
@@ -1324,7 +1326,7 @@ namespace smt::noodler {
                 if(!pr2.second.is_equation()) continue;
                 if(pr1 == pr2) continue;
                 if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
-                
+                if(pr2.second.get_right_side().size() == 1) continue;
 
                 Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
                 // compute the common prefix
@@ -1335,11 +1337,20 @@ namespace smt::noodler {
                 if(c1.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin() + i, c2.end()) });
                     this->formula.add_predicate(new_pred);
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr2.first);
+                    }
                 } else if (c2.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[i]}, Concat(c1.begin() + i, c1.end()) });
                     this->formula.add_predicate(new_pred);
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr1.first);
+                    }
                 }
             }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
         }
     }
 
@@ -1361,6 +1372,7 @@ namespace smt::noodler {
         int i = 0, j = 0;
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation()) continue;
+            if(pr1.second.get_right_side().size() == 1) continue;
 
             Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
 
@@ -1368,6 +1380,7 @@ namespace smt::noodler {
                 if(!pr2.second.is_equation()) continue;
                 if(pr1 == pr2) continue;
                 if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
+                if(pr2.second.get_right_side().size() == 1) continue;
                 
 
                 Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
