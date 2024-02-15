@@ -5322,6 +5322,7 @@ br_status seq_rewriter::mk_le_core(expr * l, expr * r, expr_ref & result) {
 }
 
 br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
+    TRACE("seq_verbose", tout << "rewriting: " << expr_ref(l, m()) << " = " << expr_ref(r, m()) << "\n";);
     expr_ref_vector res(m());
     expr_ref_pair_vector new_eqs(m());
     if (m_util.is_re(l)) {
@@ -5335,20 +5336,28 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
     expr* s;
     rational n;
     if (m_util.str.is_stoi(l, s) && m_autil.is_numeral(r, n)) {
-        result =
-            // m().mk_and(
-                // m().mk_eq(l ,r), // TODO do we need to give arith solver this info? it gets stuck if we keep this
-                m_util.re.mk_in_re(
-                    s,
-                    m_util.re.mk_concat(
-                        m_util.re.mk_star(m_util.re.mk_to_re(m_util.str.mk_string("0"))),
-                        m_util.re.mk_to_re(m_util.str.mk_string(zstring(n)))
+        if (n == -1) {
+            ; // do nothing?
+        } else if (0 <= n) {
+            result =
+                // m().mk_and(
+                    // m().mk_eq(l ,r), // TODO do we need to give arith solver this info? it gets stuck if we keep this
+                    m_util.re.mk_in_re(
+                        s,
+                        m_util.re.mk_concat(
+                            m_util.re.mk_star(m_util.re.mk_to_re(m_util.str.mk_string("0"))),
+                            m_util.re.mk_to_re(m_util.str.mk_string(zstring(n)))
+                        )
                     )
-                )
-            // )
-        ;
-        TRACE("seq_verbose", tout << result << "\n";);
-        return BR_DONE; // TODO is s reduced? should we rewrite some stuff?
+                // )
+            ;
+            TRACE("seq_verbose", tout << result << "\n";);
+            return BR_DONE; // TODO is s reduced? should we rewrite some stuff?
+        } else {
+            result = m().mk_false();
+            TRACE("seq_verbose", tout << result << "\n";);
+            return BR_DONE;
+        }
     }
 
     // TODO do the same shit with lengths
