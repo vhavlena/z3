@@ -1216,7 +1216,7 @@ namespace smt::noodler {
             // 0 <= i <= |s| && l < 0 -> v = eps
             add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
             // 0 <= i <= |s| -> xvy = s
-            add_axiom({~i_ge_0, ~ls_le_i, ~li_ge_ls, mk_eq(xey, s, false)});
+            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
             // i < 0 -> v = eps
             add_axiom({i_ge_0, mk_eq(v, eps, false)});
             // i > |s| -> v = eps
@@ -1231,7 +1231,7 @@ namespace smt::noodler {
             // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
             // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
             // after that)
-            this->var_eqs.add(expr_ref(l, m), v);
+            // this->var_eqs.add(expr_ref(l, m), v);
             return;
 
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
