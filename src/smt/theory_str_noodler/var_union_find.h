@@ -45,10 +45,10 @@ namespace smt::noodler {
     class var_union_find {
 
         obj_map<expr, obj_hashtable<expr>> un_find;
-
+        arith_util& m_util_a;
 
     public:
-        var_union_find() : un_find() { }
+        var_union_find(arith_util& m_util_a) : un_find(), m_util_a(m_util_a) { }
 
         /**
          * @brief Add new item to the equivalence
@@ -80,13 +80,26 @@ namespace smt::noodler {
          * 
          * @return Equivalence classes consisting of BasicTerms
          */
-        BasicTermEqiv get_equivalence_bt() const {
+        BasicTermEqiv get_equivalence_bt(const AutAssignment& aut_ass) const {
             std::vector<std::set<BasicTerm>> ret;
             for(const auto& t : this->un_find) {
                 std::set<BasicTerm> st;
+                int len = -1;
+                rational val;
+                if(this->m_util_a.is_numeral(t.m_key, val)) {
+                    len = val.get_int32();
+                }
                 for (const auto& s : t.m_value) {
                     std::string var = to_app(s)->get_decl()->get_name().str();
                     BasicTerm bvar(BasicTermType::Variable, var);
+                    
+                    if(len != -1 && len > 1) {
+                        std::set<std::pair<int, int>> aut_constr = mata::strings::get_word_lengths(*aut_ass.at(bvar));
+                        if(aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
+                            continue;
+                        }
+                    }
+                    
                     st.insert(bvar);  
                 }
                 ret.push_back(st);

@@ -28,8 +28,9 @@ namespace smt::noodler {
         m_rewrite(m),
         m_util_a(m),
         m_util_s(m),
+        var_eqs(m_util_a),
         m_length(m),
-        axiomatized_instances() {
+        axiomatized_instances()  {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -865,7 +866,7 @@ namespace smt::noodler {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
-        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
+        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
@@ -1231,7 +1232,7 @@ namespace smt::noodler {
             // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
             // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
             // after that)
-            // this->var_eqs.add(expr_ref(l, m), v);
+            this->var_eqs.add(expr_ref(l, m), v);
             return;
 
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
