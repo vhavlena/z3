@@ -1212,6 +1212,22 @@ namespace smt::noodler {
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(xe, s, false)});
+            // 0 <= i <= |s| && l < 0 -> v = eps
+            add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, eps, false)});
+                // substr(s, i, n) = v
+            add_axiom({mk_eq(v, e, false)});
+             // add the replacement substr -> v
+            this->predicate_replace.insert(e, v.get());
+            // update length variables
+            util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+            // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+            // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
+            // after that)
+            this->var_eqs.add(expr_ref(l, m), v);
+            return;
+
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
