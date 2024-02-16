@@ -1207,15 +1207,21 @@ namespace smt::noodler {
             }
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
+            string_theory_propagation(xey);
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
-            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(xe, s, false)});
+            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
             // 0 <= i <= |s| && l < 0 -> v = eps
             add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+            // 0 <= i <= |s| -> xvy = s
+            add_axiom({~i_ge_0, ~ls_le_i, ~li_ge_ls, mk_eq(xey, s, false)});
             // i < 0 -> v = eps
             add_axiom({i_ge_0, mk_eq(v, eps, false)});
+            // i > |s| -> v = eps
+            add_axiom({~ls_le_0, mk_eq(v, eps, false)});
+            add_axiom({ls_le_i, mk_eq(v, eps, false)});
                 // substr(s, i, n) = v
             add_axiom({mk_eq(v, e, false)});
              // add the replacement substr -> v
