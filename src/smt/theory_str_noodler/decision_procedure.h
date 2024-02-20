@@ -330,10 +330,13 @@ namespace smt::noodler {
         }
 
         /**
-         * Gets all vars s_i, such that there exists `c = to_code(s)` or `s = from_code(c)`
+         * Gets the pair of variable sets (code_subst_vars, int_subst_vars) where code_subst_vars
+         * contains all vars s_i, such that there exists "c = to_code(s)" or "s = from_code(c)"
          * in conversions where s is substituted by s_1 ... s_i ... s_n in the solution.
+         * The set int_subst_vars is defined similarly, but for "i = to_int(s)" or "s = from_int(i)"
+         * conversions.
          */
-        std::set<BasicTerm> get_vars_substituted_in_code_conversions();
+        std::pair<std::set<BasicTerm>,std::set<BasicTerm>> get_vars_substituted_in_conversions();
 
         /**
          * @brief Get the formula for code substituting variables
@@ -341,6 +344,19 @@ namespace smt::noodler {
          * It basically encodes `code_version_of(c) = to_code(c)` for each c in @p code_subst_vars
          */
         LenNode get_formula_for_code_subst_vars(const std::set<BasicTerm>& code_subst_vars);
+
+        /**
+         * @brief Get the formula for int substituting variables
+         * 
+         * It basically encodes `int_version_of(c) = to_int(c)` for each c in @p int_subst_vars
+         * 
+         * @param int_subst_vars 
+         * @param code_subst_vars 
+         * @param int_subst_vars_to_possible_valid_lengths 
+         * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
+         * @return std::pair<LenNode, LenNodePrecision> 
+         */
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const unsigned underapproximating_length = 3);
 
         /**
          * @brief Returns formula encoding `var = to_int(word)`.
@@ -353,6 +369,8 @@ namespace smt::noodler {
          */
         LenNode word_to_int(const mata::Word& word, const BasicTerm &var, bool start_with_one, bool handle_invalid_as_from_int);
 
+        LenNode encode_interval_words(const BasicTerm& var, const std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>& interval_words);
+
         /**
          * @brief Get the formula encoding to_code/from_code conversion
          */
@@ -364,7 +382,7 @@ namespace smt::noodler {
          * @param underapproximating_length For the case that we need to underapproximate, this variable sets
          * the length up to which we underapproximate
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length = 3);
+        LenNode get_formula_for_int_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths);
 
         /**
          * Formula containing all not_contains predicate (nothing else)

@@ -94,6 +94,48 @@ namespace smt::noodler {
             return only_digits_aut;
         }
 
+        /**
+         * @brief Returns automaton that accept (possibly empty) words containing only symbols encoding digits (symbols from 48 to 57)
+         */
+        static mata::nfa::Nfa digit_automaton_with_epsilon() {
+            mata::nfa::Nfa only_digits_and_epsilon(1, {0}, {0});
+            for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
+                only_digits_and_epsilon.delta.add(0, digit, 0);
+            }
+            return only_digits_and_epsilon;
+        }
+
+        /**
+         * @brief Returns automaton that accept words of length @p length containing only symbols encoding digits (symbols from 48 to 57)
+         */
+        static mata::nfa::Nfa digit_automaton_of_length(unsigned length) {
+            mata::nfa::Nfa only_digits_of_length(length+1, {0}, {length});
+            for (unsigned i = 0; i < length; ++i) {
+                for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
+                    only_digits_of_length.delta.add(i, digit, i+1);
+                }
+            }
+            return only_digits_of_length;
+        }
+
+        /**
+         * @brief Get the vector of "interval" words accepted by @p aut
+         * 
+         * Interval word is a vector of mata::Symbol intervals (pairs), for example
+         *      {[4-10], [11-20], [0-100]}
+         * represents all words
+         *      {4, 11, 0}
+         *      {4, 11, 1}
+         *          ...
+         *      {4, 12, 2}
+         *          ...
+         * 
+         * Assumes that @p aut is minimized and accepts a non-empty finite language
+         * 
+         * @param aut - minimized automaton that accepts finite language
+         */
+        static std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>> get_interval_words(const mata::nfa::Nfa& aut);
+
         mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();
             for(const BasicTerm& t : concat) {

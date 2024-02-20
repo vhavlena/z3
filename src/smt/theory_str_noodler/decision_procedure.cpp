@@ -621,8 +621,8 @@ namespace smt::noodler {
         return {LenNode(LenFormulaType::AND, conjuncts), precision};
     }
 
-    std::set<BasicTerm> DecisionProcedure::get_vars_substituted_in_code_conversions() {
-        std::set<BasicTerm> result;
+    std::pair<std::set<BasicTerm>,std::set<BasicTerm>> DecisionProcedure::get_vars_substituted_in_conversions() {
+        std::set<BasicTerm> code_subst_vars, int_subst_vars;
         for (const TermConversion& conv : conversions) {
             switch (conv.type)
             {
@@ -630,15 +630,23 @@ namespace smt::noodler {
                 case ConversionType::TO_CODE:
                 {
                     for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
-                        result.insert(var);
+                        code_subst_vars.insert(var);
+                    }
+                    break;
+                }
+                case ConversionType::TO_INT:
+                case ConversionType::FROM_INT:
+                {
+                    for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
+                        int_subst_vars.insert(var);
                     }
                     break;
                 }
                 default:
-                    break;
+                    UNREACHABLE();
             }
         }
-        return result;
+        return {code_subst_vars, int_subst_vars};
     }
 
     // see the comment of get_formula_for_conversions for explanation
@@ -694,6 +702,157 @@ namespace smt::noodler {
         }
 
         return result;
+    }
+
+    LenNode DecisionProcedure::encode_interval_words(const BasicTerm& var, const std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>& interval_words) {
+        LenNode result(LenFormulaType::OR);
+        for (const auto& interval_word : interval_words) {
+            bool need_to_split = false;
+            rational decimal(1); // TODO better name
+            std::vector<std::pair<rational,rational>> interval_cases = { {rational(0),rational(0)} };
+            // TODO if interval_word is empty, then interval cases will lead to 0 => probably ok??? this should not happen anymore anyway
+            for (auto interval_it = interval_word.crbegin(); interval_it != interval_word.crend(); ++interval_it) {
+                // we need to build backwards
+                rational interval_start(interval_it->first - AutAssignment::DIGIT_SYMBOL_START);
+                rational interval_end(interval_it->second - AutAssignment::DIGIT_SYMBOL_START);
+
+                if (need_to_split) {
+                    for (rational possible_digit = interval_start; possible_digit <= interval_end; ++possible_digit) {
+                        std::vector<std::pair<rational,rational>> new_interval_cases;
+                        for (std::pair<rational,rational>& interval_case : interval_cases) {
+                            new_interval_cases.push_back({
+                                possible_digit*decimal + interval_cases[0].first,
+                                possible_digit*decimal + interval_cases[0].second
+                            });
+                        }
+                        interval_cases = new_interval_cases;
+                    }
+                } else {
+                    assert(interval_cases.size() == 1);
+                    interval_cases[0].first += interval_start*decimal;
+                    interval_cases[0].second += interval_end*decimal;
+                    if (interval_start != 0 || interval_end != 9) {
+                        need_to_split = true;
+                    }
+                }
+
+                decimal *= 10;
+            }
+
+
+            for (const auto& interval_case : interval_cases) {
+                rational min = interval_case.first;
+                rational max = interval_case.second;
+                // we want to put
+                //      min <= int_version_of(int_subst_var) <= max
+                // but for the special case where min==max, we can just put
+                //      int_version_of(int_subst_var) = min (= max)
+                if (min == max) {
+                    result.succ.back().succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_version_of(var), min});
+                } else {
+                    result.succ.back().succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{min, int_version_of(var)});
+                    result.succ.back().succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{int_version_of(var), max});
+                }
+            }
+        }
+        return result;
+    }
+
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const unsigned underapproximating_length) {
+        LenNode result(LenFormulaType::AND);
+        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
+
+        // automaton representing all valid inputs (only digits)
+        // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
+        mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
+        STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
+        // automaton representing all non-valid inputs (contain non-digit)
+        mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
+        STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << contain_non_digit << std::endl;);
+
+        for (const BasicTerm& int_subst_var : int_subst_vars) {
+            LenNode formula_for_int_subst_var(LenFormulaType::OR);
+
+            std::shared_ptr<mata::nfa::Nfa> aut = solution.aut_ass.at(int_subst_var);
+            STRACE("str-conversion-int", tout << "NFA for " << int_subst_var << ":" << std::endl << *aut << std::endl;);
+
+            // part containing only digits
+            mata::nfa::Nfa aut_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim());
+            STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << aut_valid_part << std::endl;);
+            // part containing some non-digit
+            mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim());
+            STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << aut_non_valid_part << std::endl;);
+
+            if (!aut_non_valid_part.is_lang_empty()) {
+                // aut_non_valid_part is language of words that contain at least one non-digit
+                // we therefore create following formula:
+                //       |int_subst_var| is length of some word from aut_non_valid_part && int_version_of(int_subst_var) = -1
+                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(aut_non_valid_part, int_subst_var), LenNode(LenFormulaType::EQ, { int_version_of(int_subst_var), -1 }) });
+                if (code_subst_vars.contains(int_subst_var)) {
+                    // int_subst_var is used in some to_code/from_code
+                    // => we need to add to the previous formula also the fact, that int_subst_var cannot encode code point of a digit
+                    //      .. && !(AutAssignment::DIGIT_SYMBOL_START <= code_version_of(int_subst_var) <= AutAssignment::DIGIT_SYMBOL_END)
+                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(int_subst_var), AutAssignment::DIGIT_SYMBOL_START });
+                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ AutAssignment::DIGIT_SYMBOL_END, code_version_of(int_subst_var) });
+                }
+            }
+
+            unsigned max_length_of_words = aut_valid_part.num_of_states();
+
+            // we want to enumerate all words containing digits -> we need to underapproximate infinite language
+            if (!aut_valid_part.is_acyclic()) {
+                STRACE("str-conversion", tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_valid_part << std::endl;);
+                res_precision = LenNodePrecision::UNDERAPPROX;
+                if (max_length_of_words > underapproximating_length) {
+                    max_length_of_words = underapproximating_length;
+                }
+            }
+
+            if (aut_valid_part.is_in_lang({})) {
+                // Handle empty word as a special case.
+                // Even though it is invalid and it seems that we should set int_version_of(int_subst_var) = -1, we cannot do that
+                // as int_subst_var is substituting some string_var in int conversion, and the other variables in the substitution
+                // might not be empty, so together they could form a valid string representing integer.
+                // We therefore set int_version_of(int_subst_var) = 0 (basically anything else than -1 is ok), and we will ignore
+                // this value for the case that |int_subst_var| = 0, so we put:
+                //      |int_subst_var| = 0 && int_version_of(int_subst_var) = 0
+                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ LenNode(LenFormulaType::EQ, { int_subst_var, 0 }), LenNode(LenFormulaType::EQ, { int_version_of(int_subst_var), 0 }) });
+                // Also add the information that int_subst_var can have length 0
+                int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(0);
+            }
+
+            for (unsigned length = 1; length < max_length_of_words; ++length) {
+                // get automaton representing all accepted words containing only digits of specific length
+                mata::nfa::Nfa aut_valid_of_length = mata::nfa::minimize(mata::nfa::intersection(aut_valid_part, AutAssignment::digit_automaton_of_length(length)).trim());
+
+                if (aut_valid_of_length.is_lang_empty()) {
+                    // there are no such words
+                    continue;
+                }
+
+                //       |int_subst_var| = length && ...
+                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, LenNode(LenFormulaType::EQ, { int_subst_var, length }));
+                // remember that there are some valid words of given length
+                int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(length);
+
+                // encode all interval words accepted by aut_valid_of_length
+                formula_for_int_subst_var.succ.push_back(encode_interval_words(int_subst_var, AutAssignment::get_interval_words(aut_valid_of_length)));
+                
+                if (code_subst_vars.contains(int_subst_var) && length == 1) {
+                    // int_subst_var is used in some to_code/from_code AND we are handling the case of length==1 (for other cases, the formula from ... should force that code_var_version... is -1)
+                    // => we need to connect code_version_of(int_subst_var) and int_version_of(int_subst_var)
+                    //      code_version_of(int_subst_var) = int_version_of(int_subst_var) + AutAssignment::DIGIT_SYMBOL_START
+                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{
+                        code_version_of(int_subst_var),
+                        LenNode(LenFormulaType::PLUS, std::vector<LenNode>{int_version_of(int_subst_var), AutAssignment::DIGIT_SYMBOL_START })
+                    });
+                }
+            }
+
+            result.succ.push_back(formula_for_int_subst_var);
+        }
+
+        return {result, res_precision};
     }
 
     LenNode DecisionProcedure::word_to_int(const mata::Word& word, const BasicTerm &var, bool start_with_one, bool handle_invalid_as_from_int) {
@@ -765,130 +924,89 @@ namespace smt::noodler {
     }
 
     // see the comment of get_formula_for_conversions for explanation
-    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length) {
+    LenNode DecisionProcedure::get_formula_for_int_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths) {
         const BasicTerm& s = conv.string_var;
         const BasicTerm& i = conv.int_var;
 
         LenNode result(LenFormulaType::OR);
-        LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
         // s = s_1 ... s_n, subst_vars = <s_1, ..., s_n>
         const std::vector<BasicTerm>& subst_vars = solution.get_substituted_vars(s);
 
-        // automaton representing all valid inputs (only digits)
-        // - we also keep empty word, because we will use it for substituted vars, and one of them can be empty, while other has only digits (for example s1="12", s2="" but s="12" is valid)
-        mata::nfa::Nfa only_digits(1, {0}, {0});
-        for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
-            only_digits.delta.add(0, digit, 0);
+        // first add non-valid cases
+        if (conv.type == ConversionType::TO_INT) {
+            // for TO_INT empty string or anything that contains non-digit 
+            LenNode empty_or_one_subst_contains_non_digit(LenFormulaType::OR, {LenNode(LenFormulaType::EQ, {s, 0})}); // start with empty string: |s| = 0
+            for (const BasicTerm& subst_var : subst_vars) {
+                // subst_var contain non-digit if following equality holds (see get_formula_for_int_subst_vars)
+                //      int_version_of(subst_var) = -1
+                empty_or_one_subst_contains_non_digit.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_version_of(subst_var), -1});
+            }
+            result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                LenNode(LenFormulaType::EQ, {i, -1}), // for non-valid s, to_int(s) returns -1
+                empty_or_one_subst_contains_non_digit
+            });
+        } else {
+            // for FROM_INT only empty string (as we assume that language of s was set to only possible results of from_int)
+            result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                LenNode(LenFormulaType::LT, {0, i}), // from_int(i) = "" only if i < 0
+                LenNode(LenFormulaType::EQ, {s, 0})
+            });
         }
-        STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
-        // automaton representing all non-valid inputs (contain non-digit)
-        mata::nfa::Nfa contain_non_digit = solution.aut_ass.complement_aut(only_digits);
-        STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << contain_non_digit << std::endl;);
 
-        // cases should be the collection of all words w = w_1 ... w_n, where w_i is the word of the language L_i of the automaton for s_i
-        std::vector<std::vector<mata::Word>> cases = {{}};
+        if (subst_vars.size() == 0) {
+            // we only have empty word, i.e., only non-valid case that is already in result
+            return result;
+        }
+
+        // length_cases should contain all combinations of lengths l_1,...,l_n, such that l_i represents length of possible word containing only digits of s_i
+        std::vector<std::vector<unsigned>> length_cases = {{}};
         for (const BasicTerm& subst_var : solution.get_substituted_vars(s)) { // s_i = subst_var
-            std::shared_ptr<mata::nfa::Nfa> aut = solution.aut_ass.at(subst_var);
-            STRACE("str-conversion-int", tout << "NFA for " << subst_var << ":" << std::endl << *aut << std::endl;);
-
-            // part containing only digits
-            std::shared_ptr<mata::nfa::Nfa> aut_valid_part;
-            // part containing some non-digit
-            std::shared_ptr<mata::nfa::Nfa> aut_non_valid_part;
-
-            if (conv.type == ConversionType::TO_INT) {
-                aut_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, only_digits).trim()));
-                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
-                aut_non_valid_part = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*aut, contain_non_digit).trim()));
-                STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << *aut_non_valid_part << std::endl;);
-                if (!aut_non_valid_part->is_lang_empty()) {
-                    // aut_non_valid_part is language of words that contain at least one non-digit
-                    //  - we can get here only for the case that conv.type is to_int (for from_int, by assumptions, s should be restricted to language of "valid numbers + empty string")
-                    //  - if s_i = one of these words, then s must also contain non-digit => result i = -1
-                    // we therefore create following formula:
-                    //       |s_i| is length of some word from aut_non_valid_part && int_version_of(s_i) = -1 && i = -1
-                    result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{ solution.aut_ass.get_lengths(*aut_non_valid_part, subst_var), LenNode(LenFormulaType::EQ, { int_version_of(subst_var), -1 }), LenNode(LenFormulaType::EQ, {i, -1}) });
-                    if (code_subst_vars.contains(subst_var)) {
-                        // s_i is used in some to_code/from_code
-                        // => we need to add to the previous formula also the fact, that s_i cannot encode code point of a digit
-                        //      .. && !(AutAssignment::DIGIT_SYMBOL_START <= code_version_of(s_i) <= AutAssignment::DIGIT_SYMBOL_END)
-                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(subst_var), AutAssignment::DIGIT_SYMBOL_START });
-                        result.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ AutAssignment::DIGIT_SYMBOL_END, code_version_of(subst_var) });
-                    }
-                }
-            } else {
-                // for from_int, we assume that s is restricted to language of "valid numbers + empty string", which means that
-                // s_i should also be restricted to this language => 'aut intersected with only_digits == aut'
-                aut_valid_part = aut;
-                STRACE("str-conversion-int", tout << "only-digit NFA:" << std::endl << *aut_valid_part << std::endl;);
+            std::vector<std::vector<unsigned>> new_cases;
+            const auto& possible_lengths = int_subst_vars_to_possible_valid_lengths.at(subst_var);
+            if (possible_lengths.size() == 0) {
+                // one of the s_i does not have any word containing only digits (not even empty word) => we can just return, there will be just non-valid cases (already in result)
+                return result;
             }
-
-            unsigned max_length_of_words = aut_valid_part->num_of_states();
-
-            // we want to enumerate all words containing digits -> cannot be infinite language
-            if (!aut_valid_part->is_acyclic()) {
-                STRACE("str-conversion", tout << "failing NFA:" << std::endl << *aut_valid_part << std::endl;);
-                res_precision = LenNodePrecision::UNDERAPPROX;
-                if (max_length_of_words > underapproximating_length) {
-                    // there are 10^max_length_of_words possible cases, we put limit so there is not MEMOUT
-                    // but (experimentally) it seems to be better to reduce it even more if the automaton has less states
-                    max_length_of_words = underapproximating_length;
-                }
-            }
-
-            std::vector<std::vector<mata::Word>> new_cases;
-            for (auto word : aut_valid_part->get_words(max_length_of_words)) {
-                for (const auto& old_case : cases) {
-                    std::vector<mata::Word> new_case = old_case;
-                    new_case.push_back(word);
+            for (unsigned possible_length : possible_lengths) {
+                for (const auto& old_case : length_cases) {
+                    std::vector<unsigned> new_case = old_case;
+                    new_case.push_back(possible_length);
                     new_cases.push_back(new_case);
                 }
             }
-            cases = new_cases;
+            length_cases = new_cases;
         }
 
-        for (const auto& one_case : cases) {
+        for (const auto& one_case : length_cases) {
             assert(subst_vars.size() == one_case.size());
 
-            mata::Word full_word; // the word w
-            LenNode formula_for_case(LenFormulaType::AND); // conjunct C
-            for (unsigned i = 0; i < subst_vars.size(); ++i) {
+            // creating formula
+            //      |s_1| == |l_1| && ... && |s_n| == |l_n| && ... 
+            LenNode formula_for_case(LenFormulaType::AND);
+            //      ... && i = int_version_of(s_n) + int_version_of(s_2)*10^(l_n) + ... + int_version_of(s_2)*10^(l_3+...+l_n) + int_version_of(s_1)*10^(l_2+...+l_n) 
+            LenNode formula_for_sum(LenFormulaType::PLUS);
+
+            rational decimal(1); // TODO better name
+            for (int i = subst_vars.size()-1; i >= 0; --i) {
                 const BasicTerm& subst_var = subst_vars[i]; // var s_i
-                mata::Word word_of_subst_var = one_case[i]; // word w_i (must contain only digits, from the way it was constructed)
+                unsigned length_of_subst_var = one_case[i]; // length l_i
 
-                // creating formula
-                //   |s_i| == |w_i| && int_version_of(s_i) = to_int('1'.w_i) [ && code_version_of(s_i) = to_code(w_i) ]
-
-                // |s_i| = |w_i|
-                formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ subst_var, word_of_subst_var.size() });
-
-                // int_version_of(s_i) = to_int('1'.w_i)
-                // we add 1 at the beginning for the cases with 0s at the beginning of w_i,
-                // so that for example if w_i="00013", it does not turn it into 13 but into 100013
-                formula_for_case.succ.push_back(word_to_int(word_of_subst_var, int_version_of(subst_var), true, false));
-
-                if (code_subst_vars.contains(subst_var)) {
-                    // in the case that s_i is also one of the code vars, we need to force the exact value of code var, i.e., we add the optional part
-                    //      code_version_of(s_i) = to_code(w_i)
-                    if (word_of_subst_var.size() == 1) { // |w_i| = 1
-                        mata::Symbol code_point = word_of_subst_var[0]; // this must be a code point of a digit, as w_i can only contain digits
-                        formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(subst_var), code_point });
-                    } // "else" part is not needed, that should be solved by setting "|s_i| = |w_i|" and by using the formula from function get_formula_for_code_subst_vars()
+                // ... && |s_i| = l_i
+                formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{subst_var, length_of_subst_var});
+                // ... + int_version_of(s_i)*10^(l_{i+1}+...+l_n)
+                formula_for_sum.succ.emplace_back(LenFormulaType::TIMES, std::vector<LenNode>{ int_version_of(subst_var), decimal });
+                // decimal*(10^l_i)
+                for (unsigned j = 0; j < length_of_subst_var; ++j) {
+                    decimal *= 10;
                 }
-
-                // add w_i to the end of w
-                full_word.insert(full_word.end(), word_of_subst_var.begin(), word_of_subst_var.end());
             }
 
-            // add "i == to_int(w)" to C (we do not need to add |s| = |w|, that should come from |s| = |s1| + ... + |sn| and in C we talk about lengths of s_1,...,s_n)
-            formula_for_case.succ.push_back(word_to_int(full_word, i, false, conv.type == ConversionType::FROM_INT));
-
+            formula_for_case.succ.emplace_back(LenFormulaType::EQ,std::vector<LenNode>{ i, formula_for_sum });
             result.succ.push_back(formula_for_case);
-
         }
 
-        return {result, res_precision};
+        return result;
     }
 
     /**
@@ -950,10 +1068,17 @@ namespace smt::noodler {
         LenNode result(LenFormulaType::AND);
         LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
-        // collect all code variables, i.e. those that substitute string variables used in to_code/from_code predicates
-        std::set<BasicTerm> code_subst_vars = get_vars_substituted_in_code_conversions();
+        // collect all variables that substitute some string_var of some conversion
+        auto [code_subst_vars, int_subst_vars] = get_vars_substituted_in_conversions();
 
         result.succ.push_back(get_formula_for_code_subst_vars(code_subst_vars));
+
+        std::map<BasicTerm,std::vector<unsigned>> int_subst_vars_to_possible_valid_lengths;
+        auto int_conv_formula_with_precision = get_formula_for_int_subst_vars(int_subst_vars, code_subst_vars, int_subst_vars_to_possible_valid_lengths);
+        result.succ.push_back(int_conv_formula_with_precision.first);
+        if (int_conv_formula_with_precision.second != LenNodePrecision::PRECISE) {
+            res_precision = int_conv_formula_with_precision.second;
+        }
 
         for (const TermConversion& conv : conversions) {
             STRACE("str-conversion",
@@ -962,24 +1087,20 @@ namespace smt::noodler {
 
             switch (conv.type)
             {
-            case ConversionType::TO_CODE:
-            case ConversionType::FROM_CODE:
-            {
-                result.succ.push_back(get_formula_for_code_conversion(conv));
-                break;
-            }
-            case ConversionType::TO_INT:
-            case ConversionType::FROM_INT:
-            {
-                auto int_conv_formula_with_precision = get_formula_for_int_conversion(conv, code_subst_vars);
-                result.succ.push_back(int_conv_formula_with_precision.first);
-                if (int_conv_formula_with_precision.second != LenNodePrecision::PRECISE) {
-                    res_precision = int_conv_formula_with_precision.second;
+                case ConversionType::TO_CODE:
+                case ConversionType::FROM_CODE:
+                {
+                    result.succ.push_back(get_formula_for_code_conversion(conv));
+                    break;
                 }
-                break;
-            }
-            default:
-                UNREACHABLE();
+                case ConversionType::TO_INT:
+                case ConversionType::FROM_INT:
+                {
+                    result.succ.push_back(get_formula_for_int_conversion(conv, int_subst_vars_to_possible_valid_lengths));
+                    break;
+                }
+                default:
+                    UNREACHABLE();
             }
         }
 
