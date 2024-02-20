@@ -831,7 +831,7 @@ namespace smt::noodler {
                 }
 
                 //       |int_subst_var| = length && ...
-                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, LenNode(LenFormulaType::EQ, { int_subst_var, length }));
+                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{LenNode(LenFormulaType::EQ, { int_subst_var, length })});
                 // remember that there are some valid words of given length
                 int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(length);
 
