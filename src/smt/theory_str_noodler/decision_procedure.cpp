@@ -748,10 +748,12 @@ namespace smt::noodler {
                 // but for the special case where min==max, we can just put
                 //      int_version_of(int_subst_var) = min (= max)
                 if (min == max) {
-                    result.succ.back().succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_version_of(var), min});
+                    result.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_version_of(var), min});
                 } else {
-                    result.succ.back().succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{min, int_version_of(var)});
-                    result.succ.back().succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{int_version_of(var), max});
+                    result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                        LenNode(LenFormulaType::LEQ, {min, int_version_of(var)}),
+                        LenNode(LenFormulaType::LEQ, {int_version_of(var), max})
+                    });
                 }
             }
         }
@@ -771,6 +773,7 @@ namespace smt::noodler {
         STRACE("str-conversion-int", tout << "contains-non-digit NFA:" << std::endl << contain_non_digit << std::endl;);
 
         for (const BasicTerm& int_subst_var : int_subst_vars) {
+            int_subst_vars_to_possible_valid_lengths[int_subst_var] = {};
             LenNode formula_for_int_subst_var(LenFormulaType::OR);
 
             std::shared_ptr<mata::nfa::Nfa> aut = solution.aut_ass.at(int_subst_var);
@@ -803,9 +806,7 @@ namespace smt::noodler {
             if (!aut_valid_part.is_acyclic()) {
                 STRACE("str-conversion", tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_valid_part << std::endl;);
                 res_precision = LenNodePrecision::UNDERAPPROX;
-                if (max_length_of_words > underapproximating_length) {
-                    max_length_of_words = underapproximating_length;
-                }
+                max_length_of_words = underapproximating_length;
             }
 
             if (aut_valid_part.is_in_lang({})) {
@@ -830,13 +831,14 @@ namespace smt::noodler {
                     continue;
                 }
 
-                //       |int_subst_var| = length && ...
-                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{LenNode(LenFormulaType::EQ, { int_subst_var, length })});
                 // remember that there are some valid words of given length
                 int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(length);
 
-                // encode all interval words accepted by aut_valid_of_length
-                formula_for_int_subst_var.succ.push_back(encode_interval_words(int_subst_var, AutAssignment::get_interval_words(aut_valid_of_length)));
+                //      |int_subst_var| = length  && encode all interval words accepted by aut_valid_of_length
+                formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                    LenNode(LenFormulaType::EQ, { int_subst_var, length }),
+                    encode_interval_words(int_subst_var, AutAssignment::get_interval_words(aut_valid_of_length))
+                });
                 
                 if (code_subst_vars.contains(int_subst_var) && length == 1) {
                     // int_subst_var is used in some to_code/from_code AND we are handling the case of length==1 (for other cases, the formula from ... should force that code_var_version... is -1)
@@ -852,6 +854,8 @@ namespace smt::noodler {
             result.succ.push_back(formula_for_int_subst_var);
         }
 
+
+        STRACE("str-conversion-int", tout << "int_subst_vars formula: " << result << std::endl;);
         return {result, res_precision};
     }
 
@@ -954,6 +958,8 @@ namespace smt::noodler {
             });
         }
 
+        STRACE("str-conversion-int", tout << "non-valid part for int conversion: " << result << std::endl;);
+
         if (subst_vars.size() == 0) {
             // we only have empty word, i.e., only non-valid case that is already in result
             return result;
@@ -987,25 +993,36 @@ namespace smt::noodler {
             //      ... && i = int_version_of(s_n) + int_version_of(s_2)*10^(l_n) + ... + int_version_of(s_2)*10^(l_3+...+l_n) + int_version_of(s_1)*10^(l_2+...+l_n) 
             LenNode formula_for_sum(LenFormulaType::PLUS);
 
-            rational decimal(1); // TODO better name
+            bool is_empty = true;
+            rational decimal{1}; // TODO better name
             for (int i = subst_vars.size()-1; i >= 0; --i) {
                 const BasicTerm& subst_var = subst_vars[i]; // var s_i
                 unsigned length_of_subst_var = one_case[i]; // length l_i
 
                 // ... && |s_i| = l_i
                 formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{subst_var, length_of_subst_var});
-                // ... + int_version_of(s_i)*10^(l_{i+1}+...+l_n)
-                formula_for_sum.succ.emplace_back(LenFormulaType::TIMES, std::vector<LenNode>{ int_version_of(subst_var), decimal });
-                // decimal*(10^l_i)
-                for (unsigned j = 0; j < length_of_subst_var; ++j) {
-                    decimal *= 10;
+                STRACE("str-conversion-int", tout << "part of valid part for int conversion: " << formula_for_case << std::endl;);
+                if (length_of_subst_var > 0) {
+                    is_empty = false;
+                    // ... + int_version_of(s_i)*10^(l_{i+1}+...+l_n)
+                    formula_for_sum.succ.emplace_back(LenFormulaType::TIMES, std::vector<LenNode>{ int_version_of(subst_var), decimal });
+                    STRACE("str-conversion-int", tout << "part of the sum for int conversion: " << formula_for_sum << std::endl;);
+                    // decimal*(10^l_i)
+                    for (unsigned j = 0; j < length_of_subst_var; ++j) {
+                        decimal *= 10;
+                    }
                 }
             }
 
-            formula_for_case.succ.emplace_back(LenFormulaType::EQ,std::vector<LenNode>{ i, formula_for_sum });
+            if (is_empty) continue; // we have the case where every l_i = 0 => ignore, as it is a non-valid case handled at the beginning of the function
+
+            formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ i, formula_for_sum });
+
+            STRACE("str-conversion-int", tout << "valid part for int conversion: " << formula_for_case << std::endl;);
             result.succ.push_back(formula_for_case);
         }
 
+        STRACE("str-conversion-int", tout << "int conversion: " << result << std::endl;);
         return result;
     }
 
