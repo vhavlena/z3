@@ -1398,6 +1398,7 @@ namespace smt::noodler {
                 } else if (j == 0) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[j]}, Concat(c1.begin(), c1.begin() + i + 1) });
                     this->formula.add_predicate(new_pred);
+                    // we can remove one of the original constraint because it is redundant (it can be restored by the new one)
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr1.first);
                     }

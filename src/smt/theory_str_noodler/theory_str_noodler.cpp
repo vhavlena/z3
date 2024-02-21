@@ -1209,19 +1209,21 @@ namespace smt::noodler {
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
             string_theory_propagation(xey);
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
             // 0 <= i <= |s| && l < 0 -> v = eps
             add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
-            // 0 <= i <= |s| -> xvy = s
+            // 0 <= i <= |s| -> xey = s (e = v in fact)
             add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
             // i < 0 -> v = eps
             add_axiom({i_ge_0, mk_eq(v, eps, false)});
-            // i > |s| -> v = eps
+            // |s| < 0 -> v = eps
             add_axiom({~ls_le_0, mk_eq(v, eps, false)});
+            // i > |s| -> v = eps
             add_axiom({ls_le_i, mk_eq(v, eps, false)});
                 // substr(s, i, n) = v
             add_axiom({mk_eq(v, e, false)});
@@ -1832,6 +1834,7 @@ namespace smt::noodler {
         rational val;
         zstring str;
         // handle the special case of the form (str.prefix "a" (str.substr s 5 2)) --> (str.at s 5) == "a"
+        // TODO: move to the rewriter
         if(m_util_s.str.is_string(x, str) && str.length() == 1 && m_util_s.str.is_extract(y, sub_str, sub_ind, sub_len) && m_util_a.is_numeral(sub_ind) && m_util_a.is_numeral(sub_len, val) && val.get_int32() >= 1) {
             add_axiom({~mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), mk_literal(e) });
             add_axiom({mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), ~mk_literal(e) });
@@ -2072,7 +2075,8 @@ namespace smt::noodler {
             add_axiom({~mk_eq(ind, m_util_a.mk_int(-1), false), ~mk_literal(e) });
             add_axiom({mk_eq(ind, m_util_a.mk_int(-1), false), mk_literal(e) });
             return;
-        // if constains is of the form (str.constains str (str.at )) rewrite to a regular constaint
+        // if constains is of the form (str.constains strX (str.at ...)) rewrite to a regular constaint ((str.at ...) \in union of chars of strX)
+        // TODO: move to the rewriter
         } else if (m_util_s.str.is_at(y) && m_util_s.str.is_string(x, str) && str.length() > 0) {
             expr_ref re(m_util_s.re.mk_to_re(m_util_s.str.mk_string("")), m);
             for(size_t i = 0; i < str.length(); i++) {
