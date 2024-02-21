@@ -1337,12 +1337,20 @@ namespace smt::noodler {
                 if(c1.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin() + i, c2.end()) });
                     this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = W1 W2 Y
+                    // pr2 is of the form  X = W1 W2 W3 W4
+                    // We can remove pr2 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr2.first);
                     }
                 } else if (c2.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[i]}, Concat(c1.begin() + i, c1.end()) });
                     this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = W1 W2 W3 W4
+                    // pr2 is of the form  X = W1 W2 Y
+                    // We can remove pr1 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr1.first);
                     }
@@ -1395,6 +1403,7 @@ namespace smt::noodler {
                     // pr1 is of the form  X = Y W1 W2
                     // pr2 is of the form  X = W3 W4 W1 W2
                     // We can remove pr2 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr2.first);
                     }
@@ -1405,6 +1414,7 @@ namespace smt::noodler {
                     // pr1 is of the form  X = W3 W4 W1 W2
                     // pr2 is of the form  X = Y W1 W2
                     // We can remove pr1 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr1.first);
                     }
