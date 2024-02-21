@@ -139,6 +139,7 @@ namespace smt::noodler {
             string_theory_propagation(ex, true, false);
             
         }
+        add_conversion_axioms();
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
@@ -2316,6 +2317,26 @@ namespace smt::noodler {
         // ~is_digit(s) -> ~(s \in [0-9])
         add_axiom({mk_literal(e), ~mk_literal(s_in_digit)});
     }
+
+    /**
+     * @brief Add special axioms for conversions (from n = to_int(x) generate n = to_int(x) -> x \in 0*to_string(n)).
+     * 
+     */
+    void theory_str_noodler::add_conversion_axioms() {
+        unsigned nFormulas = ctx.get_num_asserted_formulas();
+        for (unsigned i = 0; i < nFormulas; ++i) {
+            expr *ex = ctx.get_asserted_formula(i);
+            rational val;
+            expr* to_int_arg = nullptr;
+            if(expr_cases::is_to_int_num_eq(ex, m, m_util_s, m_util_a, to_int_arg, val) && val.is_nonneg()) {
+                expr_ref re(m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_to_re(m_util_s.str.mk_string("0"))), m_util_s.re.mk_to_re(m_util_s.str.mk_string(val.to_string()))), m);
+                expr_ref in_re(m_util_s.re.mk_in_re(to_int_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            }
+
+        }
+    }
+
 
     /**
      * @brief Handle to_code, from_code, to_int, from_int

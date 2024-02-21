@@ -60,5 +60,18 @@ bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s
     return false;
 }
 
+bool is_to_int_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& to_int_arg, rational& num) {
+    expr* left = nullptr, *right = nullptr;
+    if(m.is_eq(e, left, right)) {
+        if(m_util_a.is_numeral(left, num) && m_util_s.str.is_stoi(right, to_int_arg)) {
+            return true;
+        }
+        if(m_util_a.is_numeral(right, num) && m_util_s.str.is_stoi(left, to_int_arg)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 }
