@@ -1067,6 +1067,7 @@ namespace smt::noodler {
 
         rational r;
         
+        expr *sub_from = nullptr, *sub_len, *sub_str;
         zstring str;
         // handle the case str.at "A" i
         if(m_util_s.str.is_string(s, str) && str.length() == 1) {
@@ -1075,7 +1076,20 @@ namespace smt::noodler {
             add_axiom({mk_eq(fresh, e, false)});
             predicate_replace.insert(e, fresh.get());
             return;
+        } else if(m_util_s.str.is_extract(s, sub_str, sub_from, sub_len)) {
+            expr_ref char_index(m_util_a.mk_add(sub_from, i), m);
+            m_rewrite(char_index);
+            expr_ref from_ls(m_util_a.mk_ge(m_util_a.mk_add(char_index, m_util_a.mk_int(1)), m_util_s.str.mk_length(sub_str)), m);
+            expr_ref charat(m_util_s.str.mk_at(sub_str, char_index), m);
+            literal from_ls_lit = mk_literal(from_ls);
+            
+            add_axiom({from_ls_lit,  mk_eq(e, charat, false)});
+            add_axiom({~from_ls_lit, mk_eq(e, emp, false)});
+            add_axiom({mk_eq(fresh, e, false)});
+            predicate_replace.insert(e, fresh.get());
+            return;
         }
+
         if(m_util_a.is_numeral(i, r)) {
             int val = r.get_int32();
 
