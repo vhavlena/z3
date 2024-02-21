@@ -142,7 +142,8 @@ namespace smt::noodler {
         enode* ensure_enode(expr* e);
 
         void add_length_axiom(expr* n);
-        void add_conversion_axioms();
+        void add_conversion_num_axioms();
+        void add_len_num_axioms();
 
         /**
          * @brief Get concatenation of e1 and e2

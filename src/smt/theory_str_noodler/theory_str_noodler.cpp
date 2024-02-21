@@ -139,7 +139,8 @@ namespace smt::noodler {
             string_theory_propagation(ex, true, false);
             
         }
-        add_conversion_axioms();
+        add_conversion_num_axioms();
+        add_len_num_axioms();
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
@@ -2322,7 +2323,7 @@ namespace smt::noodler {
      * @brief Add special axioms for conversions (from n = to_int(x) generate n = to_int(x) -> x \in 0*to_string(n)).
      * 
      */
-    void theory_str_noodler::add_conversion_axioms() {
+    void theory_str_noodler::add_conversion_num_axioms() {
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {
             expr *ex = ctx.get_asserted_formula(i);
@@ -2333,7 +2334,27 @@ namespace smt::noodler {
                 expr_ref in_re(m_util_s.re.mk_in_re(to_int_arg, re), m);
                 add_axiom({~mk_literal(ex), mk_literal(in_re)});
             }
+        }
+    }
 
+    void theory_str_noodler::add_len_num_axioms() {
+        unsigned nFormulas = ctx.get_num_asserted_formulas();
+        for (unsigned i = 0; i < nFormulas; ++i) {
+            expr *ex = ctx.get_asserted_formula(i);
+            rational val;
+            expr* len_arg = nullptr;
+            if(expr_cases::is_len_num_eq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64) {
+                expr_ref re(m);
+                for(int i = 0; i < val; i++) {
+                    if(re == nullptr) {
+                        re = m_util_s.re.mk_full_char(nullptr);
+                    } else {
+                        re = m_util_s.re.mk_concat(re, m_util_s.re.mk_full_char(nullptr));
+                    }  
+                }
+                expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            }
         }
     }
 
