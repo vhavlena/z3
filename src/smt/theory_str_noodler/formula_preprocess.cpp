@@ -1314,9 +1314,11 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::common_prefix_propagation() {
         TermReplaceMap replace_map = construct_replace_map();
+        std::set<size_t> rem_ids;
         size_t i = 0;
         for(const auto& pr1 : this->formula.get_predicates()) {
             if(!pr1.second.is_equation()) continue;
+            if(pr1.second.get_right_side().size() == 1) continue;
 
             Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
 
@@ -1324,7 +1326,7 @@ namespace smt::noodler {
                 if(!pr2.second.is_equation()) continue;
                 if(pr1 == pr2) continue;
                 if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
-                
+                if(pr2.second.get_right_side().size() == 1) continue;
 
                 Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
                 // compute the common prefix
@@ -1335,11 +1337,92 @@ namespace smt::noodler {
                 if(c1.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin() + i, c2.end()) });
                     this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = W1 W2 Y
+                    // pr2 is of the form  X = W1 W2 W3 W4
+                    // We can remove pr2 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr2.first);
+                    }
                 } else if (c2.size() == i + 1) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[i]}, Concat(c1.begin() + i, c1.end()) });
                     this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = W1 W2 W3 W4
+                    // pr2 is of the form  X = W1 W2 Y
+                    // We can remove pr1 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr1.first);
+                    }
                 }
             }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
+        }
+    }
+
+    /**
+     * @brief Propagate equations from a common suffix. For instance for
+     * X = Y W1 W2
+     * X = W3 W4 W1 W2
+     * infer Y = W3 W4.
+     * 
+     * Works also for a propagated case, for instance
+     * X = Y W1 W2
+     * X = W3 W4 K
+     * K = W1 W2
+     * infer Y = W3 W4
+     */
+    void FormulaPreprocessor::common_suffix_propagation() {
+        TermReplaceMap replace_map = construct_replace_map();
+        std::set<size_t> rem_ids;
+        int i = 0, j = 0;
+        for(const auto& pr1 : this->formula.get_predicates()) {
+            if(!pr1.second.is_equation()) continue;
+            if(pr1.second.get_right_side().size() == 1) continue;
+
+            Concat c1 = flatten_concat(pr1.second.get_right_side(), replace_map);
+
+            for(const auto& pr2 : this->formula.get_predicates()) {
+                if(!pr2.second.is_equation()) continue;
+                if(pr1 == pr2) continue;
+                if(pr1.second.get_left_side() != pr2.second.get_left_side()) continue;
+                if(pr2.second.get_right_side().size() == 1) continue;
+                
+
+                Concat c2 = flatten_concat(pr2.second.get_right_side(), replace_map);
+                // compute the common prefix
+                for(i = c1.size() - 1, j = c2.size() - 1; i >= 0 && j >= 0; i--, j--) {
+                    if(c1[i] != c2[j]) break;
+                }
+                // i is the first mismatching index
+                if(i == 0) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin(), c2.begin() + j + 1) });
+                    this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = Y W1 W2
+                    // pr2 is of the form  X = W3 W4 W1 W2
+                    // We can remove pr2 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr2.first);
+                    }
+                } else if (j == 0) {
+                    Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[j]}, Concat(c1.begin(), c1.begin() + i + 1) });
+                    this->formula.add_predicate(new_pred);
+                    // we can remove one of the original constraint because it is redundant (it can be restored by the new one)
+                    // pr1 is of the form  X = W3 W4 W1 W2
+                    // pr2 is of the form  X = Y W1 W2
+                    // We can remove pr1 as we generate new constraint Y = W3 W4
+                    // Note that the propagated case has no effect as there is just exactly one equation of the form K = W1 W2
+                    if(new_pred.get_right_side().size() > 1) {
+                        rem_ids.insert(pr1.first);
+                    }
+                }
+            }
+        }
+        for(const size_t & i : rem_ids) {
+            this->formula.remove_predicate(i);
         }
     }
 

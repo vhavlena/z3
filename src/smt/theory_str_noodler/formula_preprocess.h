@@ -376,6 +376,7 @@ namespace smt::noodler {
         void generate_equiv(const BasicTermEqiv& ec);
         void infer_alignment();
         void common_prefix_propagation();
+        void common_suffix_propagation();
 
         void refine_languages();
         void reduce_diseqalities();

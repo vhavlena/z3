@@ -28,8 +28,9 @@ namespace smt::noodler {
         m_rewrite(m),
         m_util_a(m),
         m_util_s(m),
+        var_eqs(m_util_a),
         m_length(m),
-        axiomatized_instances() {
+        axiomatized_instances()  {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -865,7 +866,7 @@ namespace smt::noodler {
         DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
-        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt());
+        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
@@ -1207,11 +1208,35 @@ namespace smt::noodler {
             }
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
+            string_theory_propagation(xey);
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
-            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(xe, s, false)});
+            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
+            // 0 <= i <= |s| && l < 0 -> v = eps
+            add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+            // 0 <= i <= |s| -> xey = s (e = v in fact)
+            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, eps, false)});
+            // |s| < 0 -> v = eps
+            add_axiom({~ls_le_0, mk_eq(v, eps, false)});
+            // i > |s| -> v = eps
+            add_axiom({ls_le_i, mk_eq(v, eps, false)});
+                // substr(s, i, n) = v
+            add_axiom({mk_eq(v, e, false)});
+             // add the replacement substr -> v
+            this->predicate_replace.insert(e, v.get());
+            // update length variables
+            util::get_str_variables(s, this->m_util_s, m, this->len_vars);
+            // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+            // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
+            // after that)
+            this->var_eqs.add(expr_ref(l, m), v);
+            return;
+
         } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
@@ -1234,6 +1259,12 @@ namespace smt::noodler {
             this->var_eqs.add(expr_ref(l, m), v);
             return;
         } else {
+            expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
+            m_rewrite(post_bound); // simplify
+            // if i + l >= |s|, we can set post_substr to eps
+            if(m.is_true(post_bound)) {
+                y = expr_ref(m_util_s.str.mk_string(""), m);
+            }
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
              add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
              // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
@@ -1305,6 +1336,9 @@ namespace smt::noodler {
             expr_ref at(m_util_s.str.mk_at(s, i), m);
             add_axiom({mk_eq(v, e, false)});
             add_axiom({mk_eq(v, at, false)});
+            // set an additional constraint that v in eps union sigma
+            expr_ref re(m_util_s.re.mk_in_re(v, m_util_s.re.mk_union( m_util_s.re.mk_to_re(m_util_s.str.mk_string("")),  m_util_s.re.mk_full_char(nullptr))) , m);
+            add_axiom({mk_literal(re)});
             this->predicate_replace.insert(e, v.get());
             return;
         }
@@ -1796,6 +1830,17 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
+        expr * sub_str = nullptr, *sub_ind = nullptr, *sub_len = nullptr;
+        rational val;
+        zstring str;
+        // handle the special case of the form (str.prefix "a" (str.substr s 5 2)) --> (str.at s 5) == "a"
+        // TODO: move to the rewriter
+        if(m_util_s.str.is_string(x, str) && str.length() == 1 && m_util_s.str.is_extract(y, sub_str, sub_ind, sub_len) && m_util_a.is_numeral(sub_ind) && m_util_a.is_numeral(sub_len, val) && val.get_int32() >= 1) {
+            add_axiom({~mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), mk_literal(e) });
+            add_axiom({mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), ~mk_literal(e) });
+            return;
+        }
+
         expr_ref fresh = mk_str_var_fresh("prefix");
         expr_ref xs(m_util_s.str.mk_concat(x, fresh), m);
         string_theory_propagation(xs);
@@ -2016,9 +2061,13 @@ namespace smt::noodler {
 
         axiomatized_persist_terms.insert(e);
         STRACE("str", tout  << "handle contains " << mk_pp(e, m) << std::endl;);
+        ast_manager &m = get_manager();
+        expr *x = nullptr, *y = nullptr;
+        VERIFY(m_util_s.str.is_contains(e, x, y));
 
         // if contains is of the form (str.contains (str.substr value2 0 (+ n (str.indexof value2 "A" 0))) "A"), derive simpler constraints
         expr * ind = nullptr;
+        zstring str;
         if(expr_cases::is_contains_index(e, ind, m, m_util_s, m_util_a)) {
             expr_ref ind_eq(m.mk_eq( ind, m_util_a.mk_int(-1) ), m);
             expr_ref ind_leq(m_util_a.mk_le( ind, m_util_a.mk_int(-1) ), m);
@@ -2026,11 +2075,19 @@ namespace smt::noodler {
             add_axiom({~mk_eq(ind, m_util_a.mk_int(-1), false), ~mk_literal(e) });
             add_axiom({mk_eq(ind, m_util_a.mk_int(-1), false), mk_literal(e) });
             return;
+        // if constains is of the form (str.constains strX (str.at ...)) rewrite to a regular constaint ((str.at ...) \in union of chars of strX)
+        // TODO: move to the rewriter
+        } else if (m_util_s.str.is_at(y) && m_util_s.str.is_string(x, str) && str.length() > 0) {
+            expr_ref re(m_util_s.re.mk_to_re(m_util_s.str.mk_string("")), m);
+            for(size_t i = 0; i < str.length(); i++) {
+                re = m_util_s.re.mk_union(re, m_util_s.re.mk_to_re(m_util_s.str.mk_string(str[i])));
+            }
+            expr_ref in_re(m_util_s.re.mk_in_re(y, re), m);
+            literal not_e = mk_literal(mk_not({e, m}));
+            add_axiom({not_e, mk_literal(in_re)});
+            return;
         }
 
-        ast_manager &m = get_manager();
-        expr *x = nullptr, *y = nullptr;
-        VERIFY(m_util_s.str.is_contains(e, x, y));
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");
         expr_ref pys(m_util_s.str.mk_concat(m_util_s.str.mk_concat(p, y), s), m);
