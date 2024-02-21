@@ -1392,6 +1392,9 @@ namespace smt::noodler {
                 if(i == 0) {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c1[i]}, Concat(c2.begin(), c2.begin() + j + 1) });
                     this->formula.add_predicate(new_pred);
+                    // pr1 is of the form  X = Y W1 W2
+                    // pr2 is of the form  X = W3 W4 W1 W2
+                    // We can remove pr2 as we generate new constraint Y = W3 W4
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr2.first);
                     }
@@ -1399,6 +1402,9 @@ namespace smt::noodler {
                     Predicate new_pred = Predicate(PredicateType::Equation, { Concat{c2[j]}, Concat(c1.begin(), c1.begin() + i + 1) });
                     this->formula.add_predicate(new_pred);
                     // we can remove one of the original constraint because it is redundant (it can be restored by the new one)
+                    // pr1 is of the form  X = W3 W4 W1 W2
+                    // pr2 is of the form  X = Y W1 W2
+                    // We can remove pr1 as we generate new constraint Y = W3 W4
                     if(new_pred.get_right_side().size() > 1) {
                         rem_ids.insert(pr1.first);
                     }
