@@ -717,16 +717,16 @@ namespace smt::noodler {
                 rational interval_end(interval_it->second - AutAssignment::DIGIT_SYMBOL_START);
 
                 if (need_to_split) {
+                    std::vector<std::pair<rational,rational>> new_interval_cases;
                     for (rational possible_digit = interval_start; possible_digit <= interval_end; ++possible_digit) {
-                        std::vector<std::pair<rational,rational>> new_interval_cases;
                         for (std::pair<rational,rational>& interval_case : interval_cases) {
                             new_interval_cases.push_back({
-                                possible_digit*decimal + interval_cases[0].first,
-                                possible_digit*decimal + interval_cases[0].second
+                                possible_digit*decimal + interval_case.first,
+                                possible_digit*decimal + interval_case.second
                             });
                         }
-                        interval_cases = new_interval_cases;
                     }
+                    interval_cases = new_interval_cases;
                 } else {
                     assert(interval_cases.size() == 1);
                     interval_cases[0].first += interval_start*decimal;
@@ -795,8 +795,10 @@ namespace smt::noodler {
                     // int_subst_var is used in some to_code/from_code
                     // => we need to add to the previous formula also the fact, that int_subst_var cannot encode code point of a digit
                     //      .. && !(AutAssignment::DIGIT_SYMBOL_START <= code_version_of(int_subst_var) <= AutAssignment::DIGIT_SYMBOL_END)
-                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ code_version_of(int_subst_var), AutAssignment::DIGIT_SYMBOL_START });
-                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{ AutAssignment::DIGIT_SYMBOL_END, code_version_of(int_subst_var) });
+                    formula_for_int_subst_var.succ.back().succ.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
+                        LenNode(LenFormulaType::LT, { code_version_of(int_subst_var), AutAssignment::DIGIT_SYMBOL_START }),
+                        LenNode(LenFormulaType::LT, { AutAssignment::DIGIT_SYMBOL_END, code_version_of(int_subst_var) })
+                    });
                 }
             }
 
