@@ -76,6 +76,8 @@ bool is_to_int_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m
 
 bool is_len_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& len_arg, rational& num);
 
+bool is_len_num_leq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& len_arg, rational& num);
+
 
 }
 #endif

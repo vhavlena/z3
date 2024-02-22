@@ -2354,6 +2354,10 @@ namespace smt::noodler {
                 }
                 expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
                 add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            } else if(expr_cases::is_len_num_leq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64) {
+                expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(val)), m);
+                expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
             }
         }
     }
