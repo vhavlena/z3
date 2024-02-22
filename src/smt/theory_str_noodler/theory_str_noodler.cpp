@@ -2348,7 +2348,7 @@ namespace smt::noodler {
             expr *ex = ctx.get_asserted_formula(i);
             rational val;
             expr* len_arg = nullptr;
-            if(expr_cases::is_len_num_eq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64) {
+            if(expr_cases::is_len_num_eq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64 && val > 0) {
                 expr_ref re(m);
                 for(int i = 0; i < val; i++) {
                     if(re == nullptr) {
@@ -2359,7 +2359,7 @@ namespace smt::noodler {
                 }
                 expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
                 add_axiom({~mk_literal(ex), mk_literal(in_re)});
-            } else if(expr_cases::is_len_num_leq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64) {
+            } else if(expr_cases::is_len_num_leq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < 64 && val > 0) {
                 expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(val)), m);
                 expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
                 add_axiom({~mk_literal(ex), mk_literal(in_re)});
@@ -2392,9 +2392,58 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_stoi(e, s)) {
             type = ConversionType::TO_INT;
             name_of_type = "to_int";
+            
+            /*
+            add_axiom({mk_literal(m_util_a.mk_ge(e, m_util_a.mk_int(-1)))});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string(""), false), mk_literal(m.mk_eq( m_util_a.mk_int(-1), e))});
+
+
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("0"), false), mk_eq(e, m_util_a.mk_int(0), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("1"), false), mk_eq(e, m_util_a.mk_int(1), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("2"), false), mk_eq(e, m_util_a.mk_int(2), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("3"), false), mk_eq(e, m_util_a.mk_int(3), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("4"), false), mk_eq(e, m_util_a.mk_int(4), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("5"), false), mk_eq(e, m_util_a.mk_int(5), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("6"), false), mk_eq(e, m_util_a.mk_int(6), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("7"), false), mk_eq(e, m_util_a.mk_int(7), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("8"), false), mk_eq(e, m_util_a.mk_int(8), false)});
+            add_axiom({~mk_eq(s, m_util_s.str.mk_string("9"), false), mk_eq(e, m_util_a.mk_int(9), false)});
+
+            add_axiom({~mk_literal(m_util_a.mk_le(m_util_s.str.mk_length(s), m_util_a.mk_int(1))), mk_eq(s, m_util_s.str.mk_string("0"), false), mk_eq(s, m_util_s.str.mk_string("1"), false), mk_eq(s, m_util_s.str.mk_string("2"), false), mk_eq(s, m_util_s.str.mk_string("3"), false), mk_eq(s, m_util_s.str.mk_string("4"), false), mk_eq(s, m_util_s.str.mk_string("5"), false), mk_eq(s, m_util_s.str.mk_string("6"), false), mk_eq(s, m_util_s.str.mk_string("7"), false), mk_eq(s, m_util_s.str.mk_string("8"), false), mk_eq(s, m_util_s.str.mk_string("9"), false),  mk_eq(e, m_util_a.mk_int(-1), false)});
+            */
+
+
         } else if (m_util_s.str.is_itos(e, s)) {
             type = ConversionType::FROM_INT;
             name_of_type = "from_int";
+            /*
+            expr_ref s_lt_zero(m_util_a.mk_lt(s, m_util_a.mk_int(0)), m);
+            expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
+            expr_ref len_s(m_util_a.mk_ge(m_util_s.str.mk_length(e), m_util_a.mk_int(0)), m);
+            literal s_lt_zero_lit = mk_literal(s_lt_zero);
+
+            expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(2)), m);
+            expr_ref in_re(m_util_s.re.mk_in_re(e, re), m);
+
+            add_axiom({~s_lt_zero_lit, mk_eq(e, emp, false)});
+            add_axiom({s_lt_zero_lit, ~mk_eq(e, emp, false)});
+            add_axiom({~s_lt_zero_lit, ~mk_literal(m.mk_eq(m_util_s.str.mk_length(e), m_util_a.mk_int(0))) });
+            add_axiom({s_lt_zero_lit, mk_literal(len_s)});
+
+            add_axiom({~mk_literal(m_util_a.mk_lt(s, m_util_a.mk_int(100))), mk_literal(in_re)});
+
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("0"), false), ~mk_eq(s, m_util_a.mk_int(0), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("1"), false), ~mk_eq(s, m_util_a.mk_int(1), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("2"), false), ~mk_eq(s, m_util_a.mk_int(2), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("3"), false), ~mk_eq(s, m_util_a.mk_int(3), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("4"), false), ~mk_eq(s, m_util_a.mk_int(4), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("5"), false), ~mk_eq(s, m_util_a.mk_int(5), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("6"), false), ~mk_eq(s, m_util_a.mk_int(6), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("7"), false), ~mk_eq(s, m_util_a.mk_int(7), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("8"), false), ~mk_eq(s, m_util_a.mk_int(8), false)});
+            add_axiom({mk_eq(e, m_util_s.str.mk_string("9"), false), ~mk_eq(s, m_util_a.mk_int(9), false)});
+            */
+
         } else {
             UNREACHABLE();
             return;
