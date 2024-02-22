@@ -2320,8 +2320,8 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Add special axioms for conversions (from n = to_int(x) generate n = to_int(x) -> x \in 0*to_string(n)).
-     * 
+     * @brief Add special axioms for conversions.
+     * In particular, for n = to_int(x) generate n = to_int(x) -> x \in 0*to_string(n)).
      */
     void theory_str_noodler::add_conversion_num_axioms() {
         unsigned nFormulas = ctx.get_num_asserted_formulas();
@@ -2337,6 +2337,11 @@ namespace smt::noodler {
         }
     }
 
+    /**
+     * @brief Add special axioms for length (in)equations. In particular
+     * - for (len s) == 10 create (len s) == 10 -> s \in \Sigma^10
+     * - for (len s) <= 10 create (len s) <= 10 -> s \in re.loop(0, 10)
+     */
     void theory_str_noodler::add_len_num_axioms() {
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {

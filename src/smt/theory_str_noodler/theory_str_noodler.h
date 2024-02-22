@@ -142,7 +142,13 @@ namespace smt::noodler {
         enode* ensure_enode(expr* e);
 
         void add_length_axiom(expr* n);
+        /**
+         * @brief Add special axioms for conversions.
+         */
         void add_conversion_num_axioms();
+        /**
+         * @brief Add special axioms for length (in)equations.
+         */
         void add_len_num_axioms();
 
         /**
