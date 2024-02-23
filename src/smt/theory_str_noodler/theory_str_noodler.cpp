@@ -2422,26 +2422,26 @@ namespace smt::noodler {
             expr_ref len_s(m_util_a.mk_ge(m_util_s.str.mk_length(e), m_util_a.mk_int(0)), m);
             literal s_lt_zero_lit = mk_literal(s_lt_zero);
 
-            expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(2)), m);
-            expr_ref in_re(m_util_s.re.mk_in_re(e, re), m);
+            // expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(2)), m);
+            // expr_ref in_re(m_util_s.re.mk_in_re(e, re), m);
 
             add_axiom({~s_lt_zero_lit, mk_eq(e, emp, false)});
             add_axiom({s_lt_zero_lit, ~mk_eq(e, emp, false)});
             add_axiom({~s_lt_zero_lit, ~mk_literal(m.mk_eq(m_util_s.str.mk_length(e), m_util_a.mk_int(0))) });
             add_axiom({s_lt_zero_lit, mk_literal(len_s)});
 
-            add_axiom({~mk_literal(m_util_a.mk_lt(s, m_util_a.mk_int(100))), mk_literal(in_re)});
+            // add_axiom({~mk_literal(m_util_a.mk_lt(s, m_util_a.mk_int(100))), mk_literal(in_re)});
 
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("0"), false), ~mk_eq(s, m_util_a.mk_int(0), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("1"), false), ~mk_eq(s, m_util_a.mk_int(1), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("2"), false), ~mk_eq(s, m_util_a.mk_int(2), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("3"), false), ~mk_eq(s, m_util_a.mk_int(3), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("4"), false), ~mk_eq(s, m_util_a.mk_int(4), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("5"), false), ~mk_eq(s, m_util_a.mk_int(5), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("6"), false), ~mk_eq(s, m_util_a.mk_int(6), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("7"), false), ~mk_eq(s, m_util_a.mk_int(7), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("8"), false), ~mk_eq(s, m_util_a.mk_int(8), false)});
-            add_axiom({mk_eq(e, m_util_s.str.mk_string("9"), false), ~mk_eq(s, m_util_a.mk_int(9), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("0"), false), ~mk_eq(s, m_util_a.mk_int(0), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("1"), false), ~mk_eq(s, m_util_a.mk_int(1), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("2"), false), ~mk_eq(s, m_util_a.mk_int(2), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("3"), false), ~mk_eq(s, m_util_a.mk_int(3), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("4"), false), ~mk_eq(s, m_util_a.mk_int(4), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("5"), false), ~mk_eq(s, m_util_a.mk_int(5), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("6"), false), ~mk_eq(s, m_util_a.mk_int(6), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("7"), false), ~mk_eq(s, m_util_a.mk_int(7), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("8"), false), ~mk_eq(s, m_util_a.mk_int(8), false)});
+            // add_axiom({mk_eq(e, m_util_s.str.mk_string("9"), false), ~mk_eq(s, m_util_a.mk_int(9), false)});
             
 
         } else {
