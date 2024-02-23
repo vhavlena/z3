@@ -2393,7 +2393,7 @@ namespace smt::noodler {
             type = ConversionType::TO_INT;
             name_of_type = "to_int";
             
-            /*
+            
             add_axiom({mk_literal(m_util_a.mk_ge(e, m_util_a.mk_int(-1)))});
             add_axiom({~mk_eq(s, m_util_s.str.mk_string(""), false), mk_literal(m.mk_eq( m_util_a.mk_int(-1), e))});
 
@@ -2410,13 +2410,13 @@ namespace smt::noodler {
             add_axiom({~mk_eq(s, m_util_s.str.mk_string("9"), false), mk_eq(e, m_util_a.mk_int(9), false)});
 
             add_axiom({~mk_literal(m_util_a.mk_le(m_util_s.str.mk_length(s), m_util_a.mk_int(1))), mk_eq(s, m_util_s.str.mk_string("0"), false), mk_eq(s, m_util_s.str.mk_string("1"), false), mk_eq(s, m_util_s.str.mk_string("2"), false), mk_eq(s, m_util_s.str.mk_string("3"), false), mk_eq(s, m_util_s.str.mk_string("4"), false), mk_eq(s, m_util_s.str.mk_string("5"), false), mk_eq(s, m_util_s.str.mk_string("6"), false), mk_eq(s, m_util_s.str.mk_string("7"), false), mk_eq(s, m_util_s.str.mk_string("8"), false), mk_eq(s, m_util_s.str.mk_string("9"), false),  mk_eq(e, m_util_a.mk_int(-1), false)});
-            */
+            
 
 
         } else if (m_util_s.str.is_itos(e, s)) {
             type = ConversionType::FROM_INT;
             name_of_type = "from_int";
-            /*
+            
             expr_ref s_lt_zero(m_util_a.mk_lt(s, m_util_a.mk_int(0)), m);
             expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
             expr_ref len_s(m_util_a.mk_ge(m_util_s.str.mk_length(e), m_util_a.mk_int(0)), m);
@@ -2442,7 +2442,7 @@ namespace smt::noodler {
             add_axiom({mk_eq(e, m_util_s.str.mk_string("7"), false), ~mk_eq(s, m_util_a.mk_int(7), false)});
             add_axiom({mk_eq(e, m_util_s.str.mk_string("8"), false), ~mk_eq(s, m_util_a.mk_int(8), false)});
             add_axiom({mk_eq(e, m_util_s.str.mk_string("9"), false), ~mk_eq(s, m_util_a.mk_int(9), false)});
-            */
+            
 
         } else {
             UNREACHABLE();
