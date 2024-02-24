@@ -240,7 +240,8 @@ namespace smt::noodler::util {
             assert(node.succ.size() == 2);
             expr_ref left = len_to_expr(node.succ[0], variable_map, m, m_util_s, m_util_a);
             expr_ref right = len_to_expr(node.succ[1], variable_map, m, m_util_s, m_util_a);
-            return expr_ref(m_util_a.mk_lt(left, right), m);
+            // LIA solver fails if we use "L < R" for some reason (it cannot be internalized in smt::theory_lra::imp::internalize_atom, as it expects only <= or >=); we use "!(R <= L)" instead
+            return expr_ref(m.mk_not(m_util_a.mk_le(right, left)), m);
         }
 
         case LenFormulaType::NOT: {

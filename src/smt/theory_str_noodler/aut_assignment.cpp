@@ -67,7 +67,7 @@ namespace smt::noodler {
         // maps all states q reachable in n steps (starting with n=0), into the vector of interval words with which we can reach the given state from the inital state
         std::map<mata::nfa::State,std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>> cur_level = { {*(aut.initial.begin()), {{}}} };
 
-        while (!cur_level.empty()) {
+        while (true) {
             // we will compute the mapping for states reachable in n+1 steps
             std::map<mata::nfa::State,std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>> next_level;
 

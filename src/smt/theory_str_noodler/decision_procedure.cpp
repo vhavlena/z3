@@ -907,8 +907,10 @@ namespace smt::noodler {
             // (|s| == 0 && c is not a valid code point)
             invalid_value.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{s, 0});
             // non-valid code point means that 'c < 0 || c > max_char'
-            invalid_value.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{c, 0});
-            invalid_value.succ.emplace_back(LenFormulaType::LT, std::vector<LenNode>{zstring::max_char(), c});
+            invalid_value.succ.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
+                LenNode(LenFormulaType::LT, {c, 0}),
+                LenNode(LenFormulaType::LT, {zstring::max_char(), c})
+            });
         }
 
         // Now we create the second disjunct of (1):
@@ -955,7 +957,7 @@ namespace smt::noodler {
         } else {
             // for FROM_INT only empty string (as we assume that language of s was set to only possible results of from_int)
             result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
-                LenNode(LenFormulaType::LT, {0, i}), // from_int(i) = "" only if i < 0
+                LenNode(LenFormulaType::LT, {i, 0}), // from_int(i) = "" only if i < 0
                 LenNode(LenFormulaType::EQ, {s, 0})
             });
         }
