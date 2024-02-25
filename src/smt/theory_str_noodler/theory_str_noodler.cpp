@@ -139,6 +139,8 @@ namespace smt::noodler {
             string_theory_propagation(ex, true, false);
             
         }
+        add_conversion_num_axioms();
+        add_len_num_axioms();
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }
@@ -2316,6 +2318,59 @@ namespace smt::noodler {
         // ~is_digit(s) -> ~(s \in [0-9])
         add_axiom({mk_literal(e), ~mk_literal(s_in_digit)});
     }
+
+    /**
+     * @brief Add special axioms for conversions.
+     * In particular, for n = to_int(x) generate n = to_int(x) -> x \in 0*to_string(n)).
+     */
+    void theory_str_noodler::add_conversion_num_axioms() {
+        unsigned nFormulas = ctx.get_num_asserted_formulas();
+        for (unsigned i = 0; i < nFormulas; ++i) {
+            expr *ex = ctx.get_asserted_formula(i);
+            rational val;
+            expr* to_int_arg = nullptr;
+            if(expr_cases::is_to_int_num_eq(ex, m, m_util_s, m_util_a, to_int_arg, val) && val.is_nonneg()) {
+                expr_ref re(m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_to_re(m_util_s.str.mk_string("0"))), m_util_s.re.mk_to_re(m_util_s.str.mk_string(val.to_string()))), m);
+                expr_ref in_re(m_util_s.re.mk_in_re(to_int_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            }
+        }
+    }
+
+    /**
+     * @brief Add special axioms for length (in)equations. In particular
+     * - for (len s) == 10 create (len s) == 10 -> s \in \Sigma^10
+     * - for (len s) <= 10 create (len s) <= 10 -> s \in re.loop(0, 10)
+     */
+    void theory_str_noodler::add_len_num_axioms() {
+        // number bound for the conversion of length constraints into regex constraints.
+        // For higher values this conversion could not be beneficial as we would work with 
+        // big automata in the decision procedure.
+        const int MAX_NUM = 64; 
+        unsigned nFormulas = ctx.get_num_asserted_formulas();
+        for (unsigned i = 0; i < nFormulas; ++i) {
+            expr *ex = ctx.get_asserted_formula(i);
+            rational val;
+            expr* len_arg = nullptr;
+            if(expr_cases::is_len_num_eq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < MAX_NUM && val > 0) {
+                expr_ref re(m);
+                for(int i = 0; i < val; i++) {
+                    if(re == nullptr) {
+                        re = m_util_s.re.mk_full_char(nullptr);
+                    } else {
+                        re = m_util_s.re.mk_concat(re, m_util_s.re.mk_full_char(nullptr));
+                    }  
+                }
+                expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            } else if(expr_cases::is_len_num_leq(ex, m, m_util_s, m_util_a, len_arg, val) && val.is_nonneg() && val < MAX_NUM && val > 0) {
+                expr_ref re(m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(val)), m);
+                expr_ref in_re(m_util_s.re.mk_in_re(len_arg, re), m);
+                add_axiom({~mk_literal(ex), mk_literal(in_re)});
+            }
+        }
+    }
+
 
     /**
      * @brief Handle to_code, from_code, to_int, from_int
