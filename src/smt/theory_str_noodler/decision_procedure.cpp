@@ -841,6 +841,11 @@ namespace smt::noodler {
             // and add l to int_subst_vars_to_possible_valid_lengths[int_subst_var].
             // For l=0 we need to do something else with the second conjunct, and for l=1, we also need to add something about code_version_of(int_subt_var).
 
+            if (aut_valid_part.is_lang_empty()) {
+                result.succ.push_back(formula_for_int_subst_var);
+                continue;
+            }
+
             // Handle l=0 as a special case.
             if (aut_valid_part.is_in_lang({})) {
                 // Even though it is invalid and it seems that we should set int_version_of(int_subst_var) = -1, we cannot do that
