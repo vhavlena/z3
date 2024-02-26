@@ -2472,12 +2472,18 @@ namespace smt::noodler {
             app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
 
-            // special case: argument < 10*underapproximating_length => result \in .{0,underapprimating_length} TODO: ????
+            // As the result of from_int belongs to infinite language, it is very likely that we will have to underapproximate in the decision procedure.
+            // The underapproximation maximum length of words used from this infinite language is given by m_params.m_underapprox_length, we therefore add
+            //      argument < 10^m_underapprox_length => result \in .{0,m_underapprox_length}
+            // This will force for the case that "argument < 10^m_underapprox_length", that we will not have to do any underapproximation and hopefully,
+            // the case "argument >= 10^m_underapprox_length" will not happen .
             add_axiom({
-                ~mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(99999))),
-                mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(5))))
+                ~mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(rational(10).expt(m_params.m_underapprox_length)-1))), // I rather use <= instead of <, LIA solver can have problems with that
+                mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(m_params.m_underapprox_length))))
             });
         }
+
+        // To help LIA solver, we give also some bounds on the results of to_* functions
 
         if (type == ConversionType::TO_CODE) {
             // the result of str.to_code must be between -1 and zstring::max_char

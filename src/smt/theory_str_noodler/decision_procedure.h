@@ -365,7 +365,7 @@ namespace smt::noodler {
          * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
          * @return The formula + precision of the formula (can be precise or underapproximation)
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const unsigned underapproximating_length = 5);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths);
 
         /**
          * @brief Get the formula encoding to_code/from_code conversion
