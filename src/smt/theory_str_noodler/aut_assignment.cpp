@@ -108,7 +108,7 @@ namespace smt::noodler {
                 // we get intervals
                 //      st -[5-6]-> t1
                 //      st -[8-8]-> t1
-                //      st -[6-11]-> t2
+                //      st -[9-11]-> t2
                 //      st -[12-12]-> t3
 
                 assert(trans_from_st_it->targets.size() == 1); // should be deterministic
