@@ -51,7 +51,7 @@ namespace smt::noodler {
         return nfa;
     }
 
-    std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>> AutAssignment::get_interval_words(const mata::nfa::Nfa& aut) {
+    std::vector<interval_word> AutAssignment::get_interval_words(const mata::nfa::Nfa& aut) {
         assert(aut.initial.size() == 1); // is deterministic and accepts a non-empty language
         assert(aut.is_acyclic()); // accepts a finite language
 
@@ -65,11 +65,11 @@ namespace smt::noodler {
         // we compute the reachable interval words for each state that can be reached in n steps
 
         // maps all states q reachable in n steps (starting with n=0), into the vector of interval words with which we can reach the given state from the inital state
-        std::map<mata::nfa::State,std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>> cur_level = { {*(aut.initial.begin()), {{}}} };
+        std::map<mata::nfa::State, std::vector<interval_word>> cur_level = { {*(aut.initial.begin()), {{}}} };
 
         while (true) {
             // we will compute the mapping for states reachable in n+1 steps
-            std::map<mata::nfa::State,std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>> next_level;
+            std::map<mata::nfa::State,std::vector<interval_word>> next_level;
 
             for (auto const& [st, interval_words] : cur_level) {
                 // st - state reachable in n steps

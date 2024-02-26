@@ -17,6 +17,8 @@
 
 namespace smt::noodler {
 
+    using interval_word = std::vector<std::pair<mata::Symbol,mata::Symbol>>;
+
     /**
      * hints for using AutAssignment:
      *   - use at() instead of [] operator for getting the value, use [] only for assigning
@@ -134,7 +136,7 @@ namespace smt::noodler {
          * 
          * @param aut - minimized automaton that accepts finite language
          */
-        static std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>> get_interval_words(const mata::nfa::Nfa& aut);
+        static std::vector<interval_word> get_interval_words(const mata::nfa::Nfa& aut);
 
         mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();

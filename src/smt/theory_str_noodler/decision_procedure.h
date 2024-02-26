@@ -349,7 +349,7 @@ namespace smt::noodler {
         /**
          * @brief Get the formula encoding that arithmetic variable @p var is any of the numbers encoded by some interval word from @p interval_words
          */
-        LenNode encode_interval_words(const BasicTerm& var, const std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>& interval_words);
+        LenNode encode_interval_words(const BasicTerm& var, const std::vector<interval_word>& interval_words);
 
         /**
          * @brief Get the formula for to_int/from_int substituting variables

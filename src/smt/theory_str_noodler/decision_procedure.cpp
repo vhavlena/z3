@@ -705,7 +705,7 @@ namespace smt::noodler {
         return result;
     }
 
-    LenNode DecisionProcedure::encode_interval_words(const BasicTerm& var, const std::vector<std::vector<std::pair<mata::Symbol,mata::Symbol>>>& interval_words) {
+    LenNode DecisionProcedure::encode_interval_words(const BasicTerm& var, const std::vector<interval_word>& interval_words) {
         LenNode result(LenFormulaType::OR);
         for (const auto& interval_word : interval_words) {
             // How this works on an example:
