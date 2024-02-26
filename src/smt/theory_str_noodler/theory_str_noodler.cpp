@@ -2494,14 +2494,14 @@ namespace smt::noodler {
             rational r1;
             if (m_util_s.str.is_at(s)) {
                 // argument is str.at(...) => result must be less than 10
-                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(10)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation)
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(10)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation, it did not work)
             } else if (m_util_s.str.is_extract(s, e1, e2, e3) && m_util_a.is_numeral(e3, r1)) {
                 // argument is str.substr(?, ?, numeral) => result must be less than 10^numeral
                 rational ten_to_r1(1);
                 for (rational i(0); i < r1; ++i) {
                     ten_to_r1 = ten_to_r1 * 10;
                 }
-                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(ten_to_r1)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation)
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(ten_to_r1)))}); // WARNING: here probably also must be e < 10 and NOT var_for_e < 10
             }
 
             // |argument| <= 3 -> result < 1000 (TODO: explain why we add this -> something about 5 is the underapproximating length, so we go with something lower (like 3) and then if to_int is used as an argument of from_int, we can check or something, i dont know, so if it is under, something good happens??)
