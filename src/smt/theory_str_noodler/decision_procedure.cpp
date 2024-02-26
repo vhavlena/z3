@@ -713,14 +713,17 @@ namespace smt::noodler {
             // We need to encode, as succintcly as possible, that var is any number from the interval word.
             // It is easy to see, that because last two positions can use all digits, we can create following inequations:
             //      ..200 <= var <= ..599
-            // where the first two digits are any of [4-5] and [0-9] respectively, i.e., we get:
+            // where the first two digits are any of [4-5] and [0-9] respectively, i.e., the full encoding should be the
+            // following disjunct:
             //      40200 <= var <= 40599 ||
             //      41200 <= var <= 41599 ||
             //               ...
             //      49200 <= var <= 49599 ||
             //      50200 <= var <= 50599 ||
+            //      51200 <= var <= 51599 ||
             //               ...
             //      59200 <= var <= 59599
+
             // We first compute the vector interval_cases of all the intervals [40200-40599], [41200-41599], ...
             // by going backwards in the interval_word, first by computing the main interval [..200-..599] which
             // ends after hitting first digit interval that does not contain all digits (in the exmaple it is [2-5])
