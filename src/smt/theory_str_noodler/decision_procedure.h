@@ -330,28 +330,42 @@ namespace smt::noodler {
         }
 
         /**
-         * Gets all vars s_i, such that there exists `c = to_code(s)` or `s = from_code(c)`
+         * Gets the pair of variable sets (code_subst_vars, int_subst_vars) where code_subst_vars
+         * contains all vars s_i, such that there exists "c = to_code(s)" or "s = from_code(c)"
          * in conversions where s is substituted by s_1 ... s_i ... s_n in the solution.
+         * The set int_subst_vars is defined similarly, but for "i = to_int(s)" or "s = from_int(i)"
+         * conversions.
          */
-        std::set<BasicTerm> get_vars_substituted_in_code_conversions();
+        std::pair<std::set<BasicTerm>,std::set<BasicTerm>> get_vars_substituted_in_conversions();
 
         /**
-         * @brief Get the formula for code substituting variables
+         * @brief Get the formula for to_code/from_code substituting variables
          * 
-         * It basically encodes `code_version_of(c) = to_code(c)` for each c in @p code_subst_vars
+         * It basically succinctly encodes `code_version_of(s) = to_code(w_s)` for each s in @p code_subst_vars and w_c \in solution.aut_ass.at(s) while
+         * keeping the correspondence between |s| and |w_s|
          */
         LenNode get_formula_for_code_subst_vars(const std::set<BasicTerm>& code_subst_vars);
 
         /**
-         * @brief Returns formula encoding `var = to_int(word)`.
-         * 
-         * Based on handle_invalid_as_from_int, invalid inputs (word is empty/contains non-digits) are either
-         *    - (false) handled normally, i.e., to_int(word) = -1, or
-         *    - (true) handled as if we had `word = from_int(var)`, i.e., var < 0.
-         * 
-         * @param start_with_one if true, encode instead `var = to_int('1'.word)`
+         * @brief Get the formula encoding that arithmetic variable @p var is any of the numbers encoded by some interval word from @p interval_words
          */
-        LenNode word_to_int(const mata::Word& word, const BasicTerm &var, bool start_with_one, bool handle_invalid_as_from_int);
+        LenNode encode_interval_words(const BasicTerm& var, const std::vector<interval_word>& interval_words);
+
+        /**
+         * @brief Get the formula for to_int/from_int substituting variables
+         * 
+         * It basically succinctly encodes `int_version_of(s) = to_int(w_s)` for each s in @p int_subst_vars and w_s \in solution.aut_ass.at(s) while
+         * keeping the correspondence between |s|, |w_s|, and code_version_of(s).
+         * Note that for w_s = "", we do not put int_version_of(s) = -1 but we instead force that it is NOT -1 (so that get_formula_for_int_conversion
+         * can handle this case correctly).
+         * 
+         * @param int_subst_vars to_int/from_int substituting variables for which we create formulae
+         * @param code_subst_vars to_code/from_code substituting variables (needed only if int_subst_vars and code_subst_vars are not disjoint)
+         * @param[out] int_subst_vars_to_possible_valid_lengths will map each var from int_subst_vars into a vector of lengths of all possible numbers for var (also 0 if there is empty string)
+         * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
+         * @return The formula + precision of the formula (can be precise or underapproximation)
+         */
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const unsigned underapproximating_length = 5);
 
         /**
          * @brief Get the formula encoding to_code/from_code conversion
@@ -361,10 +375,9 @@ namespace smt::noodler {
         /**
          * @brief Get the formula encoding to_int/from_int conversion
          * 
-         * @param underapproximating_length For the case that we need to underapproximate, this variable sets
-         * the length up to which we underapproximate
+         * @param int_subst_vars_to_possible_valid_lengths maps each var from int_subst_vars into a vector of lengths of all possible numbers for var (also 0 if there is empty string)
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_conversion(const TermConversion& conv, const std::set<BasicTerm>& code_subst_vars, const unsigned underapproximating_length = 3);
+        LenNode get_formula_for_int_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths);
 
         /**
          * Formula containing all not_contains predicate (nothing else)
