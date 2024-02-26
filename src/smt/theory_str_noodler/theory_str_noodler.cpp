@@ -2509,11 +2509,6 @@ namespace smt::noodler {
                 }
                 add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(ten_to_r1)))}); // WARNING: here probably also must be e < 10 and NOT var_for_e < 10
             }
-
-            // |argument| <= 3 -> result < 1000 (TODO: explain why we add this -> something about 5 is the underapproximating length, so we go with something lower (like 3) and then if to_int is used as an argument of from_int, we can check or something, i dont know, so if it is under, something good happens??)
-            // we change the first part to 'argument \in .{0,3}' (TODO: explain why. something about str.at and str.substr not generating lengths, but they probably generate that it belongs to regex of specific length etc.)
-            // app* lgth_three = m_util_s.re.mk_in_re(m_util)
-            // add_axiom({!mk_literal(m_util_s)})
         }
 
         // Add to todo
