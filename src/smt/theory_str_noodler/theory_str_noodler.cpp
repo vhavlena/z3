@@ -2471,6 +2471,43 @@ namespace smt::noodler {
                                         ); // if argument > 0, the result will be of form [1-9]+[0-9]*
             app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
+
+            // special case: argument < 10*underapproximating_length => result \in .{0,underapprimating_length} TODO: ????
+            add_axiom({
+                ~mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(99999))),
+                mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(5))))
+            });
+        }
+
+        if (type == ConversionType::TO_CODE) {
+            // the result of str.to_code must be between -1 and zstring::max_char
+            add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_int(-1), var_for_e))});
+            add_axiom({mk_literal(m_util_a.mk_le(var_for_e, m_util_a.mk_int(zstring::max_char())))});
+        }
+
+        if (type == ConversionType::TO_INT) {
+            // the result of str.to_int cannot be any negative number other than -1
+            add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_int(-1), var_for_e))});
+
+
+            expr *e1 = nullptr, *e2 = nullptr, *e3 = nullptr;
+            rational r1;
+            if (m_util_s.str.is_at(s)) {
+                // argument is str.at(...) => result must be less than 10
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(10)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation)
+            } else if (m_util_s.str.is_extract(s, e1, e2, e3) && m_util_a.is_numeral(e3, r1)) {
+                // argument is str.substr(?, ?, numeral) => result must be less than 10^numeral
+                rational ten_to_r1(1);
+                for (rational i(0); i < r1; ++i) {
+                    ten_to_r1 = ten_to_r1 * 10;
+                }
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(ten_to_r1)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation)
+            }
+
+            // |argument| <= 3 -> result < 1000 (TODO: explain why we add this -> something about 5 is the underapproximating length, so we go with something lower (like 3) and then if to_int is used as an argument of from_int, we can check or something, i dont know, so if it is under, something good happens??)
+            // we change the first part to 'argument \in .{0,3}' (TODO: explain why. something about str.at and str.substr not generating lengths, but they probably generate that it belongs to regex of specific length etc.)
+            // app* lgth_three = m_util_s.re.mk_in_re(m_util)
+            // add_axiom({!mk_literal(m_util_s)})
         }
 
         // Add to todo
