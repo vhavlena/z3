@@ -618,7 +618,9 @@ namespace smt::noodler {
         conjuncts.push_back(conv_form_with_precision.first);
         precision = conv_form_with_precision.second;
 
-        return {LenNode(LenFormulaType::AND, conjuncts), precision};
+        LenNode result(LenFormulaType::AND, conjuncts);
+        STRACE("str", tout << "Final " << (precision == LenNodePrecision::PRECISE ? "precise" : "underapproximating") << " formula from get_lengths(): " << result << std::endl;);
+        return {result, precision};
     }
 
     std::pair<std::set<BasicTerm>,std::set<BasicTerm>> DecisionProcedure::get_vars_substituted_in_conversions() {

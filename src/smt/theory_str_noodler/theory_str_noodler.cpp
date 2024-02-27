@@ -128,6 +128,7 @@ namespace smt::noodler {
         context &ctx = get_context();
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {
+            STRACE("str-init-formula", tout << "Initial asserted formula " << i << ": " << expr_ref(ctx.get_asserted_formula(i), m) << std::endl;);
             obj_hashtable<app> lens;
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
