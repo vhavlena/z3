@@ -860,7 +860,7 @@ namespace smt::noodler {
                 //      |int_subst_var| = 0 && !(int_version_of(int_subst_var) = -1)
                 formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
                     LenNode(LenFormulaType::EQ, { int_subst_var, 0 }),
-                    LenNode(LenFormulaType::NEQ, { int_version_of(int_subst_var), -2 })
+                    LenNode(LenFormulaType::NEQ, { int_version_of(int_subst_var), -1 })
                 });
                 // Also add the information that int_subst_var can have length 0
                 int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(0);
