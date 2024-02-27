@@ -128,6 +128,7 @@ namespace smt::noodler {
         context &ctx = get_context();
         unsigned nFormulas = ctx.get_num_asserted_formulas();
         for (unsigned i = 0; i < nFormulas; ++i) {
+            STRACE("str-init-formula", tout << "Initial asserted formula " << i << ": " << expr_ref(ctx.get_asserted_formula(i), m) << std::endl;);
             obj_hashtable<app> lens;
             util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
             for (app* const a : lens) {
@@ -2471,6 +2472,44 @@ namespace smt::noodler {
                                         ); // if argument > 0, the result will be of form [1-9]+[0-9]*
             app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
+
+            // As the result of from_int belongs to infinite language, it is very likely that we will have to underapproximate in the decision procedure.
+            // The underapproximation maximum length of words used from this infinite language is given by m_params.m_underapprox_length, we therefore add
+            //      argument < 10^m_underapprox_length => result \in .{0,m_underapprox_length}
+            // This will force for the case that "argument < 10^m_underapprox_length", that we will not have to do any underapproximation and hopefully,
+            // the case "argument >= 10^m_underapprox_length" will not happen .
+            add_axiom({
+                ~mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(rational(10).expt(m_params.m_underapprox_length)-1))), // I rather use <= instead of <, LIA solver can have problems with that
+                mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(m_params.m_underapprox_length))))
+            });
+        }
+
+        // To help LIA solver, we give also some bounds on the results of to_* functions
+
+        if (type == ConversionType::TO_CODE) {
+            // the result of str.to_code must be between -1 and zstring::max_char
+            add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_int(-1), var_for_e))});
+            add_axiom({mk_literal(m_util_a.mk_le(var_for_e, m_util_a.mk_int(zstring::max_char())))});
+        }
+
+        if (type == ConversionType::TO_INT) {
+            // the result of str.to_int cannot be any negative number other than -1
+            add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_int(-1), var_for_e))});
+
+
+            expr *e1 = nullptr, *e2 = nullptr, *e3 = nullptr;
+            rational r1;
+            if (m_util_s.str.is_at(s)) {
+                // argument is str.at(...) => result must be less than 10
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(10)))}); // WARNING: here must be e < 10 and NOT var_for_e < 10 (even though e == var_for_e should be there as an equation, it did not work)
+            } else if (m_util_s.str.is_extract(s, e1, e2, e3) && m_util_a.is_numeral(e3, r1)) {
+                // argument is str.substr(?, ?, numeral) => result must be less than 10^numeral
+                rational ten_to_r1(1);
+                for (rational i(0); i < r1; ++i) {
+                    ten_to_r1 = ten_to_r1 * 10;
+                }
+                add_axiom({mk_literal(m_util_a.mk_le(e, m_util_a.mk_int(ten_to_r1)))}); // WARNING: here probably also must be e < 10 and NOT var_for_e < 10
+            }
         }
 
         // Add to todo

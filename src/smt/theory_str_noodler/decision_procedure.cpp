@@ -618,7 +618,9 @@ namespace smt::noodler {
         conjuncts.push_back(conv_form_with_precision.first);
         precision = conv_form_with_precision.second;
 
-        return {LenNode(LenFormulaType::AND, conjuncts), precision};
+        LenNode result(LenFormulaType::AND, conjuncts);
+        STRACE("str", tout << "Final " << (precision == LenNodePrecision::PRECISE ? "precise" : "underapproximating") << " formula from get_lengths(): " << result << std::endl;);
+        return {result, precision};
     }
 
     std::pair<std::set<BasicTerm>,std::set<BasicTerm>> DecisionProcedure::get_vars_substituted_in_conversions() {
@@ -793,7 +795,7 @@ namespace smt::noodler {
         return result;
     }
 
-    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const unsigned underapproximating_length) {
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths) {
         LenNode result(LenFormulaType::AND);
         LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
@@ -860,7 +862,7 @@ namespace smt::noodler {
                 //      |int_subst_var| = 0 && !(int_version_of(int_subst_var) = -1)
                 formula_for_int_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
                     LenNode(LenFormulaType::EQ, { int_subst_var, 0 }),
-                    LenNode(LenFormulaType::NEQ, { int_version_of(int_subst_var), -2 })
+                    LenNode(LenFormulaType::NEQ, { int_version_of(int_subst_var), -1 })
                 });
                 // Also add the information that int_subst_var can have length 0
                 int_subst_vars_to_possible_valid_lengths[int_subst_var].push_back(0);
@@ -875,7 +877,7 @@ namespace smt::noodler {
             } else {
                 // there is infinite number of such words => we need to underapproximate
                 STRACE("str-conversion", tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_valid_part << std::endl;);
-                max_length_of_words = underapproximating_length;
+                max_length_of_words = m_params.m_underapprox_length;
                 res_precision = LenNodePrecision::UNDERAPPROX;
             }
 
