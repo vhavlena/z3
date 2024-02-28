@@ -902,7 +902,7 @@ namespace smt::noodler {
                     // save the current assignment to catch it during the loop protection
                     block_curr_len(lengths, true, false);
                     return FC_DONE;
-                } else if (is_lengths_sat == l_false && precision != LenNodePrecision::UNDERAPPROX) {
+                } else if (is_lengths_sat == l_false /*&& precision != LenNodePrecision::UNDERAPPROX*/) {
                     // TODO is handling underapprox correct here? is it even safe to underapproximate? we do not have a case where we underapproximate, but for the future
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
                     block_len = m.mk_or(block_len, lengths);
