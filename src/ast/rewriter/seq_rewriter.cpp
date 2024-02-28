@@ -4505,9 +4505,20 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
         return BR_DONE;
     }
     expr_ref b_s(m());
-    if (false && lift_str_from_to_re(b, b_s)) { // FIXME: NOODLER replacing regexes to disequalities is not beneficial for noodler
-       result = m_br.mk_eq_rw(a, b_s);
-       return BR_REWRITE_FULL;
+    if (lift_str_from_to_re(b, b_s)) {
+        // NOODLER we do not apply
+        //   a in (str.to_re a') -> (a == a')
+        // always, because replacing regexes to equalities
+        // can then lead to disequalities (if there is negation before),
+        // however, that is not beneficial for noodler.
+        // Instead, we replace only if there is a variable (noodler cannot handle var in regex)
+        m_lhs.reset();
+        str().get_concat(b_s, m_lhs);
+        remove_empty_and_concats(m_lhs);
+        if (has_var(m_lhs)) {
+            result = m_br.mk_eq_rw(a, b_s);
+            return BR_REWRITE_FULL;
+        }
     }
     expr* b1 = nullptr;
     expr* eps = nullptr;
