@@ -20,7 +20,7 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
     make release
-    make install
+    sudo make install
     ```
 
 ### Building Z3-Noodler
