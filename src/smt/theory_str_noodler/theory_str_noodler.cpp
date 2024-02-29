@@ -909,10 +909,7 @@ namespace smt::noodler {
 
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;
-                        //this->m_params.is_underapprox = true;
                     }
-                } else {
-                //     // was_something_approximated = true;
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
