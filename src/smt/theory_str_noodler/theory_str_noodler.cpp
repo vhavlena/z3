@@ -906,8 +906,13 @@ namespace smt::noodler {
                     // TODO is handling underapprox correct here? is it even safe to underapproximate? we do not have a case where we underapproximate, but for the future
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
                     block_len = m.mk_or(block_len, lengths);
+
+                    if(precision == LenNodePrecision::UNDERAPPROX) {
+                        ctx.get_fparams().is_underapprox = true;
+                        //this->m_params.is_underapprox = true;
+                    }
                 } else {
-                    was_something_approximated = true;
+                //     // was_something_approximated = true;
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
