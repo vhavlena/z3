@@ -20,6 +20,7 @@ Notes:
 #include "ast/rewriter/rewriter_types.h"
 #include "ast/ast_util.h"
 #include "ast/ast_ll_pp.h"
+#include "smt/smt_context.h"
 #include "smt/smt_kernel.h"
 #include "smt/params/smt_params.h"
 #include "smt/params/smt_params_helper.hpp"
@@ -217,6 +218,12 @@ public:
             m_ctx->collect_statistics(m_stats);
             proof_ref pr(m_ctx->get_proof(), m);
             TRACE("smt_tactic", tout << r << " " << pr << "\n";);
+
+            // check underapproximation
+            if(r == l_false && m_ctx->get_context().get_fparams().is_underapprox) {
+                r = l_undef;
+            }
+
             switch (r) {
             case l_true: {
                 if (m_fail_if_inconclusive && !in->sat_preserved())
