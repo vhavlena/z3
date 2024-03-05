@@ -61,29 +61,11 @@ namespace arith {
 
     void solver::ensure_nla() {
         if (!m_nla) {
-            m_nla = alloc(nla::solver, *m_solver.get(), m.limit());
+            m_nla = alloc(nla::solver, *m_solver.get(), s().params(), m.limit());
             for (auto const& _s : m_scopes) {
                 (void)_s;
                 m_nla->push();
             }
-            smt_params_helper prms(s().params());
-            m_nla->settings().run_order = prms.arith_nl_order();
-            m_nla->settings().run_tangents = prms.arith_nl_tangents();
-            m_nla->settings().run_horner = prms.arith_nl_horner();
-            m_nla->settings().horner_subs_fixed = prms.arith_nl_horner_subs_fixed();
-            m_nla->settings().horner_frequency = prms.arith_nl_horner_frequency();
-            m_nla->settings().horner_row_length_limit = prms.arith_nl_horner_row_length_limit();
-            m_nla->settings().run_grobner = prms.arith_nl_grobner();
-            m_nla->settings().run_nra = prms.arith_nl_nra();
-            m_nla->settings().grobner_subs_fixed = prms.arith_nl_grobner_subs_fixed();
-            m_nla->settings().grobner_eqs_growth = prms.arith_nl_grobner_eqs_growth();
-            m_nla->settings().grobner_expr_size_growth = prms.arith_nl_grobner_expr_size_growth();
-            m_nla->settings().grobner_expr_degree_growth = prms.arith_nl_grobner_expr_degree_growth();
-            m_nla->settings().grobner_max_simplified = prms.arith_nl_grobner_max_simplified();
-            m_nla->settings().grobner_number_of_conflicts_to_report = prms.arith_nl_grobner_cnfl_to_report();
-            m_nla->settings().grobner_quota = prms.arith_nl_gr_q();
-            m_nla->settings().grobner_frequency = prms.arith_nl_grobner_frequency();
-            m_nla->settings().expensive_patching = false;
         }
     }
 
@@ -160,7 +142,6 @@ namespace arith {
         expr_ref_vector& terms = st.terms();
         svector<theory_var>& vars = st.vars();
         vector<rational>& coeffs = st.coeffs();
-        rational& offset = st.offset();
         rational r;
         expr* n1, * n2;
         unsigned index = 0;
@@ -204,7 +185,9 @@ namespace arith {
                 ++index;
             }
             else if (a.is_numeral(n, r)) {
-                offset += coeffs[index] * r;
+                theory_var v = internalize_numeral(to_app(n), r);
+                coeffs[vars.size()] = coeffs[index];
+                vars.push_back(v);
                 ++index;
             }
             else if (a.is_uminus(n, n1)) {
@@ -269,6 +252,12 @@ namespace arith {
                     st.to_ensure_var().push_back(n1);
                     st.to_ensure_var().push_back(n2);
                 }
+                else if (a.is_band(n) || a.is_shl(n) || a.is_ashr(n) || a.is_lshr(n)) {
+                    m_bv_terms.push_back(to_app(n));
+                    ctx.push(push_back_vector(m_bv_terms));
+                    mk_bv_axiom(to_app(n));
+                    ensure_arg_vars(to_app(n));
+                }
                 else if (!a.is_div0(n) && !a.is_mod0(n) && !a.is_idiv0(n) && !a.is_rem0(n) && !a.is_power0(n)) {
                     found_unsupported(n);
                     ensure_arg_vars(to_app(n));
@@ -308,6 +297,13 @@ namespace arith {
         internalize_term(n->get_arg(1)->get_expr());
     }
 
+    expr* solver::mk_sub(expr* x, expr* y) {
+        rational r;
+        if (a.is_numeral(y, r) && r == 0)
+            return x;
+        return a.mk_sub(x, y);
+    }
+
     bool solver::internalize_atom(expr* atom) {
         TRACE("arith", tout << mk_pp(atom, m) << "\n";);
         expr* n1, *n2;
@@ -336,26 +332,26 @@ namespace arith {
             k = lp_api::upper_t;
         }
         else if (a.is_le(atom, n1, n2)) {
-            expr_ref n3(a.mk_sub(n1, n2), m);
+            expr_ref n3(mk_sub(n1, n2), m);
             v = internalize_def(n3);
             k = lp_api::upper_t;
             r = 0;
         }
         else if (a.is_ge(atom, n1, n2)) {
-            expr_ref n3(a.mk_sub(n1, n2), m);
+            expr_ref n3(mk_sub(n1, n2), m);
             v = internalize_def(n3);
             k = lp_api::lower_t;
             r = 0;
         }
         else if (a.is_lt(atom, n1, n2)) {
-            expr_ref n3(a.mk_sub(n1, n2), m);
+            expr_ref n3(mk_sub(n1, n2), m);
             v = internalize_def(n3);
             k = lp_api::lower_t;
             r = 0;
             lit.neg();
         }
-        else if (a.is_gt(atom, n1, n2)) {
-            expr_ref n3(a.mk_sub(n1, n2), m);
+        else if (a.is_gt(atom, n1, n2)) {            
+            expr_ref n3(mk_sub(n1, n2), m);
             v = internalize_def(n3);
             k = lp_api::upper_t;
             r = 0;
@@ -457,13 +453,26 @@ namespace arith {
         return v;
     }
 
+    theory_var solver::internalize_numeral(app* n, rational const& val) {
+        theory_var v = mk_evar(n);
+        lpvar vi = get_lpvar(v);
+        if (vi == UINT_MAX) {
+            vi = lp().add_var(v, a.is_int(n));
+            add_def_constraint_and_equality(vi, lp::GE, val);
+            add_def_constraint_and_equality(vi, lp::LE, val);
+            register_fixed_var(v, val);
+        }
+        return v;
+    }
+
+
     theory_var solver::internalize_mul(app* t) {
         SASSERT(a.is_mul(t));
         internalize_args(t, true);
         bool _has_var = has_var(t);
         mk_enode(t);
         theory_var v = mk_evar(t);
-
+                                      
         if (!_has_var) {
             svector<lpvar> vars;
             for (expr* n : *t) {
@@ -484,57 +493,32 @@ namespace arith {
         theory_var v = mk_evar(term);
         TRACE("arith", tout << mk_bounded_pp(term, m) << " v" << v << "\n";);
 
-        if (is_unit_var(st) && v == st.vars()[0]) {
+        if (is_unit_var(st) && v == st.vars()[0]) 
             return st.vars()[0];
-        }
-        else if (is_one(st) && a.is_numeral(term)) {
-            return lp().local_to_external(get_one(a.is_int(term)));
-        }
-        else if (is_zero(st) && a.is_numeral(term)) {
-            return lp().local_to_external(get_zero(a.is_int(term)));
-        }
-        else {
-            init_left_side(st);
-            lpvar vi = get_lpvar(v);
-            if (vi == UINT_MAX) {
-                if (m_left_side.empty()) {
-                    vi = lp().add_var(v, a.is_int(term));
-                    add_def_constraint_and_equality(vi, lp::GE, st.offset());
-                    add_def_constraint_and_equality(vi, lp::LE, st.offset());
-                    register_fixed_var(v, st.offset());
-                    return v;
-                }
-                if (!st.offset().is_zero()) {
-                    m_left_side.push_back(std::make_pair(st.offset(), get_one(a.is_int(term))));
-                }
-                if (m_left_side.empty()) {
-                    vi = lp().add_var(v, a.is_int(term));
-                    add_def_constraint_and_equality(vi, lp::GE, rational(0));
-                    add_def_constraint_and_equality(vi, lp::LE, rational(0));
-                }
-                else {
-                    vi = lp().add_term(m_left_side, v);
-                    SASSERT(lp::tv::is_term(vi));
-                    TRACE("arith_verbose",
-                        tout << "v" << v << " := " << mk_pp(term, m)
-                        << " slack: " << vi << " scopes: " << m_scopes.size() << "\n";
-                    lp().print_term(lp().get_term(lp::tv::raw(vi)), tout) << "\n";);
-                }
+
+        init_left_side(st);
+        lpvar vi = get_lpvar(v);
+        
+        if (vi == UINT_MAX) {
+            if (m_left_side.empty()) {
+                vi = lp().add_var(v, a.is_int(term));
+                add_def_constraint_and_equality(vi, lp::GE, rational(0));
+                add_def_constraint_and_equality(vi, lp::LE, rational(0));
             }
-            return v;
+            else {
+                vi = lp().add_term(m_left_side, v);
+                SASSERT(lp().column_has_term(vi));
+                TRACE("arith_verbose", 
+                      tout << "v" << v << " := " << mk_pp(term, m) 
+                      << " slack: " << vi << " scopes: " << m_scopes.size() << "\n";
+                      lp().print_term(lp().get_term(vi), tout) << "\n";);
+            }
         }
+        return v;
     }
 
     bool solver::is_unit_var(scoped_internalize_state& st) {
-        return st.offset().is_zero() && st.vars().size() == 1 && st.coeffs()[0].is_one();
-    }
-
-    bool solver::is_one(scoped_internalize_state& st) {
-        return st.offset().is_one() && st.vars().empty();
-    }
-
-    bool solver::is_zero(scoped_internalize_state& st) {
-        return st.offset().is_zero() && st.vars().empty();
+        return st.vars().size() == 1 && st.coeffs()[0].is_one();
     }
 
     void solver::init_left_side(scoped_internalize_state& st) {
@@ -557,8 +541,6 @@ namespace arith {
             rational const& r = m_columns[var];
             if (!r.is_zero()) {
                 auto vi = register_theory_var_in_lar_solver(var);
-                if (lp::tv::is_term(vi))
-                    vi = lp().map_term_index_to_column_index(vi);
                 m_left_side.push_back(std::make_pair(r, vi));
                 m_columns[var].reset();
             }
@@ -641,9 +623,6 @@ namespace arith {
         return lp().external_to_local(v);
     }
 
-    lp::tv solver::get_tv(theory_var v) const {
-        return lp::tv::raw(get_lpvar(v));
-    }
 
     /**
        \brief We must redefine this method, because theory of arithmetic contains

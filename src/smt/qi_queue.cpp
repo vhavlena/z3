@@ -131,6 +131,8 @@ namespace smt {
         // max_top_generation and min_top_generation are not available for computing inc_gen
         set_values(q, nullptr, generation, 0, 0, cost);
         float r = m_evaluator(m_new_gen_function, m_vals.size(), m_vals.data());
+        if (q->get_weight() > 0 || r > 0)
+            return static_cast<unsigned>(r);
         return std::max(generation + 1, static_cast<unsigned>(r));
     }
 
@@ -396,6 +398,7 @@ namespace smt {
     bool qi_queue::final_check_eh() {
         TRACE("qi_queue", display_delayed_instances_stats(tout); tout << "lazy threshold: " << m_params.m_qi_lazy_threshold
               << ", scope_level: " << m_context.get_scope_level() << "\n";);
+
         if (m_params.m_qi_conservative_final_check) {
             bool  init = false;
             float min_cost = 0.0;

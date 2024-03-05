@@ -17,11 +17,10 @@ Revision History:
 
 --*/
 
-#ifndef ELIM_BOUNDS_H_
-#define ELIM_BOUNDS_H_
 
 #include "ast/used_vars.h"
 #include "util/obj_hashtable.h"
+#include "ast/rewriter/rewriter_def.h"
 #include "ast/rewriter/var_subst.h"
 #include "ast/rewriter/elim_bounds.h"
 #include "ast/ast_pp.h"
@@ -200,4 +199,3 @@ bool elim_bounds_cfg::reduce_quantifier(quantifier * q,
     return true;
 }
 
-#endif /* ELIM_BOUNDS_H_ */

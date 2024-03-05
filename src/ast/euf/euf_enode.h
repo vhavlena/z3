@@ -36,10 +36,6 @@ namespace euf {
     typedef std::pair<enode*,bool> enode_bool_pair;
     typedef svector<enode_bool_pair> enode_bool_pair_vector;
     typedef id_var_list<> th_var_list;
-    typedef int theory_var;
-    typedef int theory_id;
-    const theory_var null_theory_var = -1;
-    const theory_id null_theory_id = -1;
 
     class enode {
         expr*         m_expr = nullptr;
@@ -52,6 +48,7 @@ namespace euf {
         bool          m_merge_tf_enabled = false;
         bool          m_is_equality = false;    // Does the expression represent an equality
         bool          m_is_relevant = false;
+        lbool         m_is_shared = l_undef;
         lbool         m_value = l_undef;        // Assignment by SAT solver for Boolean node
         sat::bool_var m_bool_var = sat::null_bool_var;    // SAT solver variable associated with Boolean node
         unsigned      m_class_size = 1;         // Size of the equivalence class if the enode is the root.
@@ -96,6 +93,7 @@ namespace euf {
             for (unsigned i = 0; i < num_args; ++i) {
                 SASSERT(to_app(f)->get_arg(i) == args[i]->get_expr());
                 n->m_args[i] = args[i];
+                n->m_args[i]->get_root()->set_is_shared(l_undef);
             }
             return n;
         }
@@ -181,6 +179,9 @@ namespace euf {
         void unmark3() { m_mark3 = false; }
         bool is_marked3() { return m_mark3; }
 
+        lbool is_shared() const { return m_is_shared; }
+        void set_is_shared(lbool s) { m_is_shared = s; }
+
         template<bool m> void mark1_targets() {
             enode* n = this;
             while (n) {
@@ -202,6 +203,7 @@ namespace euf {
         enode* get_root() const { return m_root; }
         expr*  get_expr() const { return m_expr; }
         sort*  get_sort() const { return m_expr->get_sort(); }
+        enode* get_interpreted() const { return get_root(); }
         app*  get_app() const { return to_app(m_expr); }
         func_decl* get_decl() const { return is_app(m_expr) ? to_app(m_expr)->get_decl() : nullptr; }
         unsigned get_expr_id() const { return m_expr->get_id(); }
@@ -210,6 +212,10 @@ namespace euf {
         unsigned get_root_id() const { return m_root->m_expr->get_id(); }
         bool children_are_roots() const;
         enode* get_next() const { return m_next; }
+
+        enode* get_target() const { return m_target; }
+        justification get_justification() const { return m_justification; }
+        justification get_lit_justification() const { return m_lit_justification; }
 
         bool has_lbl_hash() const { return m_lbl_hash >= 0; }
         unsigned char get_lbl_hash() const { 
@@ -224,6 +230,7 @@ namespace euf {
 
         theory_var get_th_var(theory_id id) const { return m_th_vars.find(id); }
         theory_var get_closest_th_var(theory_id id) const;
+        enode* get_closest_th_node(theory_id id);
         bool is_attached_to(theory_id id) const { return get_th_var(id) != null_theory_var; }
         bool has_th_vars() const { return !m_th_vars.empty(); }
         bool has_one_th_var() const { return !m_th_vars.empty() && !m_th_vars.get_next();}

@@ -78,7 +78,7 @@ public:
      *
      * x = t -> fresh
      * x := if(fresh, t, diff(t))
-     * where diff is a diagnonalization function available in domains of size > 1.
+     * where diff is a diagonalization function available in domains of size > 1.
      *
      */
 
@@ -400,6 +400,7 @@ class bv_expr_inverter : public iexpr_inverter {
     }
 
     bool process_concat(func_decl* f, unsigned num, expr* const* args, expr_ref& r) {
+//        return false;
         if (num == 0)
             return false;
         if (!uncnstr(num, args))
@@ -807,7 +808,7 @@ bool iexpr_inverter::uncnstr(unsigned num, expr * const * args) const {
 
 /**
    \brief Create a fresh variable for abstracting (f args[0] ... args[num-1])
-   Return true if it a new variable was created, and false if the variable already existed for this
+   Return true if a new variable was created, and false if the variable already existed for this
    application. Store the variable in v
 */
 void iexpr_inverter::mk_fresh_uncnstr_var_for(sort * s, expr_ref & v) {

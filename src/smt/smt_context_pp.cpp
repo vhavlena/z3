@@ -66,6 +66,7 @@ namespace smt {
     std::string context::last_failure_as_string() const {
         std::string r;
         switch(m_last_search_failure) {
+        case UNKNOWN:
         case OK: r = m_unknown; break;
         case MEMOUT: r = "memout"; break;
         case CANCELED: r = "canceled"; break;
@@ -82,7 +83,6 @@ namespace smt {
         case RESOURCE_LIMIT: r = "(resource limits reached)"; break;
         case QUANTIFIERS: r = "(incomplete quantifiers)"; break;
         case LAMBDAS: r = "(incomplete lambdas)"; break;
-        case UNKNOWN: r = m_unknown; break;
         }
         return r;
     }
@@ -132,7 +132,7 @@ namespace smt {
 
     void context::display_literal_info(std::ostream & out, literal l) const {
         smt::display_compact(out, l, m_bool_var2expr.data());
-        display_literal_smt2(out, l);
+        display_literal_smt2(out << " " << l << ": ", l);
         out << "relevant: " << is_relevant(bool_var2expr(l.var())) << ", val: " << get_assignment(l) << "\n";
     }
 
@@ -510,7 +510,7 @@ namespace smt {
 #else
         strm << "lemma_" << (++m_lemma_id) << ".smt2";
 #endif
-        return strm.str();
+        return std::move(strm).str();
     }
 
 
@@ -635,7 +635,7 @@ namespace smt {
             literal_vector lits;
             const_cast<conflict_resolution&>(*m_conflict_resolution).justification2literals(j.get_justification(), lits);
             out << "justification " << j.get_justification()->get_from_theory() << ": ";
-            // display_literals_smt2(out, lits);
+            display_literals_smt2(out, lits);
             break;
         }
         default:
@@ -722,7 +722,7 @@ namespace smt {
              << std::setw(4) << m_stats.m_num_del_clauses << " "
              << std::setw(7) << mem_stat() << ")\n";
 
-        std::string str(strm.str());
+        std::string str = std::move(strm).str();
         svector<size_t> offsets;
         for (size_t i = 0; i < str.size(); ++i) {
             while (i < str.size() && str[i] != ' ') ++i;

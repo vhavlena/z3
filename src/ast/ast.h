@@ -85,6 +85,7 @@ const family_id user_sort_family_id = 4;
 const family_id last_builtin_family_id = 4;
 
 const family_id arith_family_id = 5;
+const family_id poly_family_id = 6;
 
 // -----------------------------------
 //
@@ -141,7 +142,7 @@ public:
     explicit parameter(const char *s): m_val(symbol(s)) {}
     explicit parameter(const std::string &s): m_val(symbol(s)) {}
     explicit parameter(unsigned ext_id, bool): m_val(ext_id) {}
-    parameter(parameter const& other) { *this = other; }
+    explicit parameter(parameter const& other);
 
     parameter(parameter && other) noexcept : m_val(std::move(other.m_val)) {
         other.m_val = 0;
@@ -149,7 +150,10 @@ public:
 
     ~parameter();
 
-    parameter& operator=(parameter const& other);
+    parameter& operator=(parameter && other) {
+        std::swap(other.m_val, m_val);
+        return *this;
+    }
 
     kind_t get_kind() const { return static_cast<kind_t>(m_val.index()); }
     bool is_int() const { return get_kind() == PARAM_INT; }
@@ -399,6 +403,7 @@ struct func_decl_info : public decl_info {
     bool m_idempotent:1;
     bool m_skolem:1;
     bool m_lambda:1;
+    bool m_polymorphic:1;
 
     func_decl_info(family_id family_id = null_family_id, decl_kind k = null_decl_kind, unsigned num_parameters = 0, parameter const * parameters = nullptr);
 
@@ -413,6 +418,7 @@ struct func_decl_info : public decl_info {
     bool is_idempotent() const { return m_idempotent; }
     bool is_skolem() const { return m_skolem; }
     bool is_lambda() const { return m_lambda; }
+    bool is_polymorphic() const { return m_polymorphic; }
 
     void set_associative(bool flag = true) { m_left_assoc = flag; m_right_assoc = flag; }
     void set_left_associative(bool flag = true) { m_left_assoc = flag; }
@@ -425,6 +431,7 @@ struct func_decl_info : public decl_info {
     void set_idempotent(bool flag = true) { m_idempotent = flag; }
     void set_skolem(bool flag = true) { m_skolem = flag; }
     void set_lambda(bool flag = true) { m_lambda = flag; }
+    void set_polymorphic(bool flag = true) { m_polymorphic = flag; }
 
     bool operator==(func_decl_info const & info) const;
 
@@ -622,6 +629,7 @@ public:
     sort_size const & get_num_elements() const { return get_info()->get_num_elements(); }
     void set_num_elements(sort_size const& s) { get_info()->set_num_elements(s); }
     unsigned get_size() const { return get_obj_size(); }
+    bool is_type_var() const { return get_family_id() == poly_family_id; }
 };
 
 // -----------------------------------
@@ -653,6 +661,7 @@ public:
     bool is_skolem() const { return get_info() != nullptr && get_info()->is_skolem(); }
     bool is_lambda() const { return get_info() != nullptr && get_info()->is_lambda(); }
     bool is_idempotent() const { return get_info() != nullptr && get_info()->is_idempotent(); }
+    bool is_polymorphic() const { return get_info() != nullptr && get_info()->is_polymorphic(); }
     unsigned get_arity() const { return m_arity; }
     sort * get_domain(unsigned idx) const { SASSERT(idx < get_arity()); return m_domain[idx]; }
     sort * const * get_domain() const { return m_domain; }
@@ -698,6 +707,7 @@ struct app_flags {
     unsigned     m_ground:1;   // application does not have free variables or nested quantifiers.
     unsigned     m_has_quantifiers:1; // application has nested quantifiers.
     unsigned     m_has_labels:1; // application has nested labels.
+    app_flags() : m_depth(1), m_ground(1), m_has_quantifiers(0), m_has_labels(0) {}
 };
 
 class app : public expr {
@@ -705,18 +715,14 @@ class app : public expr {
 
     func_decl *  m_decl;
     unsigned     m_num_args;
+    app_flags    m_flags;
     expr *       m_args[0];
 
-    static app_flags g_constant_flags;
-
-    // remark: store term depth in the end of the app. the depth is only stored if the num_args > 0
     static unsigned get_obj_size(unsigned num_args) {
-        return num_args == 0 ? sizeof(app) : sizeof(app) + num_args * sizeof(expr *) + sizeof(app_flags);
+        return sizeof(app) + num_args * sizeof(expr *);
     }
 
     friend class tmp_app;
-
-    app_flags * flags() const { return m_num_args == 0 ? &g_constant_flags : reinterpret_cast<app_flags*>(const_cast<expr**>(m_args + m_num_args)); }
 
     app(func_decl * decl, unsigned num_args, expr * const * args);
 public:
@@ -738,10 +744,10 @@ public:
     expr * const * end() const { return m_args + m_num_args; }
     sort * _get_sort() const { return get_decl()->get_range(); }
 
-    unsigned get_depth() const { return flags()->m_depth; }
-    bool is_ground() const { return flags()->m_ground; }
-    bool has_quantifiers() const { return flags()->m_has_quantifiers; }
-    bool has_labels() const { return flags()->m_has_labels; }
+    unsigned get_depth() const { return m_flags.m_depth; }
+    bool is_ground() const { return m_flags.m_ground; }
+    bool has_quantifiers() const { return m_flags.m_has_quantifiers; }
+    bool has_labels() const { return m_flags.m_has_labels; }
 };
 
 // -----------------------------------
@@ -964,11 +970,6 @@ inline quantifier const * to_quantifier(ast const * n) { SASSERT(is_quantifier(n
 unsigned get_node_hash(ast const * n);
 bool compare_nodes(ast const * n1, ast const * n2);
 unsigned get_node_size(ast const * n);
-unsigned get_asts_hash(unsigned sz, ast * const* ns, unsigned init);
-unsigned get_apps_hash(unsigned sz, app * const* ns, unsigned init);
-unsigned get_exprs_hash(unsigned sz, expr * const* ns, unsigned init);
-unsigned get_sorts_hash(unsigned sz, sort * const* ns, unsigned init);
-unsigned get_decl_hash(unsigned sz, func_decl* const* ns, unsigned init);
 
 // This is the internal comparison functor for hash-consing AST nodes.
 struct ast_eq_proc {
@@ -1101,7 +1102,7 @@ public:
 
     // Event handlers for deleting/translating PARAM_EXTERNAL
     virtual void del(parameter const & p) {}
-    virtual parameter translate(parameter const & p, decl_plugin & target) { UNREACHABLE(); return p; }
+    virtual parameter translate(parameter const & p, decl_plugin & target) { UNREACHABLE(); return {}; }
 
     virtual bool is_considered_uninterpreted(func_decl * f) { return false; }
 };
@@ -1509,13 +1510,15 @@ protected:
     unsigned                  m_fresh_id;
     bool                      m_debug_ref_count;
     u_map<unsigned>           m_debug_free_indices;
-    std::fstream*             m_trace_stream;
-    bool                      m_trace_stream_owner;
+    std::fstream*             m_trace_stream = nullptr;
+    bool                      m_trace_stream_owner = false;
+    bool                      m_has_type_vars = false;
 #ifdef Z3DEBUG
     bool slow_not_contains(ast const * n);
 #endif
     ast_manager *             m_format_manager; // hack for isolating format objects in a different manager.
-    symbol                    m_lambda_def;
+    symbol                    m_lambda_def = symbol(":lambda-def");
+    obj_map<func_decl, func_decl*> m_poly_roots;
 
     void init();
 
@@ -1709,6 +1712,8 @@ public:
 
     sort * mk_uninterpreted_sort(symbol const & name) { return mk_uninterpreted_sort(name, 0, nullptr); }
 
+    sort * mk_type_var(symbol const& name);
+
     sort * mk_sort(symbol const & name, sort_info const & info) {
         if (info.get_family_id() == null_family_id) {
             return mk_uninterpreted_sort(name);
@@ -1730,11 +1735,26 @@ public:
 
     bool is_uninterp(sort const * s) const { return s->get_family_id() == null_family_id || s->get_family_id() == user_sort_family_id; }
 
+    bool is_type_var(sort const* s) const { return s->get_family_id() == poly_family_id; }
+
+    bool has_type_vars() const { return m_has_type_vars; }
+
+    func_decl* poly_root(func_decl* f) const { SASSERT(f->is_polymorphic()); return m_poly_roots[f]; }
+
+
+    func_decl* instantiate_polymorphic(func_decl* f, unsigned arity, sort * const* domain, sort * range);
+
     /**
        \brief A sort is "fully" interpreted if it is interpreted,
        and doesn't depend on other uninterpreted sorts.
     */
     bool is_fully_interp(sort * s) const;
+
+    bool has_type_var(sort* s) const;
+
+    bool has_type_var(func_decl* f) const;
+
+    bool has_type_var(unsigned n, sort* const* domain, sort* range) const;
 
     func_decl * mk_func_decl(family_id fid, decl_kind k, unsigned num_parameters, parameter const * parameters,
                              unsigned arity, sort * const * domain, sort * range = nullptr);

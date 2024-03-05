@@ -47,7 +47,7 @@ class mpq_manager : public mpz_manager<SYNCH> {
 
     void reset_denominator(mpq & a) {
         del(a.m_den);
-        a.m_den.m_val = 1;
+        a.m_den.set(1);
     }
 
     void normalize(mpq & a) {
@@ -761,9 +761,9 @@ public:
         return temp;
     }
 
-    void swap(mpz & a, mpz & b) { mpz_manager<SYNCH>::swap(a, b); }
+    void swap(mpz & a, mpz & b) noexcept { mpz_manager<SYNCH>::swap(a, b); }
 
-    void swap(mpq & a, mpq & b) {
+    void swap(mpq & a, mpq & b) noexcept {
         swap(a.m_num, b.m_num);
         swap(a.m_den, b.m_den);
     }
@@ -847,6 +847,14 @@ public:
     */
     unsigned prev_power_of_two(mpz const & a) { return mpz_manager<SYNCH>::prev_power_of_two(a); }
     unsigned prev_power_of_two(mpq const & a);
+
+    /**
+       \brief Return the smallest k s.t. a <= 2^k.
+
+       \remark Return 0 if a is not positive.
+    */
+    unsigned next_power_of_two(mpz const & a) { return mpz_manager<SYNCH>::next_power_of_two(a); }
+    unsigned next_power_of_two(mpq const & a);
 
     bool is_int_perfect_square(mpq const & a, mpq & r) {
         SASSERT(is_int(a));

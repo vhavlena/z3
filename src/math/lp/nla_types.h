@@ -22,8 +22,10 @@ namespace nla {
     typedef lp::lconstraint_kind     llc;
     typedef lp::constraint_index     lpci;
     typedef lp::explanation          expl_set;
-    typedef lp::var_index            lpvar;
+    typedef lp::lpvar                    lpvar;
     const lpvar null_lpvar = UINT_MAX;
+
+
     
     inline int rat_sign(const rational& r) { return r.is_pos()? 1 : ( r.is_neg()? -1 : 0); }
     inline rational rrat_sign(const rational& r) { return rational(rat_sign(r)); }

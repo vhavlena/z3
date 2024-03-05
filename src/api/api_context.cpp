@@ -78,6 +78,11 @@ namespace api {
             m().dec_ref(a);
     }
 
+    // flush_objects can only be called in the main thread.
+    // This ensures that the calls to m().dec_ref() and dealloc(o)
+    // only happens in the main thread.
+    // Calls to dec_ref are allowed in other threads when m_concurrent_dec_ref is
+    // set to true.
     void context::flush_objects() {
 #ifndef SINGLE_THREAD
         if (!m_concurrent_dec_ref)
@@ -157,6 +162,9 @@ namespace api {
         flush_objects();
         for (auto& kv : m_allocated_objects) {
             api::object* val = kv.m_value;
+#ifdef SINGLE_THREAD
+# define m_concurrent_dec_ref false
+#endif
             DEBUG_CODE(if (!m_concurrent_dec_ref) warning_msg("Uncollected memory: %d: %s", kv.m_key, typeid(*val).name()););
             dealloc(val);
         }
@@ -330,12 +338,12 @@ namespace api {
                 std::ostringstream buffer;
                 app * a = to_app(n);
                 buffer << mk_pp(a->get_decl(), m()) << " applied to: ";
-                if (a->get_num_args() > 1) buffer << "\n";
+                if (a->get_num_args() > 1) buffer << '\n';
                 for (unsigned i = 0; i < a->get_num_args(); ++i) {
                     buffer << mk_bounded_pp(a->get_arg(i), m(), 3) << " of sort ";
-                    buffer << mk_pp(a->get_arg(i)->get_sort(), m()) << "\n";
+                    buffer << mk_pp(a->get_arg(i)->get_sort(), m()) << '\n';
                 }
-                auto str = buffer.str();
+                auto str = std::move(buffer).str();
                 warning_msg("%s", str.c_str());
                 break;
             }

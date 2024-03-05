@@ -5,7 +5,6 @@
 #pragma once
 
 DEFINE_TYPE(Z3_symbol);
-DEFINE_TYPE(Z3_literals);
 DEFINE_TYPE(Z3_config);
 DEFINE_TYPE(Z3_context);
 DEFINE_TYPE(Z3_sort);
@@ -151,6 +150,7 @@ typedef enum
     Z3_SEQ_SORT,
     Z3_RE_SORT,
     Z3_CHAR_SORT,
+    Z3_TYPE_VAR,
     Z3_UNKNOWN_SORT = 1000
 } Z3_sort_kind;
 
@@ -1363,7 +1363,7 @@ typedef enum {
    - Z3_NO_PARSER:     Parser output is not available, that is, user didn't invoke #Z3_parse_smtlib2_string or #Z3_parse_smtlib2_file.
    - Z3_INVALID_PATTERN: Invalid pattern was used to build a quantifier.
    - Z3_MEMOUT_FAIL:   A memory allocation failure was encountered.
-   - Z3_FILE_ACCESS_ERRROR: A file could not be accessed.
+   - Z3_FILE_ACCESS_ERROR: A file could not be accessed.
    - Z3_INVALID_USAGE:   API call is invalid in the current state.
    - Z3_INTERNAL_FATAL: An error internal to Z3 occurred.
    - Z3_DEC_REF_ERROR: Trying to decrement the reference counter of an AST that was deleted or the reference counter was not initialized with #Z3_inc_ref.
@@ -1397,7 +1397,6 @@ typedef enum
   def_Type('FUNC_DECL',        'Z3_func_decl',        'FuncDecl')
   def_Type('PATTERN',          'Z3_pattern',          'Pattern')
   def_Type('MODEL',            'Z3_model',            'ModelObj')
-  def_Type('LITERALS',         'Z3_literals',         'Literals')
   def_Type('CONSTRUCTOR',      'Z3_constructor',      'Constructor')
   def_Type('CONSTRUCTOR_LIST', 'Z3_constructor_list', 'ConstructorList')
   def_Type('SOLVER',           'Z3_solver',           'SolverObj')
@@ -1435,8 +1434,8 @@ Z3_DECLARE_CLOSURE(Z3_fixed_eh,   void, (void* ctx, Z3_solver_callback cb, Z3_as
 Z3_DECLARE_CLOSURE(Z3_eq_eh,      void, (void* ctx, Z3_solver_callback cb, Z3_ast s, Z3_ast t));
 Z3_DECLARE_CLOSURE(Z3_final_eh,   void, (void* ctx, Z3_solver_callback cb));
 Z3_DECLARE_CLOSURE(Z3_created_eh, void, (void* ctx, Z3_solver_callback cb, Z3_ast t));
-Z3_DECLARE_CLOSURE(Z3_decide_eh,  void, (void* ctx, Z3_solver_callback cb, Z3_ast* t, unsigned* idx, Z3_lbool* phase));
-Z3_DECLARE_CLOSURE(Z3_on_clause_eh, void, (void* ctx, Z3_ast proof_hint, Z3_ast_vector literals));
+Z3_DECLARE_CLOSURE(Z3_decide_eh,  void, (void* ctx, Z3_solver_callback cb, Z3_ast t, unsigned idx, bool phase));
+Z3_DECLARE_CLOSURE(Z3_on_clause_eh, void, (void* ctx, Z3_ast proof_hint, unsigned n, unsigned const* deps, Z3_ast_vector literals));
 
 
 /**
@@ -1884,6 +1883,17 @@ extern "C" {
     Z3_sort Z3_API Z3_mk_uninterpreted_sort(Z3_context c, Z3_symbol s);
 
     /**
+       \brief Create a type variable.
+
+       Functions using type variables can be applied to instantiations that match the signature 
+       of the function. Assertions using type variables correspond to assertions over all possible
+       instantiations.
+
+       def_API('Z3_mk_type_variable', SORT, (_in(CONTEXT), _in(SYMBOL)))
+    */
+    Z3_sort Z3_API Z3_mk_type_variable(Z3_context c, Z3_symbol s);
+
+    /**
        \brief Create the Boolean type.
 
        This type is used to create propositional variables and predicates.
@@ -2073,6 +2083,16 @@ extern "C" {
                                             );
 
     /**
+       \brief Retrieve the number of fields of a constructor
+
+       \param c logical context.
+       \param constr constructor.
+
+       def_API('Z3_constructor_num_fields', UINT, (_in(CONTEXT), _in(CONSTRUCTOR)))
+    */
+    unsigned Z3_API Z3_constructor_num_fields(Z3_context c, Z3_constructor constr);
+
+    /**
        \brief Reclaim memory allocated to constructor.
 
        \param c logical context.
@@ -2172,7 +2192,7 @@ extern "C" {
        \brief Query constructor for declared functions.
 
        \param c logical context.
-       \param constr constructor container. The container must have been passed in to a #Z3_mk_datatype call.
+       \param constr constructor container. The container must have been passed into a #Z3_mk_datatype call.
        \param num_fields number of accessor fields in the constructor.
        \param constructor constructor function declaration, allocated by user.
        \param tester constructor test function declaration, allocated by user.
@@ -2317,7 +2337,7 @@ extern "C" {
        \param args constants that are used as arguments to the recursive function in the definition.
        \param body body of the recursive function
 
-       After declaring a recursive function or a collection of  mutually recursive functions, use 
+       After declaring a recursive function or a collection of mutually recursive functions, use 
        this function to provide the definition for the recursive function.
 
        \sa Z3_mk_rec_func_decl
@@ -3614,7 +3634,7 @@ extern "C" {
 
     /**
        \brief Retrieve the string constant stored in \c s.
-       Characters outside the basic printiable ASCII range are escaped.
+       Characters outside the basic printable ASCII range are escaped.
 
        \pre  Z3_is_string(c, s)
 
@@ -4897,7 +4917,7 @@ extern "C" {
     /**
        \brief Return a hash code for the given AST.
        The hash code is structural but two different AST objects can map to the same hash.
-       The result of \c Z3_get_ast_id returns an indentifier that is unique over the 
+       The result of \c Z3_get_ast_id returns an identifier that is unique over the 
        set of live AST objects.
 
        def_API('Z3_get_ast_hash', UINT, (_in(CONTEXT), _in(AST)))
@@ -5187,6 +5207,24 @@ extern "C" {
     unsigned Z3_API Z3_get_quantifier_weight(Z3_context c, Z3_ast a);
 
     /**
+       \brief Obtain skolem id of quantifier.
+
+       \pre Z3_get_ast_kind(a) == Z3_QUANTIFIER_AST
+
+       def_API('Z3_get_quantifier_skolem_id', SYMBOL, (_in(CONTEXT), _in(AST)))
+    */
+    Z3_symbol Z3_API Z3_get_quantifier_skolem_id(Z3_context c, Z3_ast a);
+
+    /**
+       \brief Obtain id of quantifier.
+
+       \pre Z3_get_ast_kind(a) == Z3_QUANTIFIER_AST
+
+       def_API('Z3_get_quantifier_id', SYMBOL, (_in(CONTEXT), _in(AST)))
+    */
+    Z3_symbol Z3_API Z3_get_quantifier_id(Z3_context c, Z3_ast a);
+
+    /**
        \brief Return number of patterns used in quantifier.
 
        \pre Z3_get_ast_kind(a) == Z3_QUANTIFIER_AST
@@ -5346,7 +5384,7 @@ extern "C" {
                                      Z3_ast const to[]);
 
     /**
-       \brief Substitute funcions in \c from with new expressions in \c to.
+       \brief Substitute functions in \c from with new expressions in \c to.
 
        The expressions in \c to can have free variables. The free variable in \c to at index 0
        refers to the first argument of \c from, the free variable at index 1 corresponds to the second argument.
@@ -5584,14 +5622,14 @@ extern "C" {
     void Z3_API Z3_add_const_interp(Z3_context c, Z3_model m, Z3_func_decl f, Z3_ast a);
 
     /**
-       \brief Increment the reference counter of the given Z3_func_interp object.
+       \brief Increment the reference counter of the given \c Z3_func_interp object.
 
        def_API('Z3_func_interp_inc_ref', VOID, (_in(CONTEXT), _in(FUNC_INTERP)))
     */
     void Z3_API Z3_func_interp_inc_ref(Z3_context c, Z3_func_interp f);
 
     /**
-       \brief Decrement the reference counter of the given Z3_func_interp object.
+       \brief Decrement the reference counter of the given \c Z3_func_interp object.
 
        def_API('Z3_func_interp_dec_ref', VOID, (_in(CONTEXT), _in(FUNC_INTERP)))
     */
@@ -7026,13 +7064,13 @@ extern "C" {
         Z3_on_clause_eh on_clause_eh);
 
     /**
-       \brief register a user-properator with the solver.
+       \brief register a user-propagator with the solver.
 
        \param c - context.
        \param s - solver object.
        \param user_context - a context used to maintain state for callbacks.
        \param push_eh - a callback invoked when scopes are pushed
-       \param pop_eh - a callback invoked when scopes are poped
+       \param pop_eh - a callback invoked when scopes are popped
        \param fresh_eh - a solver may spawn new solvers internally. This callback is used to produce a fresh user_context to be associated with fresh solvers. 
 
        def_API('Z3_solver_propagate_init', VOID, (_in(CONTEXT), _in(SOLVER), _in(VOID_PTR), _fnptr(Z3_push_eh), _fnptr(Z3_pop_eh), _fnptr(Z3_fresh_eh)))
@@ -7098,20 +7136,21 @@ extern "C" {
     
     /**
        \brief register a callback when the solver decides to split on a registered expression.
-       The callback may set the passed expression to another registered expression which will be selected instead.
-       In case the expression is a bitvector the bit to split on is determined by the bit argument and the 
-       truth-value to try first is given by is_pos. In case the truth value is undefined the solver will decide.
+       The callback may change the arguments by providing other values by calling \ref Z3_solver_next_split
 
        def_API('Z3_solver_propagate_decide', VOID, (_in(CONTEXT), _in(SOLVER), _fnptr(Z3_decide_eh)))
     */
     void Z3_API Z3_solver_propagate_decide(Z3_context c, Z3_solver s, Z3_decide_eh decide_eh);
 
     /**
-        Sets the next expression to split on
+        Sets the next (registered) expression to split on.
+        The function returns false and ignores the given expression in case the expression is already assigned internally
+        (due to relevancy propagation, this assignments might not have been reported yet by the fixed callback).
+        In case the function is called in the decide callback, it overrides the currently selected variable and phase.
      
-      def_API('Z3_solver_next_split', VOID, (_in(CONTEXT), _in(SOLVER_CALLBACK), _in(AST), _in(UINT), _in(LBOOL)))
+      def_API('Z3_solver_next_split', BOOL, (_in(CONTEXT), _in(SOLVER_CALLBACK), _in(AST), _in(UINT), _in(LBOOL)))
     */
-    void Z3_API Z3_solver_next_split(Z3_context c, Z3_solver_callback cb,  Z3_ast t, unsigned idx, Z3_lbool phase);
+    bool Z3_API Z3_solver_next_split(Z3_context c, Z3_solver_callback cb,  Z3_ast t, unsigned idx, Z3_lbool phase);
     
     /**
         Create uninterpreted function declaration for the user propagator.
@@ -7145,15 +7184,29 @@ extern "C" {
     void Z3_API Z3_solver_propagate_register_cb(Z3_context c, Z3_solver_callback cb, Z3_ast e);
 
     /**
-       \brief propagate a consequence based on fixed values.
-       This is a callback a client may invoke during the fixed_eh callback. 
-       The callback adds a propagation consequence based on the fixed values of the
-       \c ids. 
+       \brief propagate a consequence based on fixed values and equalities.       
+       A client may invoke it during the \c propagate_fixed, \c propagate_eq, \c propagate_diseq, and \c propagate_final callbacks.
+       The callback adds a propagation consequence based on the fixed values passed \c ids and equalities \c eqs based on parameters \c lhs, \c rhs.
        
-       def_API('Z3_solver_propagate_consequence', VOID, (_in(CONTEXT), _in(SOLVER_CALLBACK), _in(UINT), _in_array(2, AST), _in(UINT), _in_array(4, AST), _in_array(4, AST), _in(AST)))
+       The solver might discard the propagation in case it is true in the current state.
+       The function returns false in this case; otw. the function returns true.
+       At least one propagation in the final callback has to return true in order to
+       prevent the solver from finishing.
+
+       Assume the callback has the signature: \c propagate_consequence_eh(context, solver_cb, num_ids, ids, num_eqs, lhs, rhs, consequence).
+       \param c - context
+       \param solver_cb - solver callback
+       \param num_ids - number of fixed terms used as premise to propagation
+       \param ids - array of length \c num_ids containing terms that are fixed in the current scope
+       \param num_eqs - number of equalities used as premise to propagation
+       \param lhs - left side of equalities
+       \param rhs - right side of equalities
+       \param consequence - consequence to propagate. It is typically an atomic formula, but it can be an arbitrary formula. 
+
+       def_API('Z3_solver_propagate_consequence', BOOL, (_in(CONTEXT), _in(SOLVER_CALLBACK), _in(UINT), _in_array(2, AST), _in(UINT), _in_array(4, AST), _in_array(4, AST), _in(AST)))
     */
-    
-    void Z3_API Z3_solver_propagate_consequence(Z3_context c, Z3_solver_callback cb, unsigned num_fixed, Z3_ast const* fixed, unsigned num_eqs, Z3_ast const* eq_lhs, Z3_ast const* eq_rhs, Z3_ast conseq);
+
+    bool Z3_API Z3_solver_propagate_consequence(Z3_context c, Z3_solver_callback cb, unsigned num_fixed, Z3_ast const* fixed, unsigned num_eqs, Z3_ast const* eq_lhs, Z3_ast const* eq_rhs, Z3_ast conseq);
 
     /**
        \brief Check whether the assertions in a given solver are consistent or not.

@@ -48,6 +48,15 @@ public:
         SASSERT(m_vector.empty());
         m_set.insert(j);
     }
+
+    void remove(constraint_index j) {
+        m_set.remove(j);
+        unsigned i = 0;
+        for (auto& p : m_vector) 
+            if (p.first != j)
+                m_vector[i++] = p;
+        m_vector.shrink(i);
+    }
     
     void add_expl(const explanation& e) {
         if (e.m_vector.empty()) {
@@ -112,4 +121,18 @@ public:
     }
 
 };
+
+    struct equality {
+        lp::lpvar i, j;
+        lp::explanation e;
+        equality(lp::lpvar i, lp::lpvar j, lp::explanation const& e):i(i),j(j),e(e) {}
+    };
+    
+    struct fixed_equality {
+        lp::lpvar v;
+        rational       k;
+        lp::explanation e;
+        fixed_equality(lp::lpvar v, rational const& k, lp::explanation const& e):v(v),k(k),e(e) {}
+    };
+
 }

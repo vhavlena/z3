@@ -20,7 +20,7 @@ Revision History:
 #pragma once
 #include "math/lp/lp_settings.h"
 #include "math/lp/static_matrix.h"
-#include "math/lp/u_set.h"
+#include "util/uint_set.h"
 #include "math/lp/lar_term.h"
 #include "math/lp/lar_constraints.h"
 #include "math/lp/hnf_cutter.h"
@@ -33,7 +33,7 @@ class lar_solver;
 class lar_core_solver;
 
 class int_solver {
-    friend class create_cut;
+    friend struct create_cut;
     friend class gomory;
     friend class int_cube;
     friend class int_branch;
@@ -44,17 +44,16 @@ class int_solver {
         int_solver&         lia;
         lar_solver&         lra;
         lar_core_solver&    lrac;
-        unsigned            m_num_nbasic_patches;
-        unsigned            m_patch_cost;
-        unsigned            m_next_patch;
-        unsigned            m_delay;
     public:
         patcher(int_solver& lia);
-        bool should_apply();
-        lia_move operator()();
-        void patch_nbasic_column(unsigned j);
+        bool should_apply() const { return true; }
+        lia_move operator()() { return patch_basic_columns(); }
+        void patch_basic_column(unsigned j);
+        bool try_patch_column(unsigned v, unsigned j, mpq const& delta);
+        unsigned count_non_int();
     private:
-        lia_move patch_nbasic_columns();
+        bool patch_basic_column_on_row_cell(unsigned v, row_cell<mpq> const& c);
+        lia_move patch_basic_columns();
     };
 
     lar_solver&         lra;
@@ -64,10 +63,13 @@ class int_solver {
     unsigned            m_number_of_calls;
     lar_term            m_t;               // the term to return in the cut
     mpq                 m_k;               // the right side of the cut
+    bool                m_upper;           // cut is an upper bound
     explanation         *m_ex;             // the conflict explanation
-    bool                m_upper;           // we have a cut m_t*x <= k if m_upper is true nad m_t*x >= k otherwise
     hnf_cutter          m_hnf_cutter;
     unsigned            m_hnf_cut_period;
+    unsigned_vector     m_cut_vars;        // variables that should not be selected for cuts
+    
+    vector<equality>       m_equalities;
 public:
     int_solver(lar_solver& lp);
     
@@ -81,16 +83,17 @@ public:
     bool is_real(unsigned j) const;
     const impq & lower_bound(unsigned j) const;
     const impq & upper_bound(unsigned j) const;
-    bool column_is_int(column_index const& j) const;
+    bool column_is_int(lpvar j) const;
     const impq & get_value(unsigned j) const;
     bool at_lower(unsigned j) const;
     bool at_upper(unsigned j) const;
-    
+    void simplify(std::function<bool(unsigned)>& is_root);
+    vector<equality> const& equalities() const { return m_equalities; }
+
 private:
     // lia_move patch_nbasic_columns();
     bool get_freedom_interval_for_column(unsigned j, bool & inf_l, impq & l, bool & inf_u, impq & u, mpq & m);
     bool is_boxed(unsigned j) const;
-    bool is_fixed(unsigned j) const;
     bool is_free(unsigned j) const;
     bool value_is_int(unsigned j) const;
     bool is_feasible() const;
@@ -106,13 +109,13 @@ private:
     bool has_lower(unsigned j) const;
     bool has_upper(unsigned j) const;
     unsigned row_of_basic_column(unsigned j) const;
-    bool non_basic_columns_are_at_bounds() const;
     bool cut_indices_are_columns() const;
-    
+        
 public:
+    bool is_fixed(unsigned j) const;
     std::ostream& display_column(std::ostream & out, unsigned j) const;
-    constraint_index column_upper_bound_constraint(unsigned j) const;
-    constraint_index column_lower_bound_constraint(unsigned j) const;
+    u_dependency* column_upper_bound_constraint(unsigned j) const;
+    u_dependency* column_lower_bound_constraint(unsigned j) const;
     bool current_solution_is_inf_on_cut() const;
 
     bool shift_var(unsigned j, unsigned range);
@@ -125,12 +128,9 @@ private:
 public:
     bool is_term(unsigned j) const;
     unsigned column_count() const;
-    bool all_columns_are_bounded() const;
-    void find_feasible_solution();
     lia_move hnf_cut();
-    void patch_nbasic_column(unsigned j) { m_patcher.patch_nbasic_column(j); }
 
     int select_int_infeasible_var();
-
-  };
+    
+};
 }
