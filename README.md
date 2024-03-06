@@ -23,6 +23,8 @@ For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler descriptio
     sudo make install
     ```
 
+    Make sure your system looks for libraries in `/usr/local/include` (where Mata will be installed). For example, MacOS might skip looking for libraries there, so you might need to add these paths by running, for example `xcode-select --install`, as per a [suggestion from StackOverflow](https://stackoverflow.com/a/26265473).
+
 ### Building Z3-Noodler
 
 ```shell
