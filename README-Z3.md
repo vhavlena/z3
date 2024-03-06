@@ -1,6 +1,6 @@
 # Z3
 
-Z3 is a theorem prover from Microsoft Research.
+Z3 is a theorem prover from Microsoft Research. 
 It is licensed under the [MIT license](LICENSE.txt).
 
 If you are not familiar with Z3, you can start [here](https://github.com/Z3Prover/z3/wiki#background).
@@ -8,15 +8,15 @@ If you are not familiar with Z3, you can start [here](https://github.com/Z3Prove
 Pre-built binaries for stable and nightly releases are available from [here](https://github.com/Z3Prover/z3/releases).
 
 Z3 can be built using [Visual Studio][1], a [Makefile][2] or using [CMake][3]. It provides
-[bindings for several programming languages][4].
+[bindings for several programming languages][4]. 
 
 See the [release notes](RELEASE_NOTES.md) for notes on various stable releases of Z3.
 
 ## Build status
 
-| Azure Pipelines | Code Coverage | Open Bugs | Android Build | WASM Build | 
-| --------------- | --------------|-----------|---------------|------------|
-| [![Build Status](https://dev.azure.com/Z3Public/Z3/_apis/build/status/Z3Prover.z3?branchName=master)](https://dev.azure.com/Z3Public/Z3/_build/latest?definitionId=1&branchName=master) | [![CodeCoverage](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml) | [![Open Issues](https://github.com/Z3Prover/z3/actions/workflows/wip.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wip.yml) |[![Android Build](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml) | [![WASM Build](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml) |
+| Azure Pipelines | Code Coverage | Open Bugs | Android Build | WASM Build | Windows Build |
+| --------------- | --------------|-----------|---------------|------------|---------------|
+| [![Build Status](https://dev.azure.com/Z3Public/Z3/_apis/build/status/Z3Prover.z3?branchName=master)](https://dev.azure.com/Z3Public/Z3/_build/latest?definitionId=1&branchName=master) | [![CodeCoverage](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml) | [![Open Issues](https://github.com/Z3Prover/z3/actions/workflows/wip.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wip.yml) |[![Android Build](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml) | [![WASM Build](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml) | [![Windows](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml)
 
 <a href="https://github.com/z3prover/z3/pkgs/container/z3">Docker image</a>.
 
@@ -46,7 +46,7 @@ cd build
 nmake
 ```
 
-Z3 uses C++17. The recommended version of Visual Studio is therefore VS2019.
+Z3 uses C++17. The recommended version of Visual Studio is therefore VS2019. 
 
 ## Building Z3 using make and GCC/Clang
 
@@ -102,13 +102,13 @@ To clean Z3 you can delete the build directory and run the ``mk_make.py`` script
 ## Building Z3 using CMake
 
 Z3 has a build system using CMake. Read the [README-CMake.md](README-CMake.md)
-file for details. It is recommended for most build tasks,
+file for details. It is recommended for most build tasks, 
 except for building OCaml bindings.
 
 ## Building Z3 using vcpkg
 
 vcpkg is a full platform package manager, you can easily install libzmq with vcpkg.
-
+ 
 Execute:
 
 ```bash
@@ -120,8 +120,8 @@ git clone https://github.com/microsoft/vcpkg.git
 
 ## Dependencies
 Z3 itself has few dependencies. It uses C++ runtime libraries, including pthreads for multi-threading.
-It is optionally possible to use GMP for multi-precision integers, but Z3 contains its own self-contained
-multi-precision functionality. Python is required to build Z3. To build Java, .Net, OCaml,
+It is optionally possible to use GMP for multi-precision integers, but Z3 contains its own self-contained 
+multi-precision functionality. Python is required to build Z3. To build Java, .Net, OCaml, 
 Julia APIs requires installing relevant tool chains.
 
 ## Z3 bindings
@@ -185,7 +185,7 @@ If you do need to install to a non standard prefix a better approach is to use
 a [Python virtual environment](https://virtualenv.readthedocs.org/en/latest/)
 and install Z3 there. Python packages also work for Python3.
 Under Windows, recall to build inside the Visual C++ native command build environment.
-Note that the ``build/python/z3`` directory should be accessible from where python is used with Z3
+Note that the ``build/python/z3`` directory should be accessible from where python is used with Z3 
 and it depends on ``libz3.dll`` to be in the path.
 
 ```bash
@@ -230,6 +230,7 @@ to Z3's C API. For more information, see [MachineArithmetic/README.md](https://g
 * [.NET API](https://z3prover.github.io/api/html/namespace_microsoft_1_1_z3.html)
 * [Java API](https://z3prover.github.io/api/html/namespacecom_1_1microsoft_1_1z3.html)
 * [Python API](https://z3prover.github.io/api/html/namespacez3py.html) (also available in [pydoc format](https://z3prover.github.io/api/html/z3.html))
+* [Rust](https://github.com/prove-rs/z3.rs)
 * C
 * OCaml
 * [Julia](https://github.com/ahumenberger/Z3.jl)
