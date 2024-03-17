@@ -1044,6 +1044,7 @@ namespace smt::noodler {
 
                 // |s_i| = l_i
                 formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{subst_var, length_of_subst_var});
+                // For cases where s_i does not represent numbers (except for empty string, but then int_version_of(s_i)==-2), we do not want to use it in computation
                 // int_version_of(s_i) != -1
                 formula_for_case.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{int_version_of(subst_var), -1});
                 STRACE("str-conversion-int", tout << "part of valid part for int conversion: " << formula_for_case << std::endl;);
