@@ -1020,7 +1020,8 @@ namespace smt::noodler {
 
             // Example:
             //      one_case = 2,3,0,1
-            // Therefore, int_version_of(s_1) encodes, for |s_1| == 2, numbers with 2 digits (and there is such number), etc.
+            // Therefore, int_version_of(s_1) encodes (if it is encoding a number, i.e., it is not equal to -1), for |s_1| == 2,
+            // numbers with 2 digits (and there is such number), etc.
             // We can then create formula that says, for the case that |s_1| == 2 && |s_2| == 3 && |s_3| == 0 && |s_4| == 1,
             // i must be equal to
             //      i == int_version_of(s_1)*(10^(3+1)) + int_version_of(s_1)*10 + int_version_of(s_4)
@@ -1028,7 +1029,7 @@ namespace smt::noodler {
             //      i == 15*10000 + 364*10 + 6 = 150000 + 3640 + 6 = 153646
 
             // We are then creating formula
-            //      |s_1| == |l_1| && ... && |s_n| == |l_n| && ... 
+            //      ((|s_1| == |l_1| && int_version_of(s_1) != -1) ... && (|s_n| == |l_n| && int_version_of(s_n) != -1)) && ... 
             LenNode formula_for_case(LenFormulaType::AND);
             //      ... && i = int_version_of(s_1)*10^(l_2+...+l_n) + int_version_of(s_2)*10^(l_3+...+l_n) + ... + int_version_of(s_2)*10^(l_n) + int_version_of(s_n)
             LenNode formula_for_sum(LenFormulaType::PLUS);
@@ -1041,8 +1042,11 @@ namespace smt::noodler {
                 const BasicTerm& subst_var = subst_vars[i]; // var s_i
                 unsigned length_of_subst_var = one_case[i]; // length l_i
 
-                // ... && |s_i| = l_i
+                // |s_i| = l_i
                 formula_for_case.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{subst_var, length_of_subst_var});
+                // For cases where s_i does not represent numbers (except for empty string, but then int_version_of(s_i)==-2), we do not want to use it in computation
+                // int_version_of(s_i) != -1
+                formula_for_case.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{int_version_of(subst_var), -1});
                 STRACE("str-conversion-int", tout << "part of valid part for int conversion: " << formula_for_case << std::endl;);
                 
                 if (length_of_subst_var > 0) {
