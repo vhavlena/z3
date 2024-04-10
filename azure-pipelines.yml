@@ -43,6 +43,39 @@ jobs:
     - ${{if eq(variables['runRegressions'], 'True')}}:
       - template: scripts/test-regressions.yml
 
+- job: LinuxBuildsArm64
+  displayName: "ManyLinux ARM64 build"
+  variables:
+    name: ManyLinux
+    python: "/opt/python/cp37-cp37m/bin/python"
+  pool:
+    vmImage: "ubuntu-latest"
+  container: "quay.io/pypa/manylinux2014_x86_64:latest"
+  steps:
+  - script: curl -L -o /tmp/arm-toolchain.tar.xz 'https://developer.arm.com/-/media/Files/downloads/gnu/11.2-2022.02/binrel/gcc-arm-11.2-2022.02-x86_64-aarch64-none-linux-gnu.tar.xz?rev=33c6e30e5ac64e6dba8f0431f2c35f1b&hash=9918A05BF47621B632C7A5C8D2BB438FB80A4480'
+  - script: mkdir -p /tmp/arm-toolchain/
+  - script: tar xf /tmp/arm-toolchain.tar.xz -C /tmp/arm-toolchain/ --strip-components=1
+  - script: echo '##vso[task.prependpath]/tmp/arm-toolchain/bin'
+  - script: echo '##vso[task.prependpath]/tmp/arm-toolchain/aarch64-none-linux-gnu/libc/usr/bin'
+  - script: echo $PATH
+  - script: stat /tmp/arm-toolchain/bin/aarch64-none-linux-gnu-gcc
+  - task: PythonScript@0
+    displayName: Build
+    inputs:
+      scriptSource: 'filepath'
+      scriptPath: scripts/mk_unix_dist.py
+      arguments: --nodotnet --nojava --arch=arm64
+      pythonInterpreter: $(python)
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: dist
+      contents: '*.zip'
+      targetFolder: $(Build.ArtifactStagingDirectory)
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'ManyLinuxBuildArm64'
+      targetPath: $(Build.ArtifactStagingDirectory)
+
 - job: "Ubuntu20OCaml"
   displayName: "Ubuntu 20 with OCaml"
   pool:
@@ -144,7 +177,7 @@ jobs:
         buildCmd: 'CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Release $(cmakeStdArgs)'
         runTests: 'True'
       debugClang:
-        setupCmd1: 'julia -e "using Pkg; Pkg.add(PackageSpec(name=\"libcxxwrap_julia_jll\", version=\"0.7.0\"))"'
+        setupCmd1: 'julia -e "using Pkg; Pkg.add(PackageSpec(name=\"libcxxwrap_julia_jll\"))"'
         setupCmd2: 'JlCxxDir=$(julia -e "using libcxxwrap_julia_jll; print(dirname(libcxxwrap_julia_jll.libcxxwrap_julia_path))")'
         buildCmd: 'CC=clang CXX=clang++ cmake -DJlCxx_DIR=$JlCxxDir/cmake/JlCxx $(cmakeJulia) $(cmakeStdArgs)'
         runTests: 'True'
@@ -183,63 +216,6 @@ jobs:
       - template: scripts/test-regressions.yml
          
 
-- job: "WindowsLatest"
-  displayName: "Windows"
-  pool: 
-    vmImage: "windows-latest"
-  strategy:
-    matrix:
-      x86:
-        arch: 'x86'
-        setupCmd1: ''
-        setupCmd2: ''
-        setupCmd3: ''
-        bindings: '$(cmakePy)'
-        runTests: 'False'
-      x64:
-        arch: 'x64'
-        setupCmd1: 'julia -e "using Pkg; Pkg.add(PackageSpec(name=\"libcxxwrap_julia_jll\", version=\"0.7.0\"))"'
-        setupCmd2: 'julia -e "using libcxxwrap_julia_jll; print(dirname(libcxxwrap_julia_jll.libcxxwrap_julia_path))" > tmp.env'
-        setupCmd3: 'set /P JlCxxDir=<tmp.env'
-        bindings:  '-DJlCxx_DIR=%JlCxxDir%\..\lib\cmake\JlCxx $(cmakeJava) $(cmakeNet) $(cmakePy) -DCMAKE_BUILD_TYPE=RelWithDebInfo'
-        runTests:  'False'
-      arm64:
-        arch: 'amd64_arm64'
-        setupCmd1: ''
-        setupCmd2: ''
-        setupCmd3: ''
-        bindings: ''
-        runTests: 'False'
-  steps:
-    - script: md build
-    - script: |
-         cd build
-         $(setupCmd1)
-         $(setupCmd2)
-         $(setupCmd3)
-         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" $(arch)
-         cmake $(bindings) -G "NMake Makefiles" ../
-         nmake
-         cd ..
-    - script: |
-         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" $(arch)
-         pushd build\python
-         python z3test.py z3
-         python z3test.py z3num
-         popd
-         pushd build
-         nmake cpp_example
-         examples\cpp_example_build_dir\cpp_example.exe
-         nmake c_example
-         examples\c_example_build_dir\c_example.exe
-         nmake test-z3
-         test-z3.exe -a
-         popd
-      condition: eq(variables['runTests'], 'True')
-    - script: |
-         git clone https://github.com/z3prover/z3test z3test
-         python z3test\scripts\test_benchmarks.py build\z3.exe z3test\regressions\smt2
-      condition: eq(variables['runTests'], 'True')
 
          
 - job: "MacOSPython"
@@ -271,7 +247,7 @@ jobs:
     - script: brew install ninja
 #   - script: brew install --cask julia
     - script: |
-        julia -e "using Pkg; Pkg.add(PackageSpec(name=\"libcxxwrap_julia_jll\", version=\"0.7.0\"))"
+        julia -e "using Pkg; Pkg.add(PackageSpec(name=\"libcxxwrap_julia_jll\"))"
         JlCxxDir=$(julia -e "using libcxxwrap_julia_jll; println(joinpath(dirname(libcxxwrap_julia_jll.libcxxwrap_julia_path), \"cmake\", \"JlCxx\"))")
         set -e
         mkdir build

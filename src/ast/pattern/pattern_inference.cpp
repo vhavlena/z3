@@ -109,6 +109,7 @@ pattern_inference_cfg::pattern_inference_cfg(ast_manager & m, pattern_inference_
     m_le(),
     m_nested_arith_only(true),
     m_block_loop_patterns(params.m_pi_block_loop_patterns),
+    m_decompose_patterns(params.m_pi_decompose_patterns),
     m_candidates(m),
     m_pattern_weight_lt(m_candidates_info),
     m_collect(m, *this),
@@ -407,6 +408,9 @@ bool pattern_inference_cfg::pattern_weight_lt::operator()(expr * n1, expr * n2) 
 
 
 app* pattern_inference_cfg::mk_pattern(app* candidate) {
+    if (!m_decompose_patterns)
+      return m.mk_pattern(candidate);
+
     auto has_var_arg = [&](expr* e) {
         if (!is_app(e))
             return false;
@@ -620,9 +624,11 @@ bool pattern_inference_cfg::reduce_quantifier(
     proof_ref & result_pr) {
 
     TRACE("pattern_inference", tout << "processing:\n" << mk_pp(q, m) << "\n";);
-    if (!is_forall(q)) {
+    if (!m_params.m_pi_enabled)
         return false;
-    }
+
+    if (!is_forall(q)) 
+        return false;
 
     int weight = q->get_weight();
 
@@ -649,9 +655,8 @@ bool pattern_inference_cfg::reduce_quantifier(
         }
     }
 
-    if (q->get_num_patterns() > 0) {
+    if (q->get_num_patterns() > 0) 
         return false;
-    }
 
     if (m_params.m_pi_nopat_weight >= 0)
         weight = m_params.m_pi_nopat_weight;

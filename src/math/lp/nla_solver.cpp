@@ -16,9 +16,6 @@
 #include "math/polynomial/algebraic_numbers.h"
 
 namespace nla {
-
-    nla_settings& solver::settings() { return m_core->m_nla_settings; }
-
     void solver::add_monic(lpvar v, unsigned sz, lpvar const* vs) {
         m_core->add_monic(v, sz, vs);
     }
@@ -45,8 +42,12 @@ namespace nla {
     
     bool solver::need_check() { return m_core->has_relevant_monomial(); }
     
-    lbool solver::check(vector<lemma>& l) {
-        return m_core->check(l);
+    lbool solver::check() {
+        return m_core->check();
+    }
+
+    void solver::propagate() {
+        m_core->propagate();
     }
     
     void solver::push(){
@@ -57,8 +58,8 @@ namespace nla {
         m_core->pop(n);
     }
     
-    solver::solver(lp::lar_solver& s, reslimit& limit): 
-        m_core(alloc(core, s, limit)) {
+    solver::solver(lp::lar_solver& s, params_ref const& p, reslimit& limit): 
+        m_core(alloc(core, s, p, limit)) {
     }
     
     bool solver::influences_nl_var(lpvar j) const {    
@@ -82,22 +83,45 @@ namespace nla {
 
     nlsat::anum_manager& solver::am() { return m_core->m_nra.am(); }
 
-    nlsat::anum const& solver::am_value(lp::var_index v) const {
+    nlsat::anum const& solver::am_value(lp::lpvar v) const {
         SASSERT(use_nra_model());
         return m_core->m_nra.value(v);
     }
     
-    void solver::collect_statistics(::statistics & st) {
-        m_core->collect_statistics(st);
+    scoped_anum& solver::tmp1() {
+        SASSERT(use_nra_model());
+        return m_core->m_nra.tmp1();
     }
 
+    scoped_anum& solver::tmp2() {
+        SASSERT(use_nra_model());
+        return m_core->m_nra.tmp2();
+    }
+
+    
     // ensure r = x^y, add abstraction/refinement lemmas
-    lbool solver::check_power(lpvar r, lpvar x, lpvar y, vector<lemma>& lemmas) {
-        return m_core->check_power(r, x, y, lemmas);
+    lbool solver::check_power(lpvar r, lpvar x, lpvar y) {
+        return m_core->check_power(r, x, y);
     }
 
-    void solver::check_bounded_divisions(vector<lemma>& lemmas) {
-        m_core->check_bounded_divisions(lemmas);
+    void solver::check_bounded_divisions() {
+        m_core->check_bounded_divisions();
+    }
+
+    vector<nla::lemma> const& solver::lemmas() const {
+        return m_core->lemmas();
+    }
+    
+    vector<nla::ineq> const& solver::literals() const {
+        return m_core->literals();
+    }
+
+    vector<lp::equality> const& solver::equalities() const {
+        return m_core->equalities();
+    }
+
+    vector<lp::fixed_equality> const& solver::fixed_equalities() const {
+        return m_core->fixed_equalities();
     }
 
 }

@@ -21,6 +21,7 @@ Notes:
 #include "ast/rewriter/poly_rewriter.h"
 #include "ast/arith_decl_plugin.h"
 #include "ast/seq_decl_plugin.h"
+#include "math/polynomial/algebraic_numbers.h"
 
 class arith_rewriter_core {
 protected:
@@ -62,6 +63,7 @@ class arith_rewriter : public poly_rewriter<arith_rewriter_core> {
     bool m_eq2ineq;
     unsigned m_max_degree;
 
+    bool get_range(expr* e, rational& lo, rational& hi);
     void get_coeffs_gcd(expr * t, numeral & g, bool & first, unsigned & num_consts);
     enum const_treatment { CT_FLOOR, CT_CEIL, CT_FALSE };
     bool div_polynomial(expr * t, numeral const & g, const_treatment ct, expr_ref & result);
@@ -80,6 +82,7 @@ class arith_rewriter : public poly_rewriter<arith_rewriter_core> {
     void updt_local_params(params_ref const & p);
 
     bool is_anum_simp_target(unsigned num_args, expr * const * args);
+    bool is_algebraic_numeral(expr* n, scoped_anum& a);
 
     br_status mk_div_irrat_rat(expr * arg1, expr * arg2, expr_ref & result);
     br_status mk_div_rat_irrat(expr * arg1, expr * arg2, expr_ref & result);
@@ -97,11 +100,11 @@ class arith_rewriter : public poly_rewriter<arith_rewriter_core> {
     bool is_2_pi_integer_offset(expr * t, expr * & m);
     bool is_pi_integer(expr * t);
     bool is_pi_integer_offset(expr * t, expr * & m);
-    bool is_neg_poly(expr* e, expr_ref& neg) const;
-    expr_ref neg_monomial(expr * e) const;
+    bool is_neg_poly(expr* e, expr_ref& neg);
+    expr_ref neg_monomial(expr * e);
     expr * mk_sin_value(rational const & k);
     app * mk_sqrt(rational const & k);
-    bool divides(expr* d, expr* n, expr_ref& result);
+    bool get_divides(expr* d, expr* n, expr_ref& result);
     expr_ref remove_divisor(expr* arg, expr* num, expr* den); 
     void flat_mul(expr* e, ptr_buffer<expr>& args); 
     void remove_divisor(expr* d, ptr_buffer<expr>& args);
@@ -157,6 +160,10 @@ public:
     br_status mk_mod_core(expr * arg1, expr * arg2, expr_ref & result);
     br_status mk_rem_core(expr * arg1, expr * arg2, expr_ref & result);
     br_status mk_power_core(expr* arg1, expr* arg2, expr_ref & result);
+    br_status mk_band_core(unsigned sz, expr* arg1, expr* arg2, expr_ref& result);
+    br_status mk_shl_core(unsigned sz, expr* arg1, expr* arg2, expr_ref& result);
+    br_status mk_lshr_core(unsigned sz, expr* arg1, expr* arg2, expr_ref& result);
+    br_status mk_ashr_core(unsigned sz, expr* arg1, expr* arg2, expr_ref& result);
     void mk_div(expr * arg1, expr * arg2, expr_ref & result) {
         if (mk_div_core(arg1, arg2, result) == BR_FAILED)
             result = m.mk_app(get_fid(), OP_DIV, arg1, arg2);

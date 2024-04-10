@@ -18,7 +18,7 @@ from setuptools.command.bdist_egg import bdist_egg as _bdist_egg
 
 build_env = dict(os.environ)
 build_env['PYTHON'] = sys.executable
-build_env['CXXFLAGS'] = build_env.get('CXXFLAGS', '') + " -std=c++11"
+build_env['CXXFLAGS'] = build_env.get('CXXFLAGS', '') + " -std=c++17"
 
 # determine where we're building and where sources are
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -292,11 +292,20 @@ if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
         distos = RELEASE_METADATA[2]
         if distos in ('debian', 'ubuntu'):
             raise Exception(
-                "Linux binary distributions must be built on centos to conform to PEP 513 or alpine if targetting musl"
+                "Linux binary distributions must be built on centos to conform to PEP 513 or alpine if targeting musl"
             )
         elif distos == 'glibc':
             if arch == 'x64':
                 plat_name = 'manylinux2014_x86_64'
+            elif arch == 'arm64' or arch == 'aarch64':
+                # context on why are we match on arm64
+                # but use aarch64 on the plat_name is
+                # due to a workaround current python
+                # legacy build doesn't support aarch64
+                # so using the currently supported arm64
+                # build and simply rename it to aarch64
+                # see full context on #7148
+                plat_name = 'manylinux2014_aarch64'                
             else:
                 plat_name = 'manylinux2014_i686'
         elif distos == 'linux' and os_id == 'alpine':
@@ -313,6 +322,8 @@ if 'bdist_wheel' in sys.argv and '--plat-name' not in sys.argv:
             osver = RELEASE_METADATA[3]
             if osver.count('.') > 1:
                 osver = '.'.join(osver.split('.')[:2])
+            if osver.startswith("11"):
+                osver = "11_0"
             if arch == 'x64':
                 plat_name ='macosx_%s_x86_64' % osver.replace('.', '_')
             elif arch == 'arm64':
@@ -339,6 +350,7 @@ setup(
     license='MIT License',
     keywords=['z3', 'smt', 'sat', 'prover', 'theorem'],
     packages=['z3'],
+    install_requires = ["importlib-resources; python_version < '3.9'"],
     include_package_data=True,
     package_data={
         'z3': [os.path.join('lib', '*'), os.path.join('include', '*.h'), os.path.join('include', 'c++', '*.h')]

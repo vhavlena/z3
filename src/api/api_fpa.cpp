@@ -742,7 +742,7 @@ extern "C" {
         fpa_util & fu = ctx->fpautil();
         if (!ctx->bvutil().is_bv(to_expr(bv)) ||
             !fu.is_float(to_sort(s))) {
-            SET_ERROR_CODE(Z3_INVALID_ARG, "bv sort the flaot sort expected");
+            SET_ERROR_CODE(Z3_INVALID_ARG, "bv sort the float sort expected");
             return nullptr;
         }
         expr * a = fu.mk_to_fp(to_sort(s), to_expr(bv));
@@ -1022,7 +1022,7 @@ extern "C" {
         if (mpfm.is_inf(val)) mpqm.set(q, 0);
         std::stringstream ss;
         mpqm.display_decimal(ss, q, sbits);
-        return mk_c(c)->mk_external_string(ss.str());
+        return mk_c(c)->mk_external_string(std::move(ss).str());
         Z3_CATCH_RETURN("");
     }
 
@@ -1100,7 +1100,7 @@ extern "C" {
         }
         std::stringstream ss;
         ss << exp;
-        return mk_c(c)->mk_external_string(ss.str());
+        return mk_c(c)->mk_external_string(std::move(ss).str());
         Z3_CATCH_RETURN("");
     }
 

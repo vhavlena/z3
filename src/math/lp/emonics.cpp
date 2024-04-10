@@ -517,11 +517,10 @@ bool emonics::invariant() const {
     TRACE("nla_solver_mons", display(tout););
     // the variable index contains exactly the active monomials
     unsigned mons = 0;
-    for (lpvar v = 0; v < m_var2index.size(); v++) {
-        if (is_monic_var(v)) {
+    for (lpvar v = 0; v < m_var2index.size(); v++)
+        if (is_monic_var(v)) 
             mons++;
-        }
-    }
+            
     if (m_monics.size() != mons) {
         TRACE("nla_solver_mons", tout << "missmatch of monic vars\n";);
         return false;
@@ -537,7 +536,7 @@ bool emonics::invariant() const {
             do {
                 auto const& m = m_monics[c->m_index];
                 bool found = false;
-                for (lp::var_index w : m.rvars()) {
+                for (lp::lpvar w : m.rvars()) {
                     auto w1 = m_ve.find(w);
                     found |= v1.var() == w1.var();
                 }
@@ -594,6 +593,37 @@ bool emonics::invariant() const {
     }
 
     return true;
+}
+
+
+void emonics::set_propagated(monic const& m) {
+    struct set_unpropagated : public trail {
+        emonics& em;
+        unsigned var;
+    public:
+        set_unpropagated(emonics& em, unsigned var): em(em), var(var) {}
+        void undo() override {
+            em[var].set_propagated(false);
+        }
+    };
+    SASSERT(!m.is_propagated());
+    (*this)[m.var()].set_propagated(true);
+    m_u_f_stack.push(set_unpropagated(*this, m.var()));
+}
+
+void emonics::set_bound_propagated(monic const& m) {
+    struct set_bound_unpropagated : public trail {
+        emonics& em;
+        unsigned var;
+    public:
+        set_bound_unpropagated(emonics& em, unsigned var): em(em), var(var) {}
+        void undo() override {
+            em[var].set_bound_propagated(false);
+        }
+    };
+    SASSERT(!m.is_bound_propagated());
+    (*this)[m.var()].set_bound_propagated(true);
+    m_u_f_stack.push(set_bound_unpropagated(*this, m.var()));
 }
 
 }

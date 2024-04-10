@@ -10,6 +10,55 @@ Version 4.next
     - native word level bit-vector solving.
   - introduction of simple induction lemmas to handle a limited repertoire of induction proofs.
 
+Version 4.13.0
+==============
+- add ARM64 wheels for Python, thanks to Steven Moy, smoy
+
+Version 4.12.6
+==============
+- remove expensive rewrite that coalesces adjacent stores
+- improved Java use of reference queues thanks to Thomas Haas #7131
+- fixes to conditional import of python library thanks to Cal Jacobson #7116
+- include universe for constants that get removed during pre-processing #7121
+- code improvements, Bruce Mitchener #7119
+- fix nested callback handling for user propagators
+- include ARM64 binaries in distribution
+- added Julia API, Thanks to Yisu Remy Yang #7108
+
+Version 4.12.5
+==============
+- Fixes to pypi setup and build for MacOS distributions
+- A new theory solver "int-blast" enabled by using:
+  - sat.smt=true smt.bv.solver=2
+  - It solves a few bit-vector problems not handled by bit-blasting, especially if the bit-widths are large.
+  - It is based on encoding bit-vector constraints to non-linear integer arithmetic.
+- Optimizations to the arithmetic solver. Description: https://github.com/Z3Prover/doc/tree/master/arithmetic
+
+Version 4.12.4
+==============
+- Re-release fixing a few issues with 4.12:
+  - Python dependency on importlib.resources vs importlib_resources break automatic pypi installations. Supposedly fixed by conditioning dependency on Python 3.9 where the feature is built-in.
+  - Missing release of arm64 for Ubuntu.
+  - Futile attempt to streamline adding readme.md file as part of Nuget distribution. Nuget.org now requires a readme file. I was able to integrate the readme with the cmake build, but the cross-platform repackage in scripts/mk_nuget_task.py does not ingest a similar readme file with the CI pipelines.
+
+Version 4.12.3
+==============
+- Alpha support for polymorphism.
+  - SMTLIB3-ish, C, Python
+  It adds the new command `(declare-type-var A)` that declares a symbol (in this case `A`) globally as a polymorphic type variable.
+  The C API contains a new function `Z3_mk_type_variable` and a new enumeration case `Z3_TYPE_VAR` as a kind associated with sorts.
+  All occurrences of `A` are treated as type variables. A function declaration whose signature uses `A` is treated as a shorthand
+  for declarations of all functions that use instances of `A`.
+  Assertions that use type variables are shorthands for assertions covering all instantiations.
+- Various (ongoing) performance fixes and improvements to smt.arith.solver=6
+- A working version of solver.proof.trim=true option. Proofs logs created when using sat.smt=true may be trimmed by running z3
+  on the generated proof log using the option solver.proof.trim=true. 
+- Optimizations LIA and NIA (linear integer arithmetic and non-linear integer (and real) arithmetic reasoning).
+  smt.arith.solver=6 is the default for most use cases. It trails smt.arith.solver=2 in some scenarios and the gap has been either removed or reduced.
+  smt.arith.solver=6 is complete for integrations of non-linear real arithmetic and theories, smt.arith.solver=2 is not. 
+- qel: Light quantifier elimination based on term graphs (egraphs), and corresponding Model Based Projection for arrays and ADTs. Used by Spacer and QSAT.
+- added real-closed fields features to C API, exposed more RCF over OCaml API
+- fixes to FP
 
 Version 4.12.2
 ==============
@@ -59,7 +108,7 @@ Version 4.12.0
     Clauses that are deduced by theories are marked by default 
     by 'smt', and when more detailed information
     is available with proof hints or proof objects. 
-    Instantations are considered useful to track so they
+    Instantiations are considered useful to track so they
     are logged using terms of the form 
 
          (inst (not (forall (x) body)) body[t/x] (bind t)), where
@@ -85,7 +134,7 @@ Version 4.12.0
               checker cannot check. It is mainly a limitation
               of the arithmetic solver not pulling relevant information. 
               Ensuring a tight coupling with proof hints and the validator
-              capabilites is open ended future work and good material for theses. 
+              capabilities is open ended future work and good material for theses. 
       - bit-vector inferences - are treated as trusted 
         (there is no validation, it always blindly succeeds)
       - arrays, datatypes - there is no custom validation for 
@@ -155,13 +204,13 @@ Version 4.11.2
   with SMT format that is extensible. The resulting format is a mild extension of SMTLIB with
   three extra commands assume, learn, del. They track input clauses, generated clauses and deleted clauses.
   They are optionally augmented by proof hints. Two proof hints are used in the current version: "rup" and "farkas".
-  "rup" is used whent the generated clause can be justified by reverse unit propagation. "farkas" is used when
+  "rup" is used when the generated clause can be justified by reverse unit propagation. "farkas" is used when
   the clause can be justified by a combination of Farkas cutting planes. There is a built-in proof checker for the
   format. Quantifier instantiations are also tracked as proof hints.
-  Other proof hints are to be added as the feature set is tested and developed. The fallback, buit-in,
+  Other proof hints are to be added as the feature set is tested and developed. The fallback, built-in,
   self-checker uses z3 to check that the generated clause is a consequence. Note that this is generally
   insufficient as generated clauses are in principle required to only be satisfiability preserving.
-  Proof checking and tranformation operations is overall open ended.
+  Proof checking and transformation operations is overall open ended.
   The log for the first commit introducing this change contains further information on the format.
 - fix to re-entrancy bug in user propagator (thanks to Clemens Eisenhofer).
 - handle _toExpr for quantified formulas in JS bindings
@@ -635,7 +684,7 @@ xor88, parno, gario, Bauna, GManNickG, hanwentao, dinu09, fhowar, Cici, chinissa
       (assert F)
       (check-sat a)
       (check-sat)
-  If 'F' is unstatisfiable independently of the assumption 'a', and 
+  If 'F' is unsatisfiable independently of the assumption 'a', and 
   the inconsistency can be detected by just performing propagation,
   Then, version <= 4.3.1 may return
       unsat

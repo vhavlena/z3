@@ -74,6 +74,8 @@ public:
     virtual bool inconsistent() = 0;
     virtual model_reconstruction_trail& model_trail() = 0;
     virtual void flatten_suffix() {}
+    virtual bool updated() = 0;
+    virtual void reset_updated() = 0;
 
     trail_stack    m_trail;
     void push() {
@@ -103,12 +105,15 @@ public:
 class default_dependent_expr_state : public dependent_expr_state {
 public:
     default_dependent_expr_state(ast_manager& m): dependent_expr_state(m) {}
-    virtual unsigned qtail() const { return 0; }
-    virtual dependent_expr const& operator[](unsigned i) { throw default_exception("unexpected access"); }
-    virtual void update(unsigned i, dependent_expr const& j) { throw default_exception("unexpected update"); }
-    virtual void add(dependent_expr const& j) { throw default_exception("unexpected addition"); }
-    virtual bool inconsistent() { return false; }
-    virtual model_reconstruction_trail& model_trail() { throw default_exception("unexpected access to model reconstruction"); }
+    unsigned qtail() const override { return 0; }
+    dependent_expr const& operator[](unsigned i) override { throw default_exception("unexpected access"); }
+    void update(unsigned i, dependent_expr const& j) override { throw default_exception("unexpected update"); }
+    void add(dependent_expr const& j) override { throw default_exception("unexpected addition"); }
+    bool inconsistent() override { return false; }
+    model_reconstruction_trail& model_trail() override { throw default_exception("unexpected access to model reconstruction"); }
+    bool updated() override { return false; }
+    void reset_updated() override {}
+
 };
 
 inline std::ostream& operator<<(std::ostream& out, dependent_expr_state& st) {
@@ -147,7 +152,7 @@ protected:
     index_set indices() { return index_set(*this); }
 
     proof* mp(proof* a, proof* b) { return (a && b) ? m.mk_modus_ponens(a, b) : nullptr;  }
-
+    proof* tr(proof* a, proof* b) { return m.mk_transitivity(a, b); }
 public:
     dependent_expr_simplifier(ast_manager& m, dependent_expr_state& s) : m(m), m_fmls(s), m_trail(s.m_trail) {}
     virtual ~dependent_expr_simplifier() {}

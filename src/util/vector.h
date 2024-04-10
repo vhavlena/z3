@@ -30,9 +30,11 @@ Revision History:
 #include <functional>
 #include <memory>
 #include <type_traits>
+#include <utility>
 #include "util/memory_manager.h"
 #include "util/hash.h"
 #include "util/z3_exception.h"
+#include <vector>
 
 // disable warning for constant 'if' expressions.
 // these are used heavily in templates.
@@ -40,6 +42,8 @@ Revision History:
 #pragma warning(disable:4127)
 #endif
 
+template <typename T>
+using std_vector = std::vector<T, std_allocator<T>>;
 
 #if 0
 
@@ -327,7 +331,7 @@ public:
         return *this;
     }
 
-    vector & operator=(vector && source) {
+    vector & operator=(vector && source) noexcept {
         if (this == &source) {
             return *this;
         }
@@ -555,7 +559,7 @@ public:
         for(; pos != e; ++pos, ++prev) {
             *prev = std::move(*pos);
         }
-        reinterpret_cast<SZ *>(m_data)[SIZE_IDX]--;
+        pop_back();
     }
 
     void erase(T const & elem) {
@@ -563,6 +567,20 @@ public:
         if (it != end()) {
             erase(it);
         }
+    }
+
+    /** Erase all elements that satisfy the given predicate. Returns the number of erased elements. */
+    template <typename UnaryPredicate>
+    SZ erase_if(UnaryPredicate should_erase) {
+        iterator i = begin();
+        iterator const e = end();
+        for (iterator j = begin(); j != e; ++j)
+            if (!should_erase(std::as_const(*j)))
+                *(i++) = std::move(*j);
+        SZ const count = e - i;
+        SASSERT_EQ(i - begin(), size() - count);
+        shrink(size() - count);
+        return count;
     }
 
     void shrink(SZ s) {
@@ -753,7 +771,8 @@ using bool_vector        = svector<bool>;
 
 template<typename T>
 inline std::ostream& operator<<(std::ostream& out, svector<T> const& v) {
-    for (unsigned u : v) out << u << " ";
+    for (auto const& x : v)
+        out << x << " ";
     return out;
 }
 

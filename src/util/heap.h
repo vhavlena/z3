@@ -159,7 +159,7 @@ public:
     }
 
     unsigned size() const {
-        return m_value2indices.size();
+        return m_values.size() - 1;
     }
 
     void reserve(int s) {
@@ -259,7 +259,7 @@ public:
         return m_values.end(); 
     }
 
-    void swap(heap & other) {
+    void swap(heap & other) noexcept {
         if (this != &other) {
             CASSERT("heap", other.check_invariant());
             CASSERT("heap", check_invariant());

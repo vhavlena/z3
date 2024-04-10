@@ -249,7 +249,10 @@ extern "C" {
             expr_abstract(mk_c(c)->m(), 0, num_bound, bound_asts.data(), pat, result);
             SASSERT(result.get()->get_kind() == AST_APP);
             pinned.push_back(result.get());
-            SASSERT(mk_c(c)->m().is_pattern(result.get()));
+            if (!mk_c(c)->m().is_pattern(result.get())) {
+                SET_ERROR_CODE(Z3_INVALID_ARG, "invalid pattern");
+                RETURN_Z3(nullptr);
+            }                
             _patterns.push_back(of_pattern(result.get()));
         }
         svector<Z3_ast> _no_patterns;
@@ -378,6 +381,36 @@ extern "C" {
             return 0;
         }
         Z3_CATCH_RETURN(0);
+    }
+
+    Z3_symbol Z3_API Z3_get_quantifier_skolem_id(Z3_context c, Z3_ast a) {
+        Z3_TRY;
+        LOG_Z3_get_quantifier_skolem_id(c, a);
+        RESET_ERROR_CODE();
+        ast * _a = to_ast(a);
+        if (_a->get_kind() == AST_QUANTIFIER) {
+            return of_symbol(to_quantifier(_a)->get_skid());
+        }
+        else {
+            SET_ERROR_CODE(Z3_SORT_ERROR, nullptr);
+            return of_symbol(symbol::null);
+        }
+        Z3_CATCH_RETURN(of_symbol(symbol::null));
+    }
+
+    Z3_symbol Z3_API Z3_get_quantifier_id(Z3_context c, Z3_ast a) {
+        Z3_TRY;
+        LOG_Z3_get_quantifier_skolem_id(c, a);
+        RESET_ERROR_CODE();
+        ast * _a = to_ast(a);
+        if (_a->get_kind() == AST_QUANTIFIER) {
+            return of_symbol(to_quantifier(_a)->get_qid());
+        }
+        else {
+            SET_ERROR_CODE(Z3_SORT_ERROR, nullptr);
+            return of_symbol(symbol::null);
+        }
+        Z3_CATCH_RETURN(of_symbol(symbol::null));
     }
 
     unsigned Z3_API Z3_get_quantifier_num_patterns(Z3_context c, Z3_ast a) {

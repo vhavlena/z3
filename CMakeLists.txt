@@ -1,8 +1,8 @@
 # Enforce some CMake policies
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_compiler_flags_overrides.cmake")
-project(Z3 VERSION 4.12.2.0 LANGUAGES CXX)
+project(Z3 VERSION 4.13.0.0 LANGUAGES CXX)
 
 ################################################################################
 # Project version
@@ -41,19 +41,22 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 ################################################################################
 include(${PROJECT_SOURCE_DIR}/cmake/git_utils.cmake)
 macro(disable_git_describe)
-  message(WARNING "Disabling Z3_INCLUDE_GIT_DESCRIBE")
-  set(Z3_INCLUDE_GIT_DESCRIBE OFF CACHE BOOL "Include git describe output in version output" FORCE)
+  if(Z3_INCLUDE_GIT_DESCRIBE)
+    message(WARNING "Disabling Z3_INCLUDE_GIT_DESCRIBE")
+    set(Z3_INCLUDE_GIT_DESCRIBE OFF CACHE BOOL "Include git describe output in version output" FORCE)
+  endif()
 endmacro()
 macro(disable_git_hash)
-  message(WARNING "Disabling Z3_INCLUDE_GIT_HASH")
-  set(Z3_INCLUDE_GIT_HASH OFF CACHE BOOL "Include git hash in version output" FORCE)
-  unset(Z3GITHASH) # Used in configure_file()
+  if(Z3_INCLUDE_GIT_HASH)
+    message(WARNING "Disabling Z3_INCLUDE_GIT_HASH")
+    set(Z3_INCLUDE_GIT_HASH OFF CACHE BOOL "Include git hash in version output" FORCE)
+  endif()
 endmacro()
 option(Z3_INCLUDE_GIT_HASH "Include git hash in version output" ON)
 option(Z3_INCLUDE_GIT_DESCRIBE "Include git describe output in version output" ON)
 
 set(GIT_DIR "${PROJECT_SOURCE_DIR}/.git")
-if (EXISTS "${GIT_DIR}")
+if ((Z3_INCLUDE_GIT_HASH OR Z3_INCLUDE_GIT_HASH) AND EXISTS "${GIT_DIR}")
   # Try to make CMake configure depend on the current git HEAD so that
   # a re-configure is triggered when the HEAD changes.
   add_git_dir_dependency("${GIT_DIR}" ADD_GIT_DEP_SUCCESS)
@@ -63,13 +66,13 @@ if (EXISTS "${GIT_DIR}")
       if (NOT Z3GITHASH)
         message(WARNING "Failed to get Git hash")
         disable_git_hash()
+      else()
+        message(STATUS "Using Git hash in version output: ${Z3GITHASH}")
+        # This mimics the behaviour of the old build system.
+        set(Z3_FULL_VERSION_STR "${Z3_FULL_VERSION_STR} ${Z3GITHASH}")
       endif()
-      message(STATUS "Using Git hash in version output: ${Z3GITHASH}")
-      # This mimics the behaviour of the old build system.
-      set(Z3_FULL_VERSION_STR "${Z3_FULL_VERSION_STR} ${Z3GITHASH}")
     else()
       message(STATUS "Not using Git hash in version output")
-      unset(Z3GITHASH) # Used in configure_file()
     endif()
     if (Z3_INCLUDE_GIT_DESCRIBE)
       get_git_head_describe("${GIT_DIR}" Z3_GIT_DESCRIPTION)
@@ -81,7 +84,7 @@ if (EXISTS "${GIT_DIR}")
       # This mimics the behaviour of the old build system.
       set(Z3_FULL_VERSION_STR "${Z3_FULL_VERSION_STR} ${Z3_GIT_DESCRIPTION}")
     else()
-      message(STATUS "Not including git descrption in version")
+      message(STATUS "Not including git description in version")
     endif()
   else()
     message(WARNING "Failed to add git dependency.")
@@ -92,6 +95,9 @@ else()
   message(STATUS "Failed to find git directory.")
   disable_git_describe()
   disable_git_hash()
+endif()
+if(NOT Z3_INCLUDE_GIT_HASH)
+  unset(Z3GITHASH) # Used in configure_file()
 endif()
 
 ################################################################################
@@ -153,8 +159,8 @@ list(APPEND Z3_COMPONENT_CXX_DEFINES $<$<CONFIG:RelWithDebInfo>:_EXTERNAL_RELEAS
 ################################################################################
 # Find Python
 ################################################################################
-find_package(PythonInterp 3 REQUIRED)
-message(STATUS "PYTHON_EXECUTABLE: ${PYTHON_EXECUTABLE}")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
 
 ################################################################################
 # Target architecture detection
@@ -465,7 +471,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 # generate files used for Z3's build. Changes to these files will trigger
 # a rebuild of all the generated files.
 ################################################################################
-# Note: ``update_api.py`` is deliberately not here because it not used
+# Note: ``update_api.py`` is deliberately not here because it is not used
 # to generate every generated file. The targets that need it list it explicitly.
 set(Z3_GENERATED_FILE_EXTRA_DEPENDENCIES
   "${PROJECT_SOURCE_DIR}/scripts/mk_genfile_common.py"

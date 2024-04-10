@@ -53,9 +53,8 @@ inline std::ostream& operator<<(std::ostream& out, column_type const& t) {
 }
 
 enum class simplex_strategy_enum {
-    undecided = 3,
-    tableau_rows = 0,
-    tableau_costs = 1
+    tableau_rows,
+    tableau_costs
 };
 
 std::string column_type_to_string(column_type t);
@@ -115,6 +114,13 @@ struct statistics {
     unsigned m_hnf_cutter_calls;
     unsigned m_hnf_cuts;
     unsigned m_nla_calls;
+    unsigned m_gomory_cuts;
+    unsigned m_nla_add_bounds;
+    unsigned m_nla_propagate_bounds;
+    unsigned m_nla_propagate_eq;
+    unsigned m_nla_lemmas;
+    unsigned m_nra_calls;
+    unsigned m_nla_bounds_improvements;
     unsigned m_horner_calls;
     unsigned m_horner_conflicts;
     unsigned m_cross_nested_forms;
@@ -137,6 +143,7 @@ struct statistics {
         st.update("arith-patches-success", m_patches_success);
         st.update("arith-hnf-calls", m_hnf_cutter_calls);
         st.update("arith-hnf-cuts", m_hnf_cuts);
+        st.update("arith-gomory-cuts", m_gomory_cuts);
         st.update("arith-horner-calls", m_horner_calls);
         st.update("arith-horner-conflicts", m_horner_conflicts);
         st.update("arith-horner-cross-nested-forms", m_cross_nested_forms);
@@ -144,6 +151,12 @@ struct statistics {
         st.update("arith-grobner-conflicts", m_grobner_conflicts);
         st.update("arith-offset-eqs", m_offset_eqs);
         st.update("arith-fixed-eqs", m_fixed_eqs);
+        st.update("arith-nla-add-bounds", m_nla_add_bounds);
+        st.update("arith-nla-propagate-bounds", m_nla_propagate_bounds);
+        st.update("arith-nla-propagate-eq", m_nla_propagate_eq);
+        st.update("arith-nla-lemmas", m_nla_lemmas);
+        st.update("arith-nra-calls", m_nra_calls);   
+        st.update("arith-bounds-improvements", m_nla_bounds_improvements);
 
     }
 };
@@ -218,6 +231,8 @@ public:
     unsigned hnf_cut_period() const { return m_hnf_cut_period; }
     void set_hnf_cut_period(unsigned period) { m_hnf_cut_period = period;  }
     unsigned random_next() { return m_rand(); }
+    unsigned random_next(unsigned u ) { return m_rand(u); }
+    
     void set_random_seed(unsigned s) { m_rand.set_seed(s); }
 
     bool bound_progation() const { 
@@ -248,7 +263,7 @@ public:
     
     // the method of lar solver to use
     simplex_strategy_enum simplex_strategy() const { return m_simplex_strategy; }
-    void set_simplex_strategy(simplex_strategy_enum s) { m_simplex_strategy = s; }
+    simplex_strategy_enum & simplex_strategy()  { return m_simplex_strategy; }
     bool use_tableau_rows() const { return m_simplex_strategy == simplex_strategy_enum::tableau_rows; }
     
 #ifdef Z3DEBUG

@@ -41,6 +41,8 @@ add_executable(test-z3
   doc.cpp
   egraph.cpp
   escaped.cpp
+  euf_bv_plugin.cpp
+  euf_arith_plugin.cpp
   ex.cpp
   expr_rand.cpp
   expr_substitution.cpp
@@ -108,6 +110,7 @@ add_executable(test-z3
   simple_parser.cpp
   simplex.cpp
   simplifier.cpp
+  sls_test.cpp
   small_object_allocator.cpp
   smt2print_parse.cpp
   smt_context.cpp

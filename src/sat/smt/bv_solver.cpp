@@ -96,8 +96,6 @@ namespace bv {
     }
 
     void solver::add_fixed_eq(theory_var v1, theory_var v2) {
-        if (!get_config().m_bv_eq_axioms)
-            return;
         m_ackerman.used_eq_eh(v1, v2);
     }
 
@@ -128,7 +126,7 @@ namespace bv {
     /**
        \brief Find an unassigned bit for m_wpos[v], if such bit cannot be found invoke fixed_var_eh
     */
-    void solver::find_wpos(theory_var v) {
+    bool solver::find_wpos(theory_var v) {
         literal_vector const& bits = m_bits[v];
         unsigned sz = bits.size();
         unsigned& wpos = m_wpos[v];
@@ -137,19 +135,18 @@ namespace bv {
             if (s().value(bits[idx]) == l_undef) {
                 wpos = idx;
                 TRACE("bv", tout << "moved wpos of v" << v << " to " << wpos << "\n";);
-                return;
+                return false;
             }
         }
         TRACE("bv", tout << "v" << v << " is a fixed variable.\n";);
         fixed_var_eh(v);
+        return true;
     }
 
     /**
      *\brief v[idx] = ~v'[idx], then v /= v' is a theory axiom.
     */
     void solver::find_new_diseq_axioms(atom& a, theory_var v, unsigned idx) {
-        if (!get_config().m_bv_eq_axioms)
-            return;
         literal l = m_bits[v][idx];
         l.neg();
         for (auto vp : a) {
@@ -270,7 +267,7 @@ namespace bv {
                 ++num_undef;
                 undef_idx = -static_cast<int>(i + 1);
             }
-            if (num_undef > 1 && get_config().m_bv_eq_axioms)
+            if (num_undef > 1)
                 return;
         }
         if (num_undef == 0)
@@ -292,8 +289,6 @@ namespace bv {
             ++m_stats.m_num_ne2bit;
             s().assign(consequent, mk_ne2bit_justification(undef_idx, v1, v2, consequent, antecedent));
         }
-        else if (!get_config().m_bv_eq_axioms) 
-            ;
         else if (s().at_search_lvl()) {
             force_push();
             assert_ackerman(v1, v2);
@@ -313,7 +308,7 @@ namespace bv {
         case bv_justification::kind_t::eq2bit:
             SASSERT(s().value(c.m_antecedent) == l_true);
             r.push_back(c.m_antecedent);
-            ctx.add_antecedent(probing, var2enode(c.m_v1), var2enode(c.m_v2));
+            ctx.add_eq_antecedent(probing, var2enode(c.m_v1), var2enode(c.m_v2));
             break;
         case bv_justification::kind_t::ne2bit: {
             r.push_back(c.m_antecedent);
@@ -381,8 +376,8 @@ namespace bv {
             break;
         }
         case bv_justification::kind_t::bv2int: {
-            ctx.add_antecedent(probing, c.a, c.b);
-            ctx.add_antecedent(probing, c.a, c.c);
+            ctx.add_eq_antecedent(probing, c.a, c.b);
+            ctx.add_eq_antecedent(probing, c.a, c.c);
             break;
         }
         }
@@ -853,7 +848,17 @@ namespace bv {
         values[n->get_root_id()] = bv.mk_numeral(val, m_bits[v].size());
     }
 
-    trail_stack& solver::get_trail_stack() {
+    sat::bool_var solver::get_bit(unsigned bit, euf::enode *n) const {
+        theory_var v = n->get_th_var(get_id());
+        if (v == euf::null_theory_var)
+            return sat::null_bool_var;
+        auto &bits = m_bits[v];
+        if (bit >= bits.size())
+            return sat::null_bool_var;
+        return bits[bit].var();
+    }
+
+    trail_stack &solver::get_trail_stack() {
         return ctx.get_trail_stack();
     }
 

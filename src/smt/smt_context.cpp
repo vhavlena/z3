@@ -36,6 +36,7 @@ Revision History:
 #include "smt/smt_quick_checker.h"
 #include "smt/uses_theory.h"
 #include "smt/theory_special_relations.h"
+#include "smt/theory_polymorphism.h"
 #include "smt/smt_for_each_relevant_expr.h"
 #include "smt/smt_model_generator.h"
 #include "smt/smt_model_checker.h"
@@ -153,9 +154,8 @@ namespace smt {
 
         src_af.get_macro_manager().copy_to(dst_af.get_macro_manager());
 
-        if (!src_ctx.m_setup.already_configured()) {
+        if (!src_ctx.m_setup.already_configured()) 
             return;
-        }
 
         for (unsigned i = 0; !src_m.proofs_enabled() && i < src_ctx.m_assigned_literals.size(); ++i) {
             literal lit = src_ctx.m_assigned_literals[i];
@@ -560,6 +560,7 @@ namespace smt {
 
             // Update "equivalence" class size
             r2->m_class_size += r1->m_class_size;
+            r2->m_is_shared = 2;
 
             CASSERT("add_eq", check_invariant());
         }
@@ -920,6 +921,7 @@ namespace smt {
 
         // restore r2 class size
         r2->m_class_size -= r1->m_class_size;
+        r2->m_is_shared = 2;
 
         // unmerge "equivalence" classes
         std::swap(r1->m_next, r2->m_next);
@@ -1670,12 +1672,7 @@ namespace smt {
     }
 
     bool context::can_theories_propagate() const {
-        for (theory* t : m_theory_set) {
-            if (t->can_propagate()) {
-                return true;
-            }
-        }
-        return false;
+        return any_of(m_theory_set, [&](theory* t) { return t->can_propagate(); });
     }
 
     bool context::can_propagate() const {
@@ -2918,7 +2915,9 @@ namespace smt {
     bool context::has_split_candidate(bool_var& var, bool& is_pos) {
         if (!m_user_propagator)
             return false;
-        return m_user_propagator->get_case_split(var, is_pos);
+        if (!m_user_propagator->get_case_split(var, is_pos))
+            return false;
+        return get_assignment(var) == l_undef;
     }
     
     bool context::decide_user_interference(bool_var& var, bool& is_pos) {
@@ -3024,7 +3023,8 @@ namespace smt {
         SASSERT(is_well_sorted(m, e));
         TRACE("begin_assert_expr", tout << mk_pp(e, m) << " " << mk_pp(pr, m) << "\n";);
         TRACE("begin_assert_expr_ll", tout << mk_ll_pp(e, m) << "\n";);
-        pop_to_base_lvl();
+        if (!m_searching)
+            pop_to_base_lvl();
         if (pr == nullptr)
             m_asserted_formulas.assert_expr(e);
         else
@@ -3229,7 +3229,7 @@ namespace smt {
                 }
                 expr * f   = m_asserted_formulas.get_formula(qhead);
                 proof * pr = m_asserted_formulas.get_formula_proof(qhead);
-                SASSERT(!pr || f == m.get_fact(pr));
+                SASSERT(!pr || f == m.get_fact(pr));                    
                 internalize_assertion(f, pr, 0);
                 ++qhead;
             }
@@ -3334,6 +3334,7 @@ namespace smt {
         reset_assumptions();
         m_literal2assumption.reset();
         m_unsat_core.reset();
+
         if (!asms.empty()) {
             // We must give a chance to the theories to propagate before we create a new scope...
             propagate();
@@ -3343,6 +3344,7 @@ namespace smt {
                 return;
             if (get_cancel_flag())
                 return;
+            del_inactive_lemmas();
             push_scope();
             vector<std::pair<expr*,expr_ref>> asm2proxy;
             internalize_proxies(asms, asm2proxy);
@@ -3465,13 +3467,9 @@ namespace smt {
         }
         if (r == l_true && gparams::get_value("model_validate") == "true") {
             recfun::util u(m);
-            model_ref mdl;
-            get_model(mdl);            
-            if (u.get_rec_funs().empty()) {
-                if (mdl.get()) {
-                    for (theory* t : m_theory_set) {
-                        t->validate_model(*mdl);
-                    }
+            if (u.get_rec_funs().empty() && m_proto_model) {
+                for (theory* t : m_theory_set) {
+                    t->validate_model(*m_proto_model);
                 }
             }
 #if 0
@@ -3564,7 +3562,6 @@ namespace smt {
         try {
             internalize_assertions();
         } catch (cancel_exception&) {
-            VERIFY(resource_limits_exceeded());
             return l_undef;
         }
         expr_ref_vector theory_assumptions(m);
@@ -3636,7 +3633,6 @@ namespace smt {
                 TRACE("unsat_core_bug", tout << asms << '\n';);
                 init_assumptions(asms);
             } catch (cancel_exception&) {
-                VERIFY(resource_limits_exceeded());
                 return l_undef;
             }
             TRACE("before_search", display(tout););
@@ -3663,7 +3659,6 @@ namespace smt {
                 for (auto const& clause : clauses) if (!validate_assumptions(clause)) return l_undef;
                 init_assumptions(asms);
             } catch (cancel_exception&) {
-                VERIFY(resource_limits_exceeded());
                 return l_undef;
             }
             for (auto const& clause : clauses) init_clause(clause);
@@ -3698,6 +3693,8 @@ namespace smt {
         m_phase_default                = false;
         m_case_split_queue             ->init_search_eh();
         m_next_progress_sample         = 0;
+        if (m.has_type_vars() && !m_theories.get_plugin(poly_family_id))
+            register_plugin(alloc(theory_polymorphism, *this));
         TRACE("literal_occ", display_literal_num_occs(tout););
     }
 
@@ -4120,7 +4117,6 @@ namespace smt {
             // Moreover, I backtrack only one level.
             bool delay_forced_restart =
                 m_fparams.m_delay_units &&
-                internalized_quantifiers() &&
                 num_lits == 1 &&
                 conflict_lvl > m_search_lvl + 1 &&
                 !m.proofs_enabled() &&
@@ -4269,9 +4265,11 @@ namespace smt {
                 SASSERT(num_lits == 1);
                 expr * unit     = bool_var2expr(lits[0].var());
                 bool unit_sign  = lits[0].sign();
+                while (m.is_not(unit, unit))
+                    unit_sign = !unit_sign;
                 m_units_to_reassert.push_back(unit);
                 m_units_to_reassert_sign.push_back(unit_sign);
-                TRACE("reassert_units", tout << "asserting #" << unit->get_id() << " " << unit_sign << " @ " << m_scope_lvl << "\n";);
+                TRACE("reassert_units", tout << "asserting " << mk_pp(unit, m) << " #" << unit->get_id() << " " << unit_sign << " @ " << m_scope_lvl << "\n";);
             }
 
             m_conflict_resolution->release_lemma_atoms();
@@ -4504,8 +4502,15 @@ namespace smt {
 
     bool context::is_shared(enode * n) const {
         n = n->get_root();
+        switch (n->is_shared()) {
+        case l_true: return true;
+        case l_false: return false;
+        default: break;
+        }
+
         unsigned num_th_vars = n->get_num_th_vars();
         if (m.is_ite(n->get_expr())) {
+            n->set_is_shared(l_true);
             return true;
         }
         switch (num_th_vars) {
@@ -4531,6 +4536,7 @@ namespace smt {
                     TRACE("is_shared", tout << enode_pp(n, *this) 
                           << "\nis shared because of:\n" 
                           << enode_pp(parent, *this) << "\n";);
+                    n->set_is_shared(l_true);
                     return true;
                 }
             }
@@ -4561,7 +4567,9 @@ namespace smt {
             // the theories of (array int int) and (array (array int int) int).
             // Remark: The inconsistency is not going to be detected if they are
             // not marked as shared.
-            return get_theory(th_id)->is_shared(l->get_var());
+            bool r = get_theory(th_id)->is_shared(l->get_var());
+            n->set_is_shared(to_lbool(r));
+            return r;
         }
         default:
             return true;

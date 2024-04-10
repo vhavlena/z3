@@ -29,13 +29,12 @@ bool is_numeral_sort(Z3_context c, Z3_sort ty) {
     if (!ty) return false;
     sort * _ty = to_sort(ty);
     family_id fid  = _ty->get_family_id();
-    if (fid != mk_c(c)->get_arith_fid() &&
-        fid != mk_c(c)->get_bv_fid() &&
-        fid != mk_c(c)->get_datalog_fid() &&
-        fid != mk_c(c)->get_fpa_fid()) {
-        return false;
-    }
-    return true;
+    return 
+        fid == mk_c(c)->get_arith_fid() ||
+        fid == mk_c(c)->get_bv_fid() ||
+        fid == mk_c(c)->get_datalog_fid() ||
+        fid == mk_c(c)->get_fpa_fid();
+
 }
 
 static bool check_numeral_sort(Z3_context c, Z3_sort ty) {
@@ -152,7 +151,7 @@ extern "C" {
             mk_c(c)->bvutil().is_numeral(e) ||
             mk_c(c)->fpautil().is_numeral(e) ||
             mk_c(c)->fpautil().is_rm_numeral(e) ||
-            mk_c(c)->datalog_util().is_numeral_ext(e);
+            mk_c(c)->datalog_util().is_numeral(e);
         Z3_CATCH_RETURN(false);
     }
 
@@ -189,8 +188,8 @@ extern "C" {
         bool ok = Z3_get_numeral_rational(c, a, r);
         if (ok && r.is_int() && !r.is_neg()) {
             std::stringstream strm;
-            r.display_bin(strm, r.get_num_bits());
-            return mk_c(c)->mk_external_string(strm.str());
+            strm << r.as_bin(r.get_num_bits());
+            return mk_c(c)->mk_external_string(std::move(strm).str());
         }
         else {
             SET_ERROR_CODE(Z3_INVALID_ARG, nullptr);
@@ -238,7 +237,7 @@ extern "C" {
             else if (mk_c(c)->fpautil().is_numeral(to_expr(a), tmp)) {
                 std::ostringstream buffer;
                 fu.fm().display_smt2(buffer, tmp, false);
-                return mk_c(c)->mk_external_string(buffer.str());
+                return mk_c(c)->mk_external_string(std::move(buffer).str());
             }
             else {
                 SET_ERROR_CODE(Z3_INVALID_ARG, nullptr);
@@ -289,21 +288,21 @@ extern "C" {
         if (u.is_numeral(e, r) && !r.is_int()) {
             std::ostringstream buffer;
             r.display_decimal(buffer, precision);
-            return mk_c(c)->mk_external_string(buffer.str());
+            return mk_c(c)->mk_external_string(std::move(buffer).str());
         }
         if (u.is_irrational_algebraic_numeral(e)) {
             algebraic_numbers::anum const & n = u.to_irrational_algebraic_numeral(e);
             algebraic_numbers::manager & am   = u.am();
             std::ostringstream buffer;
             am.display_decimal(buffer, n, precision);
-            return mk_c(c)->mk_external_string(buffer.str());
+            return mk_c(c)->mk_external_string(std::move(buffer).str());
         }
         else if (mk_c(c)->fpautil().is_rm_numeral(to_expr(a), rm))
             return Z3_get_numeral_string(c, a);
         else if (mk_c(c)->fpautil().is_numeral(to_expr(a), ftmp)) {
             std::ostringstream buffer;
             fu.fm().display_decimal(buffer, ftmp, 12);
-            return mk_c(c)->mk_external_string(buffer.str());
+            return mk_c(c)->mk_external_string(std::move(buffer).str());
         }
         else if (Z3_get_numeral_rational(c, a, r)) {
             return mk_c(c)->mk_external_string(r.to_string());
