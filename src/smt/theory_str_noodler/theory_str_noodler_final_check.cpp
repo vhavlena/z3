@@ -88,6 +88,7 @@ namespace smt::noodler {
     ) {
         AutAssignment aut_assignment{};
         aut_assignment.set_alphabet(noodler_alphabet);
+        regex::Alphabet alph(noodler_alphabet);
         for (const auto &word_equation: m_membership_todo_rel) {
             const expr_ref& var_expr{ std::get<0>(word_equation) };
             assert(is_app(var_expr));
@@ -102,7 +103,7 @@ namespace smt::noodler {
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, noodler_alphabet, make_complement, make_complement) };
+            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, alph, make_complement, make_complement) };
             auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
@@ -200,10 +201,11 @@ namespace smt::noodler {
             std::set<uint32_t> alphabet;
             extract_symbols(left_side, alphabet);
             extract_symbols(right_side, alphabet);
+            regex::Alphabet alph(alphabet);
 
             // construct NFAs for both sides
-            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alphabet, false );
-            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m, alphabet, false );
+            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
+            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m, alph, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv = mata::nfa::are_equivalent(nfa1, nfa2);
@@ -513,8 +515,9 @@ namespace smt::noodler {
             // start with minterm representing symbols not ocurring in the regex
             std::set<mata::Symbol> symbols_in_regex{get_dummy_symbol()};
             extract_symbols(std::get<1>(reg_data), symbols_in_regex);
+            regex::Alphabet reg_alph(symbols_in_regex);
 
-            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, symbols_in_regex, false, false) };
+            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(reg_data)), m_util_s, m, reg_alph, false, false) };
 
             mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
             mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&alph);
