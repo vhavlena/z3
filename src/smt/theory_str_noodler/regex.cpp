@@ -114,7 +114,7 @@ namespace smt::noodler::regex {
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
                 // unlimited times (if it is not set), but we have to accept after each loop,
                 // so we add an empty word into body_nfa
-                mata::nfa::State new_state = nfa.add_state();
+                mata::nfa::State new_state = body_nfa.add_state();
                 body_nfa.initial.insert(new_state);
                 body_nfa.final.insert(new_state);
 
