@@ -105,10 +105,15 @@ namespace smt::noodler::regex {
 
                 body_nfa = mata::nfa::reduce(body_nfa);
                 nfa = mata::nfa::builder::create_empty_string_nfa();
-                // we need to repeat body_nfa at least low times
-                for (unsigned i = 0; i < low; ++i) {
-                    nfa.concatenate(body_nfa);
-                    nfa.trim();
+             
+                if(low >= LOOP_BOUND) {
+                    nfa = create_large_concat(body_nfa, low);
+                } else {
+                    // we need to repeat body_nfa at least low times
+                    for (unsigned i = 0; i < low; ++i) {
+                        nfa.concatenate(nfa);
+                        nfa.trim();
+                    }
                 }
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
@@ -219,7 +224,7 @@ namespace smt::noodler::regex {
 
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
-        if(nfa.num_of_states() < 1000) {
+        if(nfa.num_of_states() < RED_BOUND) {
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
@@ -443,5 +448,28 @@ namespace smt::noodler::regex {
             util::throw_error("unsupported operation in regex");
         }
         return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_undef};
+    }
+
+    mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count) {
+        mata::nfa::Nfa nfa_part = mata::nfa::builder::create_empty_string_nfa();
+        mata::nfa::Nfa nfa = mata::nfa::builder::create_empty_string_nfa();
+        const unsigned CONCAT = 100;
+
+        for(unsigned i = 0; i < CONCAT; i++) {
+            nfa_part.concatenate(body_nfa);
+            nfa_part.trim();
+        }
+        unsigned cnt = 0;
+        for(unsigned i = 0; i < count / CONCAT; i++) {
+            nfa.concatenate(nfa_part);
+            nfa.trim();
+            cnt += CONCAT;
+        }
+        for(; cnt <= count; cnt++) {
+            nfa.concatenate(body_nfa);
+            nfa.trim();
+        }
+
+        return nfa;
     }
 }
