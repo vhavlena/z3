@@ -91,8 +91,6 @@ namespace smt::noodler::regex {
     [[nodiscard]] mata::nfa::Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
                                              const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
 
-    mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count);
-
     /**
      * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
      * RegexInfo gathers information about emptiness; universality; length of shortest words
@@ -103,6 +101,15 @@ namespace smt::noodler::regex {
      * @return RegexInfo 
      */
     RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s, const ast_manager& m);
+
+    /**
+     * @brief Create bounded iteration of a given automaton. 
+     * 
+     * @param body_nfa Core NFA
+     * @param count Number of concatenations
+     * @return mata::nfa::Nfa NFA
+     */
+    mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count);
 }
 
 #endif
