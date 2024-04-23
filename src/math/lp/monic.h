@@ -21,15 +21,15 @@ namespace nla {
 
 class mon_eq {
     // fields
-    lp::var_index          m_v;
-    svector<lp::var_index> m_vs;
+    lp::lpvar                 m_v;
+    svector<lp::lpvar> m_vs;
 public:
     // constructors
-    mon_eq(lp::var_index v, unsigned sz, lp::var_index const* vs):
+    mon_eq(lp::lpvar v, unsigned sz, lp::lpvar const* vs):
         m_v(v), m_vs(sz, vs) {
         std::sort(m_vs.begin(), m_vs.end());
     }
-    mon_eq(lp::var_index v, const svector<lp::var_index> &vs):
+    mon_eq(lp::lpvar v, const svector<lp::lpvar> &vs):
         m_v(v), m_vs(vs) {
         std::sort(m_vs.begin(), m_vs.end());
     }
@@ -37,7 +37,7 @@ public:
         
     unsigned var() const { return m_v; }
     unsigned size() const { return m_vs.size(); }
-    const svector<lp::var_index>& vars() const { return m_vs; }
+    const svector<lp::lpvar>& vars() const { return m_vs; }
     bool empty() const { return m_vs.empty(); }
     bool is_sorted() const {
         for (unsigned i = 0; i + 1 < size(); i++)
@@ -49,7 +49,7 @@ public:
         return std::binary_search(m_vs.begin(), m_vs.end(), j);
     }
 protected:
-    svector<lp::var_index>& vars1() { return m_vs; }
+    svector<lp::lpvar>& vars1() { return m_vs; }
 };
 
 // support the congruence    
@@ -58,6 +58,8 @@ class monic: public mon_eq {
     svector<lpvar>   m_rvars;
     bool             m_rsign;
     mutable unsigned m_visited;
+    bool             m_propagated = false;
+    bool             m_bound_propagated = false;
 public:
     // constructors
     monic(lpvar v, unsigned sz, lpvar const* vs, unsigned idx):  
@@ -74,6 +76,10 @@ public:
     void reset_rfields() { m_rsign = false; m_rvars.reset(); SASSERT(m_rvars.size() == 0); }
     void push_rvar(signed_var sv) { m_rsign ^= sv.sign(); m_rvars.push_back(sv.var()); }
     void sort_rvars() { std::sort(m_rvars.begin(), m_rvars.end()); }
+    void set_propagated(bool p) { m_propagated = p; }
+    bool is_propagated() const { return m_propagated; }
+    void set_bound_propagated(bool p) { m_bound_propagated = p; }
+    bool is_bound_propagated() const { return m_bound_propagated; }
     
     svector<lpvar>::const_iterator begin() const { return vars().begin(); }
     svector<lpvar>::const_iterator end() const { return vars().end(); }

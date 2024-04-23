@@ -84,6 +84,7 @@ class mpz {
 #else
     typedef mpz_t mpz_type;
 #endif
+protected:
     int        m_val; 
     unsigned   m_kind:1;
     unsigned   m_owner:1;
@@ -110,12 +111,23 @@ public:
         return *this;
     }
 
-    void swap(mpz & other) { 
+    void swap(mpz & other) noexcept {
         std::swap(m_val, other.m_val);
         std::swap(m_ptr, other.m_ptr);
         unsigned o = m_owner; m_owner = other.m_owner; other.m_owner = o;
         unsigned k = m_kind; m_kind = other.m_kind; other.m_kind = k;
     }
+
+    void set(int v) {
+        m_val = v;
+        m_kind = mpz_small;
+    }
+
+    inline bool is_small() const { return m_kind == mpz_small; }
+
+    inline int value() const { SASSERT(is_small());  return m_val; }
+
+    inline int sign() const { SASSERT(!is_small()); return m_val; }
 };
 
 #ifndef _MP_GMP
@@ -131,7 +143,7 @@ public:
 class mpz_stack : public mpz {};
 #endif
 
-inline void swap(mpz & m1, mpz & m2) { m1.swap(m2); }
+inline void swap(mpz & m1, mpz & m2) noexcept { m1.swap(m2); }
 
 template<bool SYNCH = true>
 class mpz_manager {
@@ -242,14 +254,13 @@ class mpz_manager {
     mpz                     m_two64;
 
 
-    static int64_t i64(mpz const & a) { return static_cast<int64_t>(a.m_val); }
+    static int64_t i64(mpz const & a) { return static_cast<int64_t>(a.value()); }
 
     void set_big_i64(mpz & c, int64_t v);
 
     void set_i64(mpz & c, int64_t v) {
         if (v >= INT_MIN && v <= INT_MAX) {
-            c.m_val = static_cast<int>(v); 
-            c.m_kind = mpz_small;
+            c.set(static_cast<int>(v));             
         }
         else {
             set_big_i64(c, v);
@@ -306,25 +317,25 @@ class mpz_manager {
 
     void get_sign_cell(mpz const & a, int & sign, mpz_cell * & cell, mpz_cell* reserve) {
         if (is_small(a)) {
-            if (a.m_val == INT_MIN) {
+            if (a.value() == INT_MIN) {
                 sign = -1;
                 cell = m_int_min.m_ptr;
             }
             else {
                 cell = reserve;
                 cell->m_size = 1;
-                if (a.m_val < 0) {
+                if (a.value() < 0) {
                     sign = -1;
-                    cell->m_digits[0] = -a.m_val;
+                    cell->m_digits[0] = -a.value();
                 }
                 else {
                     sign = 1;
-                    cell->m_digits[0] = a.m_val;
+                    cell->m_digits[0] = a.value();
                 }
             }
         }
         else {
-            sign = a.m_val;
+            sign = a.sign();
             cell = a.m_ptr;
         }
     }
@@ -398,7 +409,7 @@ public:
 
     ~mpz_manager();
 
-    static bool is_small(mpz const & a) { return a.m_kind == mpz_small; }
+    static bool is_small(mpz const & a) { return a.is_small(); }
 
     static mpz mk_z(int val) { return mpz(val); }
     
@@ -461,7 +472,7 @@ public:
 
     bool eq(mpz const & a, mpz const & b) {
         if (is_small(a) && is_small(b)) {
-            return a.m_val == b.m_val;
+            return a.value() == b.value();
         }
         else {
             return big_compare(a, b) == 0;
@@ -470,7 +481,7 @@ public:
 
     bool lt(mpz const& a, int b) {
         if (is_small(a)) {
-            return a.m_val < b;
+            return a.value() < b;
         }
         else {
             return lt(a, mpz(b));
@@ -479,7 +490,7 @@ public:
 
     bool lt(mpz const & a, mpz const & b) {
         if (is_small(a) && is_small(b)) {
-            return a.m_val < b.m_val;
+            return a.value() < b.value();
         }
         else {
             return big_compare(a, b) < 0;
@@ -526,8 +537,7 @@ public:
 
     void set(mpz & target, mpz const & source) {
         if (is_small(source)) {
-            target.m_val = source.m_val;
-            target.m_kind = mpz_small;
+            target.set(source.value());
         }
         else {
             big_set(target, source);
@@ -535,8 +545,7 @@ public:
     }
 
     void set(mpz & a, int val) {
-        a.m_val = val;
-        a.m_kind = mpz_small;
+        a.set(val);
     }
 
     void set(mpz & a, unsigned val) {
@@ -554,8 +563,7 @@ public:
 
     void set(mpz & a, uint64_t val) {
         if (val < INT_MAX) {
-            a.m_val = static_cast<int>(val);
-            a.m_kind = mpz_small;
+            a.set(static_cast<int>(val));
         }
         else {
             set_big_ui64(a, val);
@@ -573,11 +581,8 @@ public:
     // deallocates any memory.
     void reset(mpz & a);
 
-    void swap(mpz & a, mpz & b) {
-        std::swap(a.m_val, b.m_val);
-        std::swap(a.m_ptr, b.m_ptr);
-        auto o = a.m_owner; a.m_owner = b.m_owner; b.m_owner = o;
-        auto k = a.m_kind; a.m_kind = b.m_kind; b.m_kind = k;
+    void swap(mpz & a, mpz & b) noexcept {
+        a.swap(b);
     }
 
     bool is_uint64(mpz const & a) const;
@@ -624,20 +629,20 @@ public:
 
     static bool is_one(mpz const & a) {
 #ifndef _MP_GMP
-        return is_small(a) && a.m_val == 1;
+        return is_small(a) && a.value() == 1;
 #else
         if (is_small(a))
-            return a.m_val == 1;
+            return a.value() == 1;
         return mpz_cmp_si(*a.m_ptr, 1) == 0;
 #endif
     }
 
     static bool is_minus_one(mpz const & a) {
 #ifndef _MP_GMP
-        return is_small(a) && a.m_val == -1;
+        return is_small(a) && a.value() == -1;
 #else
         if (is_small(a))
-            return a.m_val == -1;
+            return a.value() == -1;
         return mpz_cmp_si(*a.m_ptr, -1) == 0;
 #endif
     }
@@ -692,6 +697,13 @@ public:
        \remark Return 0 if a is not positive.
     */
     unsigned prev_power_of_two(mpz const & a) { return log2(a); }
+
+    /**
+       \brief Return the smallest k s.t. a <= 2^k.
+
+       \remark Return 0 if a is not positive.
+    */
+    unsigned next_power_of_two(mpz const & a);
     
     /**
        \brief Return true if a^{1/n} is an integer, and store the result in a.
@@ -705,7 +717,7 @@ public:
 
     bool is_even(mpz const & a) {
         if (is_small(a))
-            return !(a.m_val & 0x1);
+            return !(a.value() & 0x1);
 #ifndef _MP_GMP
         return !(0x1 & digits(a)[0]);
 #else

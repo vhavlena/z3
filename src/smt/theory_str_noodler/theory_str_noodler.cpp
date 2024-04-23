@@ -1536,7 +1536,7 @@ namespace smt::noodler {
         if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
             // s = emp -> v = t.a
             // NOTE: if we use ~s_emp, this diseqation does not become relevant
-            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v, mk_concat(t, a),false)});
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_literal(m.mk_eq(r, mk_concat(t, a)))});
             // s = a -> v = t
             // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
             add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});

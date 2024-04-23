@@ -1244,7 +1244,7 @@ bool theory_seq::get_length(expr* e, expr_ref& len, literal_vector& lits) {
 
 /**
  * solve for fold/map (recursive function that depends on a sequence)
- * Assumption: the Seq argument of fold/map expands into a concatentation of units
+ * Assumption: the Seq argument of fold/map expands into a concatenation of units
  * The assumption is enforced by tracking the length of the seq argument.
  * This is ensured in relevant_eh.
  * Under the assumption, evern occurrence of fold/map gets simplified by expanding
@@ -1270,7 +1270,6 @@ bool theory_seq::solve_nc(unsigned idx) {
     expr_ref c(m);
     expr* a = nullptr, *b = nullptr;
     VERIFY(m_util.str.is_contains(n.contains(), a, b));
-    literal pre, cnt, ctail, emp;
     lbool is_gt = ctx.get_assignment(len_gt);
     TRACE("seq", ctx.display_literal_smt2(tout << len_gt << " := " << is_gt << "\n", len_gt) << "\n";);
     
@@ -2160,7 +2159,7 @@ app* theory_seq::mk_value(app* e) {
 }
 
 
-void theory_seq::validate_model(model& mdl) {
+void theory_seq::validate_model(proto_model& mdl) {
     return;
     for (auto const& eq : m_eqs) {
         sort* srt = eq.ls[0]->get_sort();

@@ -28,8 +28,8 @@ private:
     numeral   m_num;
 public:
     _scoped_numeral(Manager & m):m_manager(m) {}
-    _scoped_numeral(_scoped_numeral const & n):m_manager(n.m_manager) { m().set(m_num, n.m_num); }
-    _scoped_numeral(_scoped_numeral &&) = default;
+    _scoped_numeral(_scoped_numeral const& n) :m_manager(n.m_manager) { m().set(m_num, n.m_num); }
+    _scoped_numeral(_scoped_numeral && n) noexcept: m_manager(n.m_manager) { m().swap(m_num, n.m_num); }
     ~_scoped_numeral() { m_manager.del(m_num); }
 
     Manager & m() const { return m_manager; }
@@ -60,11 +60,11 @@ public:
         m().reset(m_num);
     }
 
-    void swap(_scoped_numeral & n) {
+    void swap(_scoped_numeral & n) noexcept {
         m().swap(m_num, n.m_num);
     }
 
-    void swap(numeral & n) {
+    void swap(numeral & n) noexcept {
         m().swap(m_num, n);
     }
 

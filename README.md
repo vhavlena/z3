@@ -2,7 +2,7 @@
 
 Z3-Noodler is an SMT solver for string constraints such as those that occur in symbolic execution and analysis of programs, 
 reasoning about configuration files of cloud services and smart contracts, etc.
-Z3-Noodler is based on the SMT solver [Z3 v4.12.2](https://github.com/Z3Prover/z3/releases/tag/z3-4.12.2), in which it replaces the solver for the theory of strings. 
+Z3-Noodler is based on the SMT solver [Z3 v4.13.0](https://github.com/Z3Prover/z3/releases/tag/z3-4.13.0), in which it replaces the solver for the theory of strings. 
 The core of the string solver implements several decision procedures, but mainly it relies on the equation stabilization algorithm (see [Publications](#publications)).
 
 Z3-Noodler utilizes the automata library [Mata](https://github.com/VeriFIT/mata/) for efficient representation of automata and their processing.
@@ -68,8 +68,9 @@ str.replace_re_all
 Furthermore, we do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
-- Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Cascais, Portugal, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
-- F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://doi.org/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, Lübeck, Germany, volume 14000 of LNCS, pages 403–423, 2023. Springer.
+- Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Z3-Noodler: An Automata-based String Solver](https://doi.org/10.1007/978-3-031-57246-3_2). In *Proc. of TACAS'24*, volume 14570 of LNCS, pages 24-33, 2024. Springer. 
+- Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
+- F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://doi.org/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, volume 14000 of LNCS, pages 403–423, 2023. Springer.
 
 
 ## Z3-Noodler source files

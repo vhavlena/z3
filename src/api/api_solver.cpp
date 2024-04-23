@@ -170,8 +170,8 @@ extern "C" {
             if (g_is_threaded || g_thread_id != std::this_thread::get_id()) {
                 g_is_threaded = true;
                 std::ostringstream strm;
-                strm << smt2log << "-" << std::this_thread::get_id();
-                smt2log = symbol(strm.str());                
+                strm << smt2log << '-' << std::this_thread::get_id();
+                smt2log = symbol(std::move(strm).str());
             }
             to_solver(s)->m_pp = alloc(solver2smt2_pp, mk_c(c)->m(), smt2log.str());
         }
@@ -208,7 +208,7 @@ extern "C" {
         if (!smt_logics::supported_logic(to_symbol(logic))) {
             std::ostringstream strm;
             strm << "logic '" << to_symbol(logic) << "' is not recognized";
-            SET_ERROR_CODE(Z3_INVALID_ARG, strm.str());
+            SET_ERROR_CODE(Z3_INVALID_ARG, std::move(strm).str());
             RETURN_Z3(nullptr);
         }
         else {
@@ -306,7 +306,7 @@ extern "C" {
 
         if (!parse_smt2_commands(*ctx.get(), is)) {
             ctx = nullptr;
-            SET_ERROR_CODE(Z3_PARSER_ERROR, errstrm.str());
+            SET_ERROR_CODE(Z3_PARSER_ERROR, std::move(errstrm).str());
             return;
         }
 
@@ -333,7 +333,7 @@ extern "C" {
         std::stringstream err;
         sat::solver solver(to_solver_ref(s)->get_params(), m.limit());
         if (!parse_dimacs(is, err, solver)) {
-            SET_ERROR_CODE(Z3_PARSER_ERROR, err.str());
+            SET_ERROR_CODE(Z3_PARSER_ERROR, std::move(err).str());
             return;
         }
         sat2goal s2g;
@@ -400,7 +400,7 @@ extern "C" {
         if (!initialized)
             to_solver(s)->m_solver = nullptr;
         descrs.display(buffer);
-        return mk_c(c)->mk_external_string(buffer.str());
+        return mk_c(c)->mk_external_string(std::move(buffer).str());
         Z3_CATCH_RETURN("");
     }
 
@@ -799,7 +799,7 @@ extern "C" {
         init_solver(c, s);
         std::ostringstream buffer;
         to_solver_ref(s)->display(buffer);
-        return mk_c(c)->mk_external_string(buffer.str());
+        return mk_c(c)->mk_external_string(std::move(buffer).str());
         Z3_CATCH_RETURN("");
     }
 
@@ -810,7 +810,7 @@ extern "C" {
         init_solver(c, s);
         std::ostringstream buffer;
         to_solver_ref(s)->display_dimacs(buffer, include_names);
-        return mk_c(c)->mk_external_string(buffer.str());
+        return mk_c(c)->mk_external_string(std::move(buffer).str());
         Z3_CATCH_RETURN("");
     }
 
@@ -984,14 +984,14 @@ extern "C" {
         Z3_TRY;
         RESET_ERROR_CODE();
         init_solver(c, s);     
-        user_propagator::on_clause_eh_t _on_clause = [=](void* user_ctx, expr* proof, unsigned n, expr* const* _literals) {
+        user_propagator::on_clause_eh_t _on_clause = [=](void* user_ctx, expr* proof, unsigned nd, unsigned const* deps, unsigned n, expr* const* _literals) {
             Z3_ast_vector_ref * literals = alloc(Z3_ast_vector_ref, *mk_c(c), mk_c(c)->m());
             mk_c(c)->save_object(literals);
             expr_ref pr(proof, mk_c(c)->m());
             scoped_ast_vector _sc(literals);
             for (unsigned i = 0; i < n; ++i)
                 literals->m_ast_vector.push_back(_literals[i]);
-            on_clause_eh(user_ctx, of_expr(pr.get()), of_ast_vector(literals));
+            on_clause_eh(user_ctx, of_expr(pr.get()), nd, deps, of_ast_vector(literals));
         };
         to_solver_ref(s)->register_on_clause(user_context, _on_clause);
         auto& solver = *to_solver(s);
@@ -1092,15 +1092,15 @@ extern "C" {
         Z3_CATCH;
     }
 
-    void Z3_API Z3_solver_propagate_consequence(Z3_context c, Z3_solver_callback s, unsigned num_fixed, Z3_ast const* fixed_ids, unsigned num_eqs, Z3_ast const* eq_lhs, Z3_ast const* eq_rhs, Z3_ast conseq) {
+    bool Z3_API Z3_solver_propagate_consequence(Z3_context c, Z3_solver_callback s, unsigned num_fixed, Z3_ast const* fixed_ids, unsigned num_eqs, Z3_ast const* eq_lhs, Z3_ast const* eq_rhs, Z3_ast conseq) {
         Z3_TRY;
         LOG_Z3_solver_propagate_consequence(c, s, num_fixed, fixed_ids, num_eqs, eq_lhs, eq_rhs, conseq);
         RESET_ERROR_CODE();
         expr* const * _fixed_ids = (expr* const*) fixed_ids;
         expr* const * _eq_lhs = (expr*const*) eq_lhs;
         expr* const * _eq_rhs = (expr*const*) eq_rhs;
-        reinterpret_cast<user_propagator::callback*>(s)->propagate_cb(num_fixed, _fixed_ids, num_eqs, _eq_lhs, _eq_rhs, to_expr(conseq));
-        Z3_CATCH;        
+        return reinterpret_cast<user_propagator::callback*>(s)->propagate_cb(num_fixed, _fixed_ids, num_eqs, _eq_lhs, _eq_rhs, to_expr(conseq));
+        Z3_CATCH_RETURN(false);
     }
 
     void Z3_API Z3_solver_propagate_created(Z3_context c, Z3_solver s, Z3_created_eh created_eh) {
@@ -1114,17 +1114,17 @@ extern "C" {
     void Z3_API Z3_solver_propagate_decide(Z3_context c, Z3_solver s, Z3_decide_eh decide_eh) {
         Z3_TRY;
         RESET_ERROR_CODE();
-        user_propagator::decide_eh_t c = (void(*)(void*, user_propagator::callback*, expr**, unsigned*, lbool*))decide_eh;
+        user_propagator::decide_eh_t c = (void(*)(void*, user_propagator::callback*, expr*, unsigned, bool))decide_eh;
         to_solver_ref(s)->user_propagate_register_decide(c);
         Z3_CATCH;
     }
 
-    void Z3_API Z3_solver_next_split(Z3_context c, Z3_solver_callback cb,  Z3_ast t, unsigned idx, Z3_lbool phase) {
+    bool Z3_API Z3_solver_next_split(Z3_context c, Z3_solver_callback cb,  Z3_ast t, unsigned idx, Z3_lbool phase) {
         Z3_TRY;
         LOG_Z3_solver_next_split(c, cb, t, idx, phase);
         RESET_ERROR_CODE();
-        reinterpret_cast<user_propagator::callback*>(cb)->next_split_cb(to_expr(t), idx, (lbool)phase);
-        Z3_CATCH;
+        return reinterpret_cast<user_propagator::callback*>(cb)->next_split_cb(to_expr(t), idx, (lbool)phase);
+        Z3_CATCH_RETURN(false);
     }
 
     Z3_func_decl Z3_API Z3_solver_propagate_declare(Z3_context c, Z3_symbol name, unsigned n, Z3_sort* domain, Z3_sort range) {

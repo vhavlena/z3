@@ -5,6 +5,7 @@ z3_add_component(sat_smt
     arith_internalize.cpp
     arith_sls.cpp
     arith_solver.cpp
+    arith_value.cpp
     array_axioms.cpp
     array_diagnostics.cpp
     array_internalize.cpp
@@ -27,6 +28,7 @@ z3_add_component(sat_smt
     euf_proof_checker.cpp
     euf_relevancy.cpp
     euf_solver.cpp
+    intblast_solver.cpp
     fpa_solver.cpp
     pb_card.cpp
     pb_constraint.cpp
@@ -44,6 +46,8 @@ z3_add_component(sat_smt
     q_solver.cpp
     recfun_solver.cpp
     sat_th.cpp
+    sls_solver.cpp
+    specrel_solver.cpp
     tseitin_theory_checker.cpp
     user_solver.cpp
   COMPONENT_DEPENDENCIES

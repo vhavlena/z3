@@ -320,7 +320,7 @@ namespace z3 {
         /**
            \brief Create a recursive datatype over a single sort.
            \c name is the name of the recursive datatype
-           \c n - the numer of constructors of the datatype
+           \c n - the number of constructors of the datatype
            \c cs - the \c n constructors used to define the datatype
 
            References to the datatype can be created using \ref datatype_sort.
@@ -368,7 +368,7 @@ namespace z3 {
         func_decl recfun(char const * name, sort const & d1, sort const & d2, sort const & range);
 
         /**
-         * \brief add function definition body to declaration decl. decl needs to be declared using context::<recfun>.
+         * \brief add function definition body to declaration decl. decl needs to be declared using context::recfun.
          * @param decl
          * @param args
          * @param body
@@ -4214,17 +4214,20 @@ namespace z3 {
         return expr(ctx(), r);
     }
 
-    typedef std::function<void(expr const& proof, expr_vector const& clause)> on_clause_eh_t;
+    typedef std::function<void(expr const& proof, std::vector<unsigned> const& deps, expr_vector const& clause)> on_clause_eh_t;
 
     class on_clause {
         context& c;
         on_clause_eh_t m_on_clause;
 
-        static void _on_clause_eh(void* _ctx, Z3_ast _proof, Z3_ast_vector _literals) {
+        static void _on_clause_eh(void* _ctx, Z3_ast _proof, unsigned n, unsigned const* dep, Z3_ast_vector _literals) {
             on_clause* ctx = static_cast<on_clause*>(_ctx);
             expr_vector lits(ctx->c, _literals);
             expr proof(ctx->c, _proof);
-            ctx->m_on_clause(proof, lits);
+            std::vector<unsigned> deps;
+            for (unsigned i = 0; i < n; ++i)
+                deps.push_back(dep[i]);
+            ctx->m_on_clause(proof, deps, lits);
         }
     public:
         on_clause(solver& s, on_clause_eh_t& on_clause_eh): c(s.ctx()) {
@@ -4240,7 +4243,7 @@ namespace z3 {
         typedef std::function<void(void)> final_eh_t;
         typedef std::function<void(expr const&, expr const&)> eq_eh_t;
         typedef std::function<void(expr const&)> created_eh_t;
-        typedef std::function<void(expr&, unsigned&, Z3_lbool&)> decide_eh_t;
+        typedef std::function<void(expr, unsigned, bool)> decide_eh_t;
 
         final_eh_t m_final_eh;
         eq_eh_t    m_eq_eh;
@@ -4309,13 +4312,11 @@ namespace z3 {
             p->m_created_eh(e);
         }
         
-        static void decide_eh(void* _p, Z3_solver_callback cb, Z3_ast* _val, unsigned* bit, Z3_lbool* is_pos) {
+        static void decide_eh(void* _p, Z3_solver_callback cb, Z3_ast _val, unsigned bit, bool is_pos) {
             user_propagator_base* p = static_cast<user_propagator_base*>(_p);
             scoped_cb _cb(p, cb);
-            expr val(p->ctx(), *_val);
-            p->m_decide_eh(val, *bit, *is_pos);
-            // TBD: life time of val is within the scope of this callback.
-            *_val = val;
+            expr val(p->ctx(), _val);
+            p->m_decide_eh(val, bit, is_pos);
         }
         
     public:
@@ -4435,7 +4436,7 @@ namespace z3 {
         }
 
         void register_decide() {
-            m_decide_eh = [this](expr& val, unsigned& bit, Z3_lbool& is_pos) {
+            m_decide_eh = [this](expr val, unsigned bit, bool is_pos) {
                 decide(val, bit, is_pos);
             };
             if (s) {
@@ -4451,11 +4452,11 @@ namespace z3 {
 
         virtual void created(expr const& /*e*/) {}
         
-        virtual void decide(expr& /*val*/, unsigned& /*bit*/, Z3_lbool& /*is_pos*/) {}
+        virtual void decide(expr const& /*val*/, unsigned /*bit*/, bool /*is_pos*/) {}
 
-        void next_split(expr const & e, unsigned idx, Z3_lbool phase) {
+        bool next_split(expr const& e, unsigned idx, Z3_lbool phase) {
             assert(cb);
-            Z3_solver_next_split(ctx(), cb, e, idx, phase);
+            return Z3_solver_next_split(ctx(), cb, e, idx, phase);
         }
 
         /**
@@ -4498,14 +4499,14 @@ namespace z3 {
             Z3_solver_propagate_consequence(ctx(), cb, fixed.size(), _fixed.ptr(), lhs.size(), _lhs.ptr(), _rhs.ptr(), conseq);
         }
 
-        void propagate(expr_vector const& fixed, expr const& conseq) {
+        bool propagate(expr_vector const& fixed, expr const& conseq) {
             assert(cb);
             assert((Z3_context)conseq.ctx() == (Z3_context)ctx());
             array<Z3_ast> _fixed(fixed);
-            Z3_solver_propagate_consequence(ctx(), cb, _fixed.size(), _fixed.ptr(), 0, nullptr, nullptr, conseq);
+            return Z3_solver_propagate_consequence(ctx(), cb, _fixed.size(), _fixed.ptr(), 0, nullptr, nullptr, conseq);
         }
 
-        void propagate(expr_vector const& fixed,
+        bool propagate(expr_vector const& fixed,
                        expr_vector const& lhs, expr_vector const& rhs,
                        expr const& conseq) {
             assert(cb);
@@ -4515,7 +4516,7 @@ namespace z3 {
             array<Z3_ast> _lhs(lhs);
             array<Z3_ast> _rhs(rhs);
             
-            Z3_solver_propagate_consequence(ctx(), cb, _fixed.size(), _fixed.ptr(), lhs.size(), _lhs.ptr(), _rhs.ptr(), conseq);
+            return Z3_solver_propagate_consequence(ctx(), cb, _fixed.size(), _fixed.ptr(), lhs.size(), _lhs.ptr(), _rhs.ptr(), conseq);
         }
     };
 

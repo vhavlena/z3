@@ -20,7 +20,6 @@ Notes:
 
 #include "ast/ast.h"
 #include "ast/rewriter/rewriter.h"
-#include "ast/rewriter/hoist_rewriter.h"
 #include "util/params.h"
 
 /**
@@ -51,8 +50,8 @@ Notes:
 */
 class bool_rewriter {
     ast_manager &  m_manager;
-    hoist_rewriter m_hoist;
     bool           m_flat_and_or = false;
+    bool           m_sort_disjunctions = true;
     bool           m_local_ctx = false;
     bool           m_elim_and = false;
     bool           m_blast_distinct = false;
@@ -72,6 +71,8 @@ class bool_rewriter {
 
     void mk_and_as_or(unsigned num_args, expr * const * args, expr_ref & result);
 
+    bool try_ite_eq(expr* lhs, expr* rhs, expr_ref& r);
+
     expr * mk_or_app(unsigned num_args, expr * const * args);
     bool simp_nested_not_or(unsigned num_args, expr * const * args, expr_fast_mark1 & neg_lits, expr_fast_mark2 & pos_lits, expr_ref & result);
     expr * simp_arg(expr * arg, expr_fast_mark1 & neg_lits, expr_fast_mark2 & pos_lits, bool & modified);
@@ -83,7 +84,7 @@ class bool_rewriter {
     void push_new_arg(expr* arg, expr_ref_vector& new_args, expr_fast_mark1& neg_lits, expr_fast_mark2& pos_lits);
 
 public:
-    bool_rewriter(ast_manager & m, params_ref const & p = params_ref()):m_manager(m), m_hoist(m), m_local_ctx_cost(0) { 
+    bool_rewriter(ast_manager & m, params_ref const & p = params_ref()):m_manager(m), m_local_ctx_cost(0) { 
         updt_params(p); 
     }
     ast_manager & m() const { return m_manager; }

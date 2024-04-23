@@ -1,4 +1,4 @@
-#  - !/usr/bin/env python
+#!/usr/bin/env python
 ############################################
 # Copyright (c) 2012 Microsoft Corporation
 #
@@ -116,8 +116,8 @@ class APITypes:
         
     def def_Types(self, api_files):
         global Closures
-        pat1 = re.compile(" *def_Type\(\'(.*)\',[^\']*\'(.*)\',[^\']*\'(.*)\'\)[ \t]*")
-        pat2 = re.compile("Z3_DECLARE_CLOSURE\((.*),(.*), \((.*)\)\)")
+        pat1 = re.compile(r" *def_Type\(\'(.*)\',[^\']*\'(.*)\',[^\']*\'(.*)\'\)[ \t]*")
+        pat2 = re.compile(r"Z3_DECLARE_CLOSURE\((.*),(.*), \((.*)\)\)")
         for api_file in api_files:
             with open(api_file, 'r') as api:
                 for line in api:
@@ -426,9 +426,10 @@ def mk_dotnet(dotnet):
     dotnet.write('    {\n\n')
 
     for name, ret, sig in Closures:
+        sig = sig.replace("unsigned const*","uint[]")
         sig = sig.replace("void*","voidp").replace("unsigned","uint")
         sig = sig.replace("Z3_ast*","ref IntPtr").replace("uint*","ref uint").replace("Z3_lbool*","ref int")
-        ret = ret.replace("void*","voidp").replace("unsigned","uint")
+        ret = ret.replace("void*","voidp").replace("unsigned","uint")        
         if "*" in sig or "*" in ret:
             continue
         dotnet.write('        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]\n')
@@ -633,7 +634,74 @@ def mk_java(java_src, java_dir, package_name):
     java_native.write('      }\n')
     java_native.write('    }\n')
     java_native.write('  }\n')
+    java_native.write("""
+  public static native long propagateInit(Object o, long ctx, long solver);
+  public static native void propagateRegisterCreated(Object o, long ctx, long solver);
+  public static native void propagateRegisterFixed(Object o, long ctx, long solver);
+  public static native void propagateRegisterEq(Object o, long ctx, long solver);
+  public static native void propagateRegisterDecide(Object o, long ctx, long solver);
+  public static native void propagateRegisterFinal(Object o, long ctx, long solver);
+  public static native void propagateAdd(Object o, long ctx, long solver, long javainfo, long e);
+  public static native boolean propagateConsequence(Object o, long ctx, long solver, long javainfo, int num_fixed, long[] fixed, long num_eqs, long[] eq_lhs, long[] eq_rhs, long conseq);
+  public static native boolean propagateNextSplit(Object o, long ctx, long solver, long javainfo, long e, long idx, int phase);
+  public static native void propagateDestroy(Object o, long ctx, long solver, long javainfo);
 
+  public static abstract class UserPropagatorBase implements AutoCloseable {
+    protected long ctx;
+    protected long solver;
+    protected long javainfo;
+
+    public UserPropagatorBase(long _ctx, long _solver) {
+        ctx = _ctx;
+        solver = _solver;
+        javainfo = propagateInit(this, ctx, solver);
+    }
+
+    @Override
+    public void close() {
+        Native.propagateDestroy(this, ctx, solver, javainfo);
+        javainfo = 0;
+        solver = 0;
+        ctx = 0;
+    }
+
+    protected final void registerCreated() {
+        Native.propagateRegisterCreated(this, ctx, solver);
+    }
+
+    protected final void registerFixed() {
+        Native.propagateRegisterFixed(this, ctx, solver);
+    }
+
+    protected final void registerEq() {
+        Native.propagateRegisterEq(this, ctx, solver);
+    }
+
+    protected final void registerDecide() {
+        Native.propagateRegisterDecide(this, ctx, solver);
+    }
+
+    protected final void registerFinal() {
+        Native.propagateRegisterFinal(this, ctx, solver);
+    }
+
+    protected abstract void pushWrapper();
+
+    protected abstract void popWrapper(int number);
+
+    protected abstract void finWrapper();
+
+    protected abstract void eqWrapper(long lx, long ly);
+
+    protected abstract UserPropagatorBase freshWrapper(long lctx);
+
+    protected abstract void createdWrapper(long le);
+
+    protected abstract void fixedWrapper(long lvar, long lvalue);
+
+    protected abstract void decideWrapper(long lvar, int bit, boolean is_pos);
+  }
+    """)
     java_native.write('\n')
     for name, result, params in _dotnet_decls:
         java_native.write('  protected static native %s INTERNAL%s(' % (type2java(result), java_method_name(name)))
@@ -700,7 +768,7 @@ def mk_java(java_src, java_dir, package_name):
             java_wrapper.write(line)            
     for name, result, params in _dotnet_decls:
         java_wrapper.write('DLL_VIS JNIEXPORT %s JNICALL Java_%s_Native_INTERNAL%s(JNIEnv * jenv, jclass cls' % (type2javaw(result), pkg_str, java_method_name(name)))
-        i = 0
+        i = 0        
         for param in params:
             java_wrapper.write(', ')
             java_wrapper.write('%s a%d' % (param2javaw(param), i))
@@ -1761,17 +1829,28 @@ def write_core_py_preamble(core_py):
   core_py.write(
 """
 # Automatically generated file
+import atexit
 import sys, os
+import contextlib
 import ctypes
-import pkg_resources
+if sys.version_info >= (3, 9):
+    import importlib.resources as importlib_resources
+else:
+    import importlib_resources
 from .z3types import *
 from .z3consts import *
 
+_file_manager = contextlib.ExitStack()
+atexit.register(_file_manager.close)
 _ext = 'dll' if sys.platform in ('win32', 'cygwin') else 'dylib' if sys.platform == 'darwin' else 'so'
 _lib = None
+_z3_lib_resource = importlib_resources.files('z3').joinpath('lib')
+_z3_lib_resource_path = _file_manager.enter_context(
+    importlib_resources.as_file(_z3_lib_resource)
+)
 _default_dirs = ['.',
                  os.path.dirname(os.path.abspath(__file__)),
-                 pkg_resources.resource_filename('z3', 'lib'),
+                 _z3_lib_resource_path,
                  os.path.join(sys.prefix, 'lib'),
                  None]
 _all_dirs = []
@@ -1821,10 +1900,10 @@ if _lib is None:
   print("  - to the custom Z3_LIB_DIRS Python-builtin before importing the z3 module, e.g. via")
   if sys.version < '3':
     print("    import __builtin__")
-    print("    __builtin__.Z3_LIB_DIRS = [ '/path/to/libz3.%s' ] " % _ext)
+    print("    __builtin__.Z3_LIB_DIRS = [ '/path/to/z3/lib/dir' ] # directory containing libz3.%s" % _ext)
   else:
     print("    import builtins")
-    print("    builtins.Z3_LIB_DIRS = [ '/path/to/libz3.%s' ] " % _ext)
+    print("    builtins.Z3_LIB_DIRS = [ '/path/to/z3/lib/dir' ] # directory containing libz3.%s" % _ext)
   print(_failures)
   raise Z3Exception("libz3.%s not found." % _ext)
 
@@ -1854,7 +1933,7 @@ _error_handler_type  = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_uint)
 _lib.Z3_set_error_handler.restype  = None
 _lib.Z3_set_error_handler.argtypes = [ContextObj, _error_handler_type]
 
-Z3_on_clause_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
+Z3_on_clause_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint), ctypes.c_void_p)
 Z3_push_eh  = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
 Z3_pop_eh   = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint)
 Z3_fresh_eh = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
@@ -1864,7 +1943,7 @@ Z3_final_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
 Z3_eq_eh    = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
 
 Z3_created_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
-Z3_decide_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
+Z3_decide_eh = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_int)
 
 _lib.Z3_solver_register_on_clause.restype = None
 _lib.Z3_solver_propagate_init.restype = None

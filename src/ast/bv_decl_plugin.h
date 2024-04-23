@@ -96,7 +96,7 @@ enum bv_op_kind {
     OP_BUMUL_OVFL, // unsigned multiplication overflow predicate (negation of OP_BUMUL_NO_OVFL)
     OP_BSMUL_OVFL, // signed multiplication over/underflow predicate
 
-    OP_BSDIV_OVFL, // signed division overflow perdicate
+    OP_BSDIV_OVFL, // signed division overflow predicate
 
     OP_BNEG_OVFL, // negation overflow predicate
 
@@ -386,9 +386,31 @@ public:
     bool is_bv_shl(expr const * e) const { return is_app_of(e, get_fid(), OP_BSHL); }
     bool is_sign_ext(expr const * e) const { return is_app_of(e, get_fid(), OP_SIGN_EXT); }
     bool is_bv_umul_no_ovfl(expr const* e) const { return is_app_of(e, get_fid(), OP_BUMUL_NO_OVFL); }
+    bool is_redand(expr const* e) const { return is_app_of(e, get_fid(), OP_BREDAND); }
+    bool is_redor(expr const* e) const { return is_app_of(e, get_fid(), OP_BREDOR); }
+    bool is_comp(expr const* e) const { return is_app_of(e, get_fid(), OP_BCOMP); }
+    bool is_rotate_left(expr const* e) const { return is_app_of(e, get_fid(), OP_ROTATE_LEFT); }
+    bool is_rotate_right(expr const* e) const { return is_app_of(e, get_fid(), OP_ROTATE_RIGHT); }
+    bool is_ext_rotate_left(expr const* e) const { return is_app_of(e, get_fid(), OP_EXT_ROTATE_LEFT); }
+    bool is_ext_rotate_right(expr const* e) const { return is_app_of(e, get_fid(), OP_EXT_ROTATE_RIGHT); }
+
+    bool is_rotate_left(expr const* e, unsigned& n, expr*& x) const {
+        return is_rotate_left(e) && (n = to_app(e)->get_parameter(0).get_int(), x = to_app(e)->get_arg(0), true);
+    }
+    bool is_rotate_right(expr const* e, unsigned& n, expr*& x) const {
+        return is_rotate_right(e) && (n = to_app(e)->get_parameter(0).get_int(), x = to_app(e)->get_arg(0), true);
+    }
+    bool is_int2bv(expr const* e, unsigned& n, expr*& x) const {
+        return is_int2bv(e) && (n = to_app(e)->get_parameter(0).get_int(), x = to_app(e)->get_arg(0), true);
+    }
 
     MATCH_UNARY(is_bv_not);
+    MATCH_UNARY(is_redand);
+    MATCH_UNARY(is_redor);
 
+    MATCH_BINARY(is_ext_rotate_left);
+    MATCH_BINARY(is_ext_rotate_right);
+    MATCH_BINARY(is_comp);
     MATCH_BINARY(is_bv_add);
     MATCH_BINARY(is_bv_sub);
     MATCH_BINARY(is_bv_mul);
@@ -411,12 +433,23 @@ public:
     MATCH_BINARY(is_bv_sdiv);
     MATCH_BINARY(is_bv_udiv);
     MATCH_BINARY(is_bv_smod);
+    MATCH_BINARY(is_bv_and);
+    MATCH_BINARY(is_bv_or);
+    MATCH_BINARY(is_bv_xor);
+    MATCH_BINARY(is_bv_nand);
+    MATCH_BINARY(is_bv_nor);
+
 
     MATCH_BINARY(is_bv_uremi);
     MATCH_BINARY(is_bv_sremi);
     MATCH_BINARY(is_bv_sdivi);
     MATCH_BINARY(is_bv_udivi);
     MATCH_BINARY(is_bv_smodi);
+    MATCH_BINARY(is_bv_urem0);
+    MATCH_BINARY(is_bv_srem0);
+    MATCH_BINARY(is_bv_sdiv0);
+    MATCH_BINARY(is_bv_udiv0);
+    MATCH_BINARY(is_bv_smod0);
     MATCH_UNARY(is_bit2bool);
     MATCH_UNARY(is_int2bv);
     bool is_bit2bool(expr* e, expr*& bv, unsigned& idx) const;
@@ -516,17 +549,23 @@ public:
     app * mk_bv_lshr(expr* arg1, expr* arg2) { return m_manager.mk_app(get_fid(), OP_BLSHR, arg1, arg2); }
 
     app * mk_bv2int(expr* e);
+    app * mk_int2bv(unsigned sz, expr* e);
+
+    app* mk_bv_rotate_left(expr* arg1, expr* arg2) { return m_manager.mk_app(get_fid(), OP_EXT_ROTATE_LEFT, arg1, arg2); }
+    app* mk_bv_rotate_right(expr* arg1, expr* arg2) { return m_manager.mk_app(get_fid(), OP_EXT_ROTATE_RIGHT, arg1, arg2); }
+    app* mk_bv_rotate_left(expr* arg, unsigned n);
+    app* mk_bv_rotate_right(expr* arg, unsigned n);
 
     // TODO: all these binary ops commute (right?) but it'd be more logical to swap `n` & `m` in the `return`
-    app * mk_bvsmul_no_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_NO_OVFL, n, m); }
-    app * mk_bvsmul_no_udfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_NO_UDFL, n, m); }
-    app * mk_bvumul_no_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUMUL_NO_OVFL, n, m); }
-    app * mk_bvsmul_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_OVFL, n, m); }
-    app * mk_bvumul_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUMUL_OVFL, n, m); }
+    app * mk_bvsmul_no_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_NO_OVFL, m, n); }
+    app * mk_bvsmul_no_udfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_NO_UDFL, m, n); }
+    app * mk_bvumul_no_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUMUL_NO_OVFL, m, n); }
+    app * mk_bvsmul_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSMUL_OVFL, m, n); }
+    app * mk_bvumul_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUMUL_OVFL, m, n); }
     app * mk_bvsdiv_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSDIV_OVFL, m, n); }
     app * mk_bvneg_ovfl(expr* m) { return m_manager.mk_app(get_fid(), OP_BNEG_OVFL, m); }
-    app * mk_bvuadd_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUADD_OVFL, n, m); }
-    app * mk_bvsadd_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSADD_OVFL, n, m); }
+    app * mk_bvuadd_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUADD_OVFL, m, n); }
+    app * mk_bvsadd_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSADD_OVFL, m, n); }
     app * mk_bvusub_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BUSUB_OVFL, m, n); }
     app * mk_bvssub_ovfl(expr* m, expr* n) { return m_manager.mk_app(get_fid(), OP_BSSUB_OVFL, m, n); }
 

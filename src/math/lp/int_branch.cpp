@@ -15,7 +15,6 @@
 
   Revision History:
   --*/
-
 #include "math/lp/int_solver.h"
 #include "math/lp/lar_solver.h"
 #include "math/lp/int_branch.h"
@@ -25,16 +24,17 @@ namespace lp {
 int_branch::int_branch(int_solver& lia):lia(lia), lra(lia.lra) {}
 
 lia_move int_branch::operator()() {
-    lra.move_non_basic_columns_to_bounds(true);
+    lra.move_non_basic_columns_to_bounds();
     int j = find_inf_int_base_column();
     return j == -1? lia_move::sat : create_branch_on_column(j);        
 }
 
 lia_move int_branch::create_branch_on_column(int j) {
     TRACE("check_main_int", tout << "branching" << std::endl;);
-    lp_assert(lia.m_t.is_empty());
+    lia.m_t.clear();
+
     lp_assert(j != -1);
-    lia.m_t.add_monomial(mpq(1), lra.column_to_reported_index(j));
+    lia.m_t.add_monomial(mpq(1), j);
     if (lia.is_free(j)) {
         lia.m_upper = lia.random() % 2;
         lia.m_k = mpq(0);
@@ -53,7 +53,7 @@ lia_move int_branch::create_branch_on_column(int j) {
 
 int int_branch::find_inf_int_base_column() {
 
-#if 0
+#if 1
     return lia.select_int_infeasible_var();
 #endif
 
@@ -63,7 +63,7 @@ int int_branch::find_inf_int_base_column() {
     mpq small_value(1024);
     unsigned n = 0;
     lar_core_solver & lcs = lra.m_mpq_lar_core_solver;
-    unsigned prev_usage = 0; // to quiet down the compile
+    unsigned prev_usage = 0; // to quiet down the compiler
     unsigned k = 0;
     unsigned usage;
     unsigned j;

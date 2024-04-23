@@ -19,18 +19,16 @@ Description:
 namespace nla {
 
     void divisions::add_idivision(lpvar q, lpvar x, lpvar y) {
+        const auto& lra = m_core.lra;
         if (x == null_lpvar || y == null_lpvar || q == null_lpvar)
-            return;
-        if (lp::tv::is_term(x) || lp::tv::is_term(y) || lp::tv::is_term(q))
             return;
         m_idivisions.push_back({q, x, y});
         m_core.trail().push(push_back_vector(m_idivisions));
     }
 
     void divisions::add_rdivision(lpvar q, lpvar x, lpvar y) {
+        auto& lra = m_core.lra;
         if (x == null_lpvar || y == null_lpvar || q == null_lpvar)
-            return;
-        if (lp::tv::is_term(x) || lp::tv::is_term(y) || lp::tv::is_term(q))
             return;
         m_rdivisions.push_back({ q, x, y });
         m_core.trail().push(push_back_vector(m_rdivisions));
@@ -39,7 +37,7 @@ namespace nla {
     void divisions::add_bounded_division(lpvar q, lpvar x, lpvar y) {
         if (x == null_lpvar || y == null_lpvar || q == null_lpvar)
             return;
-        if (lp::tv::is_term(x) || lp::tv::is_term(y) || lp::tv::is_term(q))
+        if (m_core.lra.column_has_term(x) || m_core.lra.column_has_term(y) ||  m_core.lra.column_has_term(q))
             return;
         m_bounded_divisions.push_back({ q, x, y });
         m_core.trail().push(push_back_vector(m_bounded_divisions));
@@ -52,7 +50,7 @@ namespace nla {
     // y2 <= y1 < 0 & x1 <= x2 <= 0 => x1/y1 >= x2/y2
 
     void divisions::check() {
-        core& c = m_core;        
+        core& c = m_core;
         if (c.use_nra_model()) 
             return;
 
@@ -132,7 +130,7 @@ namespace nla {
                 auto x2val = c.val(x2);
                 auto y2val = c.val(y2);
                 auto q2val = c.val(q2);
-                if (monotonicity(x, xval, y, yval, r, rval, x2, x2val, y2, y2val, q2, q2val))
+                if (monotonicity(x, xval, y, yval, r, rval, x2, x2val, y2, y2val, q2, q2val)) 
                     return;
             }
         }

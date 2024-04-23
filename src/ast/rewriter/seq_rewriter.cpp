@@ -829,6 +829,7 @@ br_status seq_rewriter::mk_seq_concat(expr* a, expr* b, expr_ref& result) {
 
 br_status seq_rewriter::mk_seq_length(expr* a, expr_ref& result) {
     zstring b;
+    rational r;
     m_es.reset();
     str().get_concat(a, m_es);
     unsigned len = 0;
@@ -868,6 +869,17 @@ br_status seq_rewriter::mk_seq_length(expr* a, expr_ref& result) {
         result = str().mk_length(z);
         return BR_REWRITE1;
     } 
+    // not suitable for noodler: adds length check which makes it harder
+    // // len(extract(x, 0, z)) = min(z, len(x))
+    // if (str().is_extract(a, x, y, z) && 
+    //     m_autil.is_numeral(y, r) && r.is_zero() &&
+    //     m_autil.is_numeral(z, r) && r >= 0) {
+    //     expr* len_x = str().mk_length(x);
+    //     result = m().mk_ite(m_autil.mk_le(len_x, z), len_x, z);
+    //     // expr* zero = m_autil.mk_int(0);
+    //     // result = m().mk_ite(m_autil.mk_le(z, zero), zero, result);
+    //     return BR_REWRITE_FULL;
+    // }
 #if 0
     expr* s = nullptr, *offset = nullptr, *length = nullptr;
     if (str().is_extract(a, s, offset, length)) {
@@ -1213,6 +1225,11 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
     constantPos &= pos.is_unsigned();
     constantLen &= len.is_unsigned();
 
+    if (constantPos && constantLen && len == 1) {
+        result = str().mk_at(a, b);
+        return BR_REWRITE1;
+    }
+
     if (constantPos && constantLen && constantBase) {
         unsigned _pos = pos.get_unsigned();
         unsigned _len = len.get_unsigned();
@@ -1248,6 +1265,15 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
         is_suffix(a1, b1, c1) && is_suffix(a, b, c)) {
         result = str().mk_substr(a1, m_autil.mk_add(b1, b), m_autil.mk_sub(c1, b));
         return BR_REWRITE3;
+    }
+    rational r1, r2;
+    if (str().is_extract(a, a1, b1, c1) &&
+        m_autil.is_numeral(b1, r1) && r1.is_unsigned() &&
+        m_autil.is_numeral(c1, r2) && r2.is_unsigned() &&
+        constantPos && constantLen &&
+        r1 == 0 && r2 >= pos + len) {        
+        result = str().mk_substr(a1, b, c);
+        return BR_REWRITE1;            
     }
 
     if (str().is_extract(a, a1, b1, c1) && 
@@ -1547,9 +1573,17 @@ bool seq_rewriter::reduce_by_char(expr_ref& r, expr* ch, unsigned depth) {
  */
 br_status seq_rewriter::mk_seq_at(expr* a, expr* b, expr_ref& result) {
     zstring c;
-    rational r;
+    rational r, offset_r, len_r;
+    expr* offset, *a1, *len;
     expr_ref_vector lens(m());
     sort* sort_a = a->get_sort();
+    if (str().is_extract(a, a1, offset, len) && 
+        m_autil.is_numeral(offset, offset_r) && offset_r.is_zero() && 
+        m_autil.is_numeral(len, len_r) && m_autil.is_numeral(b, r) && 
+        r < len_r) {
+        result = str().mk_at(a1, b);
+        return BR_REWRITE1;
+    }
     if (!get_lengths(b, lens, r)) {
         return BR_FAILED;
     }
@@ -1722,6 +1756,10 @@ br_status seq_rewriter::mk_seq_last_index(expr* a, expr* b, expr_ref& result) {
     if (isc1 && isc2) {
         int idx = s1.last_indexof(s2);
         result = m_autil.mk_numeral(rational(idx), true);
+        return BR_DONE;
+    }
+    if (a == b) {
+        result = m_autil.mk_int(0);
         return BR_DONE;
     }
     return BR_FAILED;
@@ -3456,7 +3494,7 @@ expr_ref seq_rewriter::mk_antimirov_deriv_union(expr* d1, expr* d2) {
 // 
 // restrict(d, false) = []
 // 
-// it is already assumed that the restriction takes place witin a branch
+// it is already assumed that the restriction takes place within a branch
 // so the condition is not added explicitly but propagated down in order to eliminate 
 // infeasible cases
 expr_ref seq_rewriter::mk_antimirov_deriv_restrict(expr* e, expr* d, expr* cond) {
@@ -3695,7 +3733,7 @@ expr_ref seq_rewriter::mk_regex_concat(expr* r, expr* s) {
         result = re().mk_plus(re().mk_full_char(ele_sort));
     else if (re().is_concat(r, r1, r2))
         // create the resulting concatenation in right-associative form except for the following case
-        // TODO: maintain the followig invariant for A ++ B{m,n} + C
+        // TODO: maintain the following invariant for A ++ B{m,n} + C
         //       concat(concat(A, B{m,n}), C) (if A != () and C != ()) 
         //       concat(B{m,n}, C) (if A == () and C != ()) 
         // where A, B, C are regexes
@@ -3703,11 +3741,11 @@ expr_ref seq_rewriter::mk_regex_concat(expr* r, expr* s) {
         // In other words, do not make A ++ B{m,n} into right-assoc form, but keep B{m,n} at the top 
         // This will help to identify this situation in the merge routine:
         //               concat(concat(A, B{0,m}), C) | concat(concat(A, B{0,n}), C)
-        // simplies to 
+        // simplifies to
         //               concat(concat(A, B{0,max(m,n)}), C)
         // analogously:
         //               concat(concat(A, B{0,m}), C) & concat(concat(A, B{0,n}), C)
-        // simplies to 
+        // simplifies to
         //               concat(concat(A, B{0,min(m,n)}), C)
         result = mk_regex_concat(r1, mk_regex_concat(r2, s));
     else {
@@ -3828,12 +3866,12 @@ bool seq_rewriter::pred_implies(expr* a, expr* b) {
     Utility function to decide if two BDDs (nested if-then-else terms)
     have exactly the same structure and conditions.
 */
-bool seq_rewriter::ite_bdds_compatabile(expr* a, expr* b) {
+bool seq_rewriter::ite_bdds_compatible(expr* a, expr* b) {
     expr* ca = nullptr, *a1 = nullptr, *a2 = nullptr;
     expr* cb = nullptr, *b1 = nullptr, *b2 = nullptr;
     if (m().is_ite(a, ca, a1, a2) && m().is_ite(b, cb, b1, b2)) {
-        return (ca == cb) && ite_bdds_compatabile(a1, b1)
-                          && ite_bdds_compatabile(a2, b2);
+        return (ca == cb) && ite_bdds_compatible(a1, b1)
+                          && ite_bdds_compatible(a2, b2);
     }
     else if (m().is_ite(a) || m().is_ite(b)) {
         return false;
@@ -3893,7 +3931,7 @@ expr_ref seq_rewriter::mk_der_op_rec(decl_kind k, expr* a, expr* b) {
         // sophisticated: in an antimirov union of n terms, we really
         // want to check if any pair of them is compatible.
         else if (m().is_ite(a) && m().is_ite(b) &&
-                 !ite_bdds_compatabile(a, b)) {
+                 !ite_bdds_compatible(a, b)) {
             k = _OP_RE_ANTIMIROV_UNION;
         }
         #endif
@@ -4247,7 +4285,7 @@ expr_ref seq_rewriter::mk_derivative_rec(expr* ele, expr* r) {
     }
     else if (re().is_reverse(r, r1)) {
         if (re().is_to_re(r1, r2)) {
-            // First try to exctract hd and tl such that r = hd ++ tl and |tl|=1
+            // First try to extract hd and tl such that r = hd ++ tl and |tl|=1
             expr_ref hd(m()), tl(m());
             if (get_head_tail_reversed(r2, hd, tl)) {
                 // Use mk_der_cond to normalize
@@ -5050,12 +5088,14 @@ br_status seq_rewriter::mk_re_star(expr* a, expr_ref& result) {
  * (re.range c_1 c_n) 
  */
 br_status seq_rewriter::mk_re_range(expr* lo, expr* hi, expr_ref& result) {
-    zstring s;
+    zstring slo, shi;
     unsigned len = 0;
     bool is_empty = false;
-    if (str().is_string(lo, s) && s.length() != 1) 
+    if (str().is_string(lo, slo) && slo.length() != 1) 
         is_empty = true;
-    if (str().is_string(hi, s) && s.length() != 1) 
+    if (str().is_string(hi, shi) && shi.length() != 1) 
+        is_empty = true;
+    if (slo.length() == 1 && shi.length() == 1 && slo[0] > shi[0])
         is_empty = true;
     len = min_length(lo).second;
     if (len > 1)
@@ -5272,7 +5312,17 @@ br_status seq_rewriter::reduce_re_is_empty(expr* r, expr_ref& result) {
     else if (re().is_range(r, r1, r2) && 
              str().is_string(r1, s1) && str().is_string(r2, s2) && 
              s1.length() == 1 && s2.length() == 1) {
-        result = m().mk_bool_val(s1[0] <= s2[0]);
+        result = m().mk_bool_val(s1[0] > s2[0]);
+        return BR_DONE;
+    }
+    else if (re().is_range(r, r1, r2) && 
+             str().is_string(r1, s1) && s1.length() != 1) {
+        result = m().mk_true();
+        return BR_DONE;
+    }
+    else if (re().is_range(r, r1, r2) && 
+             str().is_string(r2, s2) && s2.length() != 1) {
+        result = m().mk_true();
         return BR_DONE;
     }
     else if ((re().is_loop(r, r1, lo) ||
@@ -5333,6 +5383,7 @@ br_status seq_rewriter::mk_le_core(expr * l, expr * r, expr_ref & result) {
 }
 
 br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
+    TRACE("seq", tout << mk_pp(l, m()) << " == " << mk_pp(r, m()) << "\n");
     expr_ref_vector res(m());
     expr_ref_pair_vector new_eqs(m());
     if (m_util.is_re(l)) {

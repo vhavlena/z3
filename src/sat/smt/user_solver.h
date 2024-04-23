@@ -75,9 +75,10 @@ namespace user_solver {
         euf::enode_pair_vector          m_eqs;
         unsigned_vector                 m_fixed_ids;
         stats                           m_stats;
-        expr*                           m_next_split_expr = nullptr;
-        unsigned                        m_next_split_idx;
-        lbool                           m_next_split_phase;
+        sat::bool_var                   m_next_split_var = sat::null_bool_var;
+        lbool                           m_next_split_phase = l_undef;
+        vector<expr_ref_vector> m_clauses_to_replay;
+        unsigned                m_replay_qhead = 0;
 
         struct justification {
             unsigned m_propagation_index { 0 };
@@ -103,6 +104,11 @@ namespace user_solver {
         bool visit(expr* e) override;
         bool visited(expr* e) override;
         bool post_visit(expr* e, bool sign, bool root) override;
+
+        sat::bool_var enode_to_bool(euf::enode* n, unsigned idx);
+
+        void replay_clause(expr_ref_vector const& clause);
+        void persist_clause(sat::literal lit, sat::justification const& j);
 
     public:
         solver(euf::solver& ctx);
@@ -134,9 +140,9 @@ namespace user_solver {
 
         bool has_fixed() const { return (bool)m_fixed_eh; }
 
-        void propagate_cb(unsigned num_fixed, expr* const* fixed_ids, unsigned num_eqs, expr* const* lhs, expr* const* rhs, expr* conseq) override;
+        bool propagate_cb(unsigned num_fixed, expr* const* fixed_ids, unsigned num_eqs, expr* const* lhs, expr* const* rhs, expr* conseq) override;
         void register_cb(expr* e) override;
-        void next_split_cb(expr* e, unsigned idx, lbool phase) override;
+        bool next_split_cb(expr* e, unsigned idx, lbool phase) override;
 
         void new_fixed_eh(euf::theory_var v, expr* value, unsigned num_lits, sat::literal const* jlits);
 

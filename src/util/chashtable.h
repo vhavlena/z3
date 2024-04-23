@@ -161,8 +161,12 @@ protected:
         unsigned curr_cellar  = (m_capacity - m_slots);
         unsigned new_slots    = m_slots * 2;
         unsigned new_cellar   = curr_cellar * 2;
+        if (new_slots < m_slots || new_cellar < curr_cellar)
+            throw default_exception("table overflow");            
         while (true) {
             unsigned new_capacity = new_slots + new_cellar;
+            if (new_capacity < new_slots)
+                throw default_exception("table overflow");
             cell * new_table      = alloc_table(new_capacity);
             cell * next_cell      = copy_table(m_table, m_slots, m_capacity,
                                                new_table, new_slots, new_capacity,
@@ -179,6 +183,8 @@ protected:
                 return;
             }
             dealloc_vect(new_table, new_capacity);
+            if (2*new_cellar < new_cellar)
+                throw default_exception("table overflow");                
             new_cellar *= 2;
         }
     }
@@ -553,7 +559,7 @@ public:
     iterator begin() const { return iterator(m_table, m_table + m_slots); }
     iterator end() const { return iterator(); }
 
-    void swap(chashtable & other) {
+    void swap(chashtable & other) noexcept {
         std::swap(m_table,       other.m_table);
         std::swap(m_capacity,    other.m_capacity);
         std::swap(m_init_slots,  other.m_init_slots);
