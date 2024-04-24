@@ -111,7 +111,7 @@ namespace smt::noodler::regex {
                 } else {
                     // we need to repeat body_nfa at least low times
                     for (unsigned i = 0; i < low; ++i) {
-                        nfa.concatenate(nfa);
+                        nfa.concatenate(body_nfa);
                         nfa.trim();
                     }
                 }
