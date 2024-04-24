@@ -47,6 +47,13 @@ namespace smt::noodler {
     lbool NielsenDecisionProcedure::compute_next_solution() {
         // if the compute_next_solution was called for the first time
         if(this->graphs.size() == 0) {
+
+            // sort predicates from smallest to largest
+            std::vector<Predicate>& preds = this->formula.get_predicates();
+            std::sort(preds.begin(), preds.end(), [](const Predicate& p1, const Predicate& p2) {
+                return (p1.get_left_side().size() + p1.get_right_side().size()) < (p2.get_left_side().size() + p2.get_right_side().size());
+            });
+
             std::vector<Formula> instances = divide_independent_formula(this->formula);
             for(const Formula& fle : instances) {
                 bool is_sat;
@@ -208,20 +215,23 @@ namespace smt::noodler {
     NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
-        std::deque<std::pair<size_t, Formula>> worklist;
-        worklist.push_back({0, trim_formula(init)}); 
+
+        // use priority queue to prefer smaller formulae (higher probability to reach a final node)
+        auto cmp = [](const auto& pr1, const auto& pr2) { return NielsenDecisionProcedure::get_formula_cost(pr1.second) > NielsenDecisionProcedure::get_formula_cost(pr2.second); };
+        std::priority_queue<std::pair<size_t, Formula>, std::vector<std::pair<size_t, Formula>>, decltype(cmp)> worklist(cmp);
+        worklist.push({0, trim_formula(init)}); 
         graph.set_init(init);
 
         is_sat = false;
         while(!worklist.empty()) {
-            std::pair<size_t, Formula> pr = worklist.front();
+            std::pair<size_t, Formula> pr = worklist.top();
             size_t index = pr.first;
             if(generated.find(pr.second) != generated.end()) {
-                worklist.pop_front();
+                worklist.pop();
                 continue;
             }
             generated.insert(pr.second);
-            worklist.pop_front();
+            worklist.pop();
 
             std::vector<Predicate> predicates = pr.second.get_predicates();
             if(is_pred_unsat(predicates[index]) || is_length_unsat(predicates[index])) {
@@ -248,7 +258,7 @@ namespace smt::noodler {
                     graph.add_edge(pr.second, rpl, label);
                 }
                 if(generated.find(rpl) == generated.end()) {
-                    worklist.push_back({index, rpl});
+                    worklist.push({index, rpl});
                 }
             }
         }
