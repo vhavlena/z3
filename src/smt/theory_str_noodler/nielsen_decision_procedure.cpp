@@ -218,6 +218,7 @@ namespace smt::noodler {
 
         // use priority queue to prefer smaller formulae (higher probability to reach a final node)
         auto cmp = [](const auto& pr1, const auto& pr2) { return NielsenDecisionProcedure::get_formula_cost(pr1.second) > NielsenDecisionProcedure::get_formula_cost(pr2.second); };
+        // priority queue sorted by the cost of formula
         std::priority_queue<std::pair<size_t, Formula>, std::vector<std::pair<size_t, Formula>>, decltype(cmp)> worklist(cmp);
         worklist.push({0, trim_formula(init)}); 
         graph.set_init(init);
