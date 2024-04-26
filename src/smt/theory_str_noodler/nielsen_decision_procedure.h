@@ -326,9 +326,20 @@ namespace smt::noodler {
         static unsigned get_formula_cost(const Formula& fl) { 
             unsigned ret = 0;
             for(const Predicate& pr : fl.get_predicates()) {
-                ret += pr.get_left_side().size() + pr.get_right_side().size();
+                ret += get_predicate_cost(pr);
             }
             return ret;
+        }
+
+        /**
+         * @brief Get predicate cost. It is computed as a number of literals/variables 
+         * occurrences in the predicate.
+         * 
+         * @param pr Preicate
+         * @return unsigned Cost
+         */
+        static unsigned get_predicate_cost(const Predicate& pr) {
+            return pr.get_left_side().size() + pr.get_right_side().size();
         }
 
     public:

@@ -51,7 +51,7 @@ namespace smt::noodler {
             // sort predicates from smallest to largest
             std::vector<Predicate>& preds = this->formula.get_predicates();
             std::sort(preds.begin(), preds.end(), [](const Predicate& p1, const Predicate& p2) {
-                return (p1.get_left_side().size() + p1.get_right_side().size()) < (p2.get_left_side().size() + p2.get_right_side().size());
+                return NielsenDecisionProcedure::get_predicate_cost(p1) < NielsenDecisionProcedure::get_predicate_cost(p2);
             });
 
             std::vector<Formula> instances = divide_independent_formula(this->formula);
