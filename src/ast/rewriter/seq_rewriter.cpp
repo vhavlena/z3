@@ -4944,6 +4944,9 @@ br_status seq_rewriter::mk_re_loop(func_decl* f, unsigned num_args, expr* const*
     rational n1, n2;
     unsigned lo, hi, lo2, hi2, np;
     expr* a = nullptr;
+    expr* comp = nullptr, *tore = nullptr;
+    zstring zstr;
+
     switch (num_args) {
     case 1: 
         np = f->get_num_parameters();
@@ -4981,6 +4984,18 @@ br_status seq_rewriter::mk_re_loop(func_decl* f, unsigned num_args, expr* const*
         if (np == 1 && lo2 == 0) {
             result = re().mk_star(args[0]);
             return BR_DONE;
+        }
+        
+        if(lo2 > 0 && re().is_complement(args[0], comp) && re().is_to_re(comp, tore) && str().is_string(tore, zstr) ) {
+            // (loop (compl (to_re str)) n m) = compl (to_re str) if |str| == 1
+            // (loop (compl (to_re str)) n m) = re.* allchar if |str| > 1
+            if(zstr.length() == 1) {
+                result = args[0];
+                return BR_DONE;
+            } else if (zstr.length() > 1) {
+                result = re().mk_full_seq(a->get_sort());
+                return BR_DONE;
+            }
         }
         break;
     case 2:

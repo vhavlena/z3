@@ -14,7 +14,7 @@ namespace {
 namespace smt::noodler::regex {
 
     [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                  const std::set<uint32_t>& alphabet, bool determinize, bool make_complement) {
+                                  const Alphabet& alphabet, bool determinize, bool make_complement) {
         Nfa nfa{};
 
         if (m_util_s.re.is_to_re(expression)) { // Handle conversion of to regex function call.
@@ -48,7 +48,7 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_dot_plus(expression)) { // Handle dot plus.
             nfa.initial.insert(0);
             nfa.final.insert(1);
-            for (const auto& symbol : alphabet) {
+            for (const auto& symbol : alphabet.get_alphabet()) {
                 nfa.delta.add(0, symbol, 1);
                 nfa.delta.add(1, symbol, 1);
             }
@@ -59,13 +59,13 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
             nfa.initial.insert(0);
             nfa.final.insert(1);
-            for (const auto& symbol : alphabet) {
+            for (const auto& symbol : alphabet.get_alphabet()) {
                 nfa.delta.add(0, symbol, 1);
             }
         } else if (m_util_s.re.is_full_seq(expression)) {
             nfa.initial.insert(0);
             nfa.final.insert(0);
-            for (const auto& symbol : alphabet) {
+            for (const auto& symbol : alphabet.get_alphabet()) {
                 nfa.delta.add(0, symbol, 0);
             }
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
@@ -97,22 +97,29 @@ namespace smt::noodler::regex {
                     // ... or empty language
                     nfa = std::move(body_nfa);
                 }
+            } else if(body_nfa.is_universal(alphabet.get_mata_alphabet())) {
+                nfa = std::move(body_nfa);
             } else {
                 body_nfa.unify_final();
                 body_nfa.unify_initial();
 
                 body_nfa = mata::nfa::reduce(body_nfa);
                 nfa = mata::nfa::builder::create_empty_string_nfa();
-                // we need to repeat body_nfa at least low times
-                for (unsigned i = 0; i < low; ++i) {
-                    nfa.concatenate(body_nfa);
-                    nfa.trim();
+             
+                if(low >= LOOP_BOUND) {
+                    nfa = create_large_concat(body_nfa, low);
+                } else {
+                    // we need to repeat body_nfa at least low times
+                    for (unsigned i = 0; i < low; ++i) {
+                        nfa.concatenate(body_nfa);
+                        nfa.trim();
+                    }
                 }
 
                 // we will now either repeat body_nfa high-low times (if is_high_set) or
                 // unlimited times (if it is not set), but we have to accept after each loop,
                 // so we add an empty word into body_nfa
-                mata::nfa::State new_state = nfa.add_state();
+                mata::nfa::State new_state = body_nfa.add_state();
                 body_nfa.initial.insert(new_state);
                 body_nfa.final.insert(new_state);
 
@@ -217,7 +224,7 @@ namespace smt::noodler::regex {
 
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
-        if(nfa.num_of_states() < 1000) {
+        if(nfa.num_of_states() < RED_BOUND) {
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
@@ -233,11 +240,7 @@ namespace smt::noodler::regex {
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
             STRACE("str-create_nfa", tout << "Complemented NFA:" << std::endl;);
-            mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : alphabet) {
-                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-            }
-            nfa = mata::nfa::complement(nfa, mata_alphabet, { 
+            nfa = mata::nfa::complement(nfa, alphabet.get_mata_alphabet(), { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
@@ -445,5 +448,28 @@ namespace smt::noodler::regex {
             util::throw_error("unsupported operation in regex");
         }
         return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_undef};
+    }
+
+    mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count) {
+        mata::nfa::Nfa nfa_part = mata::nfa::builder::create_empty_string_nfa();
+        mata::nfa::Nfa nfa = mata::nfa::builder::create_empty_string_nfa();
+        const unsigned CONCAT = 100;
+
+        for(unsigned i = 0; i < CONCAT; i++) {
+            nfa_part.concatenate(body_nfa);
+            nfa_part.trim();
+        }
+        unsigned cnt = 0;
+        for(unsigned i = 0; i < count / CONCAT; i++) {
+            nfa.concatenate(nfa_part);
+            nfa.trim();
+            cnt += CONCAT;
+        }
+        for(; cnt <= count; cnt++) {
+            nfa.concatenate(body_nfa);
+            nfa.trim();
+        }
+
+        return nfa;
     }
 }
