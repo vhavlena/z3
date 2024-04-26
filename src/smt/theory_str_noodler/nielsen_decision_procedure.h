@@ -316,6 +316,32 @@ namespace smt::noodler {
         bool get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
 
+        /**
+         * @brief Get a cost of the given formula. Implemented as a sum of literals/variables 
+         * occurring inside the formula.
+         * 
+         * @param fl Formula 
+         * @return unsigned Cost
+         */
+        static unsigned get_formula_cost(const Formula& fl) { 
+            unsigned ret = 0;
+            for(const Predicate& pr : fl.get_predicates()) {
+                ret += get_predicate_cost(pr);
+            }
+            return ret;
+        }
+
+        /**
+         * @brief Get predicate cost. It is computed as a number of literals/variables 
+         * occurrences in the predicate.
+         * 
+         * @param pr Preicate
+         * @return unsigned Cost
+         */
+        static unsigned get_predicate_cost(const Predicate& pr) {
+            return pr.get_left_side().size() + pr.get_right_side().size();
+        }
+
     public:
         
         /**
