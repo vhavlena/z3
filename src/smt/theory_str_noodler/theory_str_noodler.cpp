@@ -140,8 +140,9 @@ namespace smt::noodler {
             string_theory_propagation(ex, true, false);
             
         }
-        add_conversion_num_axioms();
-        add_len_num_axioms();
+        // not needed anymore, as we do this in rewriter
+        // add_conversion_num_axioms();
+        // add_len_num_axioms();
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
     }

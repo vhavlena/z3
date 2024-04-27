@@ -408,6 +408,13 @@ void seq_rewriter::get_param_descrs(param_descrs & r) {
 }
 
 br_status seq_rewriter::mk_bool_app(func_decl* f, unsigned n, expr* const* args, expr_ref& result) {
+    TRACE("seq",
+        tout << "(" << mk_pp(f, m());
+        for (unsigned i = 0; i < n; ++i) {
+            tout << mk_pp(args[i], m()) << " ";
+        }
+        tout << ")\n";
+    );
     switch (f->get_decl_kind()) {
     case OP_AND:
         return mk_bool_app_helper(true, n, args, result);
@@ -5362,6 +5369,12 @@ br_status seq_rewriter::reduce_re_eq(expr* l, expr* r, expr_ref& result) {
 }
 
 br_status seq_rewriter::mk_le_core(expr * l, expr * r, expr_ref & result) {
+    TRACE("seq", tout << mk_pp(l, m()) << " <= " << mk_pp(r, m()) << "\n");
+    // NOODLER: check if we do not have numerical comparison with str.len
+    // WARNING: I do not know if it will work correctly, this function in z3 does nothing because it caused problems I guess?
+    if (reduce_length_eq_leq(l, r, false, result)) {
+        return BR_REWRITE_FULL;
+    }
 
     return BR_FAILED;
 
@@ -5403,14 +5416,64 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
         return BR_DONE;
     }
     if (!changed) {
+        if (reduce_length_eq_leq(l, r, true, result) || reduce_stoi_eq(l, r, result)) {
+            // NOODLER: check if we do not have numerical comparison with str.len or str.to_int
+            return BR_REWRITE_FULL;
+        }
         return BR_FAILED;
     }
     for (auto const& p : new_eqs) {
-        res.push_back(m().mk_eq(p.first, p.second));
+        expr_ref tmp_result(m().mk_eq(p.first, p.second), m());
+        // NOODLER: check if we do not have numerical comparison with str.len or str.to_int
+        reduce_length_eq_leq(p.first, p.second, true, tmp_result);
+        reduce_stoi_eq(p.first, p.second, tmp_result);
+        res.push_back(tmp_result);
     }
     result = mk_and(res);
     TRACE("seq_verbose", tout << result << "\n";);
     return BR_REWRITE3;
+}
+
+
+bool seq_rewriter::reduce_length_eq_leq(expr *l, expr *r, bool is_equality, expr_ref& result) {
+    // number bound for the conversion of length constraints into regex constraints.
+    // For higher values this conversion could not be beneficial as we would work with 
+    // big automata in the decision procedure.
+    const int MAX_NUM = 64;
+    expr* e = nullptr;
+    unsigned n;
+    if (str().is_length(l,e) && m_autil.is_unsigned(r, n) && 0 < n && n < MAX_NUM) {
+        // for n a numeral:
+        //    (len s) == n -> s \in \Sigma^n
+        //    (len s) <= n -> s \in \Sigma^(0..n)
+        unsigned low = is_equality ? n : 0;
+        result = re().mk_in_re(e, re().mk_loop_proper(re().mk_full_char(nullptr), low, n));
+        return true;
+    } else if (str().is_length(r,e) && m_autil.is_unsigned(l, n) && 0 < n && n < MAX_NUM) {
+        // for n a numeral:
+        //    n <= (len s) -> s \in \Sigma^n\Sigma*
+        result = re().mk_in_re(e, re().mk_concat(re().mk_loop(re().mk_full_char(nullptr), n), re().mk_full_seq(nullptr)));
+        return true;
+    }
+    return false;
+}
+bool seq_rewriter::reduce_stoi_eq(expr *l, expr *r, expr_ref& result) {
+    expr* e = nullptr;
+    rational n;
+    // to_int(x) == n -> x \in 0*to_string(n)) for n>=0
+    // to_int(x) == -1 -> x \not\in [0-9]+
+    // to_int(x) == n -> false for n<-1
+    if (str().is_stoi(l, e) && m_autil.is_numeral(r, n)) {
+        if (n.is_nonneg()) {
+            result = re().mk_in_re(e, re().mk_concat(re().mk_star(re().mk_to_re(str().mk_string("0"))), re().mk_to_re(str().mk_string(n.to_string()))));
+        } else if (n == -1) {
+            result = re().mk_in_re(e, re().mk_complement(re().mk_plus(re().mk_range(str().mk_string("0"), str().mk_string("9")))));
+        } else {
+            result = m().mk_false();
+        }
+        return true;
+    }
+    return false;
 }
 
 void seq_rewriter::remove_empty_and_concats(expr_ref_vector& es) {
