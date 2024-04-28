@@ -32,6 +32,8 @@ Author:
 #include "math/automata/automaton.h"
 #include "math/automata/symbolic_automata_def.h"
 
+#include "smt/theory_str_noodler/ugly_global_variables.h"
+
 
 expr_ref sym_expr::accept(expr* e) {
     ast_manager& m = m_t.get_manager();
@@ -408,24 +410,36 @@ void seq_rewriter::get_param_descrs(param_descrs & r) {
 }
 
 br_status seq_rewriter::mk_bool_app(func_decl* f, unsigned n, expr* const* args, expr_ref& result) {
-    TRACE("seq",
-        tout << "(" << mk_pp(f, m());
-        for (unsigned i = 0; i < n; ++i) {
-            tout << mk_pp(args[i], m()) << " ";
-        }
-        tout << ")\n";
-    );
+    br_status res_status;
     switch (f->get_decl_kind()) {
     case OP_AND:
-        return mk_bool_app_helper(true, n, args, result);
+      {
+        res_status = mk_bool_app_helper(true, n, args, result);
+        break;
+      }
     case OP_OR:
-        return mk_bool_app_helper(false, n, args, result);
+      {
+        res_status = mk_bool_app_helper(false, n, args, result);
+        break;
+      }
     case OP_EQ:
         SASSERT(n == 2);
         // return mk_eq_helper(args[0], args[1], result);
     default:
-        return BR_FAILED;
+      {
+        res_status = BR_FAILED;
+      }
     }
+
+    TRACE("seq_verbose",
+        tout << mk_pp(m().mk_app(f, n, args), m());
+        if (res_status == BR_FAILED) {
+            tout << " failed to rewrite\n";
+        } else {
+            tout << " -> " << mk_pp(result, m()) << "\n";
+        }
+    );
+    return res_status;
 }
 
 br_status seq_rewriter::mk_bool_app_helper(bool is_and, unsigned n, expr* const* args, expr_ref& result) {
@@ -5369,13 +5383,14 @@ br_status seq_rewriter::reduce_re_eq(expr* l, expr* r, expr_ref& result) {
 }
 
 br_status seq_rewriter::mk_le_core(expr * l, expr * r, expr_ref & result) {
-    TRACE("seq", tout << mk_pp(l, m()) << " <= " << mk_pp(r, m()) << "\n");
     // NOODLER: check if we do not have numerical comparison with str.len
     // WARNING: I do not know if it will work correctly, this function in z3 does nothing because it caused problems I guess?
-    if (reduce_length_eq_leq(l, r, false, result)) {
+    if (smt::noodler::rewrite_shitty_things && reduce_length_eq_leq(l, r, false, result)) {
+        TRACE("seq", tout << mk_pp(l, m()) << " <= " << mk_pp(r, m()) << " -> " << result << "\n");
         return BR_REWRITE_FULL;
     }
 
+    TRACE("seq", tout << mk_pp(l, m()) << " <= " << mk_pp(r, m()) << " failed to rewrite\n");
     return BR_FAILED;
 
     // k <= len(x) -> true  if k <= 0
@@ -5400,38 +5415,40 @@ br_status seq_rewriter::mk_le_core(expr * l, expr * r, expr_ref & result) {
 }
 
 br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
-    TRACE("seq", tout << mk_pp(l, m()) << " == " << mk_pp(r, m()) << "\n");
     expr_ref_vector res(m());
     expr_ref_pair_vector new_eqs(m());
-    if (m_util.is_re(l)) {
-        return reduce_re_eq(l, r, result);
-    }
+    br_status res_status;
     bool changed = false;
-    if (reduce_eq_empty(l, r, result)) 
-        return BR_REWRITE_FULL;
-
-    if (!reduce_eq(l, r, new_eqs, changed)) {
+    if (m_util.is_re(l)) {
+        res_status = reduce_re_eq(l, r, result);
+    } else if (reduce_eq_empty(l, r, result))  {
+        res_status = BR_REWRITE_FULL;
+    } else if (!reduce_eq(l, r, new_eqs, changed)) {
         result = m().mk_false();
-        TRACE("seq_verbose", tout << result << "\n";);
-        return BR_DONE;
-    }
-    if (!changed) {
-        if (reduce_length_eq_leq(l, r, true, result) || reduce_stoi_eq(l, r, result)) {
+        res_status = BR_DONE;
+    } else if (!changed) {
+        if (smt::noodler::rewrite_shitty_things && (reduce_length_eq_leq(l, r, true, result) || reduce_stoi_eq(l, r, result))) {
             // NOODLER: check if we do not have numerical comparison with str.len or str.to_int
-            return BR_REWRITE_FULL;
+            res_status = BR_REWRITE_FULL;
+        } else {
+            res_status = BR_FAILED;
         }
-        return BR_FAILED;
+    } else {
+        for (auto const& p : new_eqs) {
+            expr_ref tmp_result(m().mk_eq(p.first, p.second), m());
+            // NOODLER: check if we do not have numerical comparison with str.len or str.to_int
+            if (smt::noodler::rewrite_shitty_things) {
+                reduce_length_eq_leq(p.first, p.second, true, tmp_result);
+                reduce_stoi_eq(p.first, p.second, tmp_result);
+            }
+            res.push_back(tmp_result);
+        }
+        result = mk_and(res);
+        res_status = BR_REWRITE3;
     }
-    for (auto const& p : new_eqs) {
-        expr_ref tmp_result(m().mk_eq(p.first, p.second), m());
-        // NOODLER: check if we do not have numerical comparison with str.len or str.to_int
-        reduce_length_eq_leq(p.first, p.second, true, tmp_result);
-        reduce_stoi_eq(p.first, p.second, tmp_result);
-        res.push_back(tmp_result);
-    }
-    result = mk_and(res);
-    TRACE("seq_verbose", tout << result << "\n";);
-    return BR_REWRITE3;
+    CTRACE("seq", res_status != BR_FAILED, tout << mk_pp(l, m()) << " == " << mk_pp(r, m()) << " -> " << result << "\n";);
+    CTRACE("seq", res_status == BR_FAILED, tout << mk_pp(l, m()) << " == " << mk_pp(r, m()) << " failed to rewrite\n";);
+    return res_status;
 }
 
 
