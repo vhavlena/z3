@@ -225,9 +225,17 @@ namespace smt::noodler::regex {
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.num_of_states() < RED_BOUND) {
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::minimize(nfa);
         }
 
@@ -471,5 +479,26 @@ namespace smt::noodler::regex {
         }
 
         return nfa;
+    }
+
+    unsigned get_loop_sum(const app* reg, const seq_util& m_util_s) {
+        expr* body;
+        unsigned lo, hi;
+        if (m_util_s.re.is_loop(reg, body, lo, hi)) {
+            unsigned body_loop = get_loop_sum(to_app(body), m_util_s);
+            if (body_loop == 0) {
+                return hi;
+            } else {
+                return hi*body_loop;
+            }
+        } else if (m_util_s.str.is_string(reg)) {
+            return 0;
+        } else {
+            unsigned sum = 0;
+            for (unsigned arg_num = 0; arg_num < reg->get_num_args(); ++arg_num) {
+                sum += get_loop_sum(to_app(reg->get_arg(arg_num)), m_util_s);
+            }
+            return sum;
+        }
     }
 }

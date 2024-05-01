@@ -775,10 +775,6 @@ namespace smt::noodler {
             }
         );
 
-        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
-        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
-        bool contains_conversions = !this->m_conversion_todo.empty();
-
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
             // one of the (dis)equations is unsat
@@ -799,11 +795,24 @@ namespace smt::noodler {
             }
         }
 
+        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
+        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
+        bool contains_conversions = !this->m_conversion_todo.empty();
+
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
         if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
             lbool result = run_membership_heur();
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        if (is_mult_membership_suitable()) {
+            lbool result = run_mult_membership_heur();
             if(result == l_true) {
                 return FC_DONE;
             } else if(result == l_false) {
