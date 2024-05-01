@@ -225,9 +225,17 @@ namespace smt::noodler::regex {
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.num_of_states() < RED_BOUND) {
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::minimize(nfa);
         }
 

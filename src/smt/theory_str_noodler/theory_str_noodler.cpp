@@ -811,6 +811,49 @@ namespace smt::noodler {
             }
         }
 
+        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
+            bool only_vars = true;
+            for (const auto &word_equation: m_membership_todo_rel) {
+                if(m_util_s.str.is_string(to_app(std::get<0>(word_equation)))) {
+                    // TODO handle this and do not give up
+                    only_vars = false;
+                    break;
+                }
+            }
+
+            if (only_vars) {
+                regex::Alphabet alph(get_symbols_from_relevant());
+                std::map<BasicTerm, std::vector<std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>>> var_to_list_of_automata_and_complement_flag;
+                for (const auto &word_equation: m_membership_todo_rel) {
+                    BasicTerm var(BasicTermType::Variable, to_app(std::get<0>(word_equation))->get_decl()->get_name().str());
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, alph, false, false));
+                    var_to_list_of_automata_and_complement_flag[var].push_back(std::make_pair(!std::get<2>(word_equation),nfa));
+                }
+
+                for (auto & [var, list_of_automata] : var_to_list_of_automata_and_complement_flag) {
+                    std::sort(list_of_automata.begin(), list_of_automata.end(), [](const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& l, const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& r) { return l.second->num_of_states() < r.second->num_of_states();});
+                    std::shared_ptr<mata::nfa::Nfa> intersection = nullptr;
+                    for (auto & [is_complement, nfa] : list_of_automata) {
+                        if (is_complement) {
+                            nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::complement(*nfa, alph.get_mata_alphabet(), { 
+                            {"algorithm", "classical"}, 
+                            {"minimize", "true"}
+                            }));
+                        }
+
+                        intersection = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*nfa, *intersection)));
+                        nfa = nullptr;
+                        
+                        if (intersection->is_lang_empty()) {
+                            return FC_CONTINUE; // l_false
+                        }
+                    }
+                }
+
+                return FC_DONE; // l_true
+            }
+        }
+
         // Gather relevant word (dis)equations to noodler formula
         Formula instance = get_word_formula_from_relevant();
         STRACE("str",
