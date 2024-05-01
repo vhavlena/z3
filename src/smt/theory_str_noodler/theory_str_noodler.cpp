@@ -812,7 +812,7 @@ namespace smt::noodler {
         }
 
         if (is_mult_membership_suitable()) {
-            lbool result = run_membership_heur();
+            lbool result = run_mult_membership_heur();
             if(result == l_true) {
                 return FC_DONE;
             } else if(result == l_false) {
