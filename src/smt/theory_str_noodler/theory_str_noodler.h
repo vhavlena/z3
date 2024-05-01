@@ -369,6 +369,16 @@ namespace smt::noodler {
         bool is_underapprox_suitable(const Formula& instance, const AutAssignment& aut_ass, const std::vector<TermConversion>& convs) const;
 
         /**
+         * @brief Checks if the relevant predicates are suitable for multiple membership heuristic
+         * 
+         * Multiple membership heuristic is used when we have formula containing only memberships.
+         * We then only need to compute intersection from the regular languages and check if it is not empty.
+         * The heuristics sorts the regexes by expected complexity of computing nfa, and iteratively computes
+         * the intersection, so that if the formula is unsat, we do not need to build all automata.
+         */
+        bool is_mult_membership_suitable();
+
+        /**
          * @brief Wrapper for running the Nielsen transformation.
          * 
          * @param instance Formula instance
@@ -384,6 +394,15 @@ namespace smt::noodler {
          * @return lbool Outcome of the heuristic procedure.
          */
         lbool run_membership_heur();
+
+        /**
+         * @brief Wrapper for running the mulitple membership query heuristics.
+         * 
+         * Check is_mult_membership_suitable() for explanation.
+         * 
+         * @return lbool Outcome of the heuristic procedure.
+         */
+        lbool run_mult_membership_heur();
 
         /**
          * @brief Wrapper for running the loop protection.

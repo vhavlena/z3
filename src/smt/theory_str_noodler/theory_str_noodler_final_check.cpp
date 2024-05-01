@@ -535,6 +535,133 @@ namespace smt::noodler {
         return l_undef;
     }
 
+    bool theory_str_noodler::is_mult_membership_suitable() {
+        if (!this->m_conversion_todo.empty() && !this->m_not_contains_todo_rel.empty()) {
+            return false;
+        }
+
+        // TODO handle (string_literal in RE) and also length vars, instead of giving up
+        for (const auto& membership: m_membership_todo_rel) {
+            if(m_util_s.str.is_string(to_app(std::get<0>(membership))) || len_vars.contains(std::get<0>(membership))) {
+                return false;
+            }
+        }
+
+        // we now check if we only have "trivial" (dis)equations, i.e. they can only be of form
+        //    x == str_literal or x != str_literal
+        // i.e., one variable on the left, a string literal on the right
+
+        for (const auto& diseq : m_word_diseq_todo_rel) {
+            if (!(util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second))
+                || len_vars.contains(diseq.first)) // TODO handle length vars in run_mult_membership_heur() by using the lengths from the final intersection automaton
+            {
+                return false;
+            }
+        }
+
+        for (const auto& eq : m_word_eq_todo_rel) {
+            if (!(util::is_str_variable(eq.first, m_util_s) && m_util_s.str.is_string(eq.second))
+                || len_vars.contains(eq.first)) // TODO handle length vars in run_mult_membership_heur() by using the lengths from the final intersection automaton
+            {
+                return false;
+            }
+        }
+    }
+
+    lbool theory_str_noodler::run_mult_membership_heur() {
+        STRACE("str", tout << "trying multiple regex membership heuristic" << std::endl;);
+
+        // gets the sum of loops of a regex (loop inside a loop is multiplied)
+        std::function<unsigned(app*)> get_loop_sum;
+        get_loop_sum = [this, &get_loop_sum](app* reg) -> unsigned {
+            expr* body;
+            unsigned lo, hi;
+            if (this->m_util_s.re.is_loop(reg, body, lo, hi)) {
+                unsigned body_loop = get_loop_sum(to_app(body));
+                if (body_loop == 0) {
+                    return hi;
+                } else {
+                    return hi*body_loop;
+                }
+            } else if (this->m_util_s.str.is_string(reg)) {
+                return 0;
+            } else {
+                unsigned sum = 0;
+                for (unsigned arg_num = 0; arg_num < reg->get_num_args(); ++arg_num) {
+                    sum += get_loop_sum(to_app(reg->get_arg(arg_num)));
+                }
+                return sum;
+            }
+        };
+
+        regex::Alphabet alph(get_symbols_from_relevant());
+        // to each var x we map all the regexes RE where we have (x in RE) + bool that is true if it is (x not in RE)
+        std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag;
+
+        // collect from relevant memberships
+        for (const auto &membership: m_membership_todo_rel) {
+            BasicTerm var(BasicTermType::Variable, to_app(std::get<0>(membership))->get_decl()->get_name().str());
+            app* reg = to_app(std::get<1>(membership));
+            var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(!std::get<2>(membership), reg));
+        }
+
+        // we assume that is_mult_membership_heur was run before, therefore we have only disequations
+        //   x != str_literal
+        // i.e., one var on left and some string literal on right, we can replace this with (x not in {str_literal})
+        for (const auto& diseq : m_word_diseq_todo_rel) {
+            BasicTerm var(BasicTermType::Variable, to_app(diseq.first)->get_decl()->get_name().str());
+            app* reg = to_app(diseq.second);
+            var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(true, reg));
+        }
+
+        // we assume that is_mult_membership_heur was run before, therefore we have only equations
+        //   x == str_literal
+        // i.e., one var on left and some string literal on right, we can replace this with (x in {str_literal})
+        for (const auto& eq : m_word_eq_todo_rel) {
+            BasicTerm var(BasicTermType::Variable, to_app(eq.first)->get_decl()->get_name().str());
+            app* reg = to_app(eq.second);
+            var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
+        }
+
+        for (auto& [var, list_of_regexes] : var_to_list_of_regexes_and_complement_flag) {
+            // sort the regexes using get_loop_sum, where those regexes that needs to be complemented should all be at the end
+            std::sort(list_of_regexes.begin(), list_of_regexes.end(), [&get_loop_sum](const std::pair<bool,app*>& l, const std::pair<bool,app*>& r) {
+                return ((!l.first && r.first) | (get_loop_sum(l.second) < get_loop_sum(r.second)));
+            });
+            STRACE("str-mult-memb-heur",
+                tout << "Sorted NFAs for var " << var << std::endl;
+                unsigned i = 0;
+                for (const auto & [is_complement, nfa] : list_of_regexes) {
+                    tout << i << " (" << (is_complement ? "" : "not ") <<"complemented):" << std::endl;
+                    tout << nfa << std::endl;
+                }
+            );
+
+            std::shared_ptr<mata::nfa::Nfa> intersection = nullptr; // we save the intersected automata here
+            for (auto& [is_complement, reg] : list_of_regexes) {
+                STRACE("str", tout << "building intersection for var " << var << " and regex " << mk_pp(reg, m) << (is_complement ? " that needs to be first complemented" : " that does not need to be first complemented") << std::endl;);
+
+                std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, is_complement, is_complement));
+
+                if (intersection == nullptr) {
+                    intersection = nfa; // this is first nfa
+                } else {
+                    intersection = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*nfa, *intersection)));
+                }
+                nfa = nullptr;
+                
+                if (intersection->is_lang_empty()) {
+                    STRACE("str", tout << "intersection is empty => UNSAT" << std::endl;);
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return l_false;
+                }
+            }
+        }
+
+        STRACE("str", tout << "intersection is not empty => SAT" << std::endl;);
+        return l_true;
+    }
+
     lbool theory_str_noodler::run_loop_protection() {
         expr_ref refine = construct_refinement();
         if (refine != nullptr) {
