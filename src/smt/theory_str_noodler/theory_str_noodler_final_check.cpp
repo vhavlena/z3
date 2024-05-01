@@ -536,7 +536,7 @@ namespace smt::noodler {
     }
 
     bool theory_str_noodler::is_mult_membership_suitable() {
-        if (!this->m_conversion_todo.empty() && !this->m_not_contains_todo_rel.empty()) {
+        if (!this->m_conversion_todo.empty() || !this->m_not_contains_todo_rel.empty()) {
             return false;
         }
 
