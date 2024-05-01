@@ -775,10 +775,6 @@ namespace smt::noodler {
             }
         );
 
-        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
-        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
-        bool contains_conversions = !this->m_conversion_todo.empty();
-
         // Solve Language (dis)equations
         if (!solve_lang_eqs_diseqs()) {
             // one of the (dis)equations is unsat
@@ -798,6 +794,20 @@ namespace smt::noodler {
                 return FC_CONTINUE;
             }
         }
+
+        vector<expr_pair> new_m_word_diseq_todo_rel;
+        for (const auto& diseq : m_word_diseq_todo_rel) {
+            if (util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second)) {
+                m_membership_todo_rel.push_back({diseq.first, expr_ref(m_util_s.re.mk_to_re(diseq.second), m), false});
+            } else {
+                new_m_word_diseq_todo_rel.push_back(diseq);
+            }
+        }
+        m_word_diseq_todo_rel = std::move(new_m_word_diseq_todo_rel);
+
+        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
+        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
+        bool contains_conversions = !this->m_conversion_todo.empty();
 
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
@@ -832,7 +842,9 @@ namespace smt::noodler {
                 }
 
                 for (auto & [var, list_of_automata] : var_to_list_of_automata_and_complement_flag) {
-                    std::sort(list_of_automata.begin(), list_of_automata.end(), [](const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& l, const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& r) { return l.second->num_of_states() < r.second->num_of_states();});
+                    std::sort(list_of_automata.begin(), list_of_automata.end(), [](const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& l, const std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>& r) {
+                        return ((!l.first && r.first) | (l.second->num_of_states() < r.second->num_of_states()));
+                    });
                     std::shared_ptr<mata::nfa::Nfa> intersection = nullptr;
                     for (auto & [is_complement, nfa] : list_of_automata) {
                         STRACE("str", tout << "building intersection for var " << var << " with automaton of size " << nfa->num_of_states() << (is_complement ? " that needs to be first complemented" : " that does not need to be first complemented") << std::endl;);
