@@ -110,6 +110,15 @@ namespace smt::noodler::regex {
      * @return mata::nfa::Nfa NFA
      */
     mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count);
+
+    /**
+     * @brief Get the sum of loops of a regex (loop inside a loop is multiplied)
+     * 
+     * @param reg some regular expression predicate (can be also string literal/var)
+     * @param m_util_s string ast util
+     * @return sum of loops inside @p regex, with nested loops multiplied 
+     */
+    unsigned get_loop_sum(const app* reg, const seq_util& m_util_s);
 }
 
 #endif

@@ -573,29 +573,6 @@ namespace smt::noodler {
     lbool theory_str_noodler::run_mult_membership_heur() {
         STRACE("str", tout << "trying multiple regex membership heuristic" << std::endl;);
 
-        // gets the sum of loops of a regex (loop inside a loop is multiplied)
-        std::function<unsigned(app*)> get_loop_sum;
-        get_loop_sum = [this, &get_loop_sum](app* reg) -> unsigned {
-            expr* body;
-            unsigned lo, hi;
-            if (this->m_util_s.re.is_loop(reg, body, lo, hi)) {
-                unsigned body_loop = get_loop_sum(to_app(body));
-                if (body_loop == 0) {
-                    return hi;
-                } else {
-                    return hi*body_loop;
-                }
-            } else if (this->m_util_s.str.is_string(reg)) {
-                return 0;
-            } else {
-                unsigned sum = 0;
-                for (unsigned arg_num = 0; arg_num < reg->get_num_args(); ++arg_num) {
-                    sum += get_loop_sum(to_app(reg->get_arg(arg_num)));
-                }
-                return sum;
-            }
-        };
-
         regex::Alphabet alph(get_symbols_from_relevant());
         // to each var x we map all the regexes RE where we have (x in RE) + bool that is true if it is (x not in RE)
         std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag;
@@ -627,8 +604,8 @@ namespace smt::noodler {
 
         for (auto& [var, list_of_regexes] : var_to_list_of_regexes_and_complement_flag) {
             // sort the regexes using get_loop_sum, where those regexes that needs to be complemented should all be at the end
-            std::sort(list_of_regexes.begin(), list_of_regexes.end(), [&get_loop_sum](const std::pair<bool,app*>& l, const std::pair<bool,app*>& r) {
-                return ((!l.first && r.first) | (get_loop_sum(l.second) < get_loop_sum(r.second)));
+            std::sort(list_of_regexes.begin(), list_of_regexes.end(), [this](const std::pair<bool,app*>& l, const std::pair<bool,app*>& r) {
+                return ((!l.first && r.first) | (regex::get_loop_sum(l.second, m_util_s) < regex::get_loop_sum(r.second, m_util_s)));
             });
             STRACE("str-mult-memb-heur",
                 tout << "Sorted NFAs for var " << var << std::endl;
