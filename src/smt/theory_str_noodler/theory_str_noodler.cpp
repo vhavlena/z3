@@ -795,16 +795,6 @@ namespace smt::noodler {
             }
         }
 
-        vector<expr_pair> new_m_word_diseq_todo_rel;
-        for (const auto& diseq : m_word_diseq_todo_rel) {
-            if (util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second)) {
-                m_membership_todo_rel.push_back({diseq.first, expr_ref(m_util_s.re.mk_to_re(diseq.second), m), false});
-            } else {
-                new_m_word_diseq_todo_rel.push_back(diseq);
-            }
-        }
-        m_word_diseq_todo_rel = std::move(new_m_word_diseq_todo_rel);
-
         bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
@@ -821,24 +811,50 @@ namespace smt::noodler {
             }
         }
 
-        if(!contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
-            bool only_vars = true;
-            for (const auto &word_equation: m_membership_todo_rel) {
-                if(m_util_s.str.is_string(to_app(std::get<0>(word_equation)))) {
+        if(!contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
+            bool is_possible = true;
+            for (const auto &membership: m_membership_todo_rel) {
+                if(m_util_s.str.is_string(to_app(std::get<0>(membership)))) {
                     // TODO handle this and do not give up
-                    only_vars = false;
+                    is_possible = false;
                     break;
                 }
             }
 
-            if (only_vars) {
+            for (const auto &diseq : m_word_diseq_todo_rel) {
+                if (!(util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second))) {
+                    is_possible = false;
+                    break;
+                }
+            }
+
+            for (const auto &eq : m_word_eq_todo_rel) {
+                if (!(util::is_str_variable(eq.first, m_util_s) && m_util_s.str.is_string(eq.second))) {
+                    is_possible = false;
+                    break;
+                }
+            }
+
+            if (is_possible) {
                 STRACE("str", tout << "trying multiple regex membership heuristic" << std::endl;);
                 regex::Alphabet alph(get_symbols_from_relevant());
                 std::map<BasicTerm, std::vector<std::pair<bool,std::shared_ptr<mata::nfa::Nfa>>>> var_to_list_of_automata_and_complement_flag;
-                for (const auto &word_equation: m_membership_todo_rel) {
-                    BasicTerm var(BasicTermType::Variable, to_app(std::get<0>(word_equation))->get_decl()->get_name().str());
-                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, alph, false, false));
-                    var_to_list_of_automata_and_complement_flag[var].push_back(std::make_pair(!std::get<2>(word_equation),nfa));
+                for (const auto &membership: m_membership_todo_rel) {
+                    BasicTerm var(BasicTermType::Variable, to_app(std::get<0>(membership))->get_decl()->get_name().str());
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, false, false));
+                    var_to_list_of_automata_and_complement_flag[var].push_back(std::make_pair(!std::get<2>(membership), nfa));
+                }
+
+                for (const auto &diseq : m_word_diseq_todo_rel) {
+                    BasicTerm var(BasicTermType::Variable, to_app(diseq.first)->get_decl()->get_name().str());
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(diseq.second), m_util_s, m, alph, false, false));
+                    var_to_list_of_automata_and_complement_flag[var].push_back(std::make_pair(true, nfa));
+                }
+
+                for (const auto &eq : m_word_eq_todo_rel) {
+                    BasicTerm var(BasicTermType::Variable, to_app(eq.first)->get_decl()->get_name().str());
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(eq.second), m_util_s, m, alph, false, false));
+                    var_to_list_of_automata_and_complement_flag[var].push_back(std::make_pair(false, nfa));
                 }
 
                 for (auto & [var, list_of_automata] : var_to_list_of_automata_and_complement_flag) {
