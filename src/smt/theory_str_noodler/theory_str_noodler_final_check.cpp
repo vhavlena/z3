@@ -566,6 +566,8 @@ namespace smt::noodler {
                 return false;
             }
         }
+
+        return true;
     }
 
     lbool theory_str_noodler::run_mult_membership_heur() {
