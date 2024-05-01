@@ -813,23 +813,25 @@ namespace smt::noodler {
 
         if(!contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
             bool is_possible = true;
-            for (const auto &membership: m_membership_todo_rel) {
-                if(m_util_s.str.is_string(to_app(std::get<0>(membership)))) {
+            for (const auto& membership: m_membership_todo_rel) {
+                if(m_util_s.str.is_string(to_app(std::get<0>(membership))) || len_vars.contains(std::get<0>(membership))) {
                     // TODO handle this and do not give up
                     is_possible = false;
                     break;
                 }
             }
 
-            for (const auto &diseq : m_word_diseq_todo_rel) {
-                if (!(util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second))) {
+            for (const auto& diseq : m_word_diseq_todo_rel) {
+                if (!(util::is_str_variable(diseq.first, m_util_s) && m_util_s.str.is_string(diseq.second)) || len_vars.contains(diseq.first)) {
+                    // TODO handle leng vars by adding lengths from intersection instead of giving up
                     is_possible = false;
                     break;
                 }
             }
 
-            for (const auto &eq : m_word_eq_todo_rel) {
-                if (!(util::is_str_variable(eq.first, m_util_s) && m_util_s.str.is_string(eq.second))) {
+            for (const auto& eq : m_word_eq_todo_rel) {
+                if (!(util::is_str_variable(eq.first, m_util_s) && m_util_s.str.is_string(eq.second)) || len_vars.contains(eq.first)) {
+                    // TODO handle leng vars by adding lengths from intersection instead of giving up
                     is_possible = false;
                     break;
                 }
