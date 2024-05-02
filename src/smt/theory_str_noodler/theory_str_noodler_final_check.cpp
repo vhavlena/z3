@@ -502,6 +502,7 @@ namespace smt::noodler {
         LengthDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
         expr_ref block_len(m.mk_false(), m);
         if (nproc.preprocess() == l_false) {
+            STRACE("str", tout << "len: unsat from preprocessing\n");
             block_curr_len(block_len);
             return l_false;
         }
@@ -513,22 +514,19 @@ namespace smt::noodler {
                 if (check_len_sat(lengths) == l_true) {
                     return l_true;
                 } else {
-                    STRACE("str", tout << "length-based procedure len unsat" <<  mk_pp(lengths, m) << std::endl;);
+                    STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
                     if (nproc.precision != LenNodePrecision::UNDERAPPROX) {
-                        // block_len = m.mk_or(block_len, lengths);
                         block_curr_len(lengths);
                         return l_false;
                     } else {
                         return l_undef;
                     }
                 }
-            } else if (result == l_false) {
-                // we did not find a solution (with satisfiable length constraints)
-                // we need to block current assignment
+            } else if (result == l_false) { // never happens
                 block_curr_len(block_len);
                 return l_false;
             } else {
-                // we could not decide if there is solution, continue with noodler decision procedure
+                // we could not decide if there is solution, continue with other decision procedure
                 break;
             }
         }
