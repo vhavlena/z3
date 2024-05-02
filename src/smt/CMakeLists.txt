@@ -75,6 +75,7 @@ z3_add_component(smt
     theory_str_noodler/decision_procedure.cpp
     theory_str_noodler/nielsen_decision_procedure.cpp
     theory_str_noodler/memb_heuristics_procedures.cpp
+    theory_str_noodler/length_decision_procedure.cpp
     theory_str_noodler/formula.cpp
     theory_str_noodler/util.cc
     theory_str_noodler/expr_cases.cpp
