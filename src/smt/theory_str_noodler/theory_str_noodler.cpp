@@ -1521,6 +1521,7 @@ namespace smt::noodler {
         // s = eps -> |v| = |a| + |t|
         add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
 
+        // axioms for the case str.replace x (y.x) z
         expr* t1 = nullptr, *t2 = nullptr;
         if(m_util_s.str.is_concat(s, t1, t2) && (t1 == a || t2 == a)) {
             if(t1 == a) {
