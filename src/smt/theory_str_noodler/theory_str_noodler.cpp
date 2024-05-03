@@ -1521,6 +1521,21 @@ namespace smt::noodler {
         // s = eps -> |v| = |a| + |t|
         add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
 
+        expr* t1 = nullptr, *t2 = nullptr;
+        if(m_util_s.str.is_concat(s, t1, t2) && (t1 == a || t2 == a)) {
+            if(t1 == a) {
+                add_axiom({~mk_eq_empty(t2), mk_eq(v, t,false)});
+                add_axiom({mk_eq_empty(t2), mk_eq(v, a ,false)});
+            } else {
+                add_axiom({~mk_eq_empty(t1), mk_eq(v, t,false)});
+                add_axiom({mk_eq_empty(t1), mk_eq(v, a,false)});
+            }
+
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
         expr* indexof = nullptr;
         if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
             expr_ref minus_one(m_util_a.mk_int(-1), m);
