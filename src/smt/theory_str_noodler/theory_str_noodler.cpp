@@ -799,6 +799,9 @@ namespace smt::noodler {
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
 
+        // Change name
+        bool contains_equations_only = this->m_lang_eq_or_diseq_todo_rel.empty() && this->m_not_contains_todo_rel.empty() && this->m_conversion_todo.empty();
+
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
         // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
         // universality checking should be faster.
@@ -857,7 +860,7 @@ namespace smt::noodler {
         }
 
         // try the length decision procedure (if enabled) to solve
-        if(m_params.m_try_length_proc && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
+        if(m_params.m_try_length_proc && LengthDecisionProcedure::is_suitable(instance, aut_assignment) && contains_equations_only) {
             lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
                 return FC_DONE;
