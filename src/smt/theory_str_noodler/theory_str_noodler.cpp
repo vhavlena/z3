@@ -1521,6 +1521,22 @@ namespace smt::noodler {
         // s = eps -> |v| = |a| + |t|
         add_axiom({~s_emp, mk_literal(m.mk_eq(m_util_s.str.mk_length(v), m_util_a.mk_add(m_util_s.str.mk_length(a), m_util_s.str.mk_length(t))))});
 
+        // axioms for the case str.replace x (y.x) z
+        expr* t1 = nullptr, *t2 = nullptr;
+        if(m_util_s.str.is_concat(s, t1, t2) && (t1 == a || t2 == a)) {
+            if(t1 == a) {
+                add_axiom({~mk_eq_empty(t2), mk_eq(v, t,false)});
+                add_axiom({mk_eq_empty(t2), mk_eq(v, a ,false)});
+            } else {
+                add_axiom({~mk_eq_empty(t1), mk_eq(v, t,false)});
+                add_axiom({mk_eq_empty(t1), mk_eq(v, a,false)});
+            }
+
+            add_axiom({mk_eq(v, r, false)});
+            predicate_replace.insert(r, v.get());
+            return;
+        }
+
         expr* indexof = nullptr;
         if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
             expr_ref minus_one(m_util_a.mk_int(-1), m);
@@ -2483,6 +2499,10 @@ namespace smt::noodler {
                                         ); // if argument > 0, the result will be of form [1-9]+[0-9]*
             app *epsilon = m_util_s.re.mk_epsilon(e->get_sort()); // if argument < 0, the result is empty string
             add_axiom({mk_literal(m_util_s.re.mk_in_re(var_for_e, m_util_s.re.mk_union(m_util_s.re.mk_union(zero, nums_without_zero), epsilon)))});
+
+            // |from_int(x)| = 0 <-> x <= -1
+            add_axiom({ mk_literal(m.mk_eq( m_util_s.str.mk_length(e), m_util_a.mk_int(0))), ~mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(-1))) });
+            add_axiom({ ~mk_literal(m.mk_eq( m_util_s.str.mk_length(e), m_util_a.mk_int(0))), mk_literal(m_util_a.mk_le(s, m_util_a.mk_int(-1))) });
 
             // As the result of from_int belongs to infinite language, it is very likely that we will have to underapproximate in the decision procedure.
             // The underapproximation maximum length of words used from this infinite language is given by m_params.m_underapprox_length, we therefore add
