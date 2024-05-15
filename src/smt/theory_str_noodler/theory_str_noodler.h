@@ -401,7 +401,7 @@ namespace smt::noodler {
         lbool run_nielsen(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
         /**
-         * @brief Wrapper for running the length-based decision procedure.
+         * @brief Wrapper for running the length-based decision procedure. 
          * 
          * @param instance Formula instance
          * @param aut_assignment Current automata assignment
