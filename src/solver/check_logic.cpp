@@ -192,6 +192,9 @@ struct check_logic::imp {
             m_arrays      = true;
             m_reals       = true;
             m_quantifiers = true; // some QF_SLIA benchmarks are miss-classified
+            if (logic == "QF_SNIA") {
+                m_nonlinear = true;
+            }
         }
         else if (logic == "QF_FD") {
             m_bvs         = true;
