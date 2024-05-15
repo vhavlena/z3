@@ -185,7 +185,7 @@ struct check_logic::imp {
             m_bvs         = true;
             m_quantifiers = true;
         }
-        else if (logic == "QF_S" || logic == "QF_SLIA") {
+        else if (logic == "QF_S" || logic == "QF_SLIA" || logic == "QF_SNIA") {
             m_uf          = true;
             m_bvs         = true;
             m_ints        = true;
