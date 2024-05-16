@@ -570,6 +570,7 @@ namespace smt {
             setup_char();
         }
         else if (m_params.m_string_solver == "noodler") {
+            setup_arith();
             setup_str_noodler();
         }
         else if (m_params.m_string_solver == "auto") {
@@ -583,7 +584,7 @@ namespace smt {
             // don't register any solver.
         }
         else {
-            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto'");
+            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto', 'noodler'");
         }
     }
 
@@ -765,7 +766,7 @@ namespace smt {
             }
         } 
         else {
-            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto'");
+            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto', 'noodler'");
         }
     }
 
@@ -784,7 +785,6 @@ namespace smt {
     }
 
     void setup::setup_str_noodler() {
-        setup_arith();
         m_context.register_plugin(alloc(noodler::theory_str_noodler, m_context, m_manager, m_params));
     }
 
