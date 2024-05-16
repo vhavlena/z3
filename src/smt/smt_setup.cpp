@@ -570,7 +570,7 @@ namespace smt {
             setup_char();
         }
         else if (m_params.m_string_solver == "noodler") {
-            setup_unknown();
+            setup_str_noodler();
         }
         else if (m_params.m_string_solver == "auto") {
             setup_unknown();
@@ -784,7 +784,7 @@ namespace smt {
     }
 
     void setup::setup_str_noodler() {
-        // setup_arith();
+        setup_arith();
         m_context.register_plugin(alloc(noodler::theory_str_noodler, m_context, m_manager, m_params));
     }
 
