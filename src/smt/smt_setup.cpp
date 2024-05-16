@@ -177,7 +177,7 @@ namespace smt {
                  setup_QF_BVRE();
             else if (m_logic == "QF_AUFLIA")
                 setup_QF_AUFLIA(st);
-            else if (m_logic == "QF_S" || m_logic == "QF_SLIA" || m_logic == "QF_SLIA")
+            else if (m_logic == "QF_S" || m_logic == "QF_SLIA" || m_logic == "QF_SNIA")
                 setup_QF_S();
             else if (m_logic == "AUFLIA")
                 setup_AUFLIA(st);
