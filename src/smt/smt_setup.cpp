@@ -129,7 +129,7 @@ namespace smt {
             setup_QF_FP();
         else if (m_logic == "QF_FPBV" || m_logic == "QF_BVFP")
             setup_QF_FPBV();
-        else if (m_logic == "QF_S" || m_logic == "QF_SLIA")
+        else if (m_logic == "QF_S" || m_logic == "QF_SLIA" || m_logic == "QF_SNIA")
             setup_QF_S();
         else if (m_logic == "QF_DT")
             setup_QF_DT();
@@ -177,7 +177,7 @@ namespace smt {
                  setup_QF_BVRE();
             else if (m_logic == "QF_AUFLIA")
                 setup_QF_AUFLIA(st);
-            else if (m_logic == "QF_S" || m_logic == "QF_SLIA")
+            else if (m_logic == "QF_S" || m_logic == "QF_SLIA" || m_logic == "QF_SNIA")
                 setup_QF_S();
             else if (m_logic == "AUFLIA")
                 setup_AUFLIA(st);
@@ -570,6 +570,7 @@ namespace smt {
             setup_char();
         }
         else if (m_params.m_string_solver == "noodler") {
+            setup_arith();
             setup_str_noodler();
         }
         else if (m_params.m_string_solver == "auto") {
@@ -583,7 +584,7 @@ namespace smt {
             // don't register any solver.
         }
         else {
-            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto'");
+            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto', 'noodler'");
         }
     }
 
@@ -750,6 +751,9 @@ namespace smt {
         else if (m_params.m_string_solver == "empty") {
             setup_seq();
         }
+        else if (m_params.m_string_solver == "noodler") {
+            setup_str_noodler();
+        }
         else if (m_params.m_string_solver == "none") {
             // don't register any solver.
         }
@@ -762,7 +766,7 @@ namespace smt {
             }
         } 
         else {
-            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto'");
+            throw default_exception("invalid parameter for smt.string_solver, valid options are 'z3str3', 'seq', 'auto', 'noodler'");
         }
     }
 
@@ -781,7 +785,6 @@ namespace smt {
     }
 
     void setup::setup_str_noodler() {
-        setup_arith();
         m_context.register_plugin(alloc(noodler::theory_str_noodler, m_context, m_manager, m_params));
     }
 

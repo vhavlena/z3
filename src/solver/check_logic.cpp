@@ -185,13 +185,16 @@ struct check_logic::imp {
             m_bvs         = true;
             m_quantifiers = true;
         }
-        else if (logic == "QF_S" || logic == "QF_SLIA") {
-            m_uf          = true;
-            m_bvs         = true;
-            m_ints        = true;
-            m_arrays      = true;
-            m_reals       = true;
-            m_quantifiers = true; // some QF_SLIA benchmarks are miss-classified
+        else if (logic == "QF_S" || logic == "QF_SLIA" || logic == "QF_SNIA") {
+            // m_uf          = true;
+            // m_bvs         = true;
+            m_ints        = true; // turn on even for QF_S, as noodler might use some arith heuristic
+            // m_arrays      = true;
+            // m_reals       = true;
+            // m_quantifiers = true; // some QF_SLIA benchmarks are miss-classified
+            if (logic == "QF_SNIA") {
+                m_nonlinear = true;
+            }
         }
         else if (logic == "QF_FD") {
             m_bvs         = true;
