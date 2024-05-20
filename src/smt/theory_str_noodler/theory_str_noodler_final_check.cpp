@@ -616,6 +616,68 @@ namespace smt::noodler {
                 }
             );
 
+            std::vector<app*> list_of_normal_regs;
+            std::vector<app*> list_of_compl_regs;
+            for (auto& [is_complement, reg] : list_of_regexes) {
+                if (is_complement) {
+                    list_of_compl_regs.push_back(reg);
+                } else {
+                    list_of_normal_regs.push_back(reg);
+                }
+            }
+
+            std::shared_ptr<mata::nfa::Nfa> intersection = nullptr; // we save the intersected automata here
+            for (auto& reg : list_of_normal_regs) {
+                std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false));
+                if (intersection == nullptr) {
+                    intersection = nfa; // this is first nfa
+                } else {
+                    intersection = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*nfa, *intersection)));
+                }
+                nfa = nullptr;
+                if (intersection->is_lang_empty()) {
+                    STRACE("str", tout << "intersection is empty => UNSAT" << std::endl;);
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return l_false;
+                }
+            }
+            
+            if (intersection == nullptr) {
+                for (auto& reg : list_of_compl_regs) {
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, true, true));
+                    if (intersection == nullptr) {
+                        intersection = nfa; // this is first nfa
+                    } else {
+                        intersection = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*nfa, *intersection)));
+                    }
+                    nfa = nullptr;
+                    if (intersection->is_lang_empty()) {
+                        STRACE("str", tout << "intersection is empty => UNSAT" << std::endl;);
+                        block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                        return l_false;
+                    }
+                }
+                return l_true;
+            } else if (!list_of_compl_regs.empty()) {
+                std::shared_ptr<mata::nfa::Nfa> unionn = nullptr; // we save the unionized automata here
+                for (auto& reg : list_of_compl_regs) {
+                    std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false));
+                    if (unionn == nullptr) {
+                        unionn = nfa; // this is first nfa
+                    } else {
+                        unionn = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::uni(*nfa, *unionn)));
+                    }
+                }
+                if (mata::nfa::is_included(*intersection, *unionn)) {
+                    STRACE("str", tout << "inclusion holds => UNSAT" << std::endl;);
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                    return l_false;
+                } else {
+                    return l_true;
+                }
+            }
+
+
             std::shared_ptr<mata::nfa::Nfa> intersection = nullptr; // we save the intersected automata here
             for (auto& [is_complement, reg] : list_of_regexes) {
                 STRACE("str", tout << "building intersection for var " << var << " and regex " << mk_pp(reg, m) << (is_complement ? " that needs to be first complemented" : " that does not need to be first complemented") << std::endl;);
