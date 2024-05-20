@@ -678,7 +678,7 @@ namespace smt::noodler {
             }
 
 
-            std::shared_ptr<mata::nfa::Nfa> intersection = nullptr; // we save the intersected automata here
+            intersection = nullptr; // we save the intersected automata here
             for (auto& [is_complement, reg] : list_of_regexes) {
                 STRACE("str", tout << "building intersection for var " << var << " and regex " << mk_pp(reg, m) << (is_complement ? " that needs to be first complemented" : " that does not need to be first complemented") << std::endl;);
 
