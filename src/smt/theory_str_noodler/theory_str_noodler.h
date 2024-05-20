@@ -375,6 +375,12 @@ namespace smt::noodler {
          * We then only need to compute intersection from the regular languages and check if it is not empty.
          * The heuristics sorts the regexes by expected complexity of computing nfa, and iteratively computes
          * the intersection, so that if the formula is unsat, we do not need to build all automata.
+         * Furthermore, for all regexes that should be complemented, we compute their union and then check
+         * the inclusion with the intersection from the previous step, i.e., we have:
+         * L_1 \cap ... \cap L_m \cap \neg L_{m+1} \cap ... \cap \neg L_n = L \cap \neg (L_{m+1} \cup ... \cup L_n)
+         *                                                                = L \cap \neg L'
+         * where L = L_1 \cap ... \cap L_m, and L' = L_{m+1} \cup ... \cup L_n.
+         * We then want to check if L \cap \neg L' is empty (unsat), which is the same as asking if L is subset of L'.
          */
         bool is_mult_membership_suitable();
 
