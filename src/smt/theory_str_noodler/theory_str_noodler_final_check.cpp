@@ -632,12 +632,15 @@ namespace smt::noodler {
                 intersection.delta.add(0, symb, 0);
             }
 
+            bool first = true;
             for (auto& reg : list_of_normal_regs) {
-                std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false));
                 intersection = mata::nfa::intersection(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
-                if (intersection.num_of_states() < regex::RED_BOUND) {
+                if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
+                    && intersection.num_of_states() < regex::RED_BOUND)
+                {
                     intersection = mata::nfa::reduce(intersection);
                 }
+                first = false;
                 if (intersection.is_lang_empty()) {
                     STRACE("str", tout << "intersection is empty => UNSAT" << std::endl;);
                     block_curr_len(expr_ref(this->m.mk_false(), this->m));
@@ -647,11 +650,15 @@ namespace smt::noodler {
 
             // Compute union L' of all regexes that should be complemented (we are using de Morgan)
             mata::nfa::Nfa unionn; // initialize to empty automaton
+            first = true;
             for (auto& reg : list_of_compl_regs) {
                 unionn = mata::nfa::uni(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
-                if (unionn.num_of_states() < regex::RED_BOUND) {
+                if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
+                    && unionn.num_of_states() < regex::RED_BOUND)
+                {
                     unionn = mata::nfa::reduce(unionn);
                 }
+                first = false;
             }
             
             STRACE("str-mult-memb-heur", tout << "computing inclusion" << std::endl;);
