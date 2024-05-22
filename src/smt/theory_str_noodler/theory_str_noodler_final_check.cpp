@@ -608,36 +608,71 @@ namespace smt::noodler {
                 return ((!l.first && r.first) | (regex::get_loop_sum(l.second, m_util_s) < regex::get_loop_sum(r.second, m_util_s)));
             });
             STRACE("str-mult-memb-heur",
-                tout << "Sorted NFAs for var " << var << std::endl;
+                tout << "Sorted regexes for var " << var << std::endl;
                 unsigned i = 0;
-                for (const auto & [is_complement, nfa] : list_of_regexes) {
-                    tout << i << " (" << (is_complement ? "" : "not ") <<"complemented):" << std::endl;
-                    tout << nfa << std::endl;
+                for (const auto & [is_complement, reg] : list_of_regexes) {
+                    tout << i << " (should " << (is_complement ? "" : "NOT ") <<"be complemented):" << mk_pp(reg, m) << std::endl;
                 }
             );
 
-            std::shared_ptr<mata::nfa::Nfa> intersection = nullptr; // we save the intersected automata here
+            std::vector<app*> list_of_normal_regs;
+            std::vector<app*> list_of_compl_regs;
             for (auto& [is_complement, reg] : list_of_regexes) {
-                STRACE("str", tout << "building intersection for var " << var << " and regex " << mk_pp(reg, m) << (is_complement ? " that needs to be first complemented" : " that does not need to be first complemented") << std::endl;);
-
-                std::shared_ptr<mata::nfa::Nfa> nfa = std::make_shared<mata::nfa::Nfa>(regex::conv_to_nfa(reg, m_util_s, m, alph, is_complement, is_complement));
-
-                if (intersection == nullptr) {
-                    intersection = nfa; // this is first nfa
+                if (is_complement) {
+                    list_of_compl_regs.push_back(reg);
                 } else {
-                    intersection = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(mata::nfa::intersection(*nfa, *intersection)));
+                    list_of_normal_regs.push_back(reg);
                 }
-                nfa = nullptr;
-                
-                if (intersection->is_lang_empty()) {
+            }
+
+            // Compute intersection L of all regexes that should not be complemented
+            mata::nfa::Nfa intersection(1, {0}, {0});
+            // initalize to universal automaton
+            for (const mata::Symbol& symb : alph.get_alphabet()) {
+                intersection.delta.add(0, symb, 0);
+            }
+
+            bool first = true;
+            for (auto& reg : list_of_normal_regs) {
+                intersection = mata::nfa::intersection(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
+                if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
+                    && intersection.num_of_states() < regex::RED_BOUND)
+                {
+                    intersection = mata::nfa::reduce(intersection);
+                }
+                first = false;
+                if (intersection.is_lang_empty()) {
                     STRACE("str", tout << "intersection is empty => UNSAT" << std::endl;);
                     block_curr_len(expr_ref(this->m.mk_false(), this->m));
                     return l_false;
                 }
             }
+
+            // Compute union L' of all regexes that should be complemented (we are using de Morgan)
+            mata::nfa::Nfa unionn; // initialize to empty automaton
+            first = true;
+            for (auto& reg : list_of_compl_regs) {
+                unionn = mata::nfa::uni(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
+                if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
+                    && unionn.num_of_states() < regex::RED_BOUND)
+                {
+                    unionn = mata::nfa::reduce(unionn);
+                }
+                first = false;
+            }
+            
+            STRACE("str-mult-memb-heur", tout << "computing inclusion" << std::endl;);
+
+            // We want to know if L \intersect \neg L' is empty, which is same as asking if L is subset of L'
+            if (mata::nfa::is_included(intersection, unionn)) {
+                // if inclusion holds, the intersection is empty => UNSAT
+                STRACE("str", tout << "inclusion holds => UNSAT" << std::endl;);
+                block_curr_len(expr_ref(this->m.mk_false(), this->m));
+                return l_false;
+            }
         }
 
-        STRACE("str", tout << "intersection is not empty => SAT" << std::endl;);
+        STRACE("str", tout << "inclusion holds for all vars => SAT" << std::endl;);
         return l_true;
     }
 
