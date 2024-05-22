@@ -7,7 +7,7 @@ The core of the string solver implements several decision procedures, but mainly
 
 Z3-Noodler utilizes the automata library [Mata](https://github.com/VeriFIT/mata/) for efficient representation of automata and their processing.
 
-For a brief overview of the architecture, see [SMT-COMP'23 Z3-Noodler description](doc/noodler/z3-noodler_systems-description.pdf).
+For a brief overview of the architecture, see [SMT-COMP'24 Z3-Noodler description](doc/noodler/z3-noodler-system-description-2024.pdf).
 
 [//]: # (TODO: Write the following paragraphs. ## Differences from Z3)
 
