@@ -143,7 +143,7 @@ namespace smt::noodler::util {
      * @param name Name of the var
      */
     static expr_ref mk_int_var(const std::string& name, ast_manager& m, arith_util& m_util_a) {
-        app* var = m.mk_const(name, m_util_a.mk_int());
+        app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int());
         // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
         return expr_ref(var, m);
     }
@@ -154,7 +154,7 @@ namespace smt::noodler::util {
      * @param name Name of the var
      */
     static expr_ref mk_str_var(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        app* var = m.mk_const(name, m_util_s.mk_string_sort());
+        app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_s.mk_string_sort());
         return expr_ref(var, m);
     }
 
