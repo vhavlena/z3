@@ -176,11 +176,18 @@ namespace smt::noodler {
 
     bool theory_str_noodler::solve_lang_eqs_diseqs() {
         for(const auto& item : this->m_lang_eq_or_diseq_todo_rel) {
-            // RegLan variables should not occur here, they are eliminated by z3 rewriter I think,
-            // so both sides of the (dis)equations should be terms representing reg. languages
             expr_ref left_side = std::get<0>(item);
             expr_ref right_side = std::get<1>(item);
             bool is_equation = std::get<2>(item);
+
+            if (util::is_variable(left_side) || util::is_variable(right_side)) {
+                // RegLan variables are replaced by rewriter if we have some equation "v = some regular lang",
+                // but if we get some completely unrestricted variables (for example just disequation "v != v'"),
+                // we throw error (TODO: we could possibly handle this, theoretically we could just ignore this
+                // sort of disequations, as we can always find a language that differs and equations should not
+                // have unrestricted RegLan anyway, as they are also replaced by rewriter)
+                util::throw_error("unrestricted RegLan variables in disequations are not supported");
+            }
 
             STRACE("str",
                 tout << "Checking lang (dis)eq: " << mk_pp(left_side, m) << (is_equation ? " == " : " != ") << mk_pp(right_side, m) << std::endl;
