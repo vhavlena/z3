@@ -121,7 +121,7 @@ namespace smt::noodler::util {
      * FIXME same function is in theory_str_noodler, decide which to keep
      */
     static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, arith_util& m_util_a) {
-        app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), false);
+        app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true);
         // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
         return expr_ref(fresh_var, m);
     }
@@ -133,7 +133,7 @@ namespace smt::noodler::util {
      * FIXME same function is in theory_str_noodler, decide which to keep
      */
     static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), false);
+        app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true);
         return expr_ref(fresh_var, m);
     }
 
