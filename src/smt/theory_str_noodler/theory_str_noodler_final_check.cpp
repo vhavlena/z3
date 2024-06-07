@@ -168,19 +168,8 @@ namespace smt::noodler {
         
         std::vector<TermConversion> conversions;
         for (const auto& transf : m_conversion_todo) {
-            BasicTerm result(BasicTermType::Variable, to_app(std::get<0>(transf))->get_decl()->get_name().str());
-            BasicTerm argument(BasicTermType::Variable, to_app(std::get<1>(transf))->get_decl()->get_name().str());
-            ConversionType type = std::get<2>(transf);
-
-            if (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT) {
-                conversions.emplace_back(type, result, argument);
-                var_name.insert({result, expr_ref(std::get<0>(transf), m)});
-                ass.insert({result, nfa_sigma_star});
-            } else {
-                conversions.emplace_back(type, argument, result);
-                var_name.insert({argument, expr_ref(std::get<1>(transf), m)});
-                ass.insert({argument, nfa_sigma_star});
-            }
+            ass.insert({transf.string_var, nfa_sigma_star});
+            conversions.push_back(transf);
         }
         return conversions;
     }

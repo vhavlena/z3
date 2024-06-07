@@ -100,7 +100,7 @@ namespace smt::noodler {
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
         // e = str.to_int(s), or e = str.from_int(s), based on the conversion type
-        scoped_vector<std::tuple<expr_ref,expr_ref,ConversionType>> m_conversion_todo;
+        scoped_vector<TermConversion> m_conversion_todo;
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
         // todo constraints and check if they are relevant for current SAT assignment => if they are
