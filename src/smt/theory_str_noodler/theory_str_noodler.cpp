@@ -942,13 +942,148 @@ namespace smt::noodler {
             }
         }
     }
+    
+    class theory_str_noodler::string_var_proc : public model_value_proc {
+        theory_str_noodler &th;
+        expr *string_var;
+        svector<model_value_dependency> m_dependencies;
+        bool len_is_important = false;
+    public:
+        string_var_proc(theory_str_noodler &th, expr *string_var) : th(th), string_var(string_var) {
+            seq_util seq(th.m);
+            expr *string_var_len = seq.str.mk_length(string_var);
+            if (th.ctx.e_internalized(string_var_len)) {
+                m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_len)));
+                len_is_important = true;
+            }
+            STRACE("str-model", tout << "init model gen for var " << mk_pp(string_var, th.m) << " where its length is" << (len_is_important ? "" : " not") << " important\n");
+        }
 
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            result.append(m_dependencies.size(), m_dependencies.data());
+        }
+
+        app * mk_value(model_generator & mg, expr_ref_vector const & values) override {
+            rational val(0);
+            if (len_is_important) {
+                bool is_int;
+                VERIFY(th.m_util_a.is_numeral(values[0], val, is_int) && is_int);
+            }
+            std::stringstream s;
+            for (rational i(0); i < val; ++i) {
+                s << "a";
+            }
+            STRACE("str-model", tout << "model for var " << mk_pp(string_var, th.m) << ": " << s.str() << "\n");
+            return th.m_util_s.str.mk_string(zstring(s.str()));
+        }
+    };
+
+    class theory_str_noodler::conc_proc : public model_value_proc {
+        theory_str_noodler &th;
+        expr *conc;
+        svector<model_value_dependency> m_dependencies;
+    public:
+        conc_proc(theory_str_noodler &th, expr *conc) : th(th), conc(conc) {
+            expr_ref_vector concat_args(th.m);
+            th.m_util_s.str.get_concat(conc, concat_args);
+            for (expr *arg : concat_args) {
+                expr *real_arg = arg;
+                if (th.predicate_replace.contains(arg)) {
+                    real_arg = th.predicate_replace[arg];
+                }
+                SASSERT(th.ctx.e_internalized(real_arg));
+                m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(real_arg)));
+            }
+            STRACE("str-model", tout << "init model gen for concatenation " << mk_pp(conc, th.m) << "\n");
+        }
+
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            result.append(m_dependencies.size(), m_dependencies.data());
+        }
+
+        app * mk_value(model_generator & mg, expr_ref_vector const & values) override {
+            zstring res;
+            zstring arg_str;
+            for (expr* arg : values) {
+                VERIFY(th.m_util_s.str.is_string(arg, arg_str));
+                res = res + arg_str;
+            }
+            STRACE("str-model", tout << "model for concatenation " << mk_pp(conc, th.m) << ": " << res << "\n");
+            return th.m_util_s.str.mk_string(res);
+        }
+    };
+
+    class theory_str_noodler::from_transformation_proc : public model_value_proc {
+        theory_str_noodler &th;
+        expr *from_expr;
+        bool is_from_int; // if false, it is from_code
+        svector<model_value_dependency> m_dependencies;
+    public:
+        from_transformation_proc(theory_str_noodler &th, expr *from_expr, bool is_from_int) : th(th), from_expr(from_expr), is_from_int(is_from_int) {
+            expr *arg;
+            if (is_from_int) {
+                VERIFY(th.m_util_s.str.is_itos(from_expr, arg));
+            } else {
+                VERIFY(th.m_util_s.str.is_from_code(from_expr, arg));
+            }
+            SASSERT(th.ctx.e_internalized(arg));
+            m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(arg)));
+            STRACE("str-model", tout << "init model gen for from_" << (is_from_int ? "int" : "code") << " " << mk_pp(arg, th.m) << "\n");
+        }
+
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            result.append(m_dependencies.size(), m_dependencies.data());
+        }
+
+        app * mk_value(model_generator & mg, expr_ref_vector const & values) override {
+            rational val;
+            bool is_int;
+            VERIFY(th.m_util_a.is_numeral(values[0], val, is_int) && is_int);
+
+            zstring res;
+            if (val < 0) {
+                res = "";
+            } else if (is_from_int) {
+                res = zstring(val);
+            } else {
+                res = zstring(val.get_unsigned());
+            }
+            STRACE("str-model", tout << "model gen for from_" << (is_from_int ? "int" : "code") << ": " << res << "\n");
+            return th.m_util_s.str.mk_string(res);
+        }
+    };
+    
     model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
-        app *const tgt = n->get_expr();
-        (void) m;
+        // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), toint/tocode and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
+        app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: sort is " << mk_pp(tgt->get_sort(), m) << ", "
                            << mk_pp(tgt, m) << '\n';);
-        return alloc(expr_wrapper_proc, tgt);
+        if (m_util_s.str.is_string(tgt)) {
+            // for string literal, we just return the string
+            return alloc(expr_wrapper_proc, tgt);
+        } else if (util::is_str_variable(tgt, m_util_s)) {
+            // TODO: get a list of string vars that are needed to compute tgt from the decision procedure and also add them to dependencies
+            return alloc(string_var_proc, *this, tgt);
+        } else if (m_util_s.str.is_concat(tgt)) {
+            return alloc(conc_proc, *this, tgt);
+        } else if (m_util_s.str.is_from_code(tgt)) {
+            // TODO, we should probably do something with the var connected? how to do the dependency, also the var will be called with its own mk_value, should we do something there?
+            return alloc(from_transformation_proc, *this, tgt, false);
+        } else if (m_util_s.str.is_itos(tgt)) {
+            // TODO, we should probably do something with the var connected? how to do the dependency, also the var will be called with its own mk_value, should we do something there?
+            return alloc(from_transformation_proc, *this, tgt, true);
+        } else if (m_util_s.is_re(tgt)) {
+            if (util::is_variable(tgt)) {
+                // TODO: ERROR unrestricted regex vars unsupported (should not be able to come here, as this should be handled by dec proc)
+                return alloc(expr_wrapper_proc, tgt);
+            } else {
+                // for regex literal (nothing else could be regex), we just return the regex
+                return alloc(expr_wrapper_proc, tgt);
+            }
+        } else {
+            // TODO: ERROR
+            return alloc(expr_wrapper_proc, tgt);
+        }
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {

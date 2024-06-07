@@ -54,6 +54,11 @@ namespace smt::noodler {
             bool initial_length; // was the length formula obtained from the initial length checking?
         };
 
+        // TODO: explain
+        class string_var_proc;
+        class conc_proc;
+        class from_transformation_proc;
+
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
