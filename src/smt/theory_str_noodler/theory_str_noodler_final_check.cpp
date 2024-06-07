@@ -169,6 +169,7 @@ namespace smt::noodler {
         std::vector<TermConversion> conversions;
         for (const auto& transf : m_conversion_todo) {
             ass.insert({transf.string_var, nfa_sigma_star});
+            conversions.push_back(transf);
         }
         return conversions;
     }
