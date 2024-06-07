@@ -10,6 +10,7 @@ void theory_str_noodler_params::updt_params(params_ref const & _p) {
     m_try_nielsen = p.str_try_nielsen();
     m_underapprox_length = p.str_underapprox_length();
     m_produce_models = p.str_produce_models();
+    m_ca_constr = p.str_ca_constr();
 }
 
 #define DISPLAY_PARAM(X) out << #X"=" << X << std::endl;
@@ -21,4 +22,5 @@ void theory_str_noodler_params::display(std::ostream & out) const {
     DISPLAY_PARAM(m_try_nielsen);
     DISPLAY_PARAM(m_underapprox_length);
     DISPLAY_PARAM(m_produce_models);
+    DISPLAY_PARAM(m_ca_constr);
 }
