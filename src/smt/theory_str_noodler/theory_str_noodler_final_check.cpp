@@ -254,7 +254,7 @@ namespace smt::noodler {
             include_ass = false;
         }
         m_int_solver.initialize(get_context(), include_ass);
-        auto ret = m_int_solver.check_sat(len_formula);
+        auto ret = m_int_solver.check_sat(len_formula, arith_model);
         // construct an unsat core --> might be expensive
         // TODO: better interface of m_int_solver
         if(unsat_core != nullptr) {

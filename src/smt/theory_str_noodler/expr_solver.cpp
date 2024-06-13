@@ -4,11 +4,12 @@ Eternal glory to Yu-Fang.
 */
 
 #include "expr_solver.h"
+#include "ast/ast_pp.h"
 
 namespace smt::noodler {
-    lbool int_expr_solver::check_sat(expr* e) {
+    lbool int_expr_solver::check_sat(expr* e, model_ref res_model) {
         TRACE("str-lia", tout << "check_sat start\n";);
-//        m_kernel.push();
+        
         erv.push_back(e);
         lbool r = m_kernel.check(erv);
         erv.pop_back();
@@ -22,10 +23,9 @@ namespace smt::noodler {
             }
         );
 
-        model_ref asdf;
-        m_kernel.get_model(asdf);
-
-//        m_kernel.pop(1);
+        if (r == lbool::l_true) {
+            m_kernel.get_model(res_model);
+        }
 
         TRACE("str-lia", tout << "check_sat end\n";);
         return r;
