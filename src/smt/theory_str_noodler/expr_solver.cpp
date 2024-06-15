@@ -7,9 +7,9 @@ Eternal glory to Yu-Fang.
 #include "ast/ast_pp.h"
 
 namespace smt::noodler {
-    lbool int_expr_solver::check_sat(expr* e, model_ref res_model) {
+    lbool int_expr_solver::check_sat(expr* e, model_ref &res_model) {
         TRACE("str-lia", tout << "check_sat start\n";);
-        
+
         erv.push_back(e);
         lbool r = m_kernel.check(erv);
         erv.pop_back();

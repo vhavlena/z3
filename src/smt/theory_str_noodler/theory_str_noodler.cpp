@@ -749,6 +749,8 @@ namespace smt::noodler {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
             return FC_DONE;
         }
+        
+        arith_model = nullptr;
 
         remove_irrelevant_constr();
 
@@ -949,20 +951,28 @@ namespace smt::noodler {
         svector<model_value_dependency> m_dependencies;
         bool len_is_important = false;
         bool to_int_is_important = false;
+        bool to_code_is_important = false;
     public:
         string_var_proc(theory_str_noodler &th, expr *string_var) : th(th), string_var(string_var) {
-            seq_util seq(th.m);
-            expr *string_var_len = seq.str.mk_length(string_var);
+            expr *string_var_len = th.m_util_s.str.mk_length(string_var);
             if (th.ctx.e_internalized(string_var_len)) {
-                m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_len)));
+                // m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_len)));
                 len_is_important = true;
             }
-            expr *string_var_to_int = seq.str.mk_stoi(string_var);
+            expr *string_var_to_int = th.m_util_s.str.mk_stoi(string_var);
             if (th.ctx.e_internalized(string_var_to_int)) {
-                m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_to_int)));
+                // m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_to_int)));
                 to_int_is_important = true;
             }
-            STRACE("str-model", tout << "init model gen for var " << mk_pp(string_var, th.m) << " where its length is" << (len_is_important ? "" : " not") << " important\n");
+            expr *string_var_to_code = th.m_util_s.str.mk_to_code(string_var);
+            if (th.ctx.e_internalized(string_var_to_code)) {
+                // m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(string_var_to_int)));
+                to_code_is_important = true;
+            }
+            STRACE("str-model", tout << "init model gen for var " << mk_pp(string_var, th.m)
+                                     << " where its length is" << (len_is_important ? "" : " not") << " important"
+                                     << ", to_int is" << (to_int_is_important ? "" : " not") << " important"
+                                     << ", and to_code is" << (to_code_is_important ? "" : " not") << " important" << "\n");
         }
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
@@ -977,22 +987,48 @@ namespace smt::noodler {
                 }
                 tout << "\n"
             );
+
             rational val(0);
+            expr_ref expr_res(th.m);
             bool is_int;
-            if (len_is_important) {
-                VERIFY(th.m_util_a.is_numeral(values[0], val, is_int) && is_int);
-            }
-            std::stringstream s;
-            for (rational i(0); i < val; ++i) {
-                s << "a";
-            }
+            zstring res;
+
             if (to_int_is_important) {
-                VERIFY(th.m_util_a.is_numeral(values[1], val, is_int) && is_int);
-                STRACE("str-model", tout << "model for var " << mk_pp(string_var, th.m) << ": " << val << "\n");
-                return th.m_util_s.str.mk_string(zstring(val));
+                th.arith_model->eval_expr(th.m_util_s.str.mk_stoi(string_var), expr_res);
+                VERIFY(th.m_util_a.is_numeral(expr_res, val, is_int) && is_int);
+                // TODO: handle val=-1
+                res = zstring(val);
             }
-            STRACE("str-model", tout << "model for var " << mk_pp(string_var, th.m) << ": " << s.str() << "\n");
-            return th.m_util_s.str.mk_string(zstring(s.str()));
+
+            if (to_code_is_important) {
+                th.arith_model->eval_expr(th.m_util_s.str.mk_to_code(string_var), expr_res);
+                VERIFY(th.m_util_a.is_numeral(expr_res, val, is_int) && is_int);
+                // TODO: handle val=-1
+                zstring code_res(val.get_unsigned());
+                if (to_int_is_important) {
+                    if (res != code_res) {
+                        util::throw_error("Model mismatch, to_int and to_code with the same arg is different");
+                    }
+                }
+                res = code_res;
+            }
+
+            if (len_is_important) {
+                th.arith_model->eval_expr(th.m_util_s.str.mk_length(string_var), expr_res);
+                VERIFY(th.m_util_a.is_numeral(expr_res, val, is_int) && is_int);
+                if (res.length() > val) {
+                    util::throw_error("Model mismatch, length of the result of to_int/to_code is longer than length of its argument");
+                }
+
+                std::stringstream s;
+                for (rational i(res.length()); i < val; ++i) {
+                    s << "0";
+                }
+                res = zstring(s.str()) + res;
+            }
+
+            STRACE("str-model", tout << "model for var " << mk_pp(string_var, th.m) << ": " << res << "\n");
+            return th.m_util_s.str.mk_string(res);
         }
     };
 
@@ -1036,16 +1072,16 @@ namespace smt::noodler {
         expr *from_expr;
         bool is_from_int; // if false, it is from_code
         svector<model_value_dependency> m_dependencies;
+        expr *arg;
     public:
         from_transformation_proc(theory_str_noodler &th, expr *from_expr, bool is_from_int) : th(th), from_expr(from_expr), is_from_int(is_from_int) {
-            expr *arg;
             if (is_from_int) {
                 VERIFY(th.m_util_s.str.is_itos(from_expr, arg));
             } else {
                 VERIFY(th.m_util_s.str.is_from_code(from_expr, arg));
             }
             SASSERT(th.ctx.e_internalized(arg));
-            m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(arg)));
+            // m_dependencies.push_back(model_value_dependency(th.ctx.get_enode(arg)));
             STRACE("str-model", tout << "init model gen for conversion " << mk_pp(from_expr,th.m) << "\n");
         }
 
@@ -1056,7 +1092,9 @@ namespace smt::noodler {
         app * mk_value(model_generator & mg, expr_ref_vector const & values) override {
             rational val;
             bool is_int;
-            VERIFY(th.m_util_a.is_numeral(values[0], val, is_int) && is_int);
+            expr_ref expr_res(th.m);
+            th.arith_model->eval_expr(arg, expr_res);
+            VERIFY(th.m_util_a.is_numeral(expr_res, val, is_int) && is_int);
 
             zstring res;
             if (val < 0) {
@@ -1064,7 +1102,11 @@ namespace smt::noodler {
             } else if (is_from_int) {
                 res = zstring(val);
             } else {
-                res = zstring(val.get_unsigned());
+                if (val > rational{zstring::max_char()}) {
+                    res = "";
+                } else {
+                    res = zstring(val.get_unsigned());
+                }
             }
             STRACE("str-model", tout << "model gen for conversion " << mk_pp(from_expr,th.m) << ": " << res << "\n");
             return th.m_util_s.str.mk_string(res);
@@ -1072,6 +1114,10 @@ namespace smt::noodler {
     };
     
     model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
+        if (!arith_model) {
+            util::throw_error("arith model is not initialized");
+        }
+
         // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), toint/tocode and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: sort is " << mk_pp(tgt->get_sort(), m) << ", "
