@@ -837,6 +837,7 @@ namespace smt::noodler {
             if(result == l_true) {
                 return FC_DONE;
             } else if(result == l_false) {
+                block_curr_len(expr_ref(this->m.mk_false(), this->m)); // there should not be any length vars, so we block fully
                 return FC_CONTINUE;
             }
         }

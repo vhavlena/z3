@@ -31,6 +31,17 @@ namespace smt::noodler {
 
         zstring get_model(BasicTerm var) override;
     };
+
+    class MultMembHeuristicProcedure : public AbstractDecisionProcedure {
+        std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag;
+        regex::Alphabet alph;
+        const seq_util& m_util_s;
+    public:
+        MultMembHeuristicProcedure(std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag, regex::Alphabet alph, const seq_util& m_util_s)
+            : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s) {}
+
+        lbool compute_next_solution() override;
+    };
 }
 
 #endif
