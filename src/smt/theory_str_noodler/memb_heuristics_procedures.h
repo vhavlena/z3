@@ -20,11 +20,16 @@ namespace smt::noodler {
         expr_ref regex;
         bool is_regex_positive;
         const seq_util& m_util_s;
+        std::shared_ptr<mata::nfa::Nfa> reg_nfa = nullptr;
     public:
         MembHeuristicProcedure(BasicTerm var, expr_ref regex, bool is_regex_positive, const seq_util& m_util_s)
             : var(var), regex(regex), is_regex_positive(is_regex_positive), m_util_s(m_util_s) {}
 
         lbool compute_next_solution() override;
+
+        void init_model(/*arith_model?*/) override {}
+
+        zstring get_model(BasicTerm var) override;
     };
 }
 

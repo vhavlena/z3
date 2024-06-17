@@ -98,6 +98,17 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
+        virtual void init_model(/*arith_model?*/) {
+            throw std::runtime_error("Unimplemented");
+        }
+
+        /**
+         * @brief Get model for the variable @p var
+         */
+        virtual zstring get_model(BasicTerm var) {
+            throw std::runtime_error("Unimplemented");
+        }
+
         virtual ~AbstractDecisionProcedure()=default;
     };
 

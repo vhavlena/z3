@@ -37,10 +37,26 @@ namespace smt::noodler {
                     return l_false;
                 } else {
                     // otherwise x should not belong in some nfa that is not sigma*, so it is sat
+                    reg_nfa = std::make_shared<mata::nfa::Nfa>(nfa);
                     return l_true;
                 }
             }
         }
         return l_undef;
+    }
+
+    zstring MembHeuristicProcedure::get_model(BasicTerm var) {
+        if (var != this->var) {
+            util::throw_error("Cannot compute var that is not used in membership heuristic dec. proc.");
+        }
+
+        if (!reg_nfa) {
+            // TODO: compute model from regex
+            util::throw_error("Cannot compute model from regex directly");
+        } else {
+            SASSERT(!is_regex_positive);
+            // TODO: get word that is NOT in reg_nfa
+            util::throw_error("Unsupported for now");
+        }
     }
 }
