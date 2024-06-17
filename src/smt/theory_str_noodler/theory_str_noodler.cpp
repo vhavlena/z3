@@ -866,6 +866,22 @@ namespace smt::noodler {
             }
         }
 
+        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
+
+        // the skip_len_sat preprocessing rule requires that the input formula is length satisfiable
+        // --> before we apply the preprocessing, we need to be sure that it is indeed true.
+        // length constraints from initial assignment
+        // we want to include all variables from the formula --> e.g.
+        // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
+        // to include also length of |u| to propagate the value to |s|
+        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths(true));
+        if(check_len_sat(lengths) == l_false) {
+            STRACE("str", tout << "Unsat from initial lengths" << std::endl);
+            block_curr_len(lengths, true, true);
+            return FC_CONTINUE;
+        }
+
+        // now we know that the initial formula is length-satisfiable
         // try underapproximation (if enabled) to solve
         if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment, conversions)) {
             STRACE("str", tout << "Try underapproximation" << std::endl);
@@ -874,8 +890,6 @@ namespace smt::noodler {
                 return FC_DONE;
             }
         }
-
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
@@ -887,7 +901,7 @@ namespace smt::noodler {
 
         // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
         // length constraints from initial assignment
-        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
+        lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths, true, true);

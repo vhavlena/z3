@@ -575,7 +575,7 @@ namespace smt::noodler {
         return l_false;
     }
 
-    LenNode DecisionProcedure::get_initial_lengths() {
+    LenNode DecisionProcedure::get_initial_lengths(bool all_vars) {
         if (init_length_sensitive_vars.empty()) {
             // there are no length sensitive vars, so we can immediately say true
             return LenNode(LenFormulaType::TRUE);
@@ -585,9 +585,16 @@ namespace smt::noodler {
         std::vector<LenNode> conjuncts = {preprocessing_len_formula};
 
         // for each initial length variable get the lengths of all its possible words for automaton in init_aut_ass
-        for (const BasicTerm &var : init_length_sensitive_vars) {
-            conjuncts.push_back(init_aut_ass.get_lengths(var));
+        if(all_vars) {
+            for (const BasicTerm &var : this->formula.get_vars()) {
+                conjuncts.push_back(init_aut_ass.get_lengths(var));
+            }
+        } else {
+            for (const BasicTerm &var : this->init_length_sensitive_vars) {
+                conjuncts.push_back(init_aut_ass.get_lengths(var));
+            }
         }
+        
 
         return LenNode(LenFormulaType::AND, conjuncts);
     }
