@@ -79,16 +79,23 @@ namespace smt::noodler::regex {
     };
 
     /**
+     * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
+     * @param[in] ex Expression to be checked for symbols.
+     * @param[in] m_util_s Seq util for AST.
+     * @param[out] alphabet A set of symbols with where found symbols are appended to.
+     */
+    void extract_symbols(expr* const ex, const seq_util& m_util_s, std::set<uint32_t>& alphabet);
+
+    /**
      * Convert expression @p expr to NFA.
      * @param[in] expression Expression to be converted to NFA.
      * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
      * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
      * @param[in] determinize Determinize intermediate automata
      * @param[in] make_complement Whether to make complement of the passed @p expr instead.
      * @return The resulting regex.
      */
-    [[nodiscard]] mata::nfa::Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] mata::nfa::Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s,
                                              const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
 
     /**
@@ -100,7 +107,7 @@ namespace smt::noodler::regex {
      * @param m ast manager
      * @return RegexInfo 
      */
-    RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s, const ast_manager& m);
+    RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s);
 
     /**
      * @brief Create bounded iteration of a given automaton. 

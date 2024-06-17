@@ -19,6 +19,7 @@ Eternal glory to Yu-Fang.
 
 #include "decision_procedure.h"
 #include "theory_str_noodler.h"
+#include "memb_heuristics_procedures.h"
 
 namespace smt::noodler {
 
@@ -806,15 +807,28 @@ namespace smt::noodler {
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
 
-        // As a heuristic, for the case we have exactly one constraint, which is of type 'x notin RE', we use universality
-        // checking instead of constructing the automaton for complement of RE. The complement can sometimes blow up, so
-        // universality checking should be faster.
+        // As a heuristic, for the case we have exactly one constraint, which is of type 'x (not)in RE', we use universality/emptiness
+        // checking of the regex (using some heuristics) instead of constructing the automaton of RE. The construction (especially complement)
+        // can sometimes blow up, so the check should be faster.
         if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
-            lbool result = run_membership_heur();
-            if(result == l_true) {
-                return FC_DONE;
-            } else if(result == l_false) {
-                return FC_CONTINUE;
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            // TODO: check if "xyz in RE" works correctly
+            expr_ref var = std::get<0>(reg_data);
+            if (util::is_str_variable(var, m_util_s) && !this->len_vars.contains(var)) { // the variable cannot be length one
+                STRACE("str", tout << "trying one membership heuristics\n";);
+                MembHeuristicProcedure dp(
+                    util::get_variable_basic_term(var),
+                    std::get<1>(reg_data),
+                    std::get<2>(reg_data),
+                    m_util_s
+                );
+                lbool result = dp.compute_next_solution();
+                if(result == l_true) {
+                    return FC_DONE;
+                } else if(result == l_false) {
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m)); // the variable is not legnth one, so we block fully
+                    return FC_CONTINUE;
+                }
             }
         }
 

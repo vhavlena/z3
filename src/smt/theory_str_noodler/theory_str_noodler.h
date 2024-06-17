@@ -283,13 +283,6 @@ namespace smt::noodler {
         void remove_irrelevant_constr();
 
         /**
-         * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
-         * @param[in] ex Expression to be checked for symbols.
-         * @param[out] alphabet A set of symbols with where found symbols are appended to.
-         */
-        void extract_symbols(expr * ex, std::set<uint32_t>& alphabet);
-
-        /**
         Convert (dis)equation @p ex to the instance of Predicate. As a side effect updates mapping of
         variables (BasicTerm) to the corresponding z3 expr.
         @param ex Z3 expression to be converted to Predicate.
@@ -402,13 +395,6 @@ namespace smt::noodler {
          * @return lbool Outcome of the procedure
          */
         lbool run_nielsen(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
-
-        /**
-         * @brief Wrapper for running the membership query heuristics.
-         * 
-         * @return lbool Outcome of the heuristic procedure.
-         */
-        lbool run_membership_heur();
 
         /**
          * @brief Wrapper for running the mulitple membership query heuristics.
