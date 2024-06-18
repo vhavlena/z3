@@ -36,11 +36,18 @@ namespace smt::noodler {
         std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag;
         regex::Alphabet alph;
         const seq_util& m_util_s;
+
+        std::map<BasicTerm, mata::nfa::Nfa> intersections;
+        std::map<BasicTerm, mata::nfa::Nfa> unions;
     public:
         MultMembHeuristicProcedure(std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag, regex::Alphabet alph, const seq_util& m_util_s)
             : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s) {}
 
         lbool compute_next_solution() override;
+
+        void init_model(/*arith_model?*/) override {}
+
+        zstring get_model(BasicTerm var) override;
     };
 }
 

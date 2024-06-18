@@ -58,6 +58,8 @@ namespace smt::noodler {
             // TODO: get word that is NOT in reg_nfa
             util::throw_error("Unsupported for now");
         }
+
+        return zstring();
     }
 
     lbool MultMembHeuristicProcedure::compute_next_solution() {
@@ -127,9 +129,29 @@ namespace smt::noodler {
                 STRACE("str-mult-memb-heur", tout << "inclusion holds => UNSAT" << std::endl;);
                 return l_false;
             }
+
+            intersections[var] = intersection;
+            unions[var] = unionn;
         }
 
         STRACE("str-mult-memb-heur", tout << "inclusion holds for all vars => SAT" << std::endl;);
         return l_true;
+    }
+    
+    zstring MultMembHeuristicProcedure::get_model(BasicTerm var) {
+        if (unions.contains(var)) {
+            // TODO: add support for getting some word from "intersections[var] \intersect \neg unions[var]" on the fly
+            util::throw_error("Unsupported for now");
+        }
+
+        auto words = intersections.at(var).get_words(intersections.at(var).num_of_states());
+        SASSERT(!words.empty());
+        
+        zstring res;
+        for (auto i : *(words.begin())) {
+            res = res + zstring(unsigned(i));
+        }
+
+        return res;
     }
 }

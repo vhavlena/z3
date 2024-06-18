@@ -227,7 +227,7 @@ namespace smt::noodler {
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<TermConversion> conversions) {
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
+        dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
         if (dec_proc.preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
             return l_false;
         }
@@ -357,14 +357,14 @@ namespace smt::noodler {
 
     lbool theory_str_noodler::run_nielsen(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         STRACE("str", tout << "Trying nielsen" << std::endl);
-        NielsenDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
-        nproc.preprocess();
+        dec_proc = NielsenDecisionProcedure(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        dec_proc.preprocess();
         expr_ref block_len(m.mk_false(), m);
-        nproc.init_computation();
+        dec_proc.init_computation();
         while (true) {
-            lbool result = nproc.compute_next_solution();
+            lbool result = dec_proc.compute_next_solution();
             if (result == l_true) {
-                expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths().first);
+                expr_ref lengths = len_node_to_z3_formula(dec_proc.get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
                     return l_true;
                 } else {
@@ -451,8 +451,8 @@ namespace smt::noodler {
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
         }
 
-        MultMembHeuristicProcedure dp(var_to_list_of_regexes_and_complement_flag, alph, m_util_s);
-        return dp.compute_next_solution();
+        dec_proc = MultMembHeuristicProcedure(var_to_list_of_regexes_and_complement_flag, alph, m_util_s);
+        return dec_proc.compute_next_solution();
     }
 
     lbool theory_str_noodler::run_loop_protection() {
@@ -507,7 +507,7 @@ namespace smt::noodler {
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions) {
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_ass, init_length_sensitive_vars, m_params, conversions };
+        dec_proc = DecisionProcedure{ instance, aut_ass, init_length_sensitive_vars, m_params, conversions };
         expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);

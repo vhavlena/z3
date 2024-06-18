@@ -816,13 +816,13 @@ namespace smt::noodler {
             expr_ref var = std::get<0>(reg_data);
             if (util::is_str_variable(var, m_util_s) && !this->len_vars.contains(var)) { // the variable cannot be length one
                 STRACE("str", tout << "trying one membership heuristics\n";);
-                MembHeuristicProcedure dp(
+                dec_proc = MembHeuristicProcedure(
                     util::get_variable_basic_term(var),
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
                     m_util_s
                 );
-                lbool result = dp.compute_next_solution();
+                lbool result = dec_proc.compute_next_solution();
                 if(result == l_true) {
                     return FC_DONE;
                 } else if(result == l_false) {
@@ -897,7 +897,7 @@ namespace smt::noodler {
             }
         }
 
-        DecisionProcedure dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
+        dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
@@ -1129,14 +1129,15 @@ namespace smt::noodler {
     };
     
     model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
-        if (!arith_model) {
-            util::throw_error("arith model is not initialized");
-        }
+        // if (!arith_model) {
+        //     util::throw_error("arith model is not initialized");
+        // }
 
         // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), toint/tocode and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: sort is " << mk_pp(tgt->get_sort(), m) << ", "
                            << mk_pp(tgt, m) << '\n';);
+        return alloc(expr_wrapper_proc, tgt);
         if (m_util_s.str.is_string(tgt)) {
             // for string literal, we just return the string
             return alloc(expr_wrapper_proc, tgt);

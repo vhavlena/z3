@@ -59,6 +59,7 @@ namespace smt::noodler {
         class conc_proc;
         class from_transformation_proc;
         model_ref arith_model;
+        AbstractDecisionProcedure dec_proc;
 
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
