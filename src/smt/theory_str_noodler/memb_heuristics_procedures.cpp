@@ -130,8 +130,14 @@ namespace smt::noodler {
                 return l_false;
             }
 
-            intersections[var] = intersection;
-            unions[var] = unionn;
+            
+            if (!list_of_normal_regs.empty()) {
+                intersections[var] = intersection;
+            }
+
+            if (!list_of_compl_regs.empty()) {
+                unions[var] = unionn;
+            }
         }
 
         STRACE("str-mult-memb-heur", tout << "inclusion holds for all vars => SAT" << std::endl;);
@@ -139,6 +145,7 @@ namespace smt::noodler {
     }
     
     zstring MultMembHeuristicProcedure::get_model(BasicTerm var) {
+        STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
         if (unions.contains(var)) {
             // TODO: add support for getting some word from "intersections[var] \intersect \neg unions[var]" on the fly
             util::throw_error("Unsupported for now");

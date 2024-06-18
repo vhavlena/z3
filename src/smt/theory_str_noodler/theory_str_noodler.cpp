@@ -816,13 +816,13 @@ namespace smt::noodler {
             expr_ref var = std::get<0>(reg_data);
             if (util::is_str_variable(var, m_util_s) && !this->len_vars.contains(var)) { // the variable cannot be length one
                 STRACE("str", tout << "trying one membership heuristics\n";);
-                dec_proc = MembHeuristicProcedure(
+                dec_proc = std::make_unique<MembHeuristicProcedure>(
                     util::get_variable_basic_term(var),
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
                     m_util_s
                 );
-                lbool result = dec_proc.compute_next_solution();
+                lbool result = dec_proc->compute_next_solution();
                 if(result == l_true) {
                     return FC_DONE;
                 } else if(result == l_false) {
@@ -897,10 +897,10 @@ namespace smt::noodler {
             }
         }
 
-        dec_proc = DecisionProcedure{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
+        dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
-        lbool result = dec_proc.preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
+        lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
         if (result == l_false) {
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
@@ -909,7 +909,7 @@ namespace smt::noodler {
 
         // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
         // length constraints from initial assignment
-        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
+        expr_ref lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths, true, true);
@@ -917,13 +917,13 @@ namespace smt::noodler {
         }
 
         STRACE("str", tout << "Starting main decision procedure" << std::endl);
-        dec_proc.init_computation();
+        dec_proc->init_computation();
 
         expr_ref block_len(m.mk_false(), m);
         while (true) {
-            result = dec_proc.compute_next_solution();
+            result = dec_proc->compute_next_solution();
             if (result == l_true) {
-                auto [noodler_lengths, precision] = dec_proc.get_lengths();
+                auto [noodler_lengths, precision] = dec_proc->get_lengths();
                 lengths = len_node_to_z3_formula(noodler_lengths);
                 lbool is_lengths_sat = check_len_sat(lengths);
 
@@ -1137,13 +1137,13 @@ namespace smt::noodler {
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: sort is " << mk_pp(tgt->get_sort(), m) << ", "
                            << mk_pp(tgt, m) << '\n';);
-        return alloc(expr_wrapper_proc, tgt);
+        // return alloc(expr_wrapper_proc, tgt);
         if (m_util_s.str.is_string(tgt)) {
             // for string literal, we just return the string
             return alloc(expr_wrapper_proc, tgt);
         } else if (util::is_str_variable(tgt, m_util_s)) {
             // TODO: get a list of string vars that are needed to compute tgt from the decision procedure and also add them to dependencies
-            return alloc(string_var_proc, *this, tgt);
+            return alloc(expr_wrapper_proc, m_util_s.str.mk_string(dec_proc->get_model(util::get_variable_basic_term(tgt))));
         } else if (m_util_s.str.is_concat(tgt)) {
             return alloc(conc_proc, *this, tgt);
         } else if (m_util_s.str.is_from_code(tgt)) {
