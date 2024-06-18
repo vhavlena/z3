@@ -746,6 +746,7 @@ namespace smt::noodler {
         TRACE("str", tout << "final_check starts" << std::endl;);
 
         if (last_run_was_sat) {
+            // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
             return FC_DONE;
         }
 
