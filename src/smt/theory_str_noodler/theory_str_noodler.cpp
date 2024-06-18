@@ -745,6 +745,10 @@ namespace smt::noodler {
     final_check_status theory_str_noodler::final_check_eh() {
         TRACE("str", tout << "final_check starts" << std::endl;);
 
+        if (last_run_was_sat) {
+            return FC_DONE;
+        }
+
         remove_irrelevant_constr();
 
         STRACE("str",
@@ -909,6 +913,7 @@ namespace smt::noodler {
                 
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
+                    last_run_was_sat = true;
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
