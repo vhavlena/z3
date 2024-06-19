@@ -112,6 +112,9 @@ namespace smt::noodler {
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in m_conversion_todo is relevant => no _todo_rel version
 
+        // true if last run of final_check_eh was sat (if it is true, then final_check_eh always return sat)
+        bool last_run_was_sat = false;
+
     public:
         char const * get_name() const override { return "noodler"; }
         theory_str_noodler(context& ctx, ast_manager & m, theory_str_noodler_params const & params);
