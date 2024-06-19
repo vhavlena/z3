@@ -876,8 +876,8 @@ namespace smt::noodler {
         // we want to include all variables from the formula --> e.g.
         // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
         // to include also length of |u| to propagate the value to |s|
-        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths(true));
-        if(check_len_sat(lengths) == l_false) {
+        expr_ref lengths_pre = len_node_to_z3_formula(dec_proc.get_initial_lengths(true));
+        if(check_len_sat(lengths_pre) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             // we postpone the decision. If the instance is both length unsatisfiable and 
             // unsatisfiable from preprocessing, we want to kill it after preprocessing as it
@@ -903,17 +903,18 @@ namespace smt::noodler {
             return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
-        // instance is length unsat --> generate theory lemma
-        if(length_unsat) {
-            block_curr_len(lengths, true, true);
-            return FC_CONTINUE;
-        }
         // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
         // length constraints from initial assignment
-        lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
+        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths, true, true);
+            return FC_CONTINUE;
+        }
+
+        // instance is length unsat --> generate theory lemma
+        if(length_unsat) {
+            block_curr_len(lengths_pre, true, true);
             return FC_CONTINUE;
         }
 
