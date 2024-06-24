@@ -59,7 +59,7 @@ namespace smt::noodler {
 
     std::set<mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
         // start with symbol representing everything not in formula
-        std::set<mata::Symbol> symbols_in_formula{get_dummy_symbol()};
+        std::set<mata::Symbol> symbols_in_formula{util::get_dummy_symbol()};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             regex::extract_symbols(word_equation.first, m_util_s, symbols_in_formula);

@@ -60,21 +60,52 @@ namespace smt::noodler::regex {
     struct Alphabet {
     
     private:
-        std::set<uint32_t> alphabet;
+        std::set<mata::Symbol> alphabet;
         mata::OnTheFlyAlphabet mata_alphabet;
     public:
-        Alphabet(const std::set<uint32_t>& alph) : alphabet(alph) {
+        Alphabet(const std::set<mata::Symbol>& alph) : alphabet(alph) {
             for (const auto& symbol : alph) {
                 this->mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
         }
 
-        const std::set<uint32_t>& get_alphabet() const {
+        const std::set<mata::Symbol>& get_alphabet() const {
             return this->alphabet;
         }
 
         const mata::OnTheFlyAlphabet& get_mata_alphabet() const {
             return this->mata_alphabet;
+        }
+
+        mata::Symbol get_unused_symbol() const {
+            // std::set is ordered, so alphabet is also ordered
+            if (*alphabet.begin() != 0) {
+                return 0;
+            } else {
+                auto it = alphabet.begin();
+                mata::Symbol s = *it;
+                ++it;
+                while (it != alphabet.end()) {
+                    if (s+1 != *it) {
+                        return s+1;
+                    }
+                    ++it;
+                }
+                return (*it)+1;
+            }
+        }
+
+        zstring get_string_from_mata_word(mata::Word word) const {
+            zstring res;
+            mata::Symbol unused_symbol = get_unused_symbol();
+            for (mata::Symbol s : word) {
+                if (util::is_dummy_symbol(s)) {
+                    res = res + zstring(unsigned(unused_symbol));
+                } else {
+                    res = res + zstring(unsigned(s));
+                }
+            }
+            return res;
         }
     };
 

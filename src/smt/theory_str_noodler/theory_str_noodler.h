@@ -276,6 +276,8 @@ namespace smt::noodler {
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
+        zstring model_of_string_expr(app* str_expr);
+
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 
         /**

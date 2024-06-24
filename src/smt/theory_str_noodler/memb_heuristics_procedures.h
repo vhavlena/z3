@@ -27,9 +27,7 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override;
 
-        void init_model(/*arith_model?*/) override {}
-
-        zstring get_model(BasicTerm var) override;
+        zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) override;
     };
 
     class MultMembHeuristicProcedure : public AbstractDecisionProcedure {
@@ -45,9 +43,7 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override;
 
-        void init_model(/*arith_model?*/) override {}
-
-        zstring get_model(BasicTerm var) override;
+        zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) override;
     };
 }
 

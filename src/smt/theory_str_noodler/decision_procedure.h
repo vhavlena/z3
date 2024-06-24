@@ -4,6 +4,7 @@
 #include <memory>
 #include <deque>
 #include <algorithm>
+#include <functional>
 
 #include "smt/params/theory_str_noodler_params.h"
 #include "formula.h"
@@ -30,19 +31,6 @@ namespace smt::noodler {
         UNDERAPPROX,
         OVERAPPROX,
     };
-
-    /**
-     * @brief Get the value of the symbol representing all symbols not ocurring in the formula (i.e. a minterm)
-     * 
-     * Dummy symbol represents all symbols not occuring in the problem. It is needed,
-     * because if we have for example disequation x != y and nothing else, we would
-     * have no symbols and incorrectly say it is unsat. Similarly, for 'x not in "aaa"
-     * and |x| = 3', we would only get symbol 'a' and say (incorrectly) unsat. This
-     * symbol however needs to have special semantics, for example to_code should
-     * interpret is as anything but used symbols.
-     */
-    inline mata::Symbol get_dummy_symbol() { static const mata::Symbol DUMMY_SYMBOL = zstring::max_char() + 1; return DUMMY_SYMBOL; }
-    inline bool is_dummy_symbol(mata::Symbol sym) { return sym == get_dummy_symbol(); }
 
     /**
      * @brief Abstract decision procedure. Defines interface for decision
@@ -98,14 +86,10 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
-        virtual void init_model(/*arith_model?*/) {
-            throw std::runtime_error("Unimplemented");
-        }
-
         /**
          * @brief Get model for the variable @p var
          */
-        virtual zstring get_model(BasicTerm var) {
+        virtual zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -231,6 +215,18 @@ namespace smt::noodler {
             return dependent_inclusions;
         }
 
+        bool get_inclusion_with_var_on_right_side(const BasicTerm& var, Predicate& found_inclusion) {
+            for (const Predicate &inclusion : inclusions) {
+                for (auto const &right_var : inclusion.get_right_set()) {
+                    if (right_var == var) {
+                        found_inclusion = inclusion;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         /**
          * Check if the vector @p right_side_vars depends on @p left_side_vars, i.e. if some variable
          * (NOT literal) occuring in @p right_side_vars occurs also in @p left_side_vars
@@ -312,6 +308,13 @@ namespace smt::noodler {
         std::vector<LenNode> disequations_len_formula_conjuncts;
 
         const theory_str_noodler_params& m_params;
+
+        // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
+        std::set<BasicTerm> code_subst_vars;
+        std::set<BasicTerm> int_subst_vars;
+
+        // keeps already computed models
+        std::map<BasicTerm,zstring> model_of_var;
 
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
@@ -457,6 +460,8 @@ namespace smt::noodler {
         LenNode get_initial_lengths() override;
 
         std::pair<LenNode, LenNodePrecision> get_lengths() override;
+
+        zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) override;
     };
 }
 
