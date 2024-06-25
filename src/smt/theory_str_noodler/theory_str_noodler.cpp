@@ -966,7 +966,7 @@ namespace smt::noodler {
             rational val(0);
             expr_ref expr_res(m);
             bool is_int;
-            arith_model->eval_expr(m_util_s.str.mk_length(util::mk_str_var(var.get_name().encode(), m , m_util_s)), expr_res);
+            arith_model->eval_expr(m_util_s.str.mk_length(util::mk_str_var(var.get_name().encode(), m, m_util_s)), expr_res);
             VERIFY(m_util_a.is_numeral(expr_res, val, is_int) && is_int);
             return val;
         };
@@ -975,7 +975,7 @@ namespace smt::noodler {
             rational val(0);
             expr_ref expr_res(m);
             bool is_int;
-            arith_model->eval_expr(util::mk_str_var(var.get_name().encode(), m , m_util_s), expr_res);
+            arith_model->eval_expr(util::mk_int_var(var.get_name().encode(), m, m_util_a), expr_res);
             VERIFY(m_util_a.is_numeral(expr_res, val, is_int) && is_int);
             return val;
         };
