@@ -1543,7 +1543,7 @@ namespace smt::noodler {
                     zstring to_int_str(to_int_value); // zstring(rational) returns the string representation of the number in the argument
                     SASSERT(len >= to_int_str.length());
                     // pad to_int_str with leading zeros until we reach desired length
-                    for (unsigned i = 0; i != len.get_unsigned() - to_int_str.length(); ++i) {
+                    while (len.get_unsigned() != to_int_str.length()) {
                         to_int_str = zstring("0") + to_int_str;
                     }
                     update_model_and_aut_ass(var, to_int_str);
@@ -1567,6 +1567,8 @@ namespace smt::noodler {
         if (model_of_var.contains(var)) {
             return model_of_var.at(var);
         }
+
+        STRACE("str-model", tout << "Generating model for var " << var << " with length " << get_arith_model_of_length(var) << "\n";);
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
