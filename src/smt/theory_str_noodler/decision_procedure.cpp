@@ -1190,6 +1190,7 @@ namespace smt::noodler {
         SolvingState init_solving_state;
         init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
+        init_solving_state.substitution_map = std::move(this->init_substitution_map);
 
         if (!equations.get_predicates().empty()) {
             // TODO we probably want to completely get rid of inclusion graphs
@@ -1240,11 +1241,11 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
         // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
-        // inside not(contains)/conversion. (Note that if opt == PreprocessType::UNDERAPPROX, there is no not(contains)).
+        // inside not(contains)/conversion.
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
-            prep_handler.skip_len_sat();
+            prep_handler.skip_len_sat(inclusions_from_preprocessing);
         }
         prep_handler.generate_identities();
         prep_handler.propagate_variables();
@@ -1252,7 +1253,7 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities();
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -1270,18 +1271,18 @@ namespace smt::noodler {
         prep_handler.common_suffix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
         prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
-            prep_handler.skip_len_sat();
+            prep_handler.skip_len_sat(inclusions_from_preprocessing); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
             prep_handler.reduce_regular_sequence(3);
-            prep_handler.remove_regular(conv_vars);
-            prep_handler.skip_len_sat();
+            prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
+            prep_handler.skip_len_sat(inclusions_from_preprocessing); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
         }
         prep_handler.reduce_regular_sequence(1);
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
 
         prep_handler.conversions_validity(conversions);
 
@@ -1489,10 +1490,24 @@ namespace smt::noodler {
         return l_undef;
     }
 
+    void DecisionProcedure::move_inclusions_from_preprocessing_to_solution() {
+        // the inclusions from preprocessing should be of form where all vars on right side
+        // occurs only once only in this inclusion, so they should belong to chain-free fragment
+        //  => they are not on a cycle (important for model generation, we want to generate the
+        //     model of vars on the right side from the left side)
+        for (const Predicate& incl : inclusions_from_preprocessing) {
+            solution.inclusions.insert(incl);
+            solution.inclusions_not_on_cycle.insert(incl); 
+        }
+        inclusions_from_preprocessing.clear();
+    }
+
     zstring DecisionProcedure::get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) {
         if (model_of_var.contains(var)) {
             return model_of_var.at(var);
         }
+
+        move_inclusions_from_preprocessing_to_solution();
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
@@ -1512,17 +1527,16 @@ namespace smt::noodler {
             }
             return update_model_and_aut_ass(result);
         } else if (solution.aut_ass.contains(var)) {
+            std::shared_ptr<mata::nfa::Nfa> possible_solutions = solution.aut_ass.at(var);
+            auto cut_possible_solutions_with = [&possible_solutions](const mata::nfa::Nfa nfa) {
+                possible_solutions = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*possible_solutions, nfa).trim());
+            };
+
+            // we only want solutions that have the correct length from the model
+            rational len = get_arith_model_of_length(var);
+            cut_possible_solutions_with(solution.aut_ass.sigma_automaton_of_length(len.get_unsigned()));
+
             if (solution.length_sensitive_vars.contains(var)) {
-                std::shared_ptr<mata::nfa::Nfa> possible_solutions = solution.aut_ass.at(var);
-
-                auto cut_possible_solutions_with = [&possible_solutions](const mata::nfa::Nfa nfa) {
-                    possible_solutions = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*possible_solutions, nfa).trim());
-                };
-
-                rational len;
-                len = get_arith_model_of_length(var);
-                cut_possible_solutions_with(solution.aut_ass.sigma_automaton_of_length(len.get_unsigned()));
-
                 if (code_subst_vars.contains(var)) {
                     SASSERT(solution.length_sensitive_vars.contains(var));
                     rational to_code_value = get_arith_model_of_var(code_version_of(var));

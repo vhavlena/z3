@@ -295,10 +295,11 @@ namespace smt::noodler {
         ///  compute_next_solution() or after preprocess()
         SolvingState solution;
 
-        // initial length vars, formula and automata assignment, can be updated by preprocessing, used for initializing the decision procedure
+        // initial length vars, formula, automata assignment and substitution map, can be updated by preprocessing, used for initializing the decision procedure
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
         Formula formula;
         AutAssignment init_aut_ass;
+        std::unordered_map<BasicTerm, std::vector<BasicTerm>> init_substitution_map;
         // contains to/from_code/int conversions
         std::vector<TermConversion> conversions;
 
@@ -308,6 +309,10 @@ namespace smt::noodler {
         std::vector<LenNode> disequations_len_formula_conjuncts;
 
         const theory_str_noodler_params& m_params;
+
+        // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
+        std::vector<Predicate> inclusions_from_preprocessing;
+        void move_inclusions_from_preprocessing_to_solution();
 
         // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
         std::set<BasicTerm> code_subst_vars;
