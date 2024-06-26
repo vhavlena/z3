@@ -1504,150 +1504,149 @@ namespace smt::noodler {
         }
         inclusions_from_preprocessing.clear();
     }
+    
+    void DecisionProcedure::restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+        for (auto& [var, nfa] : solution.aut_ass) {
+            if (var.is_literal()) { continue; } // literals should have the correct language
+            rational len = get_arith_model_of_length(var);
+            mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
+            nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
+        }
+    }
 
-    zstring DecisionProcedure::get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) {
+    // assumed to be called after restrict_languages_to_lengths()
+    void DecisionProcedure::restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+        for (const BasicTerm& var : code_subst_vars) {
+            if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
+            rational to_code_value = get_arith_model_of_int_var(code_version_of(var));
+            if (to_code_value != -1) {
+                update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
+            } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
+        }
+
+        for (const BasicTerm& var : int_subst_vars) {
+            if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
+
+            rational len = get_arith_model_of_length(var);
+            if (len == 0) {
+                // to_int_value(var) != -1 for len==0 (see get_formula_for_int_subst_vars())
+                // so we directly set ""
+                update_model_and_aut_ass(var, zstring());
+            } else {
+                rational to_int_value = get_arith_model_of_int_var(int_version_of(var));
+                if (to_int_value == -1) {
+                    // the language of var should contain only words containing some non-digit
+                    mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
+                    auto& nfa = solution.aut_ass.at(var);
+                    nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, solution.aut_ass.complement_aut(only_digits)).trim());
+                } else {
+                    zstring to_int_str(to_int_value); // zstring(rational) returns the string representation of the number in the argument
+                    SASSERT(len >= to_int_str.length());
+                    // pad to_int_str with leading zeros until we reach desired length
+                    for (unsigned i = 0; i != len.get_unsigned() - to_int_str.length(); ++i) {
+                        to_int_str = zstring("0") + to_int_str;
+                    }
+                    update_model_and_aut_ass(var, to_int_str);
+                }
+            }
+        }
+
+    }
+    
+    void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+        if (is_model_initialized) { return ;}
+        move_inclusions_from_preprocessing_to_solution();
+        restrict_languages_to_lengths(get_arith_model_of_length);
+        restrict_languages_of_conversion_vars(get_arith_model_of_int_var, get_arith_model_of_length);
+        is_model_initialized = true;
+    }
+
+    zstring DecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+        init_model(get_arith_model_of_int_var, get_arith_model_of_length);
+
         if (model_of_var.contains(var)) {
             return model_of_var.at(var);
         }
 
-        move_inclusions_from_preprocessing_to_solution();
-
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
-
-        auto update_model_and_aut_ass_of_any_var = [this](BasicTerm var, zstring result) {
-            model_of_var[var] = result;
-            if (solution.aut_ass.contains(var)) {
-                solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(result));
-            }
-            return result;
-        };
-        auto update_model_and_aut_ass =[this, &update_model_and_aut_ass_of_any_var, &var](zstring result) { return update_model_and_aut_ass_of_any_var(var, result); };
 
         if (solution.substitution_map.contains(var)) {
             zstring result;
             for (const BasicTerm& subs_var : solution.substitution_map.at(var)) {
-                result = result + get_model(subs_var, get_arith_model_of_var, get_arith_model_of_length);
+                result = result + get_model(subs_var, get_arith_model_of_int_var, get_arith_model_of_length);
             }
-            return update_model_and_aut_ass(result);
+            return update_model_and_aut_ass(var, result);
         } else if (solution.aut_ass.contains(var)) {
-            std::shared_ptr<mata::nfa::Nfa> possible_solutions = solution.aut_ass.at(var);
-            auto cut_possible_solutions_with = [&possible_solutions](const mata::nfa::Nfa nfa) {
-                possible_solutions = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*possible_solutions, nfa).trim());
-            };
+            Predicate inclusion_with_var_on_right_side;
+            if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
+                if (solution.is_inclusion_on_cycle(inclusion_with_var_on_right_side)) {
+                    // TODO handle this using the horrible proof
+                    util::throw_error("Cannot get model for inclusion on the cycle");
+                    return zstring();
+                } else {
+                    // We need to compute the vars on the right side from the vars on the left
+                    //  - first we get the string model of the left side
+                    //  - we then do "opposite" noodlification to get the values on the right side
 
-            // we only want solutions that have the correct length from the model
-            rational len = get_arith_model_of_length(var);
-            cut_possible_solutions_with(solution.aut_ass.sigma_automaton_of_length(len.get_unsigned()));
-
-            if (solution.length_sensitive_vars.contains(var)) {
-                if (code_subst_vars.contains(var)) {
-                    SASSERT(solution.length_sensitive_vars.contains(var));
-                    rational to_code_value = get_arith_model_of_var(code_version_of(var));
-                    if (to_code_value == -1) {
-                        SASSERT(len != 1);
-                    } else {
-                        SASSERT(len == 1);
-                        return update_model_and_aut_ass(zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
-                    }
-                }
-
-                if (int_subst_vars.contains(var)) {
-                    SASSERT(solution.length_sensitive_vars.contains(var));
-                    if (len == 0) {
-                        // to_int_value(var) != -1 for len==0 (see that stupid function TODO)
-                        // so we directly return ""
-                        return update_model_and_aut_ass(zstring());
-                    } else {
-                        rational to_int_value = get_arith_model_of_var(int_version_of(var));
-                        if (to_int_value == -1) {
-                            // the language of possible_solutions should contain only words containing some non-digit
-                            mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
-                            cut_possible_solutions_with(solution.aut_ass.complement_aut(only_digits));
+                    zstring left_side_string;
+                    for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
+                        if (var_on_left_side.is_literal()) {
+                            left_side_string = left_side_string + var_on_left_side.get_name();
                         } else {
-                            zstring to_int_str(to_int_value); // zstring(rational) returns the string representation of the number in the argument
-                            SASSERT(len >= to_int_str.length());
-                            // pad to_int_str with leading zeros until we reach desired length
-                            for (unsigned i = 0; i != len.get_unsigned() - to_int_str.length(); ++i) {
-                                to_int_str = zstring("0") + to_int_str;
-                            }
-                            return update_model_and_aut_ass(to_int_str);
-                            // mata::nfa::Nfa words_ending_with_to_int_value = mata::nfa::concatenate(
-                            //                 solution.aut_ass.sigma_automaton_of_length(len.get_unsigned() - to_int_str.length()),
-                            //                 AutAssignment::create_word_nfa(to_int_str)
-                            //             );
-                            // cut_possible_solutions_with(words_ending_with_to_int_value);
+                            left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_int_var, get_arith_model_of_length);
                         }
                     }
+                    if (left_side_string.empty()) {
+                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                            update_model_and_aut_ass(right_side_var, zstring());
+                        }
+                    } else {
+                        std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
+
+                        std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
+                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                            automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
+                        }
+
+                        auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
+                                                                                    left_side_string_aut,
+                                                                                    true, 
+                                                                                    {{"reduce", "forward"}});
+                        SASSERT(!noodles.empty());
+                        SASSERT(automata_on_right_side.size() == noodles[0].size());
+                        unsigned i = 0;
+                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                            if (right_side_var.is_literal()) { continue; }
+                            // becase inclusion is not on cycle, all variables on the right side must be different
+                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_words(noodles[0][i].first->num_of_states()).begin()));
+                            update_model_and_aut_ass(right_side_var, right_side_var_string);
+                            ++i;
+                        }
+                    }
+                    return model_of_var.at(var);
                 }
+            } else {
+                // var is only on the left side in the inclusion graph => we can return whatever
+
+                // TODO replace following with function that returns arbitary word from Mata
 
                 // the NFA possible_solutions should be now only consisting of noodles (no loops) of length len
                 // therefore we find a result by just following random such noodle (and because var is length sensitive
                 // we can return any of the words from possible_solutions)
+                rational len = get_arith_model_of_length(var);
                 zstring result;
                 mata::Word accepted_word;
-                mata::nfa::State s = *possible_solutions->initial.begin();
+                const auto& nfa = solution.aut_ass.at(var);
+                mata::nfa::State s = *(nfa->initial.begin());
                 while (len != accepted_word.size()) {
-                    const mata::nfa::SymbolPost& sp = *possible_solutions->delta[s].begin();
+                    const mata::nfa::SymbolPost& sp = *(nfa->delta[s].begin());
                     accepted_word.push_back(sp.symbol);
                     s = *sp.targets.begin();
                 }
-                return update_model_and_aut_ass(alph.get_string_from_mata_word(accepted_word));
-            } else {
-                Predicate inclusion_with_var_on_right_side;
-                if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
-                    if (solution.is_inclusion_on_cycle(inclusion_with_var_on_right_side)) {
-                        // TODO handle this using the horrible proof
-                        util::throw_error("Cannot get model for inclusion on the cycle");
-                        return zstring();
-                    } else {
-                        // We need to compute the vars on the right side from the vars on the left
-                        //  - first we get the string model of the left side
-                        //  - we then do "opposite" noodlification to get the values on the right side
-
-                        zstring left_side_string;
-                        for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
-                            if (var_on_left_side.is_literal()) {
-                                left_side_string = left_side_string + var_on_left_side.get_name();
-                            } else {
-                                left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_var, get_arith_model_of_length);
-                            }
-                        }
-                        if (left_side_string.empty()) {
-                            for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                                update_model_and_aut_ass_of_any_var(right_side_var, zstring());
-                            }
-                        } else {
-                            std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
-
-                            std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
-                            for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                                automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
-                            }
-
-                            auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
-                                                                                        left_side_string_aut,
-                                                                                        true, 
-                                                                                        {{"reduce", "forward"}});
-                            SASSERT(!noodles.empty());
-                            SASSERT(automata_on_right_side.size() == noodles[0].size());
-                            unsigned i = 0;
-                            for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                                zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_words(noodles[0][i].first->num_of_states()).begin()));
-                                update_model_and_aut_ass_of_any_var(right_side_var, right_side_var_string);
-                                ++i;
-                            }
-                        }
-                        return model_of_var.at(var);
-                    }
-                } else {
-                    // var is only on the left side in the inclusion graph => we can return whatever
-                    mata::Word some_word = *(solution.aut_ass.at(var)->get_words(solution.aut_ass.at(var)->num_of_states()).begin()); // TODO replace with function that returns some word
-                    return update_model_and_aut_ass(alph.get_string_from_mata_word(some_word));
-                }
+                return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {
-            util::throw_error("Var not found (probably lost in preprocessing)");
-            // TODO handle var lost in preprocessing (probably, if not in preprocessing, then we are fucked)
+            UNREACHABLE();
             return zstring();
         }
     }

@@ -89,7 +89,7 @@ namespace smt::noodler {
         /**
          * @brief Get model for the variable @p var
          */
-        virtual zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) {
+        virtual zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -313,6 +313,17 @@ namespace smt::noodler {
         // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
         std::vector<Predicate> inclusions_from_preprocessing;
         void move_inclusions_from_preprocessing_to_solution();
+        void restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_length);
+        void restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length);
+        bool is_model_initialized = false;
+        void init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length);
+        zstring update_model_and_aut_ass(BasicTerm var, zstring model) {
+            model_of_var[var] = model;
+            if (solution.aut_ass.contains(var)) {
+                solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(model));
+            }
+            return model;
+        };
 
         // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
         std::set<BasicTerm> code_subst_vars;
@@ -466,7 +477,7 @@ namespace smt::noodler {
 
         std::pair<LenNode, LenNodePrecision> get_lengths() override;
 
-        zstring get_model(BasicTerm var, std::function<rational(BasicTerm)> get_arith_model_of_var, std::function<rational(BasicTerm)> get_arith_model_of_length) override;
+        zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) override;
     };
 }
 
