@@ -275,8 +275,9 @@ namespace smt::noodler {
     };
 
     /**
-     * @brief Update automata assignment of @p var. If var exists in the aut assignment, we set
-     * L(var) = L(var) \cap L(upd). Otherwise we set L(var) = L(upd).
+     * @brief Update automata assignment of @p var.
+     * If var exists in the aut assignment, we set L(var) = L(var) \cap L(upd).
+     * Otherwise we set L(var) = L(upd).
      *
      * @param var Basic term to be updated
      * @param upd Concatenation of terms for updating @p var.
@@ -995,10 +996,14 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief For each disequation X != R1 (|X| = 1), find all equations X = R2 (|X| = 1) and use it to refine L(X) = L(X) \cap L(R).
+     * @brief Use each equations X = R (|X| = 1) to refine L(X) = L(X) \cap L(R).
+     * This step is mostly done so that we can reduce the number of disequations in reduce_diseqalities().
+     * However, we do not want to refine too aggresively, as it could lead to large automata (which is a
+     * problem in disequations), so we do not use all equations to refine (see comments inside, it is just
+     * experimentally decided that this works).
      */
     void FormulaPreprocessor::refine_languages() {
-        std::set<BasicTerm> ineq_vars;
+        std::set<BasicTerm> ineq_vars; // all variables X s.t. there exists disequation X != R (|X|=1)
         for(const auto& pr : this->formula.get_predicates()) {
             if(!pr.second.is_inequation())
                 continue;
@@ -1017,17 +1022,18 @@ namespace smt::noodler {
 
             if(pr.second.get_left_side().size() == 1) {
                 BasicTerm var = pr.second.get_left_side()[0];
-                if(ineq_vars.find(var) != ineq_vars.end()) {
-                    update_reg_constr(var, pr.second.get_right_side());
-                } else if(pr.second.get_right_side().size() == 1) {
+                if(!ineq_vars.contains(var) // we do not want to refine X from ineq_vars...
+                    || pr.second.get_right_side().size() == 1) // ...except for when we have only one var on the other side
+                {
                     update_reg_constr(var, pr.second.get_right_side());
                 }
             }
+
             if(pr.second.get_right_side().size() == 1) {
                 BasicTerm var = pr.second.get_right_side()[0];
-                if(ineq_vars.find(var) != ineq_vars.end()) {
-                    update_reg_constr(var, pr.second.get_left_side());
-                } else if(pr.second.get_left_side().size() == 1) {
+                if(!ineq_vars.contains(var) // we do not want to refine X from ineq_vars...
+                   || pr.second.get_left_side().size() == 1) // ...except for when we have only one var on the other side
+                {
                     update_reg_constr(var, pr.second.get_left_side());
                 }
             }
