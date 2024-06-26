@@ -1008,6 +1008,11 @@ namespace smt::noodler {
         // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), from_int/from_code and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: getting model for " << mk_pp(tgt, m) << " sort is " << mk_pp(tgt->get_sort(), m) << "\n";);
+
+        if (!m_params.m_produce_models) {
+            return alloc(expr_wrapper_proc, tgt);
+        }
+
         app* res;
         if (m_util_s.is_re(tgt)) {
             if (util::is_variable(tgt)) {
