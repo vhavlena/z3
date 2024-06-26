@@ -347,7 +347,6 @@ namespace smt::noodler {
                 // we do not add this equation to removed_equation, instead we add Y to substitution map
                 BasicTerm right_var = pr.second.get_right_side()[0];
                 substitution_map[right_var] = {left_var}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
-                aut_ass.erase(right_var);
             } else {
                 removed_equations.push_back(pr.second);
             }
@@ -419,7 +418,6 @@ namespace smt::noodler {
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             substitution_map[v_right] = {v_left}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
-            aut_ass.erase(v_right); // Y is in subt_map, remove from aut_ass
 
             this->formula.remove_predicate(index);
 

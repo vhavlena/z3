@@ -1190,6 +1190,9 @@ namespace smt::noodler {
         SolvingState init_solving_state;
         init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
+        for (const auto& subs : init_substitution_map) {
+            init_solving_state.aut_ass.erase(subs.first);
+        }
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
 
         if (!equations.get_predicates().empty()) {
