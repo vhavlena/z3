@@ -18,9 +18,10 @@ namespace smt::noodler {
     class MembHeuristicProcedure : public AbstractDecisionProcedure {
         BasicTerm var;
         expr_ref regex;
+        std::unique_ptr<regex::Alphabet> alph;
         bool is_regex_positive;
         const seq_util& m_util_s;
-        std::shared_ptr<mata::nfa::Nfa> reg_nfa = nullptr;
+        std::unique_ptr<mata::nfa::Nfa> reg_nfa = nullptr;
     public:
         MembHeuristicProcedure(BasicTerm var, expr_ref regex, bool is_regex_positive, const seq_util& m_util_s)
             : var(var), regex(regex), is_regex_positive(is_regex_positive), m_util_s(m_util_s) {}

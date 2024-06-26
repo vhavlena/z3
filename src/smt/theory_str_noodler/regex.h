@@ -58,23 +58,13 @@ namespace smt::noodler::regex {
      * std::set<uint32_t> and a Mata alphabet.
      */
     struct Alphabet {
-    
-    private:
         std::set<mata::Symbol> alphabet;
         mata::OnTheFlyAlphabet mata_alphabet;
-    public:
+        
         Alphabet(const std::set<mata::Symbol>& alph) : alphabet(alph) {
             for (const auto& symbol : alph) {
                 this->mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
-        }
-
-        const std::set<mata::Symbol>& get_alphabet() const {
-            return this->alphabet;
-        }
-
-        const mata::OnTheFlyAlphabet& get_mata_alphabet() const {
-            return this->mata_alphabet;
         }
 
         mata::Symbol get_unused_symbol() const {

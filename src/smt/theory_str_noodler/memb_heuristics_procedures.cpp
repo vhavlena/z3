@@ -24,12 +24,11 @@ namespace smt::noodler {
                 // start with minterm representing symbols not ocurring in the regex
                 std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
                 regex::extract_symbols(regex, m_util_s, symbols_in_regex);
-                regex::Alphabet reg_alph(symbols_in_regex);
+                alph = std::make_unique<regex::Alphabet>(symbols_in_regex);
 
-                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, reg_alph, false, false) };
+                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, *alph, false, false) };
 
-                mata::EnumAlphabet alph(symbols_in_regex.begin(), symbols_in_regex.end());
-                mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&alph);
+                mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&(alph->mata_alphabet));
 
                 if(mata::nfa::are_equivalent(nfa, sigma_star)) {
                     // x should not belong in sigma*, so it is unsat
@@ -37,7 +36,7 @@ namespace smt::noodler {
                     return l_false;
                 } else {
                     // otherwise x should not belong in some nfa that is not sigma*, so it is sat
-                    reg_nfa = std::make_shared<mata::nfa::Nfa>(nfa);
+                    reg_nfa = std::make_unique<mata::nfa::Nfa>(nfa);
                     return l_true;
                 }
             }
@@ -55,7 +54,7 @@ namespace smt::noodler {
             util::throw_error("Cannot compute model from regex directly");
         } else {
             SASSERT(!is_regex_positive);
-            // TODO: get word that is NOT in reg_nfa (do not forget dummy symbol, use regex::Alphabet::get_string_from_mata_word)
+            // TODO: get word that is NOT in reg_nfa (do not forget dummy symbol, use alph->get_string_from_mata_word)
             util::throw_error("Unsupported for now");
         }
 
@@ -68,13 +67,6 @@ namespace smt::noodler {
             std::sort(list_of_regexes.begin(), list_of_regexes.end(), [this](const std::pair<bool,app*>& l, const std::pair<bool,app*>& r) {
                 return ((!l.first && r.first) | (regex::get_loop_sum(l.second, m_util_s) < regex::get_loop_sum(r.second, m_util_s)));
             });
-            // STRACE("str-mult-memb-heur",
-            //     tout << "Sorted regexes for var " << var << std::endl;
-            //     unsigned i = 0;
-            //     for (const auto & [is_complement, reg] : list_of_regexes) {
-            //         tout << i << " (should " << (is_complement ? "" : "NOT ") <<"be complemented):" << mk_pp(reg, m) << std::endl;
-            //     }
-            // );
 
             std::vector<app*> list_of_normal_regs;
             std::vector<app*> list_of_compl_regs;
@@ -89,7 +81,7 @@ namespace smt::noodler {
             // Compute intersection L of all regexes that should not be complemented
             mata::nfa::Nfa intersection(1, {0}, {0});
             // initalize to universal automaton
-            for (const mata::Symbol& symb : alph.get_alphabet()) {
+            for (const mata::Symbol& symb : alph.alphabet) {
                 intersection.delta.add(0, symb, 0);
             }
 
@@ -151,9 +143,8 @@ namespace smt::noodler {
             util::throw_error("Unsupported for now");
         }
 
-        auto words = intersections.at(var).get_words(intersections.at(var).num_of_states());
-        SASSERT(!words.empty());
+        mata::Word word = *(intersections.at(var).get_words(intersections.at(var).num_of_states()).begin()); // TODO replace with function to get arbitrary word from mata
         
-        return alph.get_string_from_mata_word(*words.begin());
+        return alph.get_string_from_mata_word(word);
     }
 }

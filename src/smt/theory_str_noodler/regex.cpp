@@ -158,7 +158,7 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_dot_plus(expression)) { // Handle dot plus.
             nfa.initial.insert(0);
             nfa.final.insert(1);
-            for (const auto& symbol : alphabet.get_alphabet()) {
+            for (const auto& symbol : alphabet.alphabet) {
                 nfa.delta.add(0, symbol, 1);
                 nfa.delta.add(1, symbol, 1);
             }
@@ -169,13 +169,13 @@ namespace smt::noodler::regex {
         } else if (m_util_s.re.is_full_char(expression)) { // Handle full char (single occurrence of any string symbol, '.').
             nfa.initial.insert(0);
             nfa.final.insert(1);
-            for (const auto& symbol : alphabet.get_alphabet()) {
+            for (const auto& symbol : alphabet.alphabet) {
                 nfa.delta.add(0, symbol, 1);
             }
         } else if (m_util_s.re.is_full_seq(expression)) {
             nfa.initial.insert(0);
             nfa.final.insert(0);
-            for (const auto& symbol : alphabet.get_alphabet()) {
+            for (const auto& symbol : alphabet.alphabet) {
                 nfa.delta.add(0, symbol, 0);
             }
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
@@ -207,7 +207,7 @@ namespace smt::noodler::regex {
                     // ... or empty language
                     nfa = std::move(body_nfa);
                 }
-            } else if(body_nfa.is_universal(alphabet.get_mata_alphabet())) {
+            } else if(body_nfa.is_universal(alphabet.mata_alphabet)) {
                 nfa = std::move(body_nfa);
             } else {
                 body_nfa.unify_final();
@@ -358,7 +358,7 @@ namespace smt::noodler::regex {
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first
         if (make_complement) {
             STRACE("str-create_nfa", tout << "Complemented NFA:" << std::endl;);
-            nfa = mata::nfa::complement(nfa, alphabet.get_mata_alphabet(), { 
+            nfa = mata::nfa::complement(nfa, alphabet.mata_alphabet, { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
