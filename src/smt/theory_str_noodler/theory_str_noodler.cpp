@@ -966,12 +966,16 @@ namespace smt::noodler {
             rational val(0);
             expr_ref expr_res(m);
             expr_ref arg(m);
-            if (var_name.contains(var)) {
-                // var is some original string var => we want length
-                arg = expr_ref(m_util_s.str.mk_length(util::mk_str_var(var.get_name().encode(), m, m_util_s)), m);
+            if(!var_name.contains(var)) {
+                // if the variable is not found, it was introduced in the preprocessing/decision procedure
+                // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
+                arg = util::mk_int_var(var.get_name().encode(), m, m_util_a);
             } else {
-                // var was either created by us (which means even if it was string, we made it just int), or it was original int var
-                arg = expr_ref(util::mk_int_var(var.get_name().encode(), m, m_util_a), m);
+                arg = var_name.at(var);
+                if (m_util_s.is_string(arg->get_sort())) {
+                    // for string variables we want its length
+                    arg = expr_ref(m_util_s.str.mk_length(arg), m);
+                }
             }
             bool is_int;
             arith_model->eval_expr(arg, expr_res);
