@@ -1581,52 +1581,50 @@ namespace smt::noodler {
         } else if (solution.aut_ass.contains(var)) {
             Predicate inclusion_with_var_on_right_side;
             if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
-                if (solution.is_inclusion_on_cycle(inclusion_with_var_on_right_side)) {
-                    // TODO handle this using the horrible proof
-                    util::throw_error("Cannot get model for inclusion on the cycle");
-                    return zstring();
-                } else {
-                    // We need to compute the vars on the right side from the vars on the left
-                    //  - first we get the string model of the left side
-                    //  - we then do "opposite" noodlification to get the values on the right side
+                // TODO check if inclusion_with_var_on_right_side lays on a cycle (needs to be
+                // implemented solution.is_inclusion_on_cycle() is overapproximation)
+                // If it is on a cycle, then we need to use (and implement) the horrible proof (righ now the following will never finish)
 
-                    zstring left_side_string;
-                    for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
-                        if (var_on_left_side.is_literal()) {
-                            left_side_string = left_side_string + var_on_left_side.get_name();
-                        } else {
-                            left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_var);
-                        }
-                    }
-                    if (left_side_string.empty()) {
-                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                            update_model_and_aut_ass(right_side_var, zstring());
-                        }
+                // We need to compute the vars on the right side from the vars on the left
+                //  - first we get the string model of the left side
+                //  - we then do "opposite" noodlification to get the values on the right side
+
+                zstring left_side_string;
+                for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
+                    if (var_on_left_side.is_literal()) {
+                        left_side_string = left_side_string + var_on_left_side.get_name();
                     } else {
-                        std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
-
-                        std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
-                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                            automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
-                        }
-
-                        auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
-                                                                                    left_side_string_aut,
-                                                                                    true, 
-                                                                                    {{"reduce", "forward"}});
-                        SASSERT(!noodles.empty());
-                        SASSERT(automata_on_right_side.size() == noodles[0].size());
-                        unsigned i = 0;
-                        for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                            if (right_side_var.is_literal()) { continue; }
-                            // becase inclusion is not on cycle, all variables on the right side must be different
-                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_words(noodles[0][i].first->num_of_states()).begin()));
-                            update_model_and_aut_ass(right_side_var, right_side_var_string);
-                            ++i;
-                        }
+                        left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_var);
                     }
-                    return model_of_var.at(var);
                 }
+                if (left_side_string.empty()) {
+                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                        update_model_and_aut_ass(right_side_var, zstring());
+                    }
+                } else {
+                    std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
+
+                    std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
+                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                        automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
+                    }
+
+                    auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
+                                                                                left_side_string_aut,
+                                                                                true, 
+                                                                                {{"reduce", "forward"}});
+                    SASSERT(!noodles.empty());
+                    SASSERT(automata_on_right_side.size() == noodles[0].size());
+                    unsigned i = 0;
+                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                        if (right_side_var.is_literal()) { continue; }
+                        // becase inclusion is not on cycle, all variables on the right side must be different
+                        zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_words(noodles[0][i].first->num_of_states()).begin()));
+                        update_model_and_aut_ass(right_side_var, right_side_var_string);
+                        ++i;
+                    }
+                }
+                return model_of_var.at(var);
             } else {
                 // var is only on the left side in the inclusion graph => we can return whatever
 
