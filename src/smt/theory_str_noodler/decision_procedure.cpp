@@ -1559,6 +1559,30 @@ namespace smt::noodler {
         restrict_languages_to_lengths(get_arith_model_of_var);
         restrict_languages_of_conversion_vars(get_arith_model_of_var);
         is_model_initialized = true;
+
+        STRACE("str-model",
+            tout << "Init model finished" << std::endl;
+            tout << "  Inclusions:" << std::endl;
+            for (const auto& incl : solution.inclusions) {
+                tout << incl << std::endl;
+            }
+
+            tout << "  Vars in aut ass" << std::endl;
+            for (const auto& autass : solution.aut_ass) {
+                tout << "      " << autass.first << std::endl;
+                if (is_trace_enabled("str-nfa")) {
+                    tout << autass.second << std::endl;
+                }
+            }
+            tout << "  Vars in subst" << std::endl;
+            for (const auto& subst : solution.substitution_map) {
+                tout << "      " << subst.first << ": ";
+                for (const auto& substituted_var : subst.second) {
+                    tout << substituted_var << " ";
+                }
+                tout << std::endl;
+            }
+        );
     }
 
     zstring DecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
