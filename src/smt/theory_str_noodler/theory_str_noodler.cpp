@@ -1013,7 +1013,7 @@ namespace smt::noodler {
             return alloc(expr_wrapper_proc, tgt);
         }
 
-        app* res;
+        app* res = nullptr;
         if (m_util_s.is_re(tgt)) {
             if (util::is_variable(tgt)) {
                 util::throw_error("unrestricted regex vars unsupported"); // (should not be able to come here, as this should be handled by dec proc)
