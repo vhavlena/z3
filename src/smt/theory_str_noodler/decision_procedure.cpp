@@ -1507,7 +1507,7 @@ namespace smt::noodler {
     
     void DecisionProcedure::restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         for (auto& [var, nfa] : solution.aut_ass) {
-            if (var.is_literal()) { continue; } // literals should have the correct language
+            if (var.is_literal() || !solution.length_sensitive_vars.contains(var)) { continue; } // literals should have the correct language + we restrict only length vars
             rational len = get_arith_model_of_var(var);
             mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
             nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
@@ -1631,20 +1631,9 @@ namespace smt::noodler {
                 // var is only on the left side in the inclusion graph => we can return whatever
 
                 // TODO replace following with function that returns arbitary word from Mata
-
-                // the NFA possible_solutions should be now only consisting of noodles (no loops) of length len
-                // therefore we find a result by just following random such noodle (and because var is length sensitive
-                // we can return any of the words from possible_solutions)
-                rational len = get_arith_model_of_var(var);
                 zstring result;
-                mata::Word accepted_word;
                 const auto& nfa = solution.aut_ass.at(var);
-                mata::nfa::State s = *(nfa->initial.begin());
-                while (len != accepted_word.size()) {
-                    const mata::nfa::SymbolPost& sp = *(nfa->delta[s].begin());
-                    accepted_word.push_back(sp.symbol);
-                    s = *sp.targets.begin();
-                }
+                mata::Word accepted_word = *(nfa->get_words(nfa->num_of_states()).begin());
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {
