@@ -44,7 +44,7 @@ namespace smt::noodler {
         return l_undef;
     }
 
-    zstring MembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+    zstring MembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         if (var != this->var) {
             util::throw_error("Cannot compute var that is not used in membership heuristic dec. proc.");
         }
@@ -136,7 +136,7 @@ namespace smt::noodler {
         return l_true;
     }
     
-    zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+    zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
         if (unions.contains(var)) {
             // TODO: add support for getting some word from "intersections[var] \intersect \neg unions[var]" on the fly

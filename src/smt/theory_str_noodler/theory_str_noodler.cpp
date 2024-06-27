@@ -962,20 +962,19 @@ namespace smt::noodler {
     }
 
     zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
-        auto get_arith_model_of_length = [this](BasicTerm var) {
-            rational val(0);
-            expr_ref expr_res(m);
-            bool is_int;
-            arith_model->eval_expr(m_util_s.str.mk_length(util::mk_str_var(var.get_name().encode(), m, m_util_s)), expr_res);
-            VERIFY(m_util_a.is_numeral(expr_res, val, is_int) && is_int);
-            return val;
-        };
-
         auto get_arith_model_of_var = [this](BasicTerm var) {
             rational val(0);
             expr_ref expr_res(m);
+            expr_ref arg(m);
+            if (var_name.contains(var)) {
+                // var is some original string var => we want length
+                arg = expr_ref(m_util_s.str.mk_length(util::mk_str_var(var.get_name().encode(), m, m_util_s)), m);
+            } else {
+                // var was either created by us (which means even if it was string, we made it just int), or it was original int var
+                arg = expr_ref(util::mk_int_var(var.get_name().encode(), m, m_util_a), m);
+            }
             bool is_int;
-            arith_model->eval_expr(util::mk_int_var(var.get_name().encode(), m, m_util_a), expr_res);
+            arith_model->eval_expr(arg, expr_res);
             VERIFY(m_util_a.is_numeral(expr_res, val, is_int) && is_int);
             return val;
         };
@@ -985,7 +984,7 @@ namespace smt::noodler {
             // for string literal, we just return the string
             return res;
         } else if (util::is_str_variable(str_expr, m_util_s)) {
-            return dec_proc->get_model(util::get_variable_basic_term(str_expr), get_arith_model_of_var, get_arith_model_of_length);
+            return dec_proc->get_model(util::get_variable_basic_term(str_expr), get_arith_model_of_var);
         } else if (m_util_s.str.is_concat(str_expr)) {
             expr_ref_vector concats(m);
             m_util_s.str.get_concat(str_expr, concats);

@@ -1505,20 +1505,20 @@ namespace smt::noodler {
         inclusions_from_preprocessing.clear();
     }
     
-    void DecisionProcedure::restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+    void DecisionProcedure::restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         for (auto& [var, nfa] : solution.aut_ass) {
             if (var.is_literal()) { continue; } // literals should have the correct language
-            rational len = get_arith_model_of_length(var);
+            rational len = get_arith_model_of_var(var);
             mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
             nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
         }
     }
 
     // assumed to be called after restrict_languages_to_lengths()
-    void DecisionProcedure::restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+    void DecisionProcedure::restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         for (const BasicTerm& var : code_subst_vars) {
             if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
-            rational to_code_value = get_arith_model_of_int_var(code_version_of(var));
+            rational to_code_value = get_arith_model_of_var(code_version_of(var));
             if (to_code_value != -1) {
                 update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
             } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
@@ -1527,13 +1527,13 @@ namespace smt::noodler {
         for (const BasicTerm& var : int_subst_vars) {
             if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
 
-            rational len = get_arith_model_of_length(var);
+            rational len = get_arith_model_of_var(var);
             if (len == 0) {
                 // to_int_value(var) != -1 for len==0 (see get_formula_for_int_subst_vars())
                 // so we directly set ""
                 update_model_and_aut_ass(var, zstring());
             } else {
-                rational to_int_value = get_arith_model_of_int_var(int_version_of(var));
+                rational to_int_value = get_arith_model_of_var(int_version_of(var));
                 if (to_int_value == -1) {
                     // the language of var should contain only words containing some non-digit
                     mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
@@ -1553,29 +1553,29 @@ namespace smt::noodler {
 
     }
     
-    void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
+    void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         if (is_model_initialized) { return ;}
         move_inclusions_from_preprocessing_to_solution();
-        restrict_languages_to_lengths(get_arith_model_of_length);
-        restrict_languages_of_conversion_vars(get_arith_model_of_int_var, get_arith_model_of_length);
+        restrict_languages_to_lengths(get_arith_model_of_var);
+        restrict_languages_of_conversion_vars(get_arith_model_of_var);
         is_model_initialized = true;
     }
 
-    zstring DecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_int_var, const std::function<rational(BasicTerm)>& get_arith_model_of_length) {
-        init_model(get_arith_model_of_int_var, get_arith_model_of_length);
+    zstring DecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        init_model(get_arith_model_of_var);
 
         if (model_of_var.contains(var)) {
             return model_of_var.at(var);
         }
 
-        STRACE("str-model", tout << "Generating model for var " << var << " with length " << get_arith_model_of_length(var) << "\n";);
+        STRACE("str-model", tout << "Generating model for var " << var << " with length " << get_arith_model_of_var(var) << "\n";);
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
         if (solution.substitution_map.contains(var)) {
             zstring result;
             for (const BasicTerm& subs_var : solution.substitution_map.at(var)) {
-                result = result + get_model(subs_var, get_arith_model_of_int_var, get_arith_model_of_length);
+                result = result + get_model(subs_var, get_arith_model_of_var);
             }
             return update_model_and_aut_ass(var, result);
         } else if (solution.aut_ass.contains(var)) {
@@ -1595,7 +1595,7 @@ namespace smt::noodler {
                         if (var_on_left_side.is_literal()) {
                             left_side_string = left_side_string + var_on_left_side.get_name();
                         } else {
-                            left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_int_var, get_arith_model_of_length);
+                            left_side_string = left_side_string + get_model(var_on_left_side, get_arith_model_of_var);
                         }
                     }
                     if (left_side_string.empty()) {
@@ -1635,7 +1635,7 @@ namespace smt::noodler {
                 // the NFA possible_solutions should be now only consisting of noodles (no loops) of length len
                 // therefore we find a result by just following random such noodle (and because var is length sensitive
                 // we can return any of the words from possible_solutions)
-                rational len = get_arith_model_of_length(var);
+                rational len = get_arith_model_of_var(var);
                 zstring result;
                 mata::Word accepted_word;
                 const auto& nfa = solution.aut_ass.at(var);
