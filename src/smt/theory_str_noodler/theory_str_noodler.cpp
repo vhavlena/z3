@@ -899,7 +899,7 @@ namespace smt::noodler {
         // we want to include all variables from the formula --> e.g.
         // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
         // to include also length of |u| to propagate the value to |s|
-        expr_ref lengths = len_node_to_z3_formula(dec_proc.get_initial_lengths(true));
+        expr_ref lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             // we postpone the decision. If the instance is both length unsatisfiable and 
