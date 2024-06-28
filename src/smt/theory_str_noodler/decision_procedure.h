@@ -87,7 +87,10 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Get model for the variable @p var
+         * @brief Get string model for the string variable @p var
+         * 
+         * @param get_arith_model_of_var Returns either the length of a str variable or the value of the int variable in the model
+         * @return the model for @p var 
          */
         virtual zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
             throw std::runtime_error("Unimplemented");
@@ -215,6 +218,11 @@ namespace smt::noodler {
             return dependent_inclusions;
         }
 
+        /**
+         * @brief Get any inclusion that has @p var on the right side and save it to @p found inclusion
+         * 
+         * @return was such an inclusion found?
+         */
         bool get_inclusion_with_var_on_right_side(const BasicTerm& var, Predicate& found_inclusion) {
             for (const Predicate &inclusion : inclusions) {
                 for (auto const &right_var : inclusion.get_right_set()) {
@@ -309,28 +317,6 @@ namespace smt::noodler {
         std::vector<LenNode> disequations_len_formula_conjuncts;
 
         const theory_str_noodler_params& m_params;
-
-        // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
-        std::vector<Predicate> inclusions_from_preprocessing;
-        void move_inclusions_from_preprocessing_to_solution();
-        void restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-        void restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-        bool is_model_initialized = false;
-        void init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-        zstring update_model_and_aut_ass(BasicTerm var, zstring model) {
-            model_of_var[var] = model;
-            if (solution.aut_ass.contains(var)) {
-                solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(model));
-            }
-            return model;
-        };
-
-        // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
-        std::set<BasicTerm> code_subst_vars;
-        std::set<BasicTerm> int_subst_vars;
-
-        // keeps already computed models
-        std::map<BasicTerm,zstring> model_of_var;
 
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
@@ -428,6 +414,60 @@ namespace smt::noodler {
          * @return l_true -> can be unified 
          */
         lbool can_unify_not_contains(const FormulaPreprocessor& prep);
+
+        ////////////////////////////////////////////////////////////////
+        //////////////////// FOR MODEL GENERATION //////////////////////
+        ////////////////////////////////////////////////////////////////
+
+        // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
+        std::vector<Predicate> inclusions_from_preprocessing;
+
+        /// @brief Move inclusions from inclusions_from_preprocessing to solution (and clear inclusions_from_preprocessing)
+        void move_inclusions_from_preprocessing_to_solution();
+
+        /**
+         * @brief Restrict the language of length variables in solution by their lengths from model
+         * 
+         * @param get_arith_model_of_var Returns the length of a variable in the model
+         */
+        void restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
+        std::set<BasicTerm> code_subst_vars;
+        std::set<BasicTerm> int_subst_vars;
+
+        /**
+         * @brief Restricts the language of conversion vars in solution by their reults in model
+         * 
+         * @param get_arith_model_of_var Returns either the length of a str variable or the value of the int variable in the model
+         */
+        void restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+        
+        bool is_model_initialized = false;
+        /**
+         * @brief Initialize model from solution
+         * 
+         * @param get_arith_model_of_var Returns either the length of a str variable or the value of the int variable in the model
+         */
+        void init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        // keeps already computed models
+        std::map<BasicTerm,zstring> model_of_var;
+
+        /**
+         * @brief Update the model and its language in the solution of the variable @p var to @p computed_model
+         * 
+         * @param var The variable whose lang/model should be updated
+         * @param computed_model The model computed for @p var
+         * @return the computed model 
+         */
+        zstring update_model_and_aut_ass(BasicTerm var, zstring computed_model) {
+            model_of_var[var] = computed_model;
+            if (solution.aut_ass.contains(var)) {
+                solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(computed_model));
+            }
+            return computed_model;
+        };
 
     public:
 
