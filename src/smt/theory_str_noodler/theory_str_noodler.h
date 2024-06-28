@@ -54,13 +54,6 @@ namespace smt::noodler {
             bool initial_length; // was the length formula obtained from the initial length checking?
         };
 
-        // TODO: explain model stuff
-        class string_var_proc;
-        class conc_proc;
-        class from_transformation_proc;
-        model_ref arith_model;
-        std::unique_ptr<AbstractDecisionProcedure> dec_proc = nullptr;
-
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
@@ -121,6 +114,10 @@ namespace smt::noodler {
 
         // true if last run of final_check_eh was sat (if it is true, then final_check_eh always return sat)
         bool last_run_was_sat = false;
+
+        // Stuff for model generation
+        std::unique_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
+        model_ref arith_model; // keeps the arithmethic model from sat solution
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -276,6 +273,7 @@ namespace smt::noodler {
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
+        /// @brief Returns the model for @p str_expr using dec_proc and arith_model
         zstring model_of_string_expr(app* str_expr);
 
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/

@@ -67,6 +67,7 @@ namespace smt::noodler::regex {
             }
         }
 
+        /// @brief Returns any symbol that is not in the alphabet
         mata::Symbol get_unused_symbol() const {
             // std::set is ordered, so alphabet is also ordered
             if (*alphabet.begin() != 0) {
@@ -85,6 +86,7 @@ namespace smt::noodler::regex {
             }
         }
 
+        /// @brief Return zstring corresponding the the word @p word, where dummy symbol is replaced with some valid symbol not in the alphabet.
         zstring get_string_from_mata_word(mata::Word word) const {
             zstring res;
             mata::Symbol unused_symbol = get_unused_symbol();

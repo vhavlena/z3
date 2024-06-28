@@ -962,24 +962,26 @@ namespace smt::noodler {
     }
 
     zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
-        auto get_arith_model_of_var = [this](BasicTerm var) {
-            rational val(0);
-            expr_ref expr_res(m);
+        // function that returns either the length of str var or model of int var from arith_model
+        std::function<rational(BasicTerm)> get_arith_model_of_var = [this](BasicTerm var) -> rational {
             expr_ref arg(m);
+            // the following is similar to code in util::len_to_expr()
             if(!var_name.contains(var)) {
                 // if the variable is not found, it was introduced in the preprocessing/decision procedure
                 // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
                 arg = util::mk_int_var(var.get_name().encode(), m, m_util_a);
             } else {
-                arg = var_name.at(var);
+                arg = var_name.at(var); // for int vars, we just take the var
                 if (m_util_s.is_string(arg->get_sort())) {
-                    // for string variables we want its length
+                    // for string vars, we want its length
                     arg = expr_ref(m_util_s.str.mk_length(arg), m);
                 }
             }
+            expr_ref model(m);
+            arith_model->eval_expr(arg, model);
             bool is_int;
-            arith_model->eval_expr(arg, expr_res);
-            VERIFY(m_util_a.is_numeral(expr_res, val, is_int) && is_int);
+            rational val(0);
+            VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
             return val;
         };
 
@@ -988,8 +990,10 @@ namespace smt::noodler {
             // for string literal, we just return the string
             return res;
         } else if (util::is_str_variable(str_expr, m_util_s)) {
+            // for string var, we get the model from the decision procedure that returned sat
             return dec_proc->get_model(util::get_variable_basic_term(str_expr), get_arith_model_of_var);
         } else if (m_util_s.str.is_concat(str_expr)) {
+            // for concatenation, we just recursively get the models for arguments and then concatenate them
             expr_ref_vector concats(m);
             m_util_s.str.get_concat(str_expr, concats);
             for (auto concat : concats) {
@@ -997,11 +1001,13 @@ namespace smt::noodler {
             }
             return res;
         } else {
+            // for complex string functions, we should be able to find vars that replace them in predicate_replace
             if (predicate_replace.contains(str_expr)) {
                 expr* str_var = predicate_replace[to_expr(str_expr)];
                 return model_of_string_expr(to_app(str_var));
             } else {
-                util::throw_error("Unexpected expression in generating model");
+                // we should not get some string complex function that is not in predicate_replace
+                UNREACHABLE();
                 return zstring();
             }
         }
@@ -1013,18 +1019,21 @@ namespace smt::noodler {
         STRACE("str", tout << "mk_value: getting model for " << mk_pp(tgt, m) << " sort is " << mk_pp(tgt->get_sort(), m) << "\n";);
 
         if (!m_params.m_produce_models) {
+            // if producing models is not enabled, we just return the target, the model is then not valid
             return alloc(expr_wrapper_proc, tgt);
         }
 
         app* res = nullptr;
         if (m_util_s.is_re(tgt)) {
+            // if tgt is regular
             if (util::is_variable(tgt)) {
                 util::throw_error("unrestricted regex vars unsupported"); // (should not be able to come here, as this should be handled by dec proc)
             } else {
-                // for regex literal (nothing else could be regex), we just return the regex
+                // for regex literal (regex stuff in z3 is either regex var or literal), we just return the regex
                 res = tgt;
             }
         } else {
+            // if tgt is string (nothing else should be able to come into mk_value)
             res = m_util_s.str.mk_string(model_of_string_expr(tgt));
         }
         STRACE("str", tout << "model for " << mk_pp(tgt, m) << " is " << mk_pp(res,m) << "\n";);
