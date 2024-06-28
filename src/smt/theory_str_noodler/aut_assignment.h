@@ -355,6 +355,8 @@ namespace smt::noodler {
             return complement_aut(*(this->at(t)));
         }
 
+        bool is_flat(const BasicTerm& t) const;
+
     };
 
 } // Namespace smt::noodler.
