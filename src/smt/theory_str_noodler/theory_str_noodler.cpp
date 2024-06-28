@@ -889,7 +889,7 @@ namespace smt::noodler {
             }
         }
 
-        dec_proc = std::make_unique<DecisionProcedure>{ instance, aut_assignment, init_length_sensitive_vars, m_params, conversions };
+        dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         // is formula length unsatisfiable?
         bool length_unsat = false;
 
