@@ -70,7 +70,7 @@ namespace smt::noodler {
          * Get length constraints for the initial assignment (possibly modified by preprocessing).
          * If it is unsatisfiable, it means that there is no possible solution.
          */
-        virtual LenNode get_initial_lengths() {
+        virtual LenNode get_initial_lengths(bool all_vars = false) {
             throw std::runtime_error("Unimplemented");
         }
 
@@ -513,7 +513,7 @@ namespace smt::noodler {
         void init_computation() override;
         lbool compute_next_solution() override;
 
-        LenNode get_initial_lengths() override;
+        LenNode get_initial_lengths(bool all_vars = false) override;
 
         std::pair<LenNode, LenNodePrecision> get_lengths() override;
 
