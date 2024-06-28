@@ -1592,7 +1592,13 @@ namespace smt::noodler {
             return model_of_var.at(var);
         }
 
-        STRACE("str-model", tout << "Generating model for var " << var << " with length " << get_arith_model_of_var(var) << "\n";);
+        STRACE("str-model",
+            tout << "Generating model for var " << var;
+            if (solution.length_sensitive_vars.contains(var)) {
+                tout << " with length " << get_arith_model_of_var(var);
+            }
+            tout << "\n";
+        );
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
