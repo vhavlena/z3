@@ -123,7 +123,7 @@ namespace smt::noodler::regex {
         }
     }
 
-    [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s,
+    [[nodiscard]] Nfa conv_to_nfa(const app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const Alphabet& alphabet, bool determinize, bool make_complement) {
         Nfa nfa{};
 
@@ -134,12 +134,12 @@ namespace smt::noodler::regex {
             if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
                 util::throw_error("we support only string literals in str.to_re");
             }
-            nfa = conv_to_nfa(to_app(arg), m_util_s, alphabet, determinize);
+            nfa = conv_to_nfa(to_app(arg), m_util_s, m, alphabet, determinize);
         } else if (m_util_s.re.is_concat(expression)) { // Handle regex concatenation.
             SASSERT(expression->get_num_args() > 0);
-            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, alphabet);
+            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa.concatenate(conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, alphabet, determinize));
+                nfa.concatenate(conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
                 nfa.trim();
             }
         } else if (m_util_s.re.is_antimirov_union(expression)) { // Handle Antimirov union.
@@ -148,7 +148,7 @@ namespace smt::noodler::regex {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, alphabet, determinize);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             // According to make_complement, we do complement at the end, so we just invert it
             make_complement = !make_complement;
         } else if (m_util_s.re.is_derivative(expression)) { // Handle derivative.
@@ -180,9 +180,9 @@ namespace smt::noodler::regex {
             }
         } else if (m_util_s.re.is_intersection(expression)) { // Handle intersection.
             SASSERT(expression->get_num_args() > 0);
-            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, alphabet, determinize);
+            nfa = conv_to_nfa(to_app(expression->get_arg(0)), m_util_s, m, alphabet, determinize);
             for (unsigned int i = 1; i < expression->get_num_args(); ++i) {
-                nfa = mata::nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, alphabet, determinize));
+                nfa = mata::nfa::intersection(nfa, conv_to_nfa(to_app(expression->get_arg(i)), m_util_s, m, alphabet, determinize));
             }
         } else if (m_util_s.re.is_loop(expression)) { // Handle loop.
             unsigned low, high;
@@ -196,7 +196,7 @@ namespace smt::noodler::regex {
                 util::throw_error("loop should contain at least lower bound");
             }
 
-            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, alphabet, determinize);
+            Nfa body_nfa = conv_to_nfa(to_app(body), m_util_s, m, alphabet, determinize);
 
             if (body_nfa.is_lang_empty()) {
                 // for the case that body of the loop represents empty language...
@@ -261,7 +261,7 @@ namespace smt::noodler::regex {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, alphabet, determinize);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             nfa.unify_initial();
             for (const auto& initial : nfa.initial) {
                 nfa.final.insert(initial);
@@ -291,15 +291,15 @@ namespace smt::noodler::regex {
             SASSERT(is_app(left));
             SASSERT(is_app(right));
             
-            mata::nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, alphabet, determinize)};
-            mata::nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, alphabet, determinize)};
+            mata::nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
+            mata::nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
             nfa = mata::nfa::uni(aut1, aut2);
             
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, alphabet, determinize);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet, determinize);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
                     nfa.delta.add(final, mata::nfa::EPSILON, initial);
@@ -316,7 +316,7 @@ namespace smt::noodler::regex {
             SASSERT(expression->get_num_args() == 1);
             const auto child{ expression->get_arg(0) };
             SASSERT(is_app(child));
-            nfa = conv_to_nfa(to_app(child), m_util_s, alphabet);
+            nfa = conv_to_nfa(to_app(child), m_util_s, m, alphabet);
             for (const auto& final : nfa.final) {
                 for (const auto& initial : nfa.initial) {
                     nfa.delta.add(final, mata::nfa::EPSILON, initial);
@@ -335,24 +335,24 @@ namespace smt::noodler::regex {
         // intermediate automata reduction
         // if the automaton is too big --> skip it. The computation of the simulation would be too expensive.
         if(nfa.num_of_states() < RED_BOUND) {
-            // STRACE("str-create_nfa-reduce", 
-            //     tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
-            //     nfa.print_to_DOT(tout);
-            // );
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
-            // STRACE("str-create_nfa-reduce", 
-            //     tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
-            //     nfa.print_to_DOT(tout);
-            // );
+            STRACE("str-create_nfa-reduce", 
+                tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
+                nfa.print_to_DOT(tout);
+            );
             nfa = mata::nfa::minimize(nfa);
         }
 
-        // STRACE("str-create_nfa",
-        //     tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
-        //     nfa.print_to_DOT(tout);
-        // );
+        STRACE("str-create_nfa",
+            tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
+            nfa.print_to_DOT(tout);
+        );
 
         // Whether to create complement of the final automaton.
         // Warning: is_complement assumes we do the following, so if you to change this, go check is_complement first

@@ -26,7 +26,7 @@ namespace smt::noodler {
                 regex::extract_symbols(regex, m_util_s, symbols_in_regex);
                 alph = std::make_unique<regex::Alphabet>(symbols_in_regex);
 
-                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, *alph, false, false) };
+                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, *alph, false, false) };
 
                 mata::nfa::Nfa sigma_star = mata::nfa::builder::create_sigma_star_nfa(&(alph->mata_alphabet));
 
@@ -87,7 +87,7 @@ namespace smt::noodler {
 
             bool first = true;
             for (auto& reg : list_of_normal_regs) {
-                intersection = mata::nfa::intersection(regex::conv_to_nfa(reg, m_util_s, alph, false, false), intersection);
+                intersection = mata::nfa::intersection(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && intersection.num_of_states() < regex::RED_BOUND)
                 {
@@ -104,7 +104,7 @@ namespace smt::noodler {
             mata::nfa::Nfa unionn; // initialize to empty automaton
             first = true;
             for (auto& reg : list_of_compl_regs) {
-                unionn = mata::nfa::uni(regex::conv_to_nfa(reg, m_util_s, alph, false, false), unionn);
+                unionn = mata::nfa::uni(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && unionn.num_of_states() < regex::RED_BOUND)
                 {

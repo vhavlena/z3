@@ -821,7 +821,7 @@ namespace smt::noodler {
                     util::get_variable_basic_term(var),
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
-                    m_util_s
+                    m_util_s, m
                 );
                 lbool result = dec_proc->compute_next_solution();
                 if(result == l_true) {

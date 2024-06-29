@@ -104,7 +104,7 @@ namespace smt::noodler {
             }
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(word_equation) };
-            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, alph, make_complement, make_complement) };
+            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(word_equation)), m_util_s, m, alph, make_complement, make_complement) };
             auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
@@ -201,8 +201,8 @@ namespace smt::noodler {
             regex::Alphabet alph(alphabet);
 
             // construct NFAs for both sides
-            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, alph, false );
-            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, alph, false );
+            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
+            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m ,alph, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv = mata::nfa::are_equivalent(nfa1, nfa2);
@@ -451,7 +451,7 @@ namespace smt::noodler {
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
         }
 
-        dec_proc = std::make_unique<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s);
+        dec_proc = std::make_unique<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m);
         return dec_proc->compute_next_solution();
     }
 
