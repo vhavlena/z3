@@ -867,6 +867,13 @@ namespace smt::noodler {
 
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
+        STRACE("str",
+            tout << "Length variables:";
+            for (const auto &len_var : init_length_sensitive_vars) {
+                tout << " " << len_var;
+            }
+            tout << std::endl
+        );
 
 
         // There is only one symbol in the equation. The system is SAT iff lengths are SAT
@@ -889,7 +896,8 @@ namespace smt::noodler {
             }
         }
 
-        dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        // we do not put into dec_proc directly, because we might do underapproximation that saves into dec_proc
+        std::unique_ptr<DecisionProcedure> main_dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         // is formula length unsatisfiable?
         bool length_unsat = false;
 
@@ -899,7 +907,7 @@ namespace smt::noodler {
         // we want to include all variables from the formula --> e.g.
         // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
         // to include also length of |u| to propagate the value to |s|
-        expr_ref lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths(true));
+        expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             // we postpone the decision. If the instance is both length unsatisfiable and 
@@ -916,7 +924,10 @@ namespace smt::noodler {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
                 return FC_DONE;
             }
+            STRACE("str", tout << "Underapproximation did not help\n";);
         }
+
+        dec_proc = std::move(main_dec_proc);
 
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
