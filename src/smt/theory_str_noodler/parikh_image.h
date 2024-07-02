@@ -101,7 +101,7 @@ public:
 class ParikhImageDiseqTag : public ParikhImage {
 
 protected:
-    ca::CA ca;
+    ca::TagAut ca;
     // fresh variable for each AtomicSymbol. for symb, we use #symb to denote the corresponding variable
     std::map<ca::AtomicSymbol, BasicTerm> symbol_var {}; 
     // set of atomic symbols used in ca
@@ -153,11 +153,11 @@ protected:
     LenNode get_diff_symbol_formula();
 
 public:
-    ParikhImageDiseqTag(const ca::CA& ca, const std::set<ca::AtomicSymbol>& atomic_symbols) : ParikhImage(ca.nfa), ca(ca), symbol_var(), atomic_symbols(atomic_symbols) { }
+    ParikhImageDiseqTag(const ca::TagAut& ca, const std::set<ca::AtomicSymbol>& atomic_symbols) : ParikhImage(ca.nfa), ca(ca), symbol_var(), atomic_symbols(atomic_symbols) { }
 
     /**
      * @brief Compute Parikh image with the free variables containing values of registers. 
-     * Assumes that each register is set in each symbol of the CA alphabet.
+     * Assumes that each register is set in each symbol of the TagAut alphabet.
      * @return LenNode phi_parikh
      */
     LenNode compute_parikh_image() override { 
@@ -206,7 +206,7 @@ protected:
     LenNode get_nt_all_mismatch_formula(const Predicate& not_cont);
 
 public:
-    ParikhImageNotContTag(const ca::CA& ca, const std::set<ca::AtomicSymbol>& atomic_symbols) 
+    ParikhImageNotContTag(const ca::TagAut& ca, const std::set<ca::AtomicSymbol>& atomic_symbols) 
         : ParikhImageDiseqTag(ca, atomic_symbols), offset_var(util::mk_noodler_var_fresh("offset_var")) { }
 
     LenNode get_not_cont_formula(const Predicate& not_cont);

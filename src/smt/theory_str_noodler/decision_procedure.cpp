@@ -627,7 +627,7 @@ namespace smt::noodler {
         precision = conv_form_with_precision.second;
 
 
-        // if we solve disequations using CA --> get the LIA formula describing solutions
+        // if we solve disequations using TagAut --> get the LIA formula describing solutions
         if(this->m_params.m_ca_constr) {
             conjuncts.push_back(get_formula_for_ca_diseqs());
             auto not_cont_prec = get_formula_for_not_contains();
@@ -1211,8 +1211,8 @@ namespace smt::noodler {
             }));
         }
 
-        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
-        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
+        STRACE("str", tout << "TagAut-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
+        STRACE("str", tout << "TagAut-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
         return ca::get_lia_for_disequations(proj_diseqs, this->solution.aut_ass);
     }
 
@@ -1238,8 +1238,8 @@ namespace smt::noodler {
             }));
         }
 
-        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
-        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
+        STRACE("str", tout << "TagAut-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
+        STRACE("str", tout << "TagAut-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
         return ca::get_lia_for_not_contains(proj_not_cont, this->solution.aut_ass);
     }
 
@@ -1255,7 +1255,7 @@ namespace smt::noodler {
             if (dis_or_eq.is_equation()) {
                 equations.add_predicate(dis_or_eq);
             } else if (dis_or_eq.is_inequation()) {
-                // if we solve diesquations using CA --> we store the disequations to be solved later on
+                // if we solve diesquations using TagAut --> we store the disequations to be solved later on
                 if(!single_diseq && this->m_params.m_ca_constr) {
                     init_ca_diseq(dis_or_eq);
                     single_diseq = true;

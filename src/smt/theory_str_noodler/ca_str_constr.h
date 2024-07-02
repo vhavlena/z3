@@ -25,18 +25,35 @@ namespace smt::noodler::ca {
 
     using AutMatrix = std::vector<std::vector<mata::nfa::Nfa>>;
 
+    /**
+     * @brief Class representing copies of automata for each variable. 
+     * X axis = variables 
+     * Y axis = copy
+     */
     class DiseqAutMatrix {
     
     private:
         AutMatrix aut_matrix {};
+        // order of variables
         std::vector<BasicTerm> var_order {};
+        // starting state of each automaton
         std::vector<size_t> offsets {};
 
     protected:
         void create_aut_matrix(const Predicate& diseq, const AutAssignment& aut_ass);
 
+        /**
+         * @brief Recompute offsets.
+         */
         void recompute_offset();
 
+        /**
+         * @brief Get offset in the Big unified NFA (i.e., starting state of the particular NFA [ @p copy, @p var ] in the Big NFA)
+         * 
+         * @param copy Copy index
+         * @param var Variable index
+         * @return size_t Smallest/starting state
+         */
         size_t get_offset(size_t copy, size_t var) const {
             return this->offsets[copy*this->var_order.size() + var];
         } 
@@ -46,10 +63,23 @@ namespace smt::noodler::ca {
             create_aut_matrix(diseq, aut_ass);
         }
 
+        /**
+         * @brief Get state in unified automaton (where all automata in matrix are unioned).
+         * 
+         * @param copy Index of the copy
+         * @param var Index of the variable (index in @p var_order)
+         * @param state State of the particular automaton at [ @p copy, @p var ]
+         * @return mata::nfa::State State in the big NFA
+         */
         mata::nfa::State get_union_state(size_t copy, size_t var, mata::nfa::State state) const {
             return get_offset(copy, var) + state;
         }
 
+        /**
+         * @brief Unify all particular automata into a single NFA.
+         * 
+         * @return mata::nfa::Nfa Big NFA
+         */
         mata::nfa::Nfa union_matrix() const;
 
         const std::vector<BasicTerm>& get_var_order() const {
@@ -68,7 +98,10 @@ namespace smt::noodler::ca {
         }
     };
 
-    class CADiseqGen {
+    /**
+     * @brief Class for Tag aut generation for diseqations.
+     */
+    class TagDiseqGen {
 
     private:
         DiseqAutMatrix aut_matrix;
@@ -77,7 +110,7 @@ namespace smt::noodler::ca {
         ca::CounterAlphabet alph {};
 
     public:
-        CADiseqGen(const Predicate& diseq, const AutAssignment& aut_ass) : aut_matrix(diseq, aut_ass), 
+        TagDiseqGen(const Predicate& diseq, const AutAssignment& aut_ass) : aut_matrix(diseq, aut_ass), 
             aut_ass(aut_ass), diseq(diseq), alph() { }
 
     protected:
@@ -105,7 +138,7 @@ namespace smt::noodler::ca {
          * 
          * @return ca::CA Tagged automaton.
          */
-        ca::CA construct_tag_aut();
+        ca::TagAut construct_tag_aut();
 
         const DiseqAutMatrix& get_aut_matrix() const {
             return this->aut_matrix;
@@ -113,135 +146,24 @@ namespace smt::noodler::ca {
 
     };
 
-    static LenNode get_lia_for_disequations(const Formula& diseqs, const AutAssignment& autass) {
+    /**
+     * @brief Get LIA formula for a single disequations. The LIA formula describes all length 
+     * models of the diseqation. 
+     * 
+     * @param diseqs Disequations
+     * @param autass Automata assignmnent after stabilization
+     * @return LenNode LIA formula describing lengths of string models
+     */
+    LenNode get_lia_for_disequations(const Formula& diseqs, const AutAssignment& autass);
 
-        if(diseqs.get_predicates().size() == 0) {
-            return LenNode(LenFormulaType::TRUE);
-        }
-
-        // disequation to be solved
-        Predicate diseq_orig = diseqs.get_predicates()[0];
-
-        Concat left {};
-        Concat right {};
-        std::copy_if(diseq_orig.get_left_side().begin(), diseq_orig.get_left_side().end(), std::back_inserter(left),
-                [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        std::copy_if(diseq_orig.get_right_side().begin(), diseq_orig.get_right_side().end(), std::back_inserter(right),
-                [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        Predicate diseq(PredicateType::Inequation, {left, right});
-
-        if(left == right) {
-            return LenNode(LenFormulaType::FALSE);
-        }
-
-
-        CADiseqGen gen(diseq, autass);
-        ca::CA tag_aut = gen.construct_tag_aut();
-        tag_aut.nfa.trim();
-
-        STRACE("str-diseq",
-            tout << "* Variable ordering: " << std::endl;
-            tout << concat_to_string(gen.get_aut_matrix().get_var_order()) << std::endl << std::endl;
-        );
-        STRACE("str-diseq",
-            tout << "* NFAs for variables: " << std::endl;
-            for(const BasicTerm& bt : diseq.get_set()) {
-                tout << bt.to_string() << ":" << std::endl;
-                autass.at(bt)->print_to_DOT(tout);
-            }
-            tout << std::endl;
-        );
-        STRACE("str-diseq",
-            tout << "* Tag Automaton for diseq: " << diseqs.to_string() << std::endl;
-            tag_aut.print_to_DOT(tout);
-            tout << std::endl;
-        );
-        STRACE("str", tout << "CA LIA: finished" << std::endl; );
-
-        // we include only those symbols occurring in the reduced tag automaton
-        std::set<AtomicSymbol> ats;
-        for(const auto& trans : tag_aut.nfa.delta.transitions()) {
-            std::set<AtomicSymbol> sms = tag_aut.alph.get_symbol(trans.symbol);
-            ats.insert(sms.begin(), sms.end());
-        }
-
-        parikh::ParikhImageDiseqTag pi(tag_aut, ats);
-        LenNode pi_formula = pi.get_diseq_formula(diseq);
-
-        STRACE("str-diseq", tout << "* Resulting formula: " << std::endl << pi_formula << std::endl << std::endl; );
-
-        return pi_formula;
-    }
-
-    static std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& not_conts, const AutAssignment& autass) {
-        if(not_conts.get_predicates().size() == 0) {
-            return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
-        }
-        if(not_conts.get_predicates().size() > 1) {
-            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
-        }
-
-        Predicate not_cont_orig = not_conts.get_predicates()[0];
-        // remove variables with epsilon language
-        Concat left {};
-        Concat right {};
-        std::copy_if(not_cont_orig.get_left_side().begin(), not_cont_orig.get_left_side().end(), std::back_inserter(left),
-                [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        std::copy_if(not_cont_orig.get_right_side().begin(), not_cont_orig.get_right_side().end(), std::back_inserter(right),
-                [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        Predicate not_cont(PredicateType::NotContains, {left, right});
-
-        if(left == right) {
-            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
-        }
-
-        LenNodePrecision precision = LenNodePrecision::PRECISE;
-        for(const BasicTerm& bt : not_cont.get_vars()) {
-            if(!autass.is_flat(bt)) {
-                precision = LenNodePrecision::OVERAPPROX;
-                break;
-            }
-        }
-
-        // not contains to be solved
-        
-        CADiseqGen gen(not_cont, autass);
-        ca::CA tag_aut = gen.construct_tag_aut();
-        tag_aut.nfa.trim();
-
-        STRACE("str-diseq",
-            tout << "* Variable ordering: " << std::endl;
-            tout << concat_to_string(gen.get_aut_matrix().get_var_order()) << std::endl << std::endl;
-        );
-        STRACE("str-diseq",
-            tout << "* NFAs for variables: " << std::endl;
-            for(const BasicTerm& bt : not_cont.get_set()) {
-                tout << bt.to_string() << ":" << std::endl;
-                autass.at(bt)->print_to_DOT(tout);
-            }
-            tout << std::endl;
-        );
-        STRACE("str-diseq",
-            tout << "* Tag Automaton for not contains: " << not_cont.to_string() << std::endl;
-            tag_aut.print_to_DOT(tout);
-            tout << std::endl;
-        );
-        STRACE("str", tout << "CA LIA: finished" << std::endl; );
-
-        // we include only those symbols occurring in the reduced tag automaton
-        std::set<AtomicSymbol> ats;
-        for(const auto& trans : tag_aut.nfa.delta.transitions()) {
-            std::set<AtomicSymbol> sms = tag_aut.alph.get_symbol(trans.symbol);
-            ats.insert(sms.begin(), sms.end());
-        }
-
-        parikh::ParikhImageNotContTag pi(tag_aut, ats);
-        LenNode pi_formula = pi.get_not_cont_formula(not_cont);
-
-        STRACE("str-diseq", tout << "* Resulting formula: " << std::endl << pi_formula << std::endl << std::endl; );
-
-        return {pi_formula, precision};
-    }
+    /**
+     * @brief Get LIA formula for not contains. So-far it performs only simple checks.
+     * 
+     * @param not_conts Not contains
+     * @param autass Automata assignmnent after stabilization
+     * @return std::pair<LenNode, LenNodePrecision> LIA formula describing lengths of string models together with the precision.
+     */
+    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& not_conts, const AutAssignment& autass);
 
 }
 

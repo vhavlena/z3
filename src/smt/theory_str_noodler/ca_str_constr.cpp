@@ -62,7 +62,7 @@ namespace smt::noodler::ca {
 
     //-----------------------------------------------------------------------------------------------
 
-    void CADiseqGen::replace_symbols(char copy, size_t var) {
+    void TagDiseqGen::replace_symbols(char copy, size_t var) {
         BasicTerm bt = this->aut_matrix.get_var_order()[var];
 
         // <L,x>
@@ -79,7 +79,7 @@ namespace smt::noodler::ca {
     }
 
 
-    void CADiseqGen::add_connection(char copy_start, size_t var, mata::nfa::Nfa& aut_union) {
+    void TagDiseqGen::add_connection(char copy_start, size_t var, mata::nfa::Nfa& aut_union) {
 
         // mapping between original symbols and new counter symbols from this->alph
         std::map<mata::Symbol, mata::Symbol> symbols;
@@ -121,7 +121,7 @@ namespace smt::noodler::ca {
         }
     }
 
-    ca::CA CADiseqGen::construct_tag_aut() {
+    ca::TagAut TagDiseqGen::construct_tag_aut() {
 
         std::vector<BasicTerm> var_order = this->aut_matrix.get_var_order();
         // update symbols for each inner automaton
@@ -147,5 +147,88 @@ namespace smt::noodler::ca {
         return { aut_union, this->alph, var_order };
     }
 
+    //-----------------------------------------------------------------------------------------------
 
+    LenNode get_lia_for_disequations(const Formula& diseqs, const AutAssignment& autass) {
+
+        if(diseqs.get_predicates().size() == 0) {
+            return LenNode(LenFormulaType::TRUE);
+        }
+
+        // // disequation to be solved
+        // Predicate diseq_orig = diseqs.get_predicates()[0];
+
+        // Concat left {};
+        // Concat right {};
+        // std::copy_if(diseq_orig.get_left_side().begin(), diseq_orig.get_left_side().end(), std::back_inserter(left),
+        //         [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
+        // std::copy_if(diseq_orig.get_right_side().begin(), diseq_orig.get_right_side().end(), std::back_inserter(right),
+        //         [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
+        // Predicate diseq(PredicateType::Inequation, {left, right});
+
+        // if(left == right) {
+        //     return LenNode(LenFormulaType::FALSE);
+        // }
+
+        FormulaPreprocessor prep_handler{diseqs, autass, {}, {}};
+        prep_handler.propagate_eps();
+        prep_handler.remove_trivial();
+        prep_handler.reduce_diseqalities();
+        
+        if(prep_handler.get_modified_formula().get_predicates().size() == 0) {
+            return LenNode(LenFormulaType::FALSE);
+        }
+
+        Predicate diseq = prep_handler.get_modified_formula().get_predicates()[0];
+        TagDiseqGen gen(diseq, prep_handler.get_aut_assignment());
+        ca::TagAut tag_aut = gen.construct_tag_aut();
+        tag_aut.nfa.trim();
+
+        STRACE("str-diseq",
+            tout << "* Variable ordering: " << std::endl;
+            tout << concat_to_string(gen.get_aut_matrix().get_var_order()) << std::endl << std::endl;
+        );
+        STRACE("str-diseq",
+            tout << "* NFAs for variables: " << std::endl;
+            for(const BasicTerm& bt : diseq.get_set()) {
+                tout << bt.to_string() << ":" << std::endl;
+                autass.at(bt)->print_to_DOT(tout);
+            }
+            tout << std::endl;
+        );
+        STRACE("str-diseq",
+            tout << "* Tag Automaton for diseq: " << diseqs.to_string() << std::endl;
+            tag_aut.print_to_DOT(tout);
+            tout << std::endl;
+        );
+        STRACE("str", tout << "TagAut LIA: finished" << std::endl; );
+
+        // we include only those symbols occurring in the reduced tag automaton
+        std::set<AtomicSymbol> ats;
+        for(const auto& trans : tag_aut.nfa.delta.transitions()) {
+            std::set<AtomicSymbol> sms = tag_aut.alph.get_symbol(trans.symbol);
+            ats.insert(sms.begin(), sms.end());
+        }
+
+        parikh::ParikhImageDiseqTag pi(tag_aut, ats);
+        LenNode pi_formula = pi.get_diseq_formula(diseq);
+
+        STRACE("str-diseq", tout << "* Resulting formula: " << std::endl << pi_formula << std::endl << std::endl; );
+
+        return pi_formula;
+    }
+
+    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& not_conts, const AutAssignment& autass) {
+        if(not_conts.get_predicates().size() == 0) {
+            return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
+        }
+
+        FormulaPreprocessor prep_handler{not_conts, autass, {}, {}};
+        prep_handler.propagate_eps();
+        if(!prep_handler.replace_not_contains() || prep_handler.can_unify_not_contains()) {
+            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
+        }
+
+        return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
+    }
 }

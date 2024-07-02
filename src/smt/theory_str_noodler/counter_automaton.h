@@ -19,6 +19,12 @@
 
 namespace smt::noodler::ca {
 
+    /**
+     * @brief Structured alphabet. Performs mapping between mata symbols 
+     * and particular symbols T.
+     * 
+     * @tparam T Symbol type
+     */
     template <typename T>
     requires std::strict_weak_order<std::less<T>, T const&, T const&>
     class StructAlphabet {
@@ -120,7 +126,7 @@ namespace smt::noodler::ca {
     /**
      * @brief Counter Automaton
      */
-    struct CA {
+    struct TagAut {
         // underlying nfa
         mata::nfa::Nfa nfa;
         // structured alphabed with registe updates

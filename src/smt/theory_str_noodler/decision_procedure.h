@@ -329,7 +329,7 @@ namespace smt::noodler {
         std::pair<LenNode, LenNodePrecision> get_formula_for_conversions();
 
         /**
-         * @brief Initialize disquation for CA-based handling. Assumed to be called during 
+         * @brief Initialize disquation for TagAut-based handling. Assumed to be called during 
          * the decision procedure initialization.
          */
         void init_ca_diseq(const Predicate& diseq);

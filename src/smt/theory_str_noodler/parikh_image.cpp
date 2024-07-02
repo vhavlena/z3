@@ -223,7 +223,7 @@ namespace smt::noodler::parikh {
      * @return LenNode phi
      */
     LenNode ParikhImageDiseqTag::get_diseq_length(const Predicate& diseq) {
-        // e.g., for x.y get var_{r_x} + var_{r_y} where r_x is the CA register corresponding to the string variable x and 
+        // e.g., for x.y get var_{r_x} + var_{r_y} where r_x is the TagAut register corresponding to the string variable x and 
         // var_r is int variable describing value of register r after the run.
         auto concat_len = [&](const Concat& con) -> LenNode {
             LenNode sum_len(LenFormulaType::PLUS);
