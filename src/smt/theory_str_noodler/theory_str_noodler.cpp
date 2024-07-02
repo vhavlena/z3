@@ -962,7 +962,6 @@ namespace smt::noodler {
         dec_proc->init_computation();
 
         expr_ref block_len(m.mk_false(), m);
-        bool was_something_approximated = false;
         while (true) {
             result = dec_proc->compute_next_solution();
             if (result == l_true) {
@@ -970,7 +969,7 @@ namespace smt::noodler {
                 lengths = len_node_to_z3_formula(noodler_lengths);
                 lbool is_lengths_sat = check_len_sat(lengths);
                 
-                if (is_lengths_sat == l_true /*&& precision != LenNodePrecision::OVERAPPROX*/) {
+                if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     // save the current assignment to catch it during the loop protection
                     block_curr_len(lengths, true, false);
@@ -992,12 +991,6 @@ namespace smt::noodler {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
                 STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
-
-                // if (was_something_approximated) {
-                //     // if some length formula was an approximation and it did not lead to solution, we have to give up
-                //     STRACE("str", tout << "there was approximating - giving up" << std::endl);
-                //     return FC_GIVEUP;
-                // }
 
                 if(m.is_false(block_len)) {
                     block_curr_len(block_len, false, true);
