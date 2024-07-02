@@ -304,10 +304,8 @@ namespace smt::noodler {
      * provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X) is the automaton assigned to variable X.
      * 
      * @param disallowed_vars - if any of these var occurs in equation, it cannot be removed
-     * @param[out] removed_equations - removed regular equations are added to this vector (except the equation X = X_1, where
-     *                                 X_1 is length var, that is handled trough substitution_map)
      */
-    void FormulaPreprocessor::remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars, std::vector<Predicate>& removed_equations) {
+    void FormulaPreprocessor::remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars) {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
         std::deque<std::pair<size_t, Predicate>> worklist(regs.begin(), regs.end());
@@ -1090,10 +1088,8 @@ namespace smt::noodler {
     /**
      * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
      * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
-     * 
-     * @param[out] removed_equations - all removed equations are added to this vector
      */
-    void FormulaPreprocessor::skip_len_sat(std::vector<Predicate>& removed_equations) {
+    void FormulaPreprocessor::skip_len_sat() {
         std::set<size_t> rem_ids;
 
         auto is_sigma_star = [&](const std::set<BasicTerm>& bts) {

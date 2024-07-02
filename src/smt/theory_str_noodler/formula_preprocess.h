@@ -314,6 +314,10 @@ namespace smt::noodler {
         AutAssignment aut_ass;
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
+        // keeps equations that were removed during preprocessing and are needed to generate model
+        // (the variables on the right should be propagated from the left variables during model generation)
+        std::vector<Predicate> removed_equations;
+
         LenNode len_formula;
         std::unordered_set<BasicTerm> len_variables;
 
@@ -364,10 +368,11 @@ namespace smt::noodler {
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
         const LenNode& get_len_formula() const { return this->len_formula; }
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
+        const std::vector<Predicate>& get_removed_equations() const {return this->removed_equations; }
 
         Formula get_modified_formula() const;
 
-        void remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars, std::vector<Predicate>& removed_equations);
+        void remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars);
         void propagate_variables();
         void propagate_eps();
         void generate_identities();
@@ -375,7 +380,7 @@ namespace smt::noodler {
         void separate_eqs();
         void remove_extension();
         void remove_trivial();
-        void skip_len_sat(std::vector<Predicate>& removed_equations);
+        void skip_len_sat();
         void underapprox_languages();
         void generate_equiv(const BasicTermEqiv& ec);
         void infer_alignment();

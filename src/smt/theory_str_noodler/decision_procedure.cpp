@@ -1251,11 +1251,11 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
-        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
+        prep_handler.remove_regular(conv_vars);
         // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
         // inside not(contains)/conversion.
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
-            prep_handler.skip_len_sat(inclusions_from_preprocessing);
+            prep_handler.skip_len_sat();
         }
         prep_handler.generate_identities();
         prep_handler.propagate_variables();
@@ -1263,7 +1263,7 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities();
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
-        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
+        prep_handler.remove_regular(conv_vars);
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -1281,18 +1281,18 @@ namespace smt::noodler {
         prep_handler.common_suffix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
+        prep_handler.remove_regular(conv_vars);
         prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
-            prep_handler.skip_len_sat(inclusions_from_preprocessing); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
+            prep_handler.skip_len_sat(); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
             prep_handler.reduce_regular_sequence(3);
-            prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
-            prep_handler.skip_len_sat(inclusions_from_preprocessing); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
+            prep_handler.remove_regular(conv_vars);
+            prep_handler.skip_len_sat(); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
         }
         prep_handler.reduce_regular_sequence(1);
-        prep_handler.remove_regular(conv_vars, inclusions_from_preprocessing);
+        prep_handler.remove_regular(conv_vars);
 
         prep_handler.conversions_validity(conversions);
 
@@ -1301,6 +1301,7 @@ namespace smt::noodler {
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
+        this->inclusions_from_preprocessing = prep_handler.get_removed_equations();
 
         if (!this->init_aut_ass.is_sat()) {
             // some automaton in the assignment is empty => we won't find solution
