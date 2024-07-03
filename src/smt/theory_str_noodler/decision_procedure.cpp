@@ -1664,7 +1664,7 @@ namespace smt::noodler {
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {
-            // TODO sometimes we get var that is not in solution, probably means that it is not relevant?
+            UNREACHABLE();
             return zstring();
         }
     }

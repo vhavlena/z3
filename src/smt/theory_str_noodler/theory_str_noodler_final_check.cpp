@@ -249,9 +249,9 @@ namespace smt::noodler {
         }
 
         int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
-        // do we solve only regular constraints? If yes, skip other temporary length constraints (they are not necessary)
+        // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;
-        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0) {
+        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
             include_ass = false;
         }
         m_int_solver.initialize(get_context(), include_ass);
@@ -428,7 +428,8 @@ namespace smt::noodler {
 
         // collect from relevant memberships
         for (const auto &membership: m_membership_todo_rel) {
-            BasicTerm var(BasicTermType::Variable, to_app(std::get<0>(membership))->get_decl()->get_name().str());
+            BasicTerm var = util::get_variable_basic_term(std::get<0>(membership));
+            relevant_vars.insert(var);
             app* reg = to_app(std::get<1>(membership));
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(!std::get<2>(membership), reg));
         }
@@ -437,7 +438,8 @@ namespace smt::noodler {
         //   x != str_literal
         // i.e., one var on left and some string literal on right, we can replace this with (x not in {str_literal})
         for (const auto& diseq : m_word_diseq_todo_rel) {
-            BasicTerm var(BasicTermType::Variable, to_app(diseq.first)->get_decl()->get_name().str());
+            BasicTerm var = util::get_variable_basic_term(diseq.first);
+            relevant_vars.insert(var);
             app* reg = to_app(diseq.second);
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(true, reg));
         }
@@ -446,7 +448,8 @@ namespace smt::noodler {
         //   x == str_literal
         // i.e., one var on left and some string literal on right, we can replace this with (x in {str_literal})
         for (const auto& eq : m_word_eq_todo_rel) {
-            BasicTerm var(BasicTermType::Variable, to_app(eq.first)->get_decl()->get_name().str());
+            BasicTerm var = util::get_variable_basic_term(eq.first);
+            relevant_vars.insert(var);
             app* reg = to_app(eq.second);
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
         }

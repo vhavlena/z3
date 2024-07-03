@@ -45,20 +45,18 @@ namespace smt::noodler {
     }
 
     zstring MembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        if (var != this->var) {
-            util::throw_error("Cannot compute var that is not used in membership heuristic dec. proc.");
-        }
+        SASSERT(var == this->var);
 
         if (!reg_nfa) {
             // TODO: compute model from regex
             util::throw_error("Cannot compute model from regex directly");
+            return zstring();
         } else {
             SASSERT(!is_regex_positive);
             // TODO: get word that is NOT in reg_nfa (do not forget dummy symbol, use alph->get_string_from_mata_word)
             util::throw_error("Unsupported for now");
+            return zstring();
         }
-
-        return zstring();
     }
 
     lbool MultMembHeuristicProcedure::compute_next_solution() {
@@ -138,13 +136,13 @@ namespace smt::noodler {
     
     zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
+        SASSERT(unions.contains(var) || intersections.contains(var));
         if (unions.contains(var)) {
             // TODO: add support for getting some word from "intersections[var] \intersect \neg unions[var]" on the fly
             util::throw_error("Unsupported for now");
         }
 
         mata::Word word = *(intersections.at(var).get_words(intersections.at(var).num_of_states()).begin()); // TODO replace with function to get arbitrary word from mata
-        
         return alph.get_string_from_mata_word(word);
     }
 }

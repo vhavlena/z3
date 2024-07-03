@@ -116,6 +116,7 @@ namespace smt::noodler {
         bool last_run_was_sat = false;
 
         // Stuff for model generation
+        std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
         std::unique_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
         model_ref arith_model; // keeps the arithmethic model from sat solution
 

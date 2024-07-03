@@ -753,6 +753,7 @@ namespace smt::noodler {
         
         arith_model = nullptr;
         dec_proc = nullptr;
+        relevant_vars.clear();
 
         remove_irrelevant_constr();
 
@@ -817,8 +818,10 @@ namespace smt::noodler {
             expr_ref var = std::get<0>(reg_data);
             if (util::is_str_variable(var, m_util_s) && !this->len_vars.contains(var)) { // the variable cannot be length one
                 STRACE("str", tout << "trying one membership heuristics\n";);
+                BasicTerm noodler_var = util::get_variable_basic_term(var);
+                relevant_vars.insert(noodler_var);
                 dec_proc = std::make_unique<MembHeuristicProcedure>(
-                    util::get_variable_basic_term(var),
+                    noodler_var,
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
                     m_util_s, m
@@ -864,6 +867,10 @@ namespace smt::noodler {
         AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
 
         std::vector<TermConversion> conversions = get_conversions_as_basicterms(aut_assignment, symbols_in_formula);
+
+        for (const auto& [var, nfa] : aut_assignment) {
+            relevant_vars.insert(var);
+        }
 
         // Get the initial length vars that are needed here (i.e they are in aut_assignment)
         std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
@@ -1024,8 +1031,23 @@ namespace smt::noodler {
             // for string literal, we just return the string
             return res;
         } else if (util::is_str_variable(str_expr, m_util_s)) {
-            // for string var, we get the model from the decision procedure that returned sat
-            return dec_proc->get_model(util::get_variable_basic_term(str_expr), get_arith_model_of_var);
+            BasicTerm var = util::get_variable_basic_term(str_expr);
+            if (relevant_vars.contains(var)) {
+                // for relevant (string) var, we get the model from the decision procedure that returned sat
+                return dec_proc->get_model(var, get_arith_model_of_var);
+            } else {
+                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length)
+                // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
+                expr_ref model(m);
+                arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
+                bool is_int;
+                rational val(0);
+                VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+                while (res.length() != val.get_unsigned()) {
+                    res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
+                }
+                return res;
+            }
         } else if (m_util_s.str.is_concat(str_expr)) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
             expr_ref_vector concats(m);

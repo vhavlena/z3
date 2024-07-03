@@ -107,8 +107,6 @@ namespace smt::noodler::util {
      * Convert variable in @c expr form to @c BasicTerm.
      * @param variable Variable to be converted to @c BasicTerm.
      * @return Passed @p variable as a @c BasicTerm
-     *
-     * TODO: Test.
      */
     BasicTerm get_variable_basic_term(expr* variable);
 
