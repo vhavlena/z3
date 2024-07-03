@@ -603,7 +603,7 @@ namespace smt::noodler {
     std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
-        if (solution.length_sensitive_vars.empty() && !this->m_params.m_ca_constr) {
+        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().size() == 0 && !this->m_params.m_ca_constr) {
             // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
             return {LenNode(LenFormulaType::TRUE), precision};
         }
@@ -627,17 +627,15 @@ namespace smt::noodler {
         precision = conv_form_with_precision.second;
 
 
-        // if we solve disequations using CA --> get the LIA formula describing solutions
-        if(this->m_params.m_ca_constr) {
-            conjuncts.push_back(get_formula_for_ca_diseqs());
-            auto not_cont_prec = get_formula_for_not_contains();
-            if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
-                conjuncts.push_back(not_cont_prec.first);
-            } else {
-                // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
-                conjuncts.push_back(LenNode(LenFormulaType::FALSE));
-                precision = LenNodePrecision::UNDERAPPROX;
-            }
+        // get the LIA formula describing solutions for special predicates
+        conjuncts.push_back(get_formula_for_ca_diseqs());
+        auto not_cont_prec = get_formula_for_not_contains();
+        if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
+            conjuncts.push_back(not_cont_prec.first);
+        } else {
+            // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
+            conjuncts.push_back(LenNode(LenFormulaType::FALSE));
+            precision = LenNodePrecision::UNDERAPPROX;
         }
 
         LenNode result(LenFormulaType::AND, conjuncts);
