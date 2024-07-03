@@ -422,26 +422,9 @@ namespace smt::noodler {
         // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
         std::vector<Predicate> inclusions_from_preprocessing;
 
-        /// @brief Move inclusions from inclusions_from_preprocessing to solution (and clear inclusions_from_preprocessing)
-        void move_inclusions_from_preprocessing_to_solution();
-
-        /**
-         * @brief Restrict the language of length variables in solution by their lengths from model
-         * 
-         * @param get_arith_model_of_var Returns the length of a variable in the model
-         */
-        void restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-
         // see get_vars_substituted_in_conversions() for what these sets mean, we save them so that we can use them in model generation
         std::set<BasicTerm> code_subst_vars;
         std::set<BasicTerm> int_subst_vars;
-
-        /**
-         * @brief Restricts the language of conversion vars in solution by their reults in model
-         * 
-         * @param get_arith_model_of_var Returns either the length of a str variable or the value of the int variable in the model
-         */
-        void restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
         
         bool is_model_initialized = false;
         /**
@@ -464,6 +447,7 @@ namespace smt::noodler {
         zstring update_model_and_aut_ass(BasicTerm var, zstring computed_model) {
             model_of_var[var] = computed_model;
             if (solution.aut_ass.contains(var)) {
+                SASSERT(!mata::nfa::intersection(AutAssignment::create_word_nfa(computed_model), solution.aut_ass[var]).is_lang_empty());
                 solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(computed_model));
             }
             return computed_model;

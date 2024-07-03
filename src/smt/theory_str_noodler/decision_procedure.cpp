@@ -1500,8 +1500,11 @@ namespace smt::noodler {
         }
         return l_undef;
     }
+    
+    void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if (is_model_initialized) { return ;}
 
-    void DecisionProcedure::move_inclusions_from_preprocessing_to_solution() {
+        // Move inclusions from inclusions_from_preprocessing to solution (and clear inclusions_from_preprocessing)
         // the inclusions from preprocessing should be of form where all vars on right side
         // occurs only once only in this inclusion, so they should belong to chain-free fragment
         //  => they are not on a cycle (important for model generation, we want to generate the
@@ -1511,61 +1514,49 @@ namespace smt::noodler {
             solution.inclusions_not_on_cycle.insert(incl); 
         }
         inclusions_from_preprocessing.clear();
-    }
-    
-    void DecisionProcedure::restrict_languages_to_lengths(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+
+        // Restrict the languages in solution of length variables and code/int conversion variables by their models
         for (auto& [var, nfa] : solution.aut_ass) {
             if (var.is_literal() || !solution.length_sensitive_vars.contains(var)) { continue; } // literals should have the correct language + we restrict only length vars
+
+            // Restrict length
             rational len = get_arith_model_of_var(var);
             mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
             nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
-        }
-    }
 
-    // assumed to be called after restrict_languages_to_lengths()
-    void DecisionProcedure::restrict_languages_of_conversion_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        for (const BasicTerm& var : code_subst_vars) {
-            if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
-            rational to_code_value = get_arith_model_of_var(code_version_of(var));
-            if (to_code_value != -1) {
-                update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
-            } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
-        }
+            // Restrict code-conversion var
+            if (code_subst_vars.contains(var)) {
+                rational to_code_value = get_arith_model_of_var(code_version_of(var));
+                if (to_code_value != -1) {
+                    update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
+                } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
+            }
 
-        for (const BasicTerm& var : int_subst_vars) {
-            if (!solution.aut_ass.contains(var)) { continue; } // we only restrict the languages of variables that are in aut_ass
-
-            rational len = get_arith_model_of_var(var);
-            if (len == 0) {
-                // to_int_value(var) != -1 for len==0 (see get_formula_for_int_subst_vars())
-                // so we directly set ""
-                update_model_and_aut_ass(var, zstring());
-            } else {
-                rational to_int_value = get_arith_model_of_var(int_version_of(var));
-                if (to_int_value == -1) {
-                    // the language of var should contain only words containing some non-digit
-                    mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
-                    auto& nfa = solution.aut_ass.at(var);
-                    nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, solution.aut_ass.complement_aut(only_digits)).trim());
+            // Restrict int-conversion var
+            if (int_subst_vars.contains(var)) {
+                if (len == 0) {
+                    // to_int_value(var) != -1 for len==0 (see get_formula_for_int_subst_vars())
+                    // so we directly set ""
+                    update_model_and_aut_ass(var, zstring());
                 } else {
-                    zstring to_int_str(to_int_value); // zstring(rational) returns the string representation of the number in the argument
-                    SASSERT(len >= to_int_str.length());
-                    // pad to_int_str with leading zeros until we reach desired length
-                    while (len.get_unsigned() != to_int_str.length()) {
-                        to_int_str = zstring("0") + to_int_str;
+                    rational to_int_value = get_arith_model_of_var(int_version_of(var));
+                    if (to_int_value == -1) {
+                        // the language of var should contain only words containing some non-digit
+                        mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
+                        nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, solution.aut_ass.complement_aut(only_digits)).trim());
+                    } else {
+                        zstring to_int_str(to_int_value); // zstring(rational) returns the string representation of the number in the argument
+                        SASSERT(len >= to_int_str.length());
+                        // pad to_int_str with leading zeros until we reach desired length
+                        while (len.get_unsigned() != to_int_str.length()) {
+                            to_int_str = zstring("0") + to_int_str;
+                        }
+                        update_model_and_aut_ass(var, to_int_str);
                     }
-                    update_model_and_aut_ass(var, to_int_str);
                 }
             }
         }
-
-    }
-    
-    void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        if (is_model_initialized) { return ;}
-        move_inclusions_from_preprocessing_to_solution();
-        restrict_languages_to_lengths(get_arith_model_of_var);
-        restrict_languages_of_conversion_vars(get_arith_model_of_var);
+        
         is_model_initialized = true;
 
         STRACE("str-model",
