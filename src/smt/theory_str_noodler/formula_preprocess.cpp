@@ -1624,6 +1624,9 @@ namespace smt::noodler {
             }
             return false;
         };
+        if (left == right) {
+            return true;
+        }
         return can_unify(left, right, check);
     }
 

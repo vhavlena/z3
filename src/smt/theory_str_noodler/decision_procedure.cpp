@@ -627,12 +627,11 @@ namespace smt::noodler {
         precision = conv_form_with_precision.second;
 
 
-        // if we solve disequations using TagAut --> get the LIA formula describing solutions
+        // if we solve disequations using CA --> get the LIA formula describing solutions
         if(this->m_params.m_ca_constr) {
             conjuncts.push_back(get_formula_for_ca_diseqs());
             auto not_cont_prec = get_formula_for_not_contains();
-            if (precision == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
-                precision = not_cont_prec.second;
+            if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
                 conjuncts.push_back(not_cont_prec.first);
             } else {
                 // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
@@ -1211,8 +1210,8 @@ namespace smt::noodler {
             }));
         }
 
-        STRACE("str", tout << "TagAut-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
-        STRACE("str", tout << "TagAut-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
         return ca::get_lia_for_disequations(proj_diseqs, this->solution.aut_ass);
     }
 
@@ -1238,8 +1237,8 @@ namespace smt::noodler {
             }));
         }
 
-        STRACE("str", tout << "TagAut-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
-        STRACE("str", tout << "TagAut-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
         return ca::get_lia_for_not_contains(proj_not_cont, this->solution.aut_ass);
     }
 
@@ -1255,7 +1254,7 @@ namespace smt::noodler {
             if (dis_or_eq.is_equation()) {
                 equations.add_predicate(dis_or_eq);
             } else if (dis_or_eq.is_inequation()) {
-                // if we solve diesquations using TagAut --> we store the disequations to be solved later on
+                // if we solve diesquations using CA --> we store the disequations to be solved later on
                 if(!single_diseq && this->m_params.m_ca_constr) {
                     init_ca_diseq(dis_or_eq);
                     single_diseq = true;
@@ -1395,7 +1394,12 @@ namespace smt::noodler {
 
         prep_handler.conversions_validity(conversions);
 
-        // Refresh the instance
+        // try to replace the not contains predicates (so-far we replace it by regular constraints)
+        if(!prep_handler.replace_not_contains() || prep_handler.can_unify_not_contains()) {
+            return l_false;
+        }
+
+         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
@@ -1404,11 +1408,6 @@ namespace smt::noodler {
 
         if (!this->init_aut_ass.is_sat()) {
             // some automaton in the assignment is empty => we won't find solution
-            return l_false;
-        }
-
-        // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        if(!prep_handler.replace_not_contains() || prep_handler.can_unify_not_contains()) {
             return l_false;
         }
 
