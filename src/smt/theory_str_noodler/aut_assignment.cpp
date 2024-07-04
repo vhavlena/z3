@@ -162,7 +162,7 @@ namespace smt::noodler {
     bool AutAssignment::is_flat(const BasicTerm& t) const {
         bool flat = true;
 
-        mata::nfa::Nfa aut = *this->at(t);
+        const mata::nfa::Nfa& aut = *this->at(t);
 
         mata::nfa::Nfa::TarjanDiscoverCallback callback {};
         callback.scc_discover = [&](const std::vector<mata::nfa::State>& scc, const std::vector<mata::nfa::State>& tarjan_stack) -> bool {
