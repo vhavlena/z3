@@ -338,6 +338,12 @@ namespace smt::noodler {
                 this->len_variables.insert(left_var);
                 // and add len constraint |X| = |Y|
                 this->add_to_len_formula(pr.second.get_formula_eq()); 
+
+                // we do not add this equation to removed_equation, instead we add Y to substitution map
+                BasicTerm right_var = pr.second.get_right_side()[0];
+                substitution_map[right_var] = {left_var}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
+            } else {
+                removed_equations.push_back(pr.second);
             }
 
             this->formula.remove_predicate(pr.first);
@@ -399,6 +405,7 @@ namespace smt::noodler {
 
             assert(eq.get_left_side().size() == 1 && eq.get_right_side().size() == 1);
             BasicTerm v_left = eq.get_left_side()[0]; // X
+            BasicTerm v_right = eq.get_right_side()[0]; // Y
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
             this->add_to_len_formula(eq.get_formula_eq()); // add len constraint |X| = |Y|
             // propagate len variables: if Y is in len_variables, include also X
@@ -407,6 +414,7 @@ namespace smt::noodler {
             }
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
+            substitution_map[v_right] = {v_left}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
             this->formula.remove_predicate(index);
 
             // update dependencies (overapproximation). Each remaining predicat depends on the removed one.
@@ -1102,12 +1110,18 @@ namespace smt::noodler {
                 auto left_set = pr.second.get_left_set();
                 if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
+                    // we add the removed equation to removed_equations, but we have to swap
+                    // sides so that the single occurring side is on the right (we are gonna
+                    // pretend it is an inclusion and from left side compute the vars of
+                    // the right side in the model generation)
+                    removed_equations.push_back(pr.second.get_switched_sides_predicate());
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
                 auto right_set = pr.second.get_right_set();
                 if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
+                    removed_equations.push_back(pr.second);
                 }               
             }
         }
