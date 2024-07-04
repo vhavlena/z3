@@ -26,20 +26,7 @@ namespace smt::noodler {
        }
 
         lbool check_sat(expr* e, bool produce_model, model_ref &res_model);
-
-            // model_ref mod;
-            // m_kernel.get_model(mod);
-            // std::cout << *mod << std::endl;
-
-            STRACE("str-lia",
-                if(r==lbool::l_false){
-                    tout << "UNSAT core:" << std::endl;
-                    for(unsigned i=0; i < m_kernel.get_unsat_core_size(); i++) {
-                        tout << mk_pp(m_kernel.get_unsat_core_expr(i), m) << std::endl;
-                    }
-                }
-            );
-
+        void initialize(context& ctx, bool include_ass);
         void assert_expr(expr * e);
     };
 }
