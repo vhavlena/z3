@@ -972,8 +972,6 @@ namespace smt::noodler {
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
-                    // save the current assignment to catch it during the loop protection
-                    block_curr_len(lengths, true, false);
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;
