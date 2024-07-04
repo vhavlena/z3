@@ -355,6 +355,14 @@ namespace smt::noodler {
             return complement_aut(*(this->at(t)));
         }
 
+        /**
+         * @brief Check if the automaton corresponding to @p t is flat. 
+         * Flat automaton is an NFA whose every SCC is a simple loop. Basically each state in an 
+         * SCC has at most one successor within this SCC.
+         * 
+         * @param t Term 
+         * @return true <-> the corresponding automaton is flat
+         */
         bool is_flat(const BasicTerm& t) const;
 
     };

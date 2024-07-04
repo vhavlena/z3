@@ -165,7 +165,7 @@ namespace smt::noodler {
         const mata::nfa::Nfa& aut = *this->at(t);
 
         mata::nfa::Nfa::TarjanDiscoverCallback callback {};
-        callback.scc_discover = [&flat](const std::vector<mata::nfa::State>& scc, const std::vector<mata::nfa::State>& tarjan_stack) -> bool {
+        callback.scc_discover = [&flat,&aut](const std::vector<mata::nfa::State>& scc, const std::vector<mata::nfa::State>& tarjan_stack) -> bool {
             (void)tarjan_stack;
 
             for(const mata::nfa::State& st : scc) {

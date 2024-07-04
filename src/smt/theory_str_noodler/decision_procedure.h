@@ -413,21 +413,6 @@ namespace smt::noodler {
          */
         Formula not_contains{};
 
-        // /**
-        //  * @brief Construct constraints to get rid of not_contains predicates.
-        //  * @return l_false -> unsatisfiable constaint; l_undef if it is not evident
-        //  */
-        // lbool replace_not_contains();
-
-        // /**
-        //  * @brief Check if it is possible to syntactically unify not contains terms. If they are included (in the sense of vectors) the 
-        //  * not(contain) is unsatisfiable.
-        //  * 
-        //  * @param prep FormulaPreprocessor
-        //  * @return l_true -> can be unified 
-        //  */
-        // lbool can_unify_not_contains(const FormulaPreprocessor& prep);
-
         ////////////////////////////////////////////////////////////////
         //////////////////// FOR MODEL GENERATION //////////////////////
         ////////////////////////////////////////////////////////////////
