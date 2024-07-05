@@ -243,8 +243,9 @@ namespace smt::noodler {
     }
 
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core) {
-        if (len_formula == m.mk_true()) {
+        if (len_formula == m.mk_true() && (len_vars.empty() || !m_params.m_produce_models)) {
             // we assume here that existing length constraints are satisfiable, so adding true will do nothing
+            // however, for model generation, we need to always produce models if we have some length vars
             return l_true;
         }
 
@@ -422,7 +423,8 @@ namespace smt::noodler {
     }
 
     bool theory_str_noodler::is_mult_membership_suitable() {
-        if (!this->m_conversion_todo.empty() || !this->m_not_contains_todo_rel.empty()) {
+        // TODO handle length vars (also the ones without any constraints other than lenght ones, for those we just need to compute arith model)
+        if (!this->m_conversion_todo.empty() || !this->m_not_contains_todo_rel.empty() || !this->len_vars.empty()) {
             return false;
         }
 

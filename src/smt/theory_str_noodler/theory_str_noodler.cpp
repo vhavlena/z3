@@ -813,7 +813,9 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x (not)in RE', we use universality/emptiness
         // checking of the regex (using some heuristics) instead of constructing the automaton of RE. The construction (especially complement)
         // can sometimes blow up, so the check should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
+        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0
+                && this->len_vars.empty() // TODO: handle length vars that are not x (i.e., there are no string constraints on them, other than length ones, we just need to compute arith model)
+        ) {
             const auto& reg_data = this->m_membership_todo_rel[0];
             // TODO: check if "xyz in RE" works correctly
             expr_ref var = std::get<0>(reg_data);
@@ -888,6 +890,7 @@ namespace smt::noodler {
         if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
+                last_run_was_sat = true;
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -940,6 +943,7 @@ namespace smt::noodler {
             STRACE("str", tout << "Try underapproximation" << std::endl);
             if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
+                last_run_was_sat = true;
                 return FC_DONE;
             }
             STRACE("str", tout << "Underapproximation did not help\n";);
@@ -1019,6 +1023,7 @@ namespace smt::noodler {
     zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
         // function that returns either the length of str var or model of int var from arith_model
         std::function<rational(BasicTerm)> get_arith_model_of_var = [this](BasicTerm var) -> rational {
+            SASSERT(arith_model != nullptr);
             expr_ref arg(m);
             // the following is similar to code in util::len_to_expr()
             if(!var_name.contains(var)) {
@@ -1052,6 +1057,7 @@ namespace smt::noodler {
             } else {
                 // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length)
                 // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
+                SASSERT(arith_model != nullptr);
                 expr_ref model(m);
                 arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
                 bool is_int;
