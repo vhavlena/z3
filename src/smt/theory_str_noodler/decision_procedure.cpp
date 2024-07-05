@@ -131,12 +131,6 @@ namespace smt::noodler {
     }
 
     lbool DecisionProcedure::compute_next_solution() {
-
-        // if we have a not contains, we give unknown
-        // if(this->not_contains.get_predicates().size() > 1) {
-        //     return l_undef;
-        // }
-
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE("str", tout << "------------------------"
@@ -604,7 +598,8 @@ namespace smt::noodler {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
         if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().size() == 0 && !this->m_params.m_ca_constr) {
-            // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
+            // There is not notcontains predicate to be solved and there are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
+            // for the option m_ca_constr we completely skip this heuristic as there may remain also diseqations
             return {LenNode(LenFormulaType::TRUE), precision};
         }
 
