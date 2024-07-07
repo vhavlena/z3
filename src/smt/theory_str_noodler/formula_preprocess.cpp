@@ -1687,8 +1687,6 @@ namespace smt::noodler {
                         return false;
                     }
                 }
-            }
-            if(left.size() == 1 && right.size() == 1) {
                 if(this->aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
                     mata::nfa::Nfa nfa_copy = *this->aut_ass.at(left[0]);
                     for(unsigned i = 0; i < nfa_copy.num_of_states(); i++) {

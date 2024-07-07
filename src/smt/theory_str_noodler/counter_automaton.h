@@ -129,7 +129,7 @@ namespace smt::noodler::ca {
     struct TagAut {
         // underlying nfa
         mata::nfa::Nfa nfa;
-        // structured alphabed with registe updates
+        // structured alphabed with register updates
         CounterAlphabet alph;
         // variable ordering
         std::vector<BasicTerm> var_order {};
