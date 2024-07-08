@@ -103,7 +103,8 @@ namespace smt::noodler {
         }
 
         lbool compute_next_solution() override;
-        LenNode get_initial_lengths() override {
+
+        LenNode get_initial_lengths(bool all_vars = false) override {
             return LenNode(LenFormulaType::TRUE);
         }
         std::pair<LenNode, LenNodePrecision> get_lengths() override;

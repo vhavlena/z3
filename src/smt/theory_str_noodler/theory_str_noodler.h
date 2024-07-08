@@ -411,13 +411,6 @@ namespace smt::noodler {
         lbool run_length_proc(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
 
         /**
-         * @brief Wrapper for running the membership query heuristics.
-         * 
-         * @return lbool Outcome of the heuristic procedure.
-         */
-        lbool run_membership_heur();
-
-        /**
          * @brief Wrapper for running the mulitple membership query heuristics.
          * 
          * Check is_mult_membership_suitable() for explanation.
