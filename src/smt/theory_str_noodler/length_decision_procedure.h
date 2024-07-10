@@ -15,35 +15,104 @@
 
 namespace smt::noodler {
 
-    class VarConstraint
-    {
+    /**
+     * @brief Type for storing batch of equations of the form 
+     * x = y1 y2 ... 
+     * x = z1 z2 ...
+     * It represents constraints on the variable x (_name). We call it constraints on variable x.
+     */
+    class VarConstraint {
     private:
-        zstring _name;
+        zstring _name; // name of the constrained variable
         std::vector<Concat> _constr_eqs;	// All sides of equations on the opposite side of this variable
         std::vector<zstring> _lits; // Literals occuring explicitly and in contained variables
         std::vector<std::pair<zstring, zstring>> _alignments;   // All literals, that should be aligned
+        lbool is_parsed;
 
         /**
-         * @brief 
+         * @brief Check if @p side is of the form [_name]
          * 
-         * @param side 
-         * @return true 
-         * @return false 
+         * @param side Concatenation
+         * @return @p side == [_name] 
          */
         bool check_side(const Concat& side);
+
+        /**
+         * @brief Emplace concatenation to the var constraint
+         * 
+         * @param c Concatenation
+         * @param lit_conversion Occurrences of literals (unique names for the same literals) 
+         */
         void emplace(const Concat& c, std::map<zstring, BasicTerm>& lit_conversion);
-        LenNode generate_begin(const zstring& var_name, const BasicTerm& last, bool precise=true);
+
+        /**
+         * @brief Generate LIA formula b_x(var_name) = b_x(last) + |last| if last is not undef otherwise b(t) = 0
+         * Expressing that the begin of var_name is directly after last
+         * 
+         * @param var_name Variable name
+         * @param last Variable/Literal preceeding var_name
+         * @return LenNode 
+         */
+        LenNode generate_begin(const zstring& var_name, const BasicTerm& last);
+
+        /**
+         * @brief Generate the LIA formula b_x(lit) = b_from(lit) + b_x(from) where 
+         * x is the current constrained variable _name
+         * 
+         * Corresponds to the case when x = ... y ... && y = ... lit ....
+         * then b_x(lit) = b_y(lit) + b_x(y)
+         * 
+         * @param lit Literal
+         * @param from Source constrained variable
+         * @return LenNode Len formula
+         */
         LenNode generate_begin(const zstring& lit, const zstring& from);
+
+        /**
+         * @brief Generate LIA formula of the form |x| = |y_1| + ... where 
+         * x = _name and y_1 ... is in @p side_len
+         * 
+         * @param side_len Concatenation of variables
+         * @return LenNode Length formula
+         */
         LenNode generate_side_eq(const std::vector<LenNode>& side_len);
+
+        /**
+         * @brief Generate LIA formula aligning literals @p l1 and @p l2
+         * 
+         * @param l1 Literal 1
+         * @param l2 Literal 1
+         * @param conv Occurrences of literals (unique names for the same literals)  
+         * @return LenNode 
+         */
         LenNode align_literals(const zstring& l1, const zstring& l2, const std::map<zstring, BasicTerm>& conv);
-        lbool is_parsed;
+
+         /**
+         * @brief Compare first n characters of l1 with last n characters of l2 (e.g. l1=banana, l2=ababa, n=2 -> [ba]nana, aba[ba] -> true)
+         * 
+         * @return bool match of substrings
+         */
         static bool zstr_comp(const zstring& l1_val, const zstring& l2_val, unsigned n);
     public:
-        VarConstraint() : _name(), is_parsed (l_false) {};
+        VarConstraint() : _name(), is_parsed(l_false) {};
         VarConstraint(zstring name) : _name(std::move(name)), is_parsed (l_false) {};
-        bool add(const Predicate& pred, std::map<zstring, BasicTerm>& lit_conversion);
+
+        /**
+         * @brief Add predicate to the the var constraint. Do not check if a equation side matches 
+         * the variable name _name.
+         * 
+         * @param pred Predicate Predicate to be added
+         * @param[out] lit_conversion Occurrences of literals (unique names for the same literals) 
+         */
+        void add(const Predicate& pred, std::map<zstring, BasicTerm>& lit_conversion);
         std::string to_string() const;
 
+        /**
+         * @brief Get literals occurring in the variable constrain and transitively in all var constraints in 
+         * the system containing the variable in a side of current var constraint.
+         * 
+         * @return const std::vector<zstring>& Literals
+         */
         // !!! Must be called after parse !!!
         const std::vector<zstring>& get_lits() const;
 
@@ -56,8 +125,16 @@ namespace smt::noodler {
          * @param conv conversions for literals
          * @return bool success
          */
-        bool parse(std::map<zstring,VarConstraint>& pool, std::map<zstring,BasicTerm>& conv);
-
+        bool parse(std::map<zstring,VarConstraint>& pool);
+        
+        /**
+         * @brief Get length constraints generated by the batch of equations contraining x.
+         * 
+         * @param pool Pool of constraints on variables.
+         * @param conv Conversion between literals. Each literal should have unique name (corresponding to occurrences) in 
+         *  order to properly generate length constrains.
+         * @return LenNode Length constraints on the current variable constraint
+         */
         LenNode get_lengths(const std::map<zstring,VarConstraint>& pool, const std::map<zstring,BasicTerm>& conv);
     };
 
@@ -80,6 +157,14 @@ namespace smt::noodler {
         std::vector<LenNode> implicit_len_formula = {};
     public:
         LenNodePrecision precision = LenNodePrecision::PRECISE;
+
+        /**
+         * @brief Create fresh name for the given literal @p lit. 
+         * 
+         * @param lit Literal
+         * @param lit_conversion Mapping of fresh names to the original literals
+         * @return zstring 
+         */
         static zstring generate_lit_alias(const BasicTerm& lit, std::map<zstring, BasicTerm>& lit_conversion);
 
         /**
@@ -97,9 +182,6 @@ namespace smt::noodler {
              formula { form },
              init_aut_ass{ init_aut_ass },
              m_params(par) { 
-            /**
-             * TODO
-             */
         }
 
         lbool compute_next_solution() override;

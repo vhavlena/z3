@@ -32,21 +32,19 @@ namespace smt::noodler {
         _constr_eqs.emplace_back(n);
     }
 
-    bool VarConstraint::add(const Predicate& pred, std::map<zstring, BasicTerm>& lit_conversion) {
+    void VarConstraint::add(const Predicate& pred, std::map<zstring, BasicTerm>& lit_conversion) {
         if (check_side(pred.get_left_side())) {
             emplace(pred.get_right_side(), lit_conversion);
-            return true;
+            return;
         }
         if (check_side(pred.get_right_side())) {
             emplace(pred.get_left_side(), lit_conversion);
-            return true;
+            return;
         }
 
         // Fresh variable 
         emplace(pred.get_right_side(), lit_conversion);
         emplace(pred.get_left_side(), lit_conversion);
-
-        return false;
     }
 
     const std::vector<zstring>& VarConstraint::get_lits() const {
@@ -92,6 +90,7 @@ namespace smt::noodler {
         zstring l1_val = conv.at(l1).get_name();
         zstring l2_val = conv.at(l2).get_name();
 
+        // both literals are just single letters
         if (l1_val.length() == 1) {
             if (l2_val.length() == 1) {
                 if (l1_val[0] == l2_val[0]) {
@@ -102,15 +101,19 @@ namespace smt::noodler {
             }
         }
 
+        // positions (counted from l1_val) that can be overlayed with l2_val
         std::vector<unsigned> overlays{};
-
         for (unsigned n = 1; n <= l2_val.length() + l1_val.length() - 1; ++n) {
             if (zstr_comp(l1_val, l2_val, n)) {
                 overlays.emplace_back(n);
             }
         }
 
+        // l1 is completely before l2
+        // b(l1) + |l1| <= b(l2)
         LenNode before (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l1, this->_name), rational(l1_val.length())}), begin_of(l2, this->_name)});
+        // l2 is completely before l1
+        // b(l2) + |l2| <= b(l1)
         LenNode after (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l2, this->_name), rational(l2_val.length())}), begin_of(l1, this->_name)});
         std::vector<LenNode> align{before, after};
         for (unsigned i : overlays) {
@@ -121,6 +124,8 @@ namespace smt::noodler {
             }));
         }
 
+        // the literals are aligned in a way that they are completely next to each other, or they 
+        // are aligned on positions given by overlays
         return LenNode(LenFormulaType::OR, align);
     }
 
@@ -137,25 +142,26 @@ namespace smt::noodler {
         for (const Concat& side : _constr_eqs) {
             // bool unconstrained = true;    // there are unconstrained variables
             std::vector<LenNode> side_len {};
-
             for (const BasicTerm& t : side) {
-                if (t.get_type() == BasicTermType::Literal) {
+                if (t.is_literal()) {
                     side_len.emplace_back(conv.at(t.get_name()));
                 } else {
                     side_len.emplace_back(t);
                 }
             }
-
             form.emplace_back(generate_side_eq(side_len));
         }
 
         // begin constraints
         for (const Concat& side : _constr_eqs) {
             BasicTerm last (BasicTermType::Length);
-
             for (const BasicTerm& t : side) {
+                // assume that the current left variable is y (_name). Then
+                // b_y(t) = b_y(last) + |last| if last is not undef otherwise b(t) = 0
                 form.emplace_back(generate_begin(t.get_name(), last));
-                if (t.get_type() == BasicTermType::Variable && pool.count(t.get_name())) {
+                // if the system is of the form y (_name) = ... x ... && x = l1 x2 l2
+                // we generate b_y(l1) = b_x(l1) + b_y(x)
+                if (t.is_variable() && pool.contains(t.get_name())) {
                     for (const zstring& lit : pool.at(t.get_name()).get_lits()) {
                         form.emplace_back(generate_begin(lit, t.get_name()));
                     }
@@ -176,31 +182,28 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, form);
     }
 
-    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last, bool precise) {
+    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) {
         LenNode end_of_last = (last.get_type() == BasicTermType::Length)
             ? LenNode(0)
             : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last});
 
-        LenFormulaType ftype = precise ? LenFormulaType::EQ : LenFormulaType::LEQ;
-        LenNode out = LenNode(ftype, {end_of_last, begin_of(var_name, this->_name)});
-        
+        LenNode out = LenNode(LenFormulaType::EQ, {end_of_last, begin_of(var_name, this->_name)});
         return out;
     }
 
     LenNode VarConstraint::generate_begin(const zstring& lit, const zstring& from) {
+        // b_x(lit) = b_from(lit) + b_x(from)
         LenNode out (LenFormulaType::EQ, {begin_of(lit, this->_name), LenNode(LenFormulaType::PLUS, {begin_of(lit, from), begin_of(from, this->_name)})});
         return out;
     }
 
-    bool VarConstraint::parse(std::map<zstring,VarConstraint>& pool, std::map<zstring,BasicTerm>& conv) {
+    bool VarConstraint::parse(std::map<zstring,VarConstraint>& pool) {
         if (is_parsed == l_true) {
             return true;	// Already parsed
         }
-
         if (is_parsed == l_undef) {
             return false;	// Cycle
         }
-
         is_parsed = l_undef;	// Currently in parsing
 
         // parse derived
@@ -212,32 +215,30 @@ namespace smt::noodler {
                 }
                 if (t.get_type() == BasicTermType::Variable) {
                     // parse constrained variables
-                    if (pool.count(t.get_name())) {
-                        if (pool[t.get_name()].parse(pool, conv) == false) {
+                    // the variable X occurrs on the left side of some equation
+                    if (pool.count(t.get_name()) > 0) {
+                        if (pool[t.get_name()].parse(pool) == false) {
                             return false;	// There is a cycle
                         }
-
+                        // propagate all literals from equations corresponding to the variable X
                         for (const zstring& lit : pool[t.get_name()].get_lits()) {
                             lits_in_side.emplace_back(lit);
                         }
                     }
                 }
             }
-
+            // _lits contains so-far parsed literals. 
             for (const zstring& l1 : _lits) {
                 for (const zstring& l2 : lits_in_side) {
                     _alignments.emplace_back(l1, l2);
                 }
             }
-
             for (const zstring& l : lits_in_side) {
                 _lits.emplace_back(l);
             }
         }
 
         is_parsed = l_true;
-
-        
         return true;
     }
 
@@ -260,7 +261,7 @@ namespace smt::noodler {
 
         for (const zstring& t :_lits) {
             // for explicit: ... lname ...
-            ret += " " + t.encode(); // + ((t.parent_var == "") ? "" : ("("+t.parent_var.encode()+")"));
+            ret += " " + t.encode();
         }
 
         ret += "\n#####\n";
@@ -369,7 +370,7 @@ namespace smt::noodler {
         );  
 
         for (std::pair<zstring, VarConstraint> it : pool) {
-            if (pool[it.first].parse(pool, lit_conversion) == false) {
+            if (pool[it.first].parse(pool) == false) {
                 // There is a cycle
                 STRACE("str", tout << "len: Cyclic dependecy.\n";);
                 return l_undef;	// We cannot solve this formula
@@ -378,9 +379,10 @@ namespace smt::noodler {
 
         // Change if there is filler var filter
         for (const BasicTerm& v : this->formula.get_vars()) {
+            // 0 <= |v|
             implicit_len_formula.emplace_back(LenNode(LenFormulaType::LEQ, {0, v}));
         }
-
+        // generate length for each batch of equations in the pool
         for (std::pair<zstring, VarConstraint> it : pool) {
             computed_len_formula.emplace_back(pool[it.first].get_lengths(pool, lit_conversion));
         }
