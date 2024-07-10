@@ -21,8 +21,8 @@ namespace smt::noodler {
     void VarConstraint::emplace(const Concat& c, std::map<zstring, BasicTerm>& lit_conversion) {
         Concat n {};
         for (const BasicTerm& t : c) {
-            if (BasicTermType::Literal == t.get_type()) {
-                BasicTerm lit(BasicTermType::Literal, LengthDecisionProcedure::generate_lit_alias(t, lit_conversion));
+            if (t.is_literal()) {
+                BasicTerm lit(BasicTermType::Literal, ConstraintPool::generate_lit_alias(t, lit_conversion));
                 n.emplace_back(lit);
             } else {
                 n.emplace_back(t);
@@ -51,7 +51,7 @@ namespace smt::noodler {
         return _lits;
     }
 
-    LenNode VarConstraint::generate_side_eq(const std::vector<LenNode>& side_len) {
+    LenNode VarConstraint::generate_side_eq(const std::vector<LenNode>& side_len) const {
         LenNode left = BasicTerm(BasicTermType::Variable, this->_name);
         // if there is no variable: length is 0, for one variable the length of the right side is its length, for more the length is their sum
         LenNode right = (side_len.size() == 0) ? LenNode(0)
@@ -86,7 +86,7 @@ namespace smt::noodler {
         return true;
     }
 
-    LenNode VarConstraint::align_literals(const zstring& l1, const zstring& l2, const std::map<zstring, BasicTerm>& conv) {
+    LenNode VarConstraint::align_literals(const zstring& l1, const zstring& l2, const std::map<zstring, BasicTerm>& conv) const {
         zstring l1_val = conv.at(l1).get_name();
         zstring l2_val = conv.at(l2).get_name();
 
@@ -129,8 +129,9 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::OR, align);
     }
 
-    LenNode VarConstraint::get_lengths(const std::map<zstring,VarConstraint>& pool, const std::map<zstring,BasicTerm>& conv) {
+    LenNode VarConstraint::get_lengths(const ConstraintPool& pool) const {
         std::vector<LenNode> form{};
+        auto conv = pool.get_lit_conversion();
 
         // lits alignment
         for (const auto& a : _alignments) {
@@ -161,8 +162,8 @@ namespace smt::noodler {
                 form.emplace_back(generate_begin(t.get_name(), last));
                 // if the system is of the form y (_name) = ... x ... && x = l1 x2 l2
                 // we generate b_y(l1) = b_x(l1) + b_y(x)
-                if (t.is_variable() && pool.contains(t.get_name())) {
-                    for (const zstring& lit : pool.at(t.get_name()).get_lits()) {
+                if (t.is_variable() && pool.contains(t)) {
+                    for (const zstring& lit : pool.at(t).get_lits()) {
                         form.emplace_back(generate_begin(lit, t.get_name()));
                     }
                 }
@@ -182,7 +183,7 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, form);
     }
 
-    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) {
+    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) const {
         LenNode end_of_last = (last.get_type() == BasicTermType::Length)
             ? LenNode(0)
             : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last});
@@ -191,13 +192,13 @@ namespace smt::noodler {
         return out;
     }
 
-    LenNode VarConstraint::generate_begin(const zstring& lit, const zstring& from) {
+    LenNode VarConstraint::generate_begin(const zstring& lit, const zstring& from) const {
         // b_x(lit) = b_from(lit) + b_x(from)
         LenNode out (LenFormulaType::EQ, {begin_of(lit, this->_name), LenNode(LenFormulaType::PLUS, {begin_of(lit, from), begin_of(from, this->_name)})});
         return out;
     }
 
-    bool VarConstraint::parse(std::map<zstring,VarConstraint>& pool) {
+    bool VarConstraint::parse(ConstraintPool& pool) {
         if (is_parsed == l_true) {
             return true;	// Already parsed
         }
@@ -210,18 +211,17 @@ namespace smt::noodler {
         for (const Concat& side : _constr_eqs) {
             std::vector<zstring> lits_in_side {};
             for (const BasicTerm& t : side) {
-                if (t.get_type() == BasicTermType::Literal) {
+                if (t.is_literal()) {
                     lits_in_side.emplace_back(t.get_name());
-                }
-                if (t.get_type() == BasicTermType::Variable) {
+                } else if (t.is_variable()) {
                     // parse constrained variables
                     // the variable X occurrs on the left side of some equation
-                    if (pool.count(t.get_name()) > 0) {
-                        if (pool[t.get_name()].parse(pool) == false) {
+                    if (pool.count(t) > 0) {
+                        if (pool[t].parse(pool) == false) {
                             return false;	// There is a cycle
                         }
                         // propagate all literals from equations corresponding to the variable X
-                        for (const zstring& lit : pool[t.get_name()].get_lits()) {
+                        for (const zstring& lit : pool[t].get_lits()) {
                             lits_in_side.emplace_back(lit);
                         }
                     }
@@ -275,35 +275,27 @@ namespace smt::noodler {
         return os;
     }
 
-    zstring LengthDecisionProcedure::generate_lit_alias(const BasicTerm& lit, std::map<zstring, BasicTerm>& lit_conversion) {
-        zstring new_lit_name = util::mk_noodler_var_fresh("lit").get_name();
-        // lit_conversion[new_lit_name] = lit;
-        lit_conversion.emplace(std::make_pair(new_lit_name, lit));
-        return new_lit_name;
-    }
-
-    void LengthDecisionProcedure::add_to_pool(std::map<zstring, VarConstraint>& pool, const Predicate& pred) {
+    void ConstraintPool::add_to_pool(const Predicate& pred) {
         bool in_pool = false;
 
         for (const Concat& side : pred.get_params()) {
-            if (side.size() == 1 && side[0].get_type() == BasicTermType::Variable) {
-                zstring var_name = side[0].get_name();
-                if (pool.count(var_name) == 0) {
-                    pool[var_name] = VarConstraint(var_name);
+            if (side.size() == 1 && side[0].is_variable()) {
+                BasicTerm var = side[0];
+                if (this->count(var) == 0) {
+                    (*this)[var] = VarConstraint(var.get_name());
                 }
-                pool[var_name].add(pred, lit_conversion);
+                (*this)[var].add(pred, this->lit_conversion);
 
                 in_pool = true;
             }
         }
 
         if (!in_pool) {
-            zstring fresh = util::mk_noodler_var_fresh("f").get_name();
-            pool[fresh] = VarConstraint(fresh);
-            pool[fresh].add(pred, lit_conversion);
+            BasicTerm fresh = util::mk_noodler_var_fresh("f");
+            (*this)[fresh] = VarConstraint(fresh.get_name());
+            (*this)[fresh].add(pred, this->lit_conversion);
         }
     }
-
 
     ///////////////////////////////////
 
@@ -355,22 +347,20 @@ namespace smt::noodler {
 
         STRACE("str", tout << "True\n"; );
 
-        std::map<zstring, VarConstraint> pool{};
-
         for (const Predicate& pred : this->formula.get_predicates()) {
-            add_to_pool(pool, pred);
+            this->pool.add_to_pool(pred);
         }   
 
         STRACE("str",
             tout << "Conversions:\n-----\n";
-            for (auto c : lit_conversion) {
+            for (auto c : this->pool.get_lit_conversion()) {
                 tout << c.first << " : " << c.second << std::endl;
             }
             tout << "-----\n";
         );  
 
-        for (std::pair<zstring, VarConstraint> it : pool) {
-            if (pool[it.first].parse(pool) == false) {
+        for (auto& [var, constr] : pool) {
+            if (constr.parse(pool) == false) {
                 // There is a cycle
                 STRACE("str", tout << "len: Cyclic dependecy.\n";);
                 return l_undef;	// We cannot solve this formula
@@ -383,8 +373,8 @@ namespace smt::noodler {
             implicit_len_formula.emplace_back(LenNode(LenFormulaType::LEQ, {0, v}));
         }
         // generate length for each batch of equations in the pool
-        for (std::pair<zstring, VarConstraint> it : pool) {
-            computed_len_formula.emplace_back(pool[it.first].get_lengths(pool, lit_conversion));
+        for (const auto& [var, constr] : pool) {
+            computed_len_formula.emplace_back(constr.get_lengths(this->pool));
         }
 
         STRACE("str", tout << "len: Finished computing.\n");
