@@ -51,6 +51,8 @@ namespace smt::noodler {
         std::vector<zstring> _lits; // Literals occuring explicitly and in contained variables
         std::vector<std::pair<zstring, zstring>> _alignments;   // All literals, that should be aligned
         lbool is_parsed;
+        // variables occurring in the variable constraint
+        std::set<BasicTerm> vars {};
 
         /**
          * @brief Check if @p side is of the form [_name]
@@ -139,6 +141,15 @@ namespace smt::noodler {
         // !!! Must be called after parse !!!
         const std::vector<zstring>& get_lits() const;
 
+        /**
+         * @brief Get variables occurring inside the var constraint
+         * 
+         * @return const std::set<BasicTerm> Variables
+         */
+        const std::set<BasicTerm> get_vars() const {
+            return this->vars;
+        }
+
 
         // TODO: already generate here
         /**
@@ -157,6 +168,17 @@ namespace smt::noodler {
          * @return LenNode Length constraints on the current variable constraint
          */
         LenNode get_lengths(const ConstraintPool& pool) const;
+
+        /**
+         * @brief Get LIA formula saying that literals matching the same variables do not share any part.
+         * Assumes that the var constraints contain @p multi_var.
+         * 
+         * @param pool Pool of var constraints
+         * @param multi_var Variable with multiple occurrences
+         * @param source_var Variable whose var constraints contains also the variable @p multi_var
+         * @return LenNode LIA formula
+         */
+        LenNode get_multi_var_lia(const ConstraintPool& pool, const BasicTerm& multi_var, const BasicTerm& source_var) const;
     };
 
     /**

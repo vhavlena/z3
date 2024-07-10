@@ -25,6 +25,7 @@ namespace smt::noodler {
                 BasicTerm lit(BasicTermType::Literal, ConstraintPool::generate_lit_alias(t, lit_conversion));
                 n.emplace_back(lit);
             } else {
+                this->vars.insert(t);
                 n.emplace_back(t);
             }
         }
@@ -183,6 +184,165 @@ namespace smt::noodler {
         return LenNode(LenFormulaType::AND, form);
     }
 
+    LenNode VarConstraint::get_multi_var_lia(const ConstraintPool& pool, const BasicTerm& multi_var, const BasicTerm& source_var) const {
+        auto conv = pool.get_lit_conversion();
+        std::vector<zstring> other_lits = this->get_lits();
+
+        // formula saying that inside of the interval [begin, end] there is no literal in x
+        auto free_formula = [&](const BasicTerm& var, const LenNode& begin, const LenNode& end) -> LenNode {
+            LenNode formula(LenFormulaType::AND);
+            for(const zstring& lit : other_lits) {
+                LenNode or_fle(LenFormulaType::OR);
+                // b_x(lit) + |lit| <= begin
+                or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                    LenNode(LenFormulaType::PLUS, { begin_of(lit, this->_name), conv.at(lit) }), 
+                    begin, 
+                }) );
+                // end <= b_x(lit)
+                or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                    end,
+                    begin_of(lit, this->_name), 
+                }) );
+                formula.succ.push_back(or_fle);
+            }
+            return formula;
+        };
+
+        // case when literal lit completely fits into var
+        auto in_formula_case1 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
+            LenNode pre1(LenFormulaType::AND);
+            // b_y(var) <= b_y(lit)
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                begin_of(var.get_name(), source_var.get_name()),
+                begin_of(lit, source_var.get_name()) 
+            }) );
+            // b_y(lit) + |lit| <= b_y(var) + |var|
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }) 
+            }) );
+
+            // begin = b_x(var) + ( b_y(lit) - b_y(var) )
+            LenNode begin = LenNode(LenFormulaType::PLUS, { 
+                begin_of(var.get_name(), this->_name), 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()),
+                    begin_of(var.get_name(), source_var.get_name()),
+                } )
+            });
+            // end = begin + |lit|
+            LenNode end = LenNode(LenFormulaType::PLUS, { 
+                begin,
+                conv.at(lit)
+            });
+            LenNode case1(LenFormulaType::OR, {
+                LenNode(LenFormulaType::NOT, { pre1 }),
+                free_formula(var, begin, end),
+            });
+            return case1;
+        };
+
+        // case when literal lit starts left of var and covers a part of var
+        auto in_formula_case2 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
+            LenNode pre1(LenFormulaType::AND);
+            // b_y(lit) <= b_y(var)
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                begin_of(lit, source_var.get_name()), 
+                begin_of(var.get_name(), source_var.get_name()) 
+            }) );
+            // b_y(var) < b_y(lit) + |lit|
+            pre1.succ.push_back( LenNode(LenFormulaType::LT, { 
+                begin_of(var.get_name(), source_var.get_name()),
+                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+            }) );
+            // begin = b_x(var)
+            LenNode begin = begin_of(var.get_name(), this->_name);
+            // end = begin + b_y(lit) + ( |lit| - b_y(var) )
+            LenNode end = LenNode(LenFormulaType::PLUS, { 
+                begin,
+                begin_of(lit, source_var.get_name()) ,
+                LenNode(LenFormulaType::MINUS, {
+                    conv.at(lit),
+                    begin_of(var.get_name(), source_var.get_name()),
+                } )
+            });
+            LenNode case1(LenFormulaType::OR, {
+                LenNode(LenFormulaType::NOT, { pre1 }),
+                free_formula(var, begin, end),
+            });
+            return case1;
+        };
+
+        // case when literal lit starts inside var and exceeds the boundary of var
+        auto in_formula_case3 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
+            LenNode pre1(LenFormulaType::AND);
+            // b_y(var) <= b_y(lit)
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                begin_of(var.get_name(), source_var.get_name()), 
+                begin_of(lit, source_var.get_name()) 
+            }) );
+            // b_y(var) + |var| <= b_y(lit) + |lit|
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
+                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+            }) );
+            // begin = b_x(var) + ( b_y(lit) - b_y(var) )
+            LenNode begin = LenNode(LenFormulaType::PLUS, { 
+                begin_of(var.get_name(), this->_name), 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()),
+                    begin_of(var.get_name(), source_var.get_name()),
+                } )
+            });
+            // end = b_x(var) + |var|
+            LenNode end = LenNode(LenFormulaType::PLUS, { 
+                begin_of(var.get_name(), this->_name),
+                var,
+            });
+            LenNode case1(LenFormulaType::OR, {
+                LenNode(LenFormulaType::NOT, { pre1 }),
+                free_formula(var, begin, end),
+            });
+            return case1;
+        };
+
+        // case when literal lit completely covers var
+        auto in_formula_case4 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
+            LenNode pre1(LenFormulaType::AND);
+            //  b_y(lit) <= b_y(var)
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                begin_of(lit, source_var.get_name()),
+                begin_of(var.get_name(), source_var.get_name()), 
+            }) );
+            // b_y(var) + |var| <= b_y(lit) + |lit|
+            pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
+                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
+                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+            }) );
+            // begin = b_x(var)
+            LenNode begin = begin_of(var.get_name(), this->_name);
+            // end = b_x(var) + |var|
+            LenNode end = LenNode(LenFormulaType::PLUS, { 
+                begin_of(var.get_name(), this->_name),
+                var,
+            });
+            LenNode case1(LenFormulaType::OR, {
+                LenNode(LenFormulaType::NOT, { pre1 }),
+                free_formula(var, begin, end),
+            });
+            return case1;
+        };
+
+        LenNode formula(LenFormulaType::AND);
+        for(const zstring& lit : pool.at(source_var).get_lits()) {
+            formula.succ.push_back(in_formula_case1(multi_var, lit));
+            formula.succ.push_back(in_formula_case2(multi_var, lit));
+            formula.succ.push_back(in_formula_case3(multi_var, lit));
+            formula.succ.push_back(in_formula_case4(multi_var, lit));
+        }
+        return formula;
+    }
+
     LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) const {
         LenNode end_of_last = (last.get_type() == BasicTermType::Length)
             ? LenNode(0)
@@ -311,13 +471,19 @@ namespace smt::noodler {
         );
 
         // Check for suitability
-        std::vector<BasicTerm> concat_vars = {};	// variables that have appeared in concatenation 
+        std::vector<BasicTerm> concat_vars = {};	// variables that have appeared in concatenation
+        std::set<BasicTerm> multi_vars = {};
         
         // TODO: compact to a function
         STRACE("str", tout << " - checking suitability: "; );
         for (const Predicate& pred : this->formula.get_predicates()) {
             if (!pred.is_equation()) {
                 STRACE("str", tout << "False - Inequations\n");
+                return l_undef;
+            }
+            if (pred.mult_occurr_var_side(Predicate::EquationSideType::Left) || 
+                pred.mult_occurr_var_side(Predicate::EquationSideType::Right)) {
+                STRACE("str", tout << "False - multiple occurrences of a variable in single equation\n");
                 return l_undef;
             }
             for (const Concat& side : pred.get_params()) {
@@ -330,12 +496,15 @@ namespace smt::noodler {
                         continue;
                     }
 
+                    // TODO: refactor
                     if (std::find(concat_vars.begin(), concat_vars.end(), t) == concat_vars.end()) {
                         concat_vars.emplace_back(t);
                         continue;
                     } else {
-                        STRACE("str", tout << "False - multiconcat on " << t.to_string() << std::endl; );
-                        return l_undef;
+                        multi_vars.insert(t);
+                        STRACE("str", tout << "multiconcat on " << t.to_string() << std::endl; );
+                        continue;
+                        // return l_undef;
                     }
 
                     STRACE("str", tout << "False - regular constraitns on term " << t << std::endl; );
@@ -343,6 +512,12 @@ namespace smt::noodler {
                 }
             }
         }
+
+        if(multi_vars.size() > 1) {
+            STRACE("str", tout << "multiple vars " << std::endl; );
+            return l_undef;
+        }
+
         // End check for suitability
 
         STRACE("str", tout << "True\n"; );
@@ -375,6 +550,26 @@ namespace smt::noodler {
         // generate length for each batch of equations in the pool
         for (const auto& [var, constr] : pool) {
             computed_len_formula.emplace_back(constr.get_lengths(this->pool));
+        }
+
+        if(multi_vars.size() == 1) {
+            // TODO: set UNDERAPPROX
+            BasicTerm multi_var = *multi_vars.begin();
+            for (const auto& [var1, constr1] : pool) {
+                for (const auto& [var2, constr2] : pool) {
+                    if(var1 == var2 || !constr1.get_vars().contains(multi_var) || !constr2.get_vars().contains(multi_var)) {
+                        continue;
+                    }
+                    LenNode mult_lia = constr1.get_multi_var_lia(pool, multi_var, var2);
+                    STRACE("str",
+                        tout << "Multi var lia:\n-----\n";
+                        tout << mult_lia << std::endl;
+                        tout << "-----\n";
+                    );  
+                    
+                    computed_len_formula.emplace_back(mult_lia);
+                }
+            }
         }
 
         STRACE("str", tout << "len: Finished computing.\n");
