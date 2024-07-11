@@ -417,7 +417,10 @@ namespace smt::noodler {
                         block_curr_len(lengths);
                         return l_false;
                     } else {
-                        return l_undef;
+                        ctx.get_fparams().is_underapprox = true;
+                        block_curr_len(expr_ref(m.mk_false(), m));
+                        return l_false;
+                        //return l_undef;
                     }
                 }
             } else if (result == l_false) { // never happens

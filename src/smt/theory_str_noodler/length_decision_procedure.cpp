@@ -553,7 +553,8 @@ namespace smt::noodler {
         }
 
         if(multi_vars.size() == 1) {
-            // TODO: set UNDERAPPROX
+            // we are working with underapproximation only
+            this->precision = LenNodePrecision::UNDERAPPROX;
             BasicTerm multi_var = *multi_vars.begin();
             for (const auto& [var1, constr1] : pool) {
                 for (const auto& [var2, constr2] : pool) {
