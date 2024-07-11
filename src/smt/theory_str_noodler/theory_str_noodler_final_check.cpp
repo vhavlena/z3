@@ -416,11 +416,13 @@ namespace smt::noodler {
                     if (nproc.precision != LenNodePrecision::UNDERAPPROX) {
                         block_curr_len(lengths);
                         return l_false;
-                    } else {
+                    } else if (nproc.get_formula().get_predicates().size() > 10) {
                         ctx.get_fparams().is_underapprox = true;
                         block_curr_len(expr_ref(m.mk_false(), m));
                         return l_false;
                         //return l_undef;
+                    } else {
+                        return l_undef;
                     }
                 }
             } else if (result == l_false) { // never happens
