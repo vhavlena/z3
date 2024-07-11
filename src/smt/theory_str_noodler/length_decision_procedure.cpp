@@ -552,6 +552,7 @@ namespace smt::noodler {
             computed_len_formula.emplace_back(constr.get_lengths(this->pool));
         }
 
+        // there are multiple variable occurrences --> generate LIA formula matching their values
         if(multi_vars.size() == 1) {
             // we are working with underapproximation only
             this->precision = LenNodePrecision::UNDERAPPROX;
@@ -596,9 +597,6 @@ namespace smt::noodler {
         }
 
         return {len_formula, this->precision};
-    }
-
-    void LengthDecisionProcedure::init_computation() {
     }
 
     lbool LengthDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {

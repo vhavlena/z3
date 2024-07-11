@@ -394,45 +394,30 @@ namespace smt::noodler {
             return l_false;
         }
         nproc.init_computation();
-        while (true) {
-            lbool result = nproc.compute_next_solution();
-            if (result == l_true) {
-                expr_ref lengths = len_node_to_z3_formula(nproc.get_lengths().first);
-                if (check_len_sat(lengths) == l_true) {
-                    return l_true;
-                } else {
-                    STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
-                    block_len = m.mk_or(block_len, lengths);
-
-                    // if(nproc.precision == LenNodePrecision::UNDERAPPROX && nproc.get_formula().get_predicates().size() >= 10) {
-                    //     ctx.get_fparams().is_underapprox = true;
-                    //     block_curr_len(expr_ref(m.mk_false(), m));
-                    // } else if (nproc.precision != LenNodePrecision::UNDERAPPROX) {
-                    //     block_curr_len(lengths);
-                    // } else {
-                    //     return l_undef;
-                    // }
-                    // return l_false;
-                    if (nproc.precision != LenNodePrecision::UNDERAPPROX) {
-                        block_curr_len(lengths);
-                        return l_false;
-                    } else if (nproc.get_formula().get_predicates().size() > 10) {
-                        ctx.get_fparams().is_underapprox = true;
-                        block_curr_len(expr_ref(m.mk_false(), m));
-                        return l_false;
-                        //return l_undef;
-                    } else {
-                        return l_undef;
-                    }
-                }
-            } else if (result == l_false) { // never happens
-                block_curr_len(block_len);
-                return l_false;
+        
+        lbool result = nproc.compute_next_solution();
+        if (result == l_true) {
+            auto [formula, precision] = nproc.get_lengths();
+            expr_ref lengths = len_node_to_z3_formula(formula);
+            if (check_len_sat(lengths) == l_true) {
+                return l_true;
             } else {
-                // we could not decide if there is solution, continue with other decision procedure
-                break;
+                STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
+                block_len = m.mk_or(block_len, lengths);
+
+                if (precision != LenNodePrecision::UNDERAPPROX) {
+                    block_curr_len(lengths);
+                    return l_false;
+                } else if (nproc.get_formula().get_predicates().size() > 10) {
+                    ctx.get_fparams().is_underapprox = true;
+                    block_curr_len(expr_ref(m.mk_false(), m));
+                    return l_false;
+                } else {
+                    return l_undef;
+                }
             }
-        }
+        } 
+        // we could not decide if there is solution, continue with other decision procedure
         return l_undef;
     }
 
