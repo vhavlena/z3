@@ -32,7 +32,6 @@ namespace smt::noodler {
 
         static zstring generate_lit_alias(const BasicTerm& lit, std::map<zstring, BasicTerm>& lit_conversion) {
             zstring new_lit_name = util::mk_noodler_var_fresh("lit").get_name();
-            // lit_conversion[new_lit_name] = lit;
             lit_conversion.emplace(std::make_pair(new_lit_name, lit));
             return new_lit_name;
         }
@@ -150,8 +149,6 @@ namespace smt::noodler {
             return this->vars;
         }
 
-
-        // TODO: already generate here
         /**
          * @brief parse var constraint
          * 
@@ -199,6 +196,18 @@ namespace smt::noodler {
 
         // pool of variable constraints
         ConstraintPool pool {};
+
+    protected:
+        /**
+         * @brief Check whether the preprocessed formula can be solved using the length-based procedure. 
+         * It checks and stores multiple occurrences of variables @p multi_vars (do not include the constrained variables).
+         * It also checks if formula contains equations only. 
+         * 
+         * @param[out] multi_vars Variables with multiple occurrences 
+         * @return lbool l_under <-> the formula is out of the fragment
+         */
+        lbool check_formula(std::set<BasicTerm>& multi_vars);
+    
     public:
         LenNodePrecision precision = LenNodePrecision::PRECISE;
 

@@ -140,7 +140,6 @@ namespace smt::noodler {
         }
 
         // kontys constraints e.g. x = uvw -> |x| = |u|+|v|+|w|
-        // TODO: only generate restrictrions for length sensitive variables
         for (const Concat& side : _constr_eqs) {
             // bool unconstrained = true;    // there are unconstrained variables
             std::vector<LenNode> side_len {};
@@ -459,22 +458,9 @@ namespace smt::noodler {
 
     ///////////////////////////////////
 
-    lbool LengthDecisionProcedure::compute_next_solution() {
-        STRACE("str", tout << "len: Compute next solution\n"; );
-
-        STRACE("str",
-            tout << " - formula after preprocess:\n";
-            for (const Predicate& pred : this->formula.get_predicates()) {
-                tout << "\t" << pred << std::endl;
-            }
-            tout << std::endl;
-        );
-
-        // Check for suitability
-        std::vector<BasicTerm> concat_vars = {};	// variables that have appeared in concatenation
-        std::set<BasicTerm> multi_vars = {};
+    lbool LengthDecisionProcedure::check_formula(std::set<BasicTerm>& multi_vars) {
+        std::set<BasicTerm> concat_vars = {};	// variables that have appeared in concatenation
         
-        // TODO: compact to a function
         STRACE("str", tout << " - checking suitability: "; );
         for (const Predicate& pred : this->formula.get_predicates()) {
             if (!pred.is_equation()) {
@@ -495,32 +481,31 @@ namespace smt::noodler {
                     if (t.is_literal()) {
                         continue;
                     }
-
-                    // TODO: refactor
-                    if (std::find(concat_vars.begin(), concat_vars.end(), t) == concat_vars.end()) {
-                        concat_vars.emplace_back(t);
-                        continue;
+                    if (!concat_vars.contains(t)) {
+                        concat_vars.insert(t);
                     } else {
                         multi_vars.insert(t);
                         STRACE("str", tout << "multiconcat on " << t.to_string() << std::endl; );
-                        continue;
-                        // return l_undef;
                     }
-
-                    STRACE("str", tout << "False - regular constraitns on term " << t << std::endl; );
-                    return l_undef;
                 }
             }
+        }
+        return l_true;
+    }
+
+    lbool LengthDecisionProcedure::compute_next_solution() {
+        STRACE("str", tout << "len: Compute next solution\n"; );
+
+        std::set<BasicTerm> multi_vars = {};
+        // Check for suitability
+        if(check_formula(multi_vars) == l_undef) {
+            return l_undef;
         }
 
         if(multi_vars.size() > 1) {
             STRACE("str", tout << "multiple vars " << std::endl; );
             return l_undef;
         }
-
-        // End check for suitability
-
-        STRACE("str", tout << "True\n"; );
 
         for (const Predicate& pred : this->formula.get_predicates()) {
             this->pool.add_to_pool(pred);
@@ -642,6 +627,14 @@ namespace smt::noodler {
             // some automaton in the assignment is empty => we won't find solution
             return l_false;
         }
+
+        STRACE("str",
+            tout << " - formula after preprocess:\n";
+            for (const Predicate& pred : this->formula.get_predicates()) {
+                tout << "\t" << pred << std::endl;
+            }
+            tout << std::endl;
+        );
 
         return l_undef;
     }
