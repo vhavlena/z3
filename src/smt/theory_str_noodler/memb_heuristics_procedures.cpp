@@ -142,7 +142,7 @@ namespace smt::noodler {
             util::throw_error("Unsupported for now");
         }
 
-        mata::Word word = *(intersections.at(var).get_words(intersections.at(var).num_of_states()).begin()); // TODO replace with function to get arbitrary word from mata
+        mata::Word word = *(intersections.at(var).get_word());
         return alph.get_string_from_mata_word(word);
     }
 }
