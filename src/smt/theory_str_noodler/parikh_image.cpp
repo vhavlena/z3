@@ -228,7 +228,7 @@ namespace smt::noodler::parikh {
         auto concat_len = [&](const Concat& con) -> LenNode {
             LenNode sum_len(LenFormulaType::PLUS);
             for(const BasicTerm& bt : con) {
-                ca::AtomicSymbol as = {0, bt, 0, 0}; // <L,x> symbol
+                ca::AtomicSymbol as = ca::AtomicSymbol::create_l_symbol(bt); // <L,x> symbol
                 if(this->symbol_var.contains(as)) {
                     sum_len.succ.push_back(LenNode(this->symbol_var.at(as)));
                 }
@@ -246,7 +246,7 @@ namespace smt::noodler::parikh {
         LenNode lengths(LenFormulaType::AND);
         // for each variable generate |x| = #<L,x>
         for(const BasicTerm& bt : vars) {
-            ca::AtomicSymbol as = {0, bt, 0, 0}; // <L,x> symbol
+            ca::AtomicSymbol as = ca::AtomicSymbol::create_l_symbol(bt); // <L,x> symbol
             // if the symbol is completely missing in the automaton, we say FALSE
             if(!this->symbol_var.contains(as)) {
                 lengths.succ.push_back(LenNode(LenFormulaType::FALSE));
@@ -377,7 +377,7 @@ namespace smt::noodler::parikh {
                 if (ind > max_ind) {
                     break;
                 }
-                ca::AtomicSymbol as = {0, bt, 0, 0}; // <L,x> symbol
+                ca::AtomicSymbol as = ca::AtomicSymbol::create_l_symbol(bt); // <L,x> symbol
                 sum_len.succ.push_back(LenNode(this->symbol_var.at(as)));
                 ++ind;
             }
@@ -405,7 +405,7 @@ namespace smt::noodler::parikh {
 
         LenNode left = concat_len(diseq.get_left_side(), i - 1);
         // add symbol <P, var, label_left, 0> where var is i-th variable on left side of diseq
-        ca::AtomicSymbol lats = {1, var_left, label_left, 0};
+        ca::AtomicSymbol lats = ca::AtomicSymbol::create_p_symbol(var_left, label_left);
         if(!this->symbol_var.contains(lats)) {
             return LenNode(LenFormulaType::FALSE);
         }
@@ -415,14 +415,14 @@ namespace smt::noodler::parikh {
         // add the add_right parameter ( 0 by default )
         right.succ.insert(right.succ.begin(), add_right);
         // add symbol <P, var, label_right, 0> where var is j-th variable on right side of diseq
-        ca::AtomicSymbol rats2 = {1, var_right, label_right, 0};
+        ca::AtomicSymbol rats2 = ca::AtomicSymbol::create_p_symbol(var_right, label_right);
         if(!this->symbol_var.contains(rats2)) {
             return LenNode(LenFormulaType::FALSE);
         }
         right.succ.push_back(LenNode(this->symbol_var.at(rats2)));
         // if x == y, we add #<P,x,1> to #<P,x,2>
         if (var_right == var_left) {
-            ca::AtomicSymbol rats1 = {1, var_right, 1, 0};
+            ca::AtomicSymbol rats1 = ca::AtomicSymbol::create_p_symbol(var_right, 1);
             right.succ.push_back(LenNode(this->symbol_var.at(rats1)));
         }
         
@@ -483,7 +483,7 @@ namespace smt::noodler::parikh {
                 }
                 LenNode sum(LenFormulaType::PLUS);
                 for(const BasicTerm& var : col) {
-                    ca::AtomicSymbol counterpart = {2, var, (ats.label == 1 ? char(2) : char(1)), ats.symbol};
+                    ca::AtomicSymbol counterpart = ca::AtomicSymbol::create_r_symbol(var, (ats.label == 1 ? char(2) : char(1)), ats.symbol);
                     auto iter = this->symbol_var.find(counterpart);
                     // if there is not the counterpart, we don't have to generate the formula
                     if (iter == this->symbol_var.end()) {

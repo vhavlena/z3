@@ -66,10 +66,10 @@ namespace smt::noodler::ca {
         BasicTerm bt = this->aut_matrix.get_var_order()[var];
 
         // <L,x>
-        std::set<ca::AtomicSymbol> ats({ ca::AtomicSymbol{0, bt, 0, 0}});
+        std::set<ca::AtomicSymbol> ats({ ca::AtomicSymbol::create_l_symbol(bt)});
         if (copy != 2) {
             // <P,x,copy+1>
-            ats.insert(ca::AtomicSymbol{1, bt, char(copy+1), 0});
+            ats.insert(ca::AtomicSymbol::create_p_symbol(bt, char(copy+1)));
         }
 
         mata::Symbol new_symbol = this->alph.add_symbol(ats);
@@ -90,7 +90,7 @@ namespace smt::noodler::ca {
         // lambda for a particular symbol construction
         auto const_symbol = [](char copy, const BasicTerm& bt, mata::Symbol sym) -> std::set<ca::AtomicSymbol> {
             // <L,x>, <P,x,copy>, <R,x,copy,a>
-            std::set<ca::AtomicSymbol> ats({ ca::AtomicSymbol{0, bt, 0, 0}, ca::AtomicSymbol{1, bt, copy, 0}, ca::AtomicSymbol{2, bt, copy, sym} });
+            std::set<ca::AtomicSymbol> ats({ ca::AtomicSymbol::create_l_symbol(bt), ca::AtomicSymbol::create_p_symbol(bt, copy), ca::AtomicSymbol::create_r_symbol(bt, copy, sym) });
             return ats;
         };
 

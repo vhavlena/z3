@@ -76,7 +76,7 @@ namespace smt::noodler::ca {
      * @brief Symbols of the form <mark, var, label, symbol>
      * <L,var> counts the length of a string assignment of variable var
      * <P,var,i> counts the i-th mismatch in variable var (i=label)
-     * <R,i,symb> captures i-th mismatch symbol (i=label)
+     * <R,x,i,symb> captures i-th mismatch symbol (i=label)
      */
     struct AtomicSymbol {
         char mark; // 0 = L; 1 = P; 2 = R
@@ -121,6 +121,18 @@ namespace smt::noodler::ca {
 
             ret = "<" + marks[size_t(mark)] + var_str + label_str + symbol_str + ">";
             return ret;
+        }
+
+        static AtomicSymbol create_l_symbol(const BasicTerm& var) {
+            return AtomicSymbol{0, var, 0, 0};
+        }
+
+        static AtomicSymbol create_p_symbol(const BasicTerm& var, char label) {
+            return AtomicSymbol{1, var, label, 0};
+        }
+
+        static AtomicSymbol create_r_symbol(const BasicTerm& var, char label, mata::Symbol symbol) {
+            return AtomicSymbol{2, var, label, symbol};
         }
     };
 
