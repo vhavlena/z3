@@ -47,16 +47,16 @@ make test-noodler
 ```
 
 ### Running Z3-Noodler
-To run Z3-Noodler, select Z3-Noodler as Z3's string solver when executing Z3.
+To run Z3-Noodler, use:
 ```shell
 cd build/
-./z3 smt.string_solver=noodler <instance_file.smt2> 
+./z3 <instance_file.smt2> 
 ```
 
 If you want to get a model for sat instances (using `get-model` or `get-value`), you need to enable model generation:
 ```shell
 cd build/
-./z3 smt.string_solver=noodler model=true <instance_file.smt2> 
+./z3 model=true <instance_file.smt2> 
 ```
 However, model generation is highly experimental, the models might be invalid or they cannot be computed (yet).
 
