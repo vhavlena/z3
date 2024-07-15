@@ -150,6 +150,8 @@ namespace smt::noodler::ca {
      * @brief Get LIA formula for disequations. The LIA formula describes all length 
      * models of the diseqation. 
      * 
+     * TODO: So-far it supports only one disequation. 
+     * 
      * @param diseqs Disequations
      * @param autass Automata assignmnent after stabilization
      * @return LenNode LIA formula describing lengths of string models
