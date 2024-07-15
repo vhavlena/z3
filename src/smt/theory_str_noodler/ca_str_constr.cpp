@@ -155,21 +155,6 @@ namespace smt::noodler::ca {
             return LenNode(LenFormulaType::TRUE);
         }
 
-        // // disequation to be solved
-        // Predicate diseq_orig = diseqs.get_predicates()[0];
-
-        // Concat left {};
-        // Concat right {};
-        // std::copy_if(diseq_orig.get_left_side().begin(), diseq_orig.get_left_side().end(), std::back_inserter(left),
-        //         [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        // std::copy_if(diseq_orig.get_right_side().begin(), diseq_orig.get_right_side().end(), std::back_inserter(right),
-        //         [&](const BasicTerm& n){ return !autass.is_epsilon(n); });
-        // Predicate diseq(PredicateType::Inequation, {left, right});
-
-        // if(left == right) {
-        //     return LenNode(LenFormulaType::FALSE);
-        // }
-
         FormulaPreprocessor prep_handler{diseqs, autass, {}, {}};
         prep_handler.propagate_eps();
         prep_handler.remove_trivial();

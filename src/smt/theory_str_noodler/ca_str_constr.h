@@ -86,9 +86,9 @@ namespace smt::noodler::ca {
             return this->var_order;
         }
 
-        void set_aut(size_t copy, size_t var, const mata::nfa::Nfa& aut, bool re_offset = false) {
+        void set_aut(size_t copy, size_t var, const mata::nfa::Nfa& aut, bool recomp_offset = false) {
             this->aut_matrix[copy][var] = aut;
-            if(re_offset) {
+            if(recomp_offset) {
                 recompute_offset();
             }
         }
@@ -99,7 +99,7 @@ namespace smt::noodler::ca {
     };
 
     /**
-     * @brief Class for Tag aut generation for diseqations.
+     * @brief Class for Tag aut generation for a single.
      */
     class TagDiseqGen {
 
@@ -147,7 +147,7 @@ namespace smt::noodler::ca {
     };
 
     /**
-     * @brief Get LIA formula for a single disequations. The LIA formula describes all length 
+     * @brief Get LIA formula for disequations. The LIA formula describes all length 
      * models of the diseqation. 
      * 
      * @param diseqs Disequations

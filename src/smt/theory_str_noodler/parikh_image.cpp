@@ -77,7 +77,7 @@ namespace smt::noodler::parikh {
      * @param prev_trans [q] = [(.,.,q), .... ]. Vector (idexed by states q) containing list of transitions with the target state being q 
      * @return LenNode phi_kirch
      */
-    LenNode ParikhImage::compute_phi_kirch(const TransitionCol& succ_trans, const TransitionCol& prev_trans) {
+    LenNode ParikhImage::compute_phi_kirch(const TransitionStateVector& succ_trans, const TransitionStateVector& prev_trans) {
         LenNode phi_kirch(LenFormulaType::AND);
 
         for (size_t state = 0; state < this->nfa.num_of_states(); state++) {
@@ -117,7 +117,7 @@ namespace smt::noodler::parikh {
      * @param prev_trans [q] = [(.,.,q), .... ]. Vector (idexed by states q) containing list of transitions with the target state being q 
      * @return LenNode phi_span 
      */
-    LenNode ParikhImage::compute_phi_span(const TransitionCol& succ_trans, const TransitionCol& prev_trans) {
+    LenNode ParikhImage::compute_phi_span(const TransitionStateVector& succ_trans, const TransitionStateVector& prev_trans) {
        LenNode phi_span(LenFormulaType::AND);
 
         for (size_t state = 0; state < this->nfa.num_of_states(); state++) {
@@ -183,8 +183,8 @@ namespace smt::noodler::parikh {
         this->trans.clear();
 
         LenNode phi_trans(LenFormulaType::AND);
-        TransitionCol succ_trans(nfa.num_of_states());
-        TransitionCol prev_trans(nfa.num_of_states());
+        TransitionStateVector succ_trans(nfa.num_of_states());
+        TransitionStateVector prev_trans(nfa.num_of_states());
         for(const auto& tr : nfa.delta.transitions()) {
             Transition tr_inst = {tr.source, tr.symbol, tr.target}; 
             trans.insert({tr_inst, util::mk_noodler_var_fresh("trans")});

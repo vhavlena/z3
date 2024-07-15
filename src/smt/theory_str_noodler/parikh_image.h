@@ -21,7 +21,7 @@
 namespace smt::noodler::parikh {
 
 using Transition = std::tuple<mata::nfa::State, mata::Symbol, mata::nfa::State>;
-using TransitionCol = std::vector<std::vector<Transition>>;
+using TransitionStateVector = std::vector<std::vector<Transition>>;
 
 /**
  * @brief Parikh image computation of NFA
@@ -66,7 +66,7 @@ protected:
      * @param prev_trans [q] = [(.,.,q), .... ]. Vector (idexed by states q) containing list of transitions with the target state being q 
      * @return LenNode phi_kirch
      */
-    LenNode compute_phi_kirch(const TransitionCol& succ_trans, const TransitionCol& prev_trans);
+    LenNode compute_phi_kirch(const TransitionStateVector& succ_trans, const TransitionStateVector& prev_trans);
     /**
      * @brief Compute formulae phi_span ensures connectedness of a run. Formula checks if there is a consistent 
      * spanning tree wrt a run. 
@@ -74,7 +74,7 @@ protected:
      * @param prev_trans [q] = [(.,.,q), .... ]. Vector (idexed by states q) containing list of transitions with the target state being q 
      * @return LenNode phi_span 
      */
-    LenNode compute_phi_span(const TransitionCol& succ_trans, const TransitionCol& prev_trans);
+    LenNode compute_phi_span(const TransitionStateVector& succ_trans, const TransitionStateVector& prev_trans);
 
 public:
     ParikhImage(const mata::nfa::Nfa& nfa) : nfa(nfa) { } 
