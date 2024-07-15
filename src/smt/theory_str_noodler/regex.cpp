@@ -293,7 +293,7 @@ namespace smt::noodler::regex {
             
             mata::nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
             mata::nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
-            nfa = mata::nfa::uni(aut1, aut2);
+            nfa = mata::nfa::union_nondet(aut1, aut2);
             
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
