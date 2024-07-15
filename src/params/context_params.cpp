@@ -175,7 +175,7 @@ void context_params::collect_param_descrs(param_descrs & d) {
 
 void context_params::collect_solver_param_descrs(param_descrs & d) {
     d.insert("proof", CPK_BOOL, "proof generation, it must be enabled when the Z3 context is created", "false");
-    d.insert("model", CPK_BOOL, "model generation for solvers, this parameter can be overwritten when creating a solver", "true");
+    d.insert("model", CPK_BOOL, "model generation for solvers, this parameter can be overwritten when creating a solver", "false");
     d.insert("unsat_core", CPK_BOOL, "unsat-core generation for solvers, this parameter can be overwritten when creating a solver, not every solver in Z3 supports unsat core generation", "false");
 }
 

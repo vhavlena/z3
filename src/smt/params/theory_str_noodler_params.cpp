@@ -1,6 +1,7 @@
 
 #include "smt/params/theory_str_noodler_params.h"
 #include "smt/params/smt_params_helper.hpp"
+#include "util/gparams.h"
 
 void theory_str_noodler_params::updt_params(params_ref const & _p) {
     smt_params_helper p(_p);
@@ -10,8 +11,8 @@ void theory_str_noodler_params::updt_params(params_ref const & _p) {
     m_try_nielsen = p.str_try_nielsen();
     m_try_length_proc = p.str_try_length_proc();
     m_underapprox_length = p.str_underapprox_length();
-    m_produce_models = p.str_produce_models();
     m_ca_constr = p.str_ca_constr();
+    m_produce_models = gparams::get_ref().get_bool("model", false);
 }
 
 #define DISPLAY_PARAM(X) out << #X"=" << X << std::endl;
