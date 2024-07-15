@@ -99,7 +99,7 @@ namespace smt::noodler::ca {
     };
 
     /**
-     * @brief Class for Tag aut generation for a single.
+     * @brief Class for Tag aut generation for a single disequation.
      */
     class TagDiseqGen {
 
