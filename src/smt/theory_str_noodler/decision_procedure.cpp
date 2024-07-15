@@ -266,8 +266,7 @@ namespace smt::noodler {
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
                 STRACE("str-nfa",
-                    tout << "Automaton for left var " << l_var.get_name() << ":" << std::endl;
-                    left_side_automata.back()->print_to_DOT(tout);
+                    tout << "Automaton for left var " << l_var.get_name() << ":" << std::endl << *left_side_automata.back();
                 );
             }
             /********************************************************************************************************/
@@ -309,8 +308,8 @@ namespace smt::noodler {
                         for (const auto &r_var : next_division) {
                             tout << " " << r_var.get_name();
                         }
-                        tout << ":" << std::endl;
-                        next_aut->print_to_DOT(tout);
+                        tout << ":" << std::endl
+                             << *next_aut;
                     );
                     next_aut = right_var_aut;
                     next_division = std::vector<BasicTerm>{ *right_var_it };
@@ -327,8 +326,8 @@ namespace smt::noodler {
                             for (const auto &r_var : next_division) {
                                 tout << " " << r_var.get_name();
                             }
-                            tout << ":" << std::endl;
-                            next_aut->print_to_DOT(tout);
+                            tout << ":" << std::endl
+                                 << *next_aut;
                         );
                         next_aut = right_var_aut;
                         next_division = std::vector<BasicTerm>{ *right_var_it };
@@ -349,8 +348,7 @@ namespace smt::noodler {
                 for (const auto &r_var : next_division) {
                     tout << " " << r_var.get_name();
                 }
-                tout << ":" << std::endl;
-                next_aut->print_to_DOT(tout);
+                tout << ":" << std::endl << *next_aut;
             );
             /********************************************************************************************************/
             /************************************* End of right side processing *************************************/

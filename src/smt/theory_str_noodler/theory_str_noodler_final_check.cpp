@@ -146,7 +146,7 @@ namespace smt::noodler {
             tout << "Created automata assignment for formula:" << std::endl;
             for (const auto& single_aut_assignment: aut_assignment) {
                tout << "Automaton for " << single_aut_assignment.first.get_name() << ":" << std::endl;
-               single_aut_assignment.second->print_to_DOT(tout);
+               tout << *single_aut_assignment.second;
             }
         );
 

@@ -337,21 +337,21 @@ namespace smt::noodler::regex {
         if(nfa.num_of_states() < RED_BOUND) {
             STRACE("str-create_nfa-reduce", 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
-                nfa.print_to_DOT(tout);
+                tout << nfa;
             );
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
             STRACE("str-create_nfa-reduce", 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
-                nfa.print_to_DOT(tout);
+                tout << nfa;
             );
             nfa = mata::nfa::minimize(nfa);
         }
 
         STRACE("str-create_nfa",
             tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
-            nfa.print_to_DOT(tout);
+            tout << nfa;
         );
 
         // Whether to create complement of the final automaton.
@@ -362,7 +362,7 @@ namespace smt::noodler::regex {
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
-            STRACE("str-create_nfa", nfa.print_to_DOT(tout););
+            STRACE("str-create_nfa", tout << nfa;);
         }
         return nfa;
     }
