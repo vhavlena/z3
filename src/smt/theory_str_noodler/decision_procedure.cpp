@@ -1606,12 +1606,12 @@ namespace smt::noodler {
             for (const auto& autass : solution.aut_ass) {
                 tout << "      " << autass.first << std::endl;
                 if (is_trace_enabled("str-nfa")) {
-                    tout << autass.second << std::endl;
+                    tout << *autass.second << std::endl;
                 }
             }
             tout << "  Vars in subst" << std::endl;
             for (const auto& subst : solution.substitution_map) {
-                tout << "      " << subst.first << ": ";
+                tout << "      " << subst.first << " -> ";
                 for (const auto& substituted_var : subst.second) {
                     tout << substituted_var << " ";
                 }
