@@ -131,12 +131,6 @@ namespace smt::noodler {
     }
 
     lbool DecisionProcedure::compute_next_solution() {
-
-        // if we have a not contains, we give unknown
-        if(this->not_contains.get_predicates().size() > 0) {
-            return l_undef;
-        }
-
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE("str", tout << "------------------------"
@@ -603,8 +597,9 @@ namespace smt::noodler {
     std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
-        if (solution.length_sensitive_vars.empty()) {
-            // There are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
+        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().size() == 0 && !this->m_params.m_ca_constr) {
+            // There is not notcontains predicate to be solved and there are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
+            // for the option m_ca_constr we completely skip this heuristic as there may remain also diseqations
             return {LenNode(LenFormulaType::TRUE), precision};
         }
 
@@ -625,6 +620,18 @@ namespace smt::noodler {
         auto conv_form_with_precision = get_formula_for_conversions();
         conjuncts.push_back(conv_form_with_precision.first);
         precision = conv_form_with_precision.second;
+
+
+        // get the LIA formula describing solutions for special predicates
+        conjuncts.push_back(get_formula_for_ca_diseqs());
+        auto not_cont_prec = get_formula_for_not_contains();
+        if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
+            conjuncts.push_back(not_cont_prec.first);
+        } else {
+            // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
+            conjuncts.push_back(LenNode(LenFormulaType::FALSE));
+            precision = LenNodePrecision::UNDERAPPROX;
+        }
 
         LenNode result(LenFormulaType::AND, conjuncts);
         STRACE("str", tout << "Final " << (precision == LenNodePrecision::PRECISE ? "precise" : "underapproximating") << " formula from get_lengths(): " << result << std::endl;);
@@ -1166,20 +1173,99 @@ namespace smt::noodler {
         return {result, res_precision};
     }
 
+    void DecisionProcedure::init_ca_diseq(const Predicate& diseq) {
+        this->disequations.add_predicate(diseq);
+        // include variables occurring in the diseqations into init_length_sensitive_vars
+        for(const BasicTerm& var : diseq.get_vars()) {
+            this->init_length_sensitive_vars.insert(var);
+        }
+    }
+
+    LenNode DecisionProcedure::get_formula_for_ca_diseqs() {
+        Formula proj_diseqs {};
+
+        auto proj_concat = [&](const Concat& con) -> Concat {
+            Concat ret {};
+            for(const BasicTerm& bt : con) {
+                Concat subst = this->solution.get_substituted_vars(bt);
+                ret.insert(ret.end(), subst.begin(), subst.end());
+            }
+            return ret;
+        };
+
+        // take the original disequations (taken from input) and 
+        // propagate substitutions involved by the current substitution map of 
+        // a stable solution
+        for(const Predicate& dis : this->disequations.get_predicates()) {
+            proj_diseqs.add_predicate(Predicate(PredicateType::Inequation, {
+                proj_concat(dis.get_left_side()),
+                proj_concat(dis.get_right_side()),
+            }));
+        }
+
+        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
+        return ca::get_lia_for_disequations(proj_diseqs, this->solution.aut_ass);
+    }
+
+    std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_formula_for_not_contains() {
+        Formula proj_not_cont {};
+
+        auto proj_concat = [&](const Concat& con) -> Concat {
+            Concat ret {};
+            for(const BasicTerm& bt : con) {
+                Concat subst = this->solution.get_substituted_vars(bt);
+                ret.insert(ret.end(), subst.begin(), subst.end());
+            }
+            return ret;
+        };
+
+        // take the original disequations (taken from input) and 
+        // propagate substitutions involved by the current substitution map of 
+        // a stable solution
+        for(const Predicate& dis : this->not_contains.get_predicates()) {
+            proj_not_cont.add_predicate(Predicate(PredicateType::NotContains, {
+                proj_concat(dis.get_left_side()),
+                proj_concat(dis.get_right_side()),
+            }));
+        }
+
+        STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
+        STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
+        return ca::get_lia_for_not_contains(proj_not_cont, this->solution.aut_ass);
+    }
+
     /**
      * @brief Creates initial inclusion graph according to the preprocessed instance.
      */
     void DecisionProcedure::init_computation() {
         Formula equations;
+
+        bool some_diseq_handled_by_ca = false;
+
         for (auto const &dis_or_eq : formula.get_predicates()) {
             if (dis_or_eq.is_equation()) {
                 equations.add_predicate(dis_or_eq);
             } else if (dis_or_eq.is_inequation()) {
-                for (auto const &eq_from_diseq : replace_disequality(dis_or_eq)) {
-                    equations.add_predicate(eq_from_diseq);
+                // if we solve diesquations using CA --> we store the disequations to be solved later on
+                if(!some_diseq_handled_by_ca && this->m_params.m_ca_constr) {
+                    init_ca_diseq(dis_or_eq);
+                    some_diseq_handled_by_ca = true;
+                } else {
+                    for (auto const &eq_from_diseq : replace_disequality(dis_or_eq)) {
+                        equations.add_predicate(eq_from_diseq);
+                    }
                 }
             } else {
                 util::throw_error("Decision procedure can handle only equations and disequations");
+            }
+        }
+        // we set all variables in not contains as length
+        if(this->m_params.m_ca_constr) {
+            for(const Predicate& nt : this->not_contains.get_predicates()) {
+                for(const BasicTerm& var : nt.get_vars()) {
+                    this->init_length_sensitive_vars.insert(var);
+                }
             }
         }
 
@@ -1231,6 +1317,11 @@ namespace smt::noodler {
             conv_vars.insert(conv.string_var);
         }
 
+        // try to replace the not contains predicates (so-far we replace it by regular constraints)
+        if(prep_handler.can_unify_not_contains()) {
+            return l_false;
+        }
+
         // So-far just lightweight preprocessing
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -1241,7 +1332,7 @@ namespace smt::noodler {
         // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of 
         // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of 
         // pure equalitities it could create bigger automata, which may be problem later during the noodlification.
-        if(this->formula.contains_pred_type(PredicateType::Inequation) || this->not_contains.get_predicates().size() > 0) {
+        if(this->formula.contains_pred_type(PredicateType::Inequation) || this->formula.contains_pred_type(PredicateType::NotContains)) {
             // Refine languages is applied in the order given by the predicates. Single iteration 
             // might not update crucial variables that could contradict the formula. 
             // Two iterations seem to be a good trade-off since the automata could explode in the fixpoint.
@@ -1296,7 +1387,12 @@ namespace smt::noodler {
 
         prep_handler.conversions_validity(conversions);
 
-        // Refresh the instance
+        // try to replace the not contains predicates (so-far we replace it by regular constraints)
+        if(!prep_handler.replace_not_contains() || prep_handler.can_unify_not_contains()) {
+            return l_false;
+        }
+
+         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
@@ -1308,15 +1404,8 @@ namespace smt::noodler {
             return l_false;
         }
 
-        // try to replace the not contains predicates (so-far we replace it by regular constraints)
-        if(replace_not_contains() == l_false || can_unify_not_contains(prep_handler) == l_true) {
-            return l_false;
-        }
-
-        // there remains some not contains --> return undef
-        if(this->not_contains.get_predicates().size() > 0) {
-            return l_undef;
-        }
+        // extract not contains predicate to a separate container
+        this->formula.extract_predicates(PredicateType::NotContains, this->not_contains);
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
@@ -1335,6 +1424,11 @@ namespace smt::noodler {
             }
             tout << std::endl);
         STRACE("str", tout << "Formula after preprocessing:" << std::endl << this->formula.to_string() << std::endl; );
+
+        // there remains some not contains --> return undef
+        if(this->not_contains.get_predicates().size() > 0) {
+            return l_undef;
+        }
 
         if (!this->init_aut_ass.is_sat()) {
             // some automaton in the assignment is empty => we won't find solution
@@ -1445,62 +1539,6 @@ namespace smt::noodler {
         return new_eqs;
     }
 
-    /**
-     * @brief Try to replace not contains predicates. In particular, we replace predicates of the form (not_contains lit x) where 
-     * lit is a literal by a regular constraint x notin Alit' where  Alit' was obtained from A(lit) by setting all 
-     * states initial and final. 
-     */
-    lbool DecisionProcedure::replace_not_contains() {
-        Formula remain_not_contains{};
-        for(const Predicate& pred : this->not_contains.get_predicates()) {
-            Concat left = pred.get_params()[0];
-            Concat right = pred.get_params()[1];
-            if(left.size() == 1 && right.size() == 1) {
-                if(this->init_aut_ass.is_singleton(left[0]) && this->init_aut_ass.is_singleton(right[0])) {
-                    if(mata::nfa::are_equivalent(*this->init_aut_ass.at(left[0]), *this->init_aut_ass.at(right[0]))) {
-                        return l_false;
-                    }
-                }
-            }
-            if(left.size() == 1 && right.size() == 1) {
-                if(this->init_aut_ass.is_singleton(left[0]) && right[0].is_variable()) {
-                    mata::nfa::Nfa nfa_copy = *this->init_aut_ass.at(left[0]);
-                    for(unsigned i = 0; i < nfa_copy.num_of_states(); i++) {
-                        nfa_copy.initial.insert(i);
-                        nfa_copy.final.insert(i);
-                    }
-
-                    mata::nfa::Nfa complement = this->init_aut_ass.complement_aut(nfa_copy);
-                    this->init_aut_ass.restrict_lang(right[0], complement);
-                    continue;
-                }
-            }
-            if(right.size() == 1 && this->init_aut_ass.is_epsilon(right[0])) {
-                return l_false;
-            }
-            remain_not_contains.add_predicate(pred);
-        }
-        this->not_contains = remain_not_contains;
-        return l_undef;
-    }
-
-    /**
-     * @brief Check if it is possible to syntactically unify not contains terms. If they are included (in the sense of vectors) the 
-     * not(contain) is unsatisfiable.
-     * 
-     * @param prep FormulaPreprocessor
-     * @return l_true -> can be unified
-     */
-    lbool DecisionProcedure::can_unify_not_contains(const FormulaPreprocessor& prep) {
-        for(const Predicate& pred : this->not_contains.get_predicates()) {
-            if(prep.can_unify_contain(pred.get_params()[0], pred.get_params()[1])) {
-                return l_true;
-            }
-
-        }
-        return l_undef;
-    }
-    
     void DecisionProcedure::init_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         if (is_model_initialized) { return ;}
 

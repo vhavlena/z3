@@ -968,12 +968,15 @@ namespace smt::noodler {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
                 lengths = len_node_to_z3_formula(noodler_lengths);
                 lbool is_lengths_sat = check_len_sat(lengths);
-
-                // we assume that precision != LenNodePrecision::OVERAPPROX
                 
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
+
+                    if(precision == LenNodePrecision::OVERAPPROX) {
+                        ctx.get_fparams().is_overapprox = true;
+                    }
+
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
@@ -1716,7 +1719,8 @@ namespace smt::noodler {
             // The following axioms are redundant in the sense of completeness, but in the nested replace calls 
             // they can relate the contains predicate from the general replace (and thence the SAT solver can help a lot).
             literal cnt = mk_literal(m_util_s.str.mk_contains(s, a));
-            add_axiom({~cnt, mk_eq(v, t,false)});
+            // strenghten not contains axiom with s = a
+            add_axiom({~cnt, mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
             add_axiom({cnt, s_emp, mk_eq(v, a,false)});
             ctx.force_phase(cnt);
 
@@ -2743,7 +2747,7 @@ namespace smt::noodler {
         }
 
         for(const auto& nc : this->m_not_contains_todo_rel) {
-            app_ref nc_app(m_util_s.str.mk_contains(nc.first, nc.second), m);
+            app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
             refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
         }
 
