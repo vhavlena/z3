@@ -347,6 +347,8 @@ namespace smt::noodler {
         bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
+        std::string print_info();
+
 
     public:
         FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
@@ -386,6 +388,7 @@ namespace smt::noodler {
         void infer_alignment();
         void common_prefix_propagation();
         void common_suffix_propagation();
+        void conversions_validity(std::vector<TermConversion>& conversions);
 
         void refine_languages();
         void reduce_diseqalities();
@@ -401,7 +404,6 @@ namespace smt::noodler {
          */
         bool can_unify_not_contains();
 
-        void conversions_validity(std::vector<TermConversion>& conversions);
         /**
          * @brief Construct constraints to get rid of not_contains predicates.
          * @return false -> unsatisfiable constaint; true if it is not evident
