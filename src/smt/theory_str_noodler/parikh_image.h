@@ -21,6 +21,8 @@
 namespace smt::noodler::parikh {
 
 using Transition = std::tuple<mata::nfa::State, mata::Symbol, mata::nfa::State>;
+// Structure storing for each state a vector of transitions adjacent to this state. 
+// In particular TransitionStateVector[state] is a vector of transitions with source state being state
 using TransitionStateVector = std::vector<std::vector<Transition>>;
 
 /**

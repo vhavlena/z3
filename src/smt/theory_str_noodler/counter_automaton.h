@@ -134,6 +134,10 @@ namespace smt::noodler::ca {
         static AtomicSymbol create_r_symbol(const BasicTerm& var, char label, mata::Symbol symbol) {
             return AtomicSymbol{2, var, label, symbol};
         }
+
+    private:
+        // private constructor; the AtomicSymbol should be constructed using functions create*
+        AtomicSymbol(char mrk, const BasicTerm& vr, char lbl, mata::Symbol symb ) : mark(mrk), var(vr), label(lbl), symbol(symb) {}
     };
 
     using CounterAlphabet = StructAlphabet<std::set<AtomicSymbol>>;
