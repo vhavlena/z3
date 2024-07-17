@@ -78,6 +78,7 @@ namespace smt::noodler {
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
+                this->model_paths.push_back({});
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
                     Path<CounterLabel> path;
@@ -85,6 +86,7 @@ namespace smt::noodler {
                         return l_undef;
                     }
                     this->length_paths[this->length_paths.size() - 1].push_back(path);
+                    this->model_paths[this->length_paths.size() - 1].push_back({});
                 }
             }
         } else {
@@ -106,7 +108,7 @@ namespace smt::noodler {
                 if(this->length_paths_index >= this->length_paths[i].size()) {
                     continue;
                 }
-                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts)) {
+                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts, this->model_paths[i][this->length_paths_index])) {
                     return l_undef;
                 }
             }
@@ -329,22 +331,22 @@ namespace smt::noodler {
     bool NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, CounterSystem& result) const {
         result = CounterSystem();
 
-        auto nielsen_rule_concat = [](const NielsenLabel& lab) {
-            // nielsen rule is x -> ax, x -> yx or x -> []
-            if(lab.second.size() == 0) {
-                return Concat{};
-            }
-            return Concat(lab.second.begin(), lab.second.end() - 1);
-        };
+        // auto nielsen_rule_concat = [](const NielsenLabel& lab) {
+        //     // nielsen rule is x -> ax, x -> yx or x -> []
+        //     if(lab.second.size() == 0) {
+        //         return Concat{};
+        //     }
+        //     return { Concat(lab.second.begin(), lab.second.end() - 1);
+        // };
 
         // conversion of a nielsen label to the counter label
         auto conv_fnc = [&](const NielsenLabel& lab, CounterLabel& result) {
             if(lab.second.size() == 0) {
-                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}, nielsen_rule_concat(lab)};
+                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}, lab};
             } else if(lab.second.size() == 2 && lab.second[0].is_literal()) {
-                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}, nielsen_rule_concat(lab)};
+                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}, lab};
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
-                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}, nielsen_rule_concat(lab)};
+                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}, lab};
             } else {
                 return false;
             }
@@ -359,7 +361,7 @@ namespace smt::noodler {
         // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                CounterLabel target {BasicTerm(BasicTermType::Variable), {}, {}}; // randomly initialize the variable, this has no meaning
+                CounterLabel target {BasicTerm(BasicTermType::Variable), {}, {BasicTerm(BasicTermType::Variable), {}}}; // randomly initialize the variable, this has no meaning
                 if (!conv_fnc(trans.second, target)) { // the value of target is set here
                     return false;
                 }
@@ -367,6 +369,12 @@ namespace smt::noodler {
             }
         }
         return true;
+    }
+
+    NielsenLabel NielsenDecisionProcedure::join_nielsen_label(const NielsenLabel& l1, const NielsenLabel& l2) {
+        Concat symbols(l1.second.begin(), l1.second.end() - 1);
+        symbols.insert(symbols.end(), l2.second.begin(), l2.second.end() - 1);
+        return {l1.first, symbols};
     }
 
     /**
@@ -385,9 +393,9 @@ namespace smt::noodler {
             
             zstring sm = std::to_string(std::stoi(l1.sum[1].get_name().encode()) + std::stoi(l2.sum[1].get_name().encode()));
             // concatenate symbols
-            Concat symbols(l1.symbols.begin(), l1.symbols.end());
-            symbols.insert(symbols.end(), l2.symbols.begin(), l2.symbols.end());
-            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)}, symbols};
+            //Concat symbols(l1.nielsen_rule.second.begin(), l1.nielsen_rule.second.end() - 1);
+            //symbols.insert(symbols.end(), l2.symbols.begin(), l2.symbols.end());
+            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)},join_nielsen_label(l1.nielsen_rule, l2.nielsen_rule)};
             return true;
         }
         return false;
@@ -416,7 +424,7 @@ namespace smt::noodler {
                         Formula last = dest_pr.first;
                         CounterLabel last_lab = dest_pr.second;
 
-                        CounterLabel res{BasicTerm(BasicTermType::Length)};
+                        CounterLabel res{BasicTerm(BasicTermType::Length), {}, {BasicTerm(BasicTermType::Length), {}}};
                         if(join_counter_label(mid_lab, last_lab, res)) {
                             add_edges.insert({fl, last, res});
                         }
@@ -502,7 +510,7 @@ namespace smt::noodler {
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.left) == in_vars.end()) {
                 BasicTerm tmp_var(BasicTermType::Variable);
-                if (!get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                if (!get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}, lab.nielsen_rule}, in_vars, tmp_var, conjuncts)) {
                     return false;
                 }
                 in_vars.insert_or_assign(lab.left, tmp_var);
@@ -512,7 +520,7 @@ namespace smt::noodler {
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.sum[1]) == in_vars.end()) {
                 BasicTerm tmp_var(BasicTermType::Variable);
-                if (!get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                if (!get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}, lab.nielsen_rule}, in_vars, tmp_var, conjuncts)) {
                     return false;
                 }
                 in_vars.insert_or_assign(lab.sum[1], tmp_var);
@@ -559,9 +567,10 @@ namespace smt::noodler {
      * @param path Part of the counter system contining only self-loops.
      * @param actual_var_map Var map assigning temporary int variables to the original string variables
      * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @param[out] model_path Model generator obtained from @p path allowing to generate a model.
      * @return bool True iff the formula was successfully created
      */
-    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
+    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts, ModelPath& model_path) {
         // path of length 0 = true
         if(path.labels.size() == 0) {
             return true;
@@ -577,6 +586,8 @@ namespace smt::noodler {
                 return false;
             }
             actual_var_map.insert_or_assign(lab.left, out_var);
+            // add nielsen rule to the model generator
+            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
 
             // there is a self-loop
             if(it != path.self_loops.end()) {
@@ -584,6 +595,8 @@ namespace smt::noodler {
                 if (!get_label_sl_formula(it->second, actual_var_map, sl_var, conjuncts)) {
                     return false;
                 }
+                // assume that last conjunct is of the form 0 <= fresh, where fresh is a variable counting number of self-loop iterations
+                model_path.push_back({ it->second.nielsen_rule, conjuncts.end()->succ[1].atom_val });
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
         }

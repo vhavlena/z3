@@ -231,6 +231,8 @@ namespace smt::noodler {
         }
     };
 
+    using NielsenLabel = std::pair<BasicTerm, Concat>;
+
     /**
      * @brief Transition label for a counter system. In the form of left := sum[0] + sum[1] + ...
      */
@@ -238,7 +240,7 @@ namespace smt::noodler {
         BasicTerm left;
         std::vector<BasicTerm> sum;
         // symbols on transitions (multiple symbols for accelerated self-loop)
-        Concat symbols;
+        NielsenLabel nielsen_rule;
     };
 
     inline bool operator<(const CounterLabel& lhs, const CounterLabel& rhs) {
@@ -248,18 +250,24 @@ namespace smt::noodler {
             if(lhs.sum < rhs.sum) {
                 return true;
             } else if (lhs.sum == rhs.sum) {
-                return lhs.symbols < rhs.symbols;
+                return lhs.nielsen_rule < rhs.nielsen_rule;
             }
         }
         return false;
     }
 
-    using NielsenLabel = std::pair<BasicTerm, Concat>;
     using NielsenGraph = TransitionGraph<NielsenLabel>;
     using CounterSystem = TransitionGraph<CounterLabel>;
 
+    struct ModelLabel {
+        NielsenLabel rule;
+        BasicTerm repetition_var;
+    };
+
     template<typename Label>
     using SelfLoop = typename std::pair<Formula, Label>;
+    // TODO: rename to model generator
+    using ModelPath = std::vector<ModelLabel>;
 
     /**
      * @brief Decision procedure for quadratic equations using the Nielsen transformation.
@@ -274,6 +282,8 @@ namespace smt::noodler {
 
         std::vector<NielsenGraph> graphs {};
         std::vector<std::vector<Path<CounterLabel>>> length_paths;
+        // model paths 
+        std::vector<std::vector<ModelPath>> model_paths;
         size_t length_paths_index = 0;
 
         LenNode length_formula_for_solution = LenNode(LenFormulaType::TRUE);
@@ -310,6 +320,7 @@ namespace smt::noodler {
 
         // counter graph condensation
         static void condensate_counter_system(CounterSystem& cs);
+        static NielsenLabel join_nielsen_label(const NielsenLabel& l1, const NielsenLabel& l2);
         static bool join_counter_label(const CounterLabel& l1, const CounterLabel& l2, CounterLabel & res);
 
         // extraction of a promising part of the condensated counter graph
@@ -317,7 +328,7 @@ namespace smt::noodler {
         bool get_length_path(const CounterSystem& cs, const SelfLoop<CounterLabel>& sl, Path<CounterLabel>& result);
 
         // construct length formula
-        bool length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
+        bool length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts, ModelPath& model_path);
         bool get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
@@ -400,11 +411,8 @@ namespace smt::noodler {
         if(sum.size() > 0) {
             sum.pop_back();
         }
-        for(const BasicTerm& bt : lab.symbols) {
-            symbs += bt.get_name().encode() + " ";
-        }
 
-        return ret + sum + " " + symbs;
+        return ret + sum + " " + nielsen_label_to_string(lab.nielsen_rule);
     }
 }
 
