@@ -162,7 +162,7 @@ namespace smt::noodler::ca {
         }
 
         // taken and modified from Mata
-        void print_to_DOT(std::ostream &output) const {
+        void print_to_dot(std::ostream &output) const {
             output << "digraph finiteAutomaton {" << std::endl
                         << "node [shape=circle];" << std::endl;
 
