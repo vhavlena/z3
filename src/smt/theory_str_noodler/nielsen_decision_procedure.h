@@ -237,13 +237,19 @@ namespace smt::noodler {
     struct CounterLabel {
         BasicTerm left;
         std::vector<BasicTerm> sum;
+        // symbols on transitions (multiple symbols for accelerated self-loop)
+        Concat symbols;
     };
 
     inline bool operator<(const CounterLabel& lhs, const CounterLabel& rhs) {
         if(lhs.left < rhs.left) {
             return true;
         } else if(lhs.left == rhs.left) {
-            return lhs.sum < rhs.sum;
+            if(lhs.sum < rhs.sum) {
+                return true;
+            } else if (lhs.sum == rhs.sum) {
+                return lhs.symbols < rhs.symbols;
+            }
         }
         return false;
     }
@@ -385,7 +391,7 @@ namespace smt::noodler {
     }
 
     static std::string counter_label_to_string(const CounterLabel& lab) {
-        std::string ret, sum;
+        std::string ret, sum, symbs;
         ret += lab.left.to_string() + " := ";
 
         for(const BasicTerm& bt : lab.sum) {
@@ -394,8 +400,11 @@ namespace smt::noodler {
         if(sum.size() > 0) {
             sum.pop_back();
         }
+        for(const BasicTerm& bt : lab.symbols) {
+            symbs += bt.get_name().encode() + " ";
+        }
 
-        return ret + sum;
+        return ret + sum + " " + symbs;
     }
 }
 

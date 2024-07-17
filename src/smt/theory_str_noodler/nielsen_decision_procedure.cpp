@@ -329,14 +329,22 @@ namespace smt::noodler {
     bool NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, CounterSystem& result) const {
         result = CounterSystem();
 
-        // conversion of a nielsen label to the counter label
-        auto conv_fnc = [](const NielsenLabel& lab, CounterLabel& result) {
+        auto nielsen_rule_concat = [](const NielsenLabel& lab) {
+            // nielsen rule is x -> ax, x -> yx or x -> []
             if(lab.second.size() == 0) {
-                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}};
+                return Concat{};
+            }
+            return Concat(lab.second.begin(), lab.second.end() - 1);
+        };
+
+        // conversion of a nielsen label to the counter label
+        auto conv_fnc = [&](const NielsenLabel& lab, CounterLabel& result) {
+            if(lab.second.size() == 0) {
+                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}, nielsen_rule_concat(lab)};
             } else if(lab.second.size() == 2 && lab.second[0].is_literal()) {
-                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}};
+                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}, nielsen_rule_concat(lab)};
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
-                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
+                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}, nielsen_rule_concat(lab)};
             } else {
                 return false;
             }
@@ -351,7 +359,7 @@ namespace smt::noodler {
         // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                CounterLabel target{BasicTerm(BasicTermType::Variable)}; // randomly initialize the variable, this has no meaning
+                CounterLabel target {BasicTerm(BasicTermType::Variable), {}, {}}; // randomly initialize the variable, this has no meaning
                 if (!conv_fnc(trans.second, target)) { // the value of target is set here
                     return false;
                 }
@@ -376,7 +384,10 @@ namespace smt::noodler {
             l1.sum[1].get_type() == BasicTermType::Length && l2.sum[1].get_type() == BasicTermType::Length) {
             
             zstring sm = std::to_string(std::stoi(l1.sum[1].get_name().encode()) + std::stoi(l2.sum[1].get_name().encode()));
-            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)}};
+            // concatenate symbols
+            Concat symbols(l1.symbols.begin(), l1.symbols.end());
+            symbols.insert(symbols.end(), l2.symbols.begin(), l2.symbols.end());
+            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)}, symbols};
             return true;
         }
         return false;
@@ -396,7 +407,6 @@ namespace smt::noodler {
         // Compatible labels: labels of the form x := x + 1; x := x + 1 which can be 
         // simplified to x := x + 2. This edge is added to fl --> last
         for(const Formula& fl : cs.get_nodes()) {
-            // std::set<std::pair<Formula, CounterLabel>> add_edges;
             for(const auto& pr : cs.edges[fl]) {
                 Formula mid = pr.first;
                 CounterLabel mid_lab = pr.second;
