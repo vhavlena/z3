@@ -102,7 +102,7 @@ namespace smt::noodler {
             mata::nfa::Nfa unionn; // initialize to empty automaton
             first = true;
             for (auto& reg : list_of_compl_regs) {
-                unionn = mata::nfa::uni(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
+                unionn = mata::nfa::union_nondet(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && unionn.num_of_states() < regex::RED_BOUND)
                 {
@@ -142,7 +142,7 @@ namespace smt::noodler {
             util::throw_error("Unsupported for now");
         }
 
-        mata::Word word = *(intersections.at(var).get_words(intersections.at(var).num_of_states()).begin()); // TODO replace with function to get arbitrary word from mata
+        mata::Word word = *(intersections.at(var).get_word());
         return alph.get_string_from_mata_word(word);
     }
 }

@@ -293,7 +293,7 @@ namespace smt::noodler::regex {
             
             mata::nfa::Nfa aut1 {conv_to_nfa(to_app(left), m_util_s, m, alphabet, determinize)};
             mata::nfa::Nfa aut2 {conv_to_nfa(to_app(right), m_util_s, m, alphabet, determinize)};
-            nfa = mata::nfa::uni(aut1, aut2);
+            nfa = mata::nfa::union_nondet(aut1, aut2);
             
         } else if (m_util_s.re.is_star(expression)) { // Handle star iteration.
             SASSERT(expression->get_num_args() == 1);
@@ -337,21 +337,21 @@ namespace smt::noodler::regex {
         if(nfa.num_of_states() < RED_BOUND) {
             STRACE("str-create_nfa-reduce", 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be reduced" << "---------------" << std::endl;
-                nfa.print_to_DOT(tout);
+                tout << nfa;
             );
             nfa = mata::nfa::reduce(nfa);
         }
         if(determinize) {
             STRACE("str-create_nfa-reduce", 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
-                nfa.print_to_DOT(tout);
+                tout << nfa;
             );
             nfa = mata::nfa::minimize(nfa);
         }
 
         STRACE("str-create_nfa",
             tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << "---------------" << std::endl;
-            nfa.print_to_DOT(tout);
+            tout << nfa;
         );
 
         // Whether to create complement of the final automaton.
@@ -362,7 +362,7 @@ namespace smt::noodler::regex {
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
                 });
-            STRACE("str-create_nfa", nfa.print_to_DOT(tout););
+            STRACE("str-create_nfa", tout << nfa;);
         }
         return nfa;
     }

@@ -266,8 +266,7 @@ namespace smt::noodler {
             for (const auto &l_var : left_side_vars) {
                 left_side_automata.push_back(element_to_process.aut_ass.at(l_var));
                 STRACE("str-nfa",
-                    tout << "Automaton for left var " << l_var.get_name() << ":" << std::endl;
-                    left_side_automata.back()->print_to_DOT(tout);
+                    tout << "Automaton for left var " << l_var.get_name() << ":" << std::endl << *left_side_automata.back();
                 );
             }
             /********************************************************************************************************/
@@ -309,8 +308,8 @@ namespace smt::noodler {
                         for (const auto &r_var : next_division) {
                             tout << " " << r_var.get_name();
                         }
-                        tout << ":" << std::endl;
-                        next_aut->print_to_DOT(tout);
+                        tout << ":" << std::endl
+                             << *next_aut;
                     );
                     next_aut = right_var_aut;
                     next_division = std::vector<BasicTerm>{ *right_var_it };
@@ -327,8 +326,8 @@ namespace smt::noodler {
                             for (const auto &r_var : next_division) {
                                 tout << " " << r_var.get_name();
                             }
-                            tout << ":" << std::endl;
-                            next_aut->print_to_DOT(tout);
+                            tout << ":" << std::endl
+                                 << *next_aut;
                         );
                         next_aut = right_var_aut;
                         next_division = std::vector<BasicTerm>{ *right_var_it };
@@ -349,8 +348,7 @@ namespace smt::noodler {
                 for (const auto &r_var : next_division) {
                     tout << " " << r_var.get_name();
                 }
-                tout << ":" << std::endl;
-                next_aut->print_to_DOT(tout);
+                tout << ":" << std::endl << *next_aut;
             );
             /********************************************************************************************************/
             /************************************* End of right side processing *************************************/
@@ -1608,12 +1606,12 @@ namespace smt::noodler {
             for (const auto& autass : solution.aut_ass) {
                 tout << "      " << autass.first << std::endl;
                 if (is_trace_enabled("str-nfa")) {
-                    tout << autass.second << std::endl;
+                    tout << *autass.second << std::endl;
                 }
             }
             tout << "  Vars in subst" << std::endl;
             for (const auto& subst : solution.substitution_map) {
-                tout << "      " << subst.first << ": ";
+                tout << "      " << subst.first << " -> ";
                 for (const auto& substituted_var : subst.second) {
                     tout << substituted_var << " ";
                 }
@@ -1686,7 +1684,7 @@ namespace smt::noodler {
                     for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
                         if (right_side_var.is_literal()) { continue; }
                         // becase inclusion is not on cycle, all variables on the right side must be different
-                        zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_words(noodles[0][i].first->num_of_states()).begin()));
+                        zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_word()));
                         update_model_and_aut_ass(right_side_var, right_side_var_string);
                         ++i;
                     }
@@ -1698,7 +1696,7 @@ namespace smt::noodler {
                 // TODO replace following with function that returns arbitary word from Mata
                 zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
-                mata::Word accepted_word = *(nfa->get_words(nfa->num_of_states()).begin());
+                mata::Word accepted_word = *(nfa->get_word());
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {

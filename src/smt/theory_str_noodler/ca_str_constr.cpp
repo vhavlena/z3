@@ -55,7 +55,7 @@ namespace smt::noodler::ca {
             if (copy != 2) {
                 aut_line.final.clear();
             }
-            ret.uni(aut_line);
+            ret.unite_nondet_with(aut_line);
         }
         return ret;
     }
@@ -177,13 +177,13 @@ namespace smt::noodler::ca {
             tout << "* NFAs for variables: " << std::endl;
             for(const BasicTerm& bt : diseq.get_set()) {
                 tout << bt.to_string() << ":" << std::endl;
-                autass.at(bt)->print_to_DOT(tout);
+                autass.at(bt)->print_to_dot(tout);
             }
             tout << std::endl;
         );
         STRACE("str-diseq",
             tout << "* Tag Automaton for diseq: " << diseqs.to_string() << std::endl;
-            tag_aut.print_to_DOT(tout);
+            tag_aut.print_to_dot(tout);
             tout << std::endl;
         );
         STRACE("str", tout << "TagAut LIA: finished" << std::endl; );
