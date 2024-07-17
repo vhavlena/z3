@@ -384,6 +384,43 @@ namespace smt::noodler {
         return l_undef;
     }
 
+    lbool theory_str_noodler::run_length_proc(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
+        STRACE("str", tout << "Trying length-based procedure" << std::endl);
+        LengthDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        expr_ref block_len(m.mk_false(), m);
+        if (nproc.preprocess() == l_false) {
+            STRACE("str", tout << "len: unsat from preprocessing\n");
+            block_curr_len(block_len);
+            return l_false;
+        }
+        nproc.init_computation();
+        
+        lbool result = nproc.compute_next_solution();
+        if (result == l_true) {
+            auto [formula, precision] = nproc.get_lengths();
+            expr_ref lengths = len_node_to_z3_formula(formula);
+            if (check_len_sat(lengths) == l_true) {
+                return l_true;
+            } else {
+                STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
+                block_len = m.mk_or(block_len, lengths);
+
+                if (precision != LenNodePrecision::UNDERAPPROX) {
+                    block_curr_len(lengths);
+                    return l_false;
+                } else if (nproc.get_formula().get_predicates().size() > 10) {
+                    ctx.get_fparams().is_underapprox = true;
+                    block_curr_len(expr_ref(m.mk_false(), m));
+                    return l_false;
+                } else {
+                    return l_undef;
+                }
+            }
+        } 
+        // we could not decide if there is solution, continue with other decision procedure
+        return l_undef;
+    }
+
     bool theory_str_noodler::is_mult_membership_suitable() {
         if (!this->m_conversion_todo.empty() || !this->m_not_contains_todo_rel.empty()) {
             return false;

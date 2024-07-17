@@ -138,6 +138,7 @@ namespace smt::noodler {
 
     enum struct LenFormulaType {
         PLUS,
+        MINUS,
         TIMES,
         EQ,
         NEQ, // not equal
@@ -184,6 +185,9 @@ namespace smt::noodler {
             return os << "(!= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::PLUS:
             os << "(+";
+            break;
+        case LenFormulaType::MINUS:
+            os << "(-";
             break;
         case LenFormulaType::TIMES:
             os << "(*";
