@@ -1682,10 +1682,11 @@ namespace smt::noodler {
                     SASSERT(automata_on_right_side.size() == noodles[0].size());
                     unsigned i = 0;
                     for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                        if (right_side_var.is_literal()) { continue; }
-                        // becase inclusion is not on cycle, all variables on the right side must be different
-                        zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_word()));
-                        update_model_and_aut_ass(right_side_var, right_side_var_string);
+                        if (!right_side_var.is_literal()) {
+                            // becase inclusion is not on cycle, all variables on the right side must be different
+                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_word()));
+                            update_model_and_aut_ass(right_side_var, right_side_var_string);
+                        }
                         ++i;
                     }
                 }
@@ -1696,6 +1697,7 @@ namespace smt::noodler {
                 // TODO replace following with function that returns arbitary word from Mata
                 zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
+                STRACE("str-model-nfa", tout << "NFA for var " << var << " before getting some word:\n" << *nfa;);
                 mata::Word accepted_word = *(nfa->get_word());
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
