@@ -347,7 +347,7 @@ namespace smt::noodler {
         bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
-        std::string print_info();
+        std::string print_info(bool print_nfas = false);
 
 
     public:

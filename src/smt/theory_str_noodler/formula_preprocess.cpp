@@ -359,7 +359,7 @@ namespace smt::noodler {
                 }
             }
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -425,7 +425,7 @@ namespace smt::noodler {
         // Not true: you can have equation of two, literals which is not removed 
         //assert(!this->formula.contains_simple_eqs());
 
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -557,7 +557,7 @@ namespace smt::noodler {
         for(const auto &pr : new_preds) {
             this->formula.add_predicate(pr.second, pr.first);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -668,7 +668,7 @@ namespace smt::noodler {
             this->formula.add_predicate(eq);
             // We do not add dependency
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -756,7 +756,7 @@ namespace smt::noodler {
             this->dependency[pr.first].insert(eps_eq_id.begin(), eps_eq_id.end());
         }
 
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -853,7 +853,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -971,7 +971,7 @@ namespace smt::noodler {
         for(const auto& pr : updates) {
             this->update_predicate(pr.first, pr.second);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -992,7 +992,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1093,7 +1093,7 @@ namespace smt::noodler {
                 this->aut_ass[pr.first] = std::make_shared<mata::nfa::Nfa>(mata::nfa::reduce(inters));
             }
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1140,7 +1140,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1211,7 +1211,7 @@ namespace smt::noodler {
         for(const auto &pr : new_preds) {
             this->formula.add_predicate(pr);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1285,7 +1285,7 @@ namespace smt::noodler {
                 }
             }
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1392,7 +1392,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1458,7 +1458,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1519,7 +1519,7 @@ namespace smt::noodler {
                 }
             }
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     } 
 
     /**
@@ -1571,7 +1571,7 @@ namespace smt::noodler {
         for(const size_t & i : rem_ids) {
             this->formula.remove_predicate(i);
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1676,7 +1676,7 @@ namespace smt::noodler {
                     len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.int_var, -1});
                 }
         }
-        STRACE("str-prep", tout << print_info());
+        STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     }
 
     /**
@@ -1738,13 +1738,21 @@ namespace smt::noodler {
         return true;
     }
 
-    std::string FormulaPreprocessor::print_info() {
+    std::string FormulaPreprocessor::print_info(bool print_nfas) {
         std::stringstream res;
         res << "Current formula:\n";
         for (const auto& pred : formula.get_predicates_set()) {
             res << pred << std::endl;
         }
-        res << "Current automata assignment:\n" << aut_ass.print();
+        res << "Current automata assignment:\n";
+        for (const auto& [var, nfa] : aut_ass) {
+            res << var << " -> ";
+            if (print_nfas) {
+                res << std::endl << *nfa;
+            } else {
+                res << "NFA\n";
+            }
+        }
         res << "Current substition map:\n";
         for (const auto& [var, subst] : substitution_map) {
             res << var << " ->";
