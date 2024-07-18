@@ -76,7 +76,6 @@ namespace smt::noodler {
                     return l_undef;
                 }
 
-
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
@@ -574,7 +573,7 @@ namespace smt::noodler {
      * @param[out] model_path Model generator obtained from @p path allowing to generate a model.
      * @return bool True iff the formula was successfully created
      */
-    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts, ModelPath& model_path) {
+    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts, ModelGenerator& model_path) {
         // path of length 0 = true
         if(path.labels.size() == 0) {
             return true;
@@ -653,13 +652,13 @@ namespace smt::noodler {
         return false;
     }
 
-    void NielsenDecisionProcedure::generate_current_model(const std::vector<ModelPath>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+    void NielsenDecisionProcedure::generate_current_model(const std::vector<ModelGenerator>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         for(const BasicTerm& var : this->formula.get_vars()) {
             // set epsilon to each variable
             this->model[var] = "";
         }
         // for each inclusion graph there is a model generator
-        for(const ModelPath& model_path : model_generator) {
+        for(const ModelGenerator& model_path : model_generator) {
             for(const ModelLabel& model_label : model_path) {
                 // we are processing rule x -> eps; all variables are already set to eps
                 if(model_label.rule.second.size() == 0) {
@@ -694,7 +693,7 @@ namespace smt::noodler {
     zstring NielsenDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         // model was not initialized yet
         if(this->model.size() == 0) {
-            std::vector<ModelPath> cur_model_path {};
+            std::vector<ModelGenerator> cur_model_path {};
             for(size_t i = 0; i < this->length_paths.size(); i++) {
                 if(this->length_paths_index - 1 >= this->model_paths[i].size()) {
                     continue;
@@ -705,6 +704,62 @@ namespace smt::noodler {
             generate_current_model(cur_model_path, get_arith_model_of_var);
         }
         return this->model[var];
+    }
+
+    ModelGenerator NielsenModel::simple_generator_from_path(const Path<CounterLabel>& path) {
+        ModelGenerator gen {};
+        for(size_t i = 1; i < path.nodes.size(); i++) {
+            CounterLabel lab = path.labels[i-1];
+            // add nielsen rule to the model generator
+            gen.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
+        }
+        return gen;
+    }
+
+    void NielsenModel::initialize_model() {
+        for(const BasicTerm& var : this->vars) {
+            // set epsilon to each variable
+            this->model[var] = "";
+        }
+    }
+
+    void NielsenModel::generate_submodel(const ModelGenerator& generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        // assumed to be called after initialize_model()
+        for(const ModelLabel& model_label : generator) {
+            // we are processing rule x -> eps; all variables are already set to eps
+            if(model_label.rule.second.size() == 0) {
+                continue;
+            }
+            // rules are of the form x -> alpha x
+            Concat lit_concat(model_label.rule.second.begin(), model_label.rule.second.end() - 1);
+            // rule is of the form x -> y x
+            if(lit_concat[0].is_variable()) {
+                this->model[model_label.rule.first] = this->model[model_label.rule.first] + this->model[lit_concat[0]];
+            } else {
+                // rule is of the form x -> str x (there might be a repetition variable)
+                zstring str_concat = "";
+                for(const BasicTerm& bt : lit_concat) {
+                    str_concat = str_concat + bt.get_name();
+                }
+                // repetite the string
+                if(model_label.repetition_var.is_variable()) {
+                    rational repetitions = get_arith_model_of_var(model_label.repetition_var);
+                    zstring base = str_concat;
+                    str_concat = "";
+                    for(rational i = rational(0); i < repetitions; i++) {
+                        str_concat = str_concat + base;
+                    }
+                }
+                this->model[model_label.rule.first] = this->model[model_label.rule.first] + str_concat;
+            }
+        }
+    }
+
+    void NielsenModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        initialize_model();
+        for(const ModelGenerator& gen : this->graph_generators) {
+            generate_submodel(gen, get_arith_model_of_var);
+        }
     }
 
 } // Namespace smt::noodler.
