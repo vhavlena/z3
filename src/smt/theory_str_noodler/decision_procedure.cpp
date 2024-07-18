@@ -1393,6 +1393,7 @@ namespace smt::noodler {
          // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
+        this->init_substitution_map = prep_handler.get_substitution_map();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
         this->inclusions_from_preprocessing = prep_handler.get_removed_equations();

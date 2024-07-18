@@ -365,6 +365,7 @@ namespace smt::noodler {
         void get_regular_sublists(std::map<Concat, unsigned>& res) const;
         void get_eps_terms(std::set<BasicTerm>& res) const;
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
+        const std::unordered_map<BasicTerm, std::vector<BasicTerm>>& get_substitution_map() const { return this->substitution_map; }
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
