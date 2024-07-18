@@ -1646,9 +1646,9 @@ namespace smt::noodler {
         } else if (solution.aut_ass.contains(var)) {
             Predicate inclusion_with_var_on_right_side;
             if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
-                // TODO check if inclusion_with_var_on_right_side lays on a cycle (needs to be
-                // implemented solution.is_inclusion_on_cycle() is overapproximation)
+                // TODO check if inclusion_with_var_on_right_side lays on a cycle.
                 // If it is on a cycle, then we need to use (and implement) the horrible proof (righ now the following will never finish)
+                // Right now if there is some cycle, this will never finish.
 
                 // We need to compute the vars on the right side from the vars on the left
                 //  - first we get the string model of the left side
@@ -1669,8 +1669,9 @@ namespace smt::noodler {
                 } else {
                     std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
 
+                    const auto& vars_on_right_side = inclusion_with_var_on_right_side.get_right_side(); // becase inclusion is not on cycle, all variables on the right side must be different
                     std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
-                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                    for (const auto &right_side_var : vars_on_right_side) {
                         automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
                     }
 
@@ -1679,22 +1680,29 @@ namespace smt::noodler {
                                                                                 true, 
                                                                                 {{"reduce", "forward"}});
                     SASSERT(!noodles.empty());
-                    SASSERT(automata_on_right_side.size() == noodles[0].size());
-                    unsigned i = 0;
-                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                        if (!right_side_var.is_literal()) {
-                            // becase inclusion is not on cycle, all variables on the right side must be different
-                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_word()));
-                            update_model_and_aut_ass(right_side_var, right_side_var_string);
+                    unsigned index_of_right_var_that_is_not_yet_processed = 0;
+                    for (const auto &noodle_aut : noodles[0]) { // we can take any noodle, so we take the first one
+                        // noodle_aut.second[0] is the index of the right var whose automaton is noodle_aut.first (see compute_next_solution() for better explanation)
+                        unsigned index_of_right_var_that_belongs_to_noodle_aut = noodle_aut.second[0];
+                        while (index_of_right_var_that_is_not_yet_processed < index_of_right_var_that_belongs_to_noodle_aut) {
+                            // skipped vars means that they are empty strings
+                            BasicTerm right_var_that_is_not_yet_processed = vars_on_right_side[index_of_right_var_that_is_not_yet_processed];
+                            update_model_and_aut_ass(right_var_that_is_not_yet_processed, zstring());
+                            ++index_of_right_var_that_is_not_yet_processed;
                         }
-                        ++i;
+                        // update model based on noodle_aut
+                        BasicTerm right_var_that_belongs_to_noodle_aut = vars_on_right_side[index_of_right_var_that_belongs_to_noodle_aut];
+                        if (!right_var_that_belongs_to_noodle_aut.is_literal()) {
+                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodle_aut.first->get_word()));
+                            SASSERT(index_of_right_var_that_is_not_yet_processed == index_of_right_var_that_belongs_to_noodle_aut);
+                            update_model_and_aut_ass(right_var_that_belongs_to_noodle_aut, right_side_var_string);
+                        }
+                        ++index_of_right_var_that_is_not_yet_processed;
                     }
                 }
                 return model_of_var.at(var);
             } else {
                 // var is only on the left side in the inclusion graph => we can return whatever
-
-                // TODO replace following with function that returns arbitary word from Mata
                 zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
                 STRACE("str-model-nfa", tout << "NFA for var " << var << " before getting some word:\n" << *nfa;);
