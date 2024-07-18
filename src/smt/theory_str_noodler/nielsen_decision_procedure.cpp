@@ -75,10 +75,13 @@ namespace smt::noodler {
                 if (!create_counter_system(graph, counter_system)) {
                     return l_undef;
                 }
+
+
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
                 this->model_paths.push_back({});
+                // TODO: modles: if there is no self-loop, we still need a path for model generation
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
                     Path<CounterLabel> path;
@@ -108,6 +111,7 @@ namespace smt::noodler {
                 if(this->length_paths_index >= this->length_paths[i].size()) {
                     continue;
                 }
+                // TODO: models: it suffices to keep only the last model path
                 if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts, this->model_paths[i][this->length_paths_index])) {
                     return l_undef;
                 }
@@ -373,7 +377,7 @@ namespace smt::noodler {
 
     NielsenLabel NielsenDecisionProcedure::join_nielsen_label(const NielsenLabel& l1, const NielsenLabel& l2) {
         Concat symbols(l1.second.begin(), l1.second.end() - 1);
-        symbols.insert(symbols.end(), l2.second.begin(), l2.second.end() - 1);
+        symbols.insert(symbols.end(), l2.second.begin(), l2.second.end());
         return {l1.first, symbols};
     }
 
@@ -596,7 +600,7 @@ namespace smt::noodler {
                     return false;
                 }
                 // assume that last conjunct is of the form 0 <= fresh, where fresh is a variable counting number of self-loop iterations
-                model_path.push_back({ it->second.nielsen_rule, conjuncts.end()->succ[1].atom_val });
+                model_path.push_back({ it->second.nielsen_rule, conjuncts.back().succ[1].atom_val });
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
         }
@@ -647,6 +651,60 @@ namespace smt::noodler {
         }
 
         return false;
+    }
+
+    void NielsenDecisionProcedure::generate_current_model(const std::vector<ModelPath>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        for(const BasicTerm& var : this->formula.get_vars()) {
+            // set epsilon to each variable
+            this->model[var] = "";
+        }
+        // for each inclusion graph there is a model generator
+        for(const ModelPath& model_path : model_generator) {
+            for(const ModelLabel& model_label : model_path) {
+                // we are processing rule x -> eps; all variables are already set to eps
+                if(model_label.rule.second.size() == 0) {
+                    continue;
+                }
+                // rules are of the form x -> alpha x
+                Concat lit_concat(model_label.rule.second.begin(), model_label.rule.second.end() - 1);
+                // rule is of the form x -> y x
+                if(lit_concat[0].is_variable()) {
+                    this->model[model_label.rule.first] = this->model[model_label.rule.first] + this->model[lit_concat[0]];
+                } else {
+                    // rule is of the form x -> str x (there might be a repetition variable)
+                    zstring str_concat = "";
+                    for(const BasicTerm& bt : lit_concat) {
+                        str_concat = str_concat + bt.get_name();
+                    }
+                    // repetite the string
+                    if(model_label.repetition_var.is_variable()) {
+                        rational repetitions = get_arith_model_of_var(model_label.repetition_var);
+                        zstring base = str_concat;
+                        str_concat = "";
+                        for(rational i = rational(0); i < repetitions; i++) {
+                            str_concat = str_concat + base;
+                        }
+                    }
+                    this->model[model_label.rule.first] = this->model[model_label.rule.first] + str_concat;
+                }
+            }
+        }
+    }
+
+    zstring NielsenDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        // model was not initialized yet
+        if(this->model.size() == 0) {
+            std::vector<ModelPath> cur_model_path {};
+            for(size_t i = 0; i < this->length_paths.size(); i++) {
+                if(this->length_paths_index - 1 >= this->model_paths[i].size()) {
+                    continue;
+                }
+                cur_model_path.push_back(this->model_paths[i][this->length_paths_index-1]);
+            }
+            
+            generate_current_model(cur_model_path, get_arith_model_of_var);
+        }
+        return this->model[var];
     }
 
 } // Namespace smt::noodler.

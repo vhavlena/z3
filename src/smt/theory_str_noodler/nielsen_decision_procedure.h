@@ -284,6 +284,9 @@ namespace smt::noodler {
         std::vector<std::vector<Path<CounterLabel>>> length_paths;
         // model paths 
         std::vector<std::vector<ModelPath>> model_paths;
+        std::map<BasicTerm, zstring> model {};
+
+
         size_t length_paths_index = 0;
 
         LenNode length_formula_for_solution = LenNode(LenFormulaType::TRUE);
@@ -332,6 +335,8 @@ namespace smt::noodler {
         bool get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
+
+        void generate_current_model(const std::vector<ModelPath>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         /**
          * @brief Get a cost of the given formula. Implemented as a sum of literals/variables 
@@ -392,6 +397,15 @@ namespace smt::noodler {
 
         lbool preprocess(PreprocessType opt = PreprocessType::PLAIN, const BasicTermEqiv &len_eq_vars = {}) override;
 
+        /**
+         * @brief Get string model based on integer constraints.
+         * 
+         * @param var Variable whose model is obtained.
+         * @param get_arith_model_of_var LIA model.
+         * @return zstring String model of @p var
+         */
+        zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
     };
 
     static std::string nielsen_label_to_string(const NielsenLabel& lab) {
@@ -413,6 +427,15 @@ namespace smt::noodler {
         }
 
         return ret + sum + " " + nielsen_label_to_string(lab.nielsen_rule);
+    }
+
+    static std::string model_path_to_string(const ModelPath& path) {
+        std::string ret;
+
+        for(const ModelLabel& lab : path) {
+            ret += nielsen_label_to_string(lab.rule) + (lab.repetition_var.is_variable() ? " : " +  lab.repetition_var.to_string() : "") + ", ";
+        }
+        return ret;
     }
 }
 
