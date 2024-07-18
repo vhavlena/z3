@@ -324,7 +324,7 @@ namespace smt::noodler {
                 continue;
             }
 
-            // if right side contains len vars (except when we have X = Y), we must do splitting => cannot remove
+            // if right side contains multiple len vars we must do splitting => cannot remove (we can remove if we have only one length var with possibly literals)
             bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
             if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_right_side_len) {
                 continue;
@@ -338,14 +338,10 @@ namespace smt::noodler {
                 // we propagate the lengthness of right side variable to the left side
                 this->len_variables.insert(left_var);
                 // and add len constraint |X| = |Y|
-                this->add_to_len_formula(pr.second.get_formula_eq()); 
-
-                // we do not add this equation to removed_equation, instead we add Y to substitution map
-                BasicTerm right_var = pr.second.get_right_side()[0];
-                substitution_map[right_var] = {left_var}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
-            } else {
-                removed_equations.push_back(pr.second);
+                this->add_to_len_formula(pr.second.get_formula_eq());
             }
+            
+            removed_equations.push_back(pr.second);
 
             this->formula.remove_predicate(pr.first);
             STRACE("str-prep-remove_regular", tout << "removed" << std::endl;);
