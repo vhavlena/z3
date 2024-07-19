@@ -62,7 +62,8 @@ namespace smt::noodler {
             for(const Formula& fle : instances) {
                 bool is_sat;
                 // create Nielsen graph and trim it
-                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), is_sat);
+                // we may early terminate only if it is not necessary to generate models
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty() && !this->m_params.m_produce_models, is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -70,19 +71,11 @@ namespace smt::noodler {
                 graph = graph.trim();
                 this->graphs.push_back(graph);
 
-                // if there are no length variables --> do not construct the counter system
-                if(this->init_length_sensitive_vars.size() == 0) {
-                    continue;
-                }
                 // create a counter system from the Nielsen graph a condensate it
                 CounterSystem counter_system;
                 if (!create_counter_system(graph, counter_system)) {
                     return l_undef;
                 }
-
-                condensate_counter_system(counter_system);
-                condensate_counter_system(counter_system);
-                this->length_paths.push_back({});
 
                 // generate path from the counter system for potential model generation
                 if(this->m_params.m_produce_models) {
@@ -96,6 +89,15 @@ namespace smt::noodler {
                     this->model_handler.set_generator(graph_counter, NielsenModel::simple_generator_from_path(path.value()));
                     graph_counter++;
                 }
+
+                // if there are no length variables --> do not construct the counter system
+                if(this->init_length_sensitive_vars.size() == 0) {
+                    continue;
+                }
+
+                condensate_counter_system(counter_system);
+                condensate_counter_system(counter_system);
+                this->length_paths.push_back({});
 
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
