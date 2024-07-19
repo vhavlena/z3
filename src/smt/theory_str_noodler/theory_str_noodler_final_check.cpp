@@ -559,4 +559,14 @@ namespace smt::noodler {
             return l_true;
         }
     }
+
+    void theory_str_noodler::propagate_lengths_from_arith_model() {
+        if (!m_params.m_produce_models) { return; }
+        SASSERT(arith_model != nullptr);
+        expr_ref model(m);
+        for (const auto& len_var : len_vars) {
+            arith_model->eval_expr(m_util_s.str.mk_length(len_var), model);
+            add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
+        }
+    }
 }

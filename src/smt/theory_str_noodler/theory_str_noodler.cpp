@@ -901,6 +901,8 @@ namespace smt::noodler {
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
             lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -932,6 +934,8 @@ namespace smt::noodler {
         if(m_params.m_try_length_proc && contains_eqs_and_diseqs_only && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
             lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -944,6 +948,7 @@ namespace smt::noodler {
             if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
                 last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             }
             STRACE("str", tout << "Underapproximation did not help\n";);
@@ -987,6 +992,7 @@ namespace smt::noodler {
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
+                    propagate_lengths_from_arith_model();
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;
