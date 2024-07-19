@@ -81,7 +81,7 @@ namespace smt::noodler {
                 if(this->m_params.m_produce_models) {
                     // it suffices to take arbitrary path by default
                     // if a different path is used for LIA generation, this path is set to model generation as well (later) 
-                    std::optional<Path<CounterLabel>> path = counter_system.shortest_path(counter_system.get_init(), *counter_system.get_fins().begin());
+                    std::optional<Path<CounterLabel>> path = counter_system.shortest_path(counter_system.get_init(), trim_formula(fle));
                     if(!path.has_value()) {
                         // the formula is of the form x = x --> we know that x is not length (otherwise we get unknown), we can generate the default model x = eps
                         this->model_handler.set_generator(graph_counter, {});
