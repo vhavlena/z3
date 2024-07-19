@@ -421,7 +421,7 @@ namespace smt::noodler {
             // concatenate symbols
             //Concat symbols(l1.nielsen_rule.second.begin(), l1.nielsen_rule.second.end() - 1);
             //symbols.insert(symbols.end(), l2.symbols.begin(), l2.symbols.end());
-            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)},join_nielsen_label(l1.nielsen_rule, l2.nielsen_rule)};
+            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)},join_nielsen_label(l2.nielsen_rule, l1.nielsen_rule)};
             return true;
         }
         return false;
@@ -612,6 +612,8 @@ namespace smt::noodler {
                 return false;
             }
             actual_var_map.insert_or_assign(lab.left, out_var);
+            // add nielsen rule to the model generator
+            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
 
             // there is a self-loop
             if(it != path.self_loops.end()) {
@@ -623,8 +625,6 @@ namespace smt::noodler {
                 model_path.push_back({ it->second.nielsen_rule, conjuncts.back().succ[1].atom_val });
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
-            // add nielsen rule to the model generator
-            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
         }
 
         return true;
