@@ -63,7 +63,7 @@ namespace smt::noodler {
                 bool is_sat;
                 // create Nielsen graph and trim it
                 // we may early terminate only if it is not necessary to generate models
-                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), !this->m_params.m_produce_models, is_sat);
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), this->m_params.m_produce_models || !this->init_length_sensitive_vars.empty(), is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -285,7 +285,7 @@ namespace smt::noodler {
             std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
-                if(!add_edges) {
+                if(add_edges) {
                     graph.add_edge(pr.second, rpl, label);
                 }
                 if(generated.find(rpl) == generated.end()) {
@@ -376,6 +376,7 @@ namespace smt::noodler {
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
                 result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}, lab};
             } else {
+                std::cout << nielsen_label_to_string(lab) << std::endl;
                 return false;
             }
             return true;
