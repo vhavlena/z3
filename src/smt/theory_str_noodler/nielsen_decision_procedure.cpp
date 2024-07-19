@@ -83,10 +83,11 @@ namespace smt::noodler {
                     // if a different path is used for LIA generation, this path is set to model generation as well (later) 
                     std::optional<Path<CounterLabel>> path = counter_system.shortest_path(counter_system.get_init(), *counter_system.get_fins().begin());
                     if(!path.has_value()) {
-                        util::throw_error("there is no path in Nielsen graph");
-                        return l_undef;
+                        // the formula is of the form x = x --> we know that x is not length (otherwise we get unknown), we can generate the default model x = eps
+                        this->model_handler.set_generator(graph_counter, {});
+                    } else {
+                        this->model_handler.set_generator(graph_counter, NielsenModel::simple_generator_from_path(path.value()));
                     }
-                    this->model_handler.set_generator(graph_counter, NielsenModel::simple_generator_from_path(path.value()));
                     graph_counter++;
                 }
 
