@@ -139,7 +139,11 @@ namespace smt::noodler {
         SASSERT(unions.contains(var) || intersections.contains(var));
         mata::Word word;
         if (unions.contains(var)) {
-            word = *mata::nfa::get_word_from_lang_difference(intersections.at(var), unions.at(var));
+            if (intersections.contains(var)) {
+                word = *mata::nfa::get_word_from_lang_difference(intersections.at(var), unions.at(var));
+            } else {
+                word = *unions.at(var).get_word_from_complement(&alph.mata_alphabet);
+            }
         } else {
             word = *(intersections.at(var).get_word());
         }
