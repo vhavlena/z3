@@ -612,8 +612,6 @@ namespace smt::noodler {
                 return false;
             }
             actual_var_map.insert_or_assign(lab.left, out_var);
-            // add nielsen rule to the model generator
-            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
 
             // there is a self-loop
             if(it != path.self_loops.end()) {
@@ -625,6 +623,8 @@ namespace smt::noodler {
                 model_path.push_back({ it->second.nielsen_rule, conjuncts.back().succ[1].atom_val });
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
+            // add nielsen rule to the model generator
+            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
         }
 
         return true;
