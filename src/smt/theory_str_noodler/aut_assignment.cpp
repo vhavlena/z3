@@ -1,5 +1,6 @@
 #include "aut_assignment.h"
 #include "util.h"
+#include "regex.h"
 
 namespace smt::noodler {
     LenNode AutAssignment::get_lengths(const BasicTerm& var) const {
@@ -187,5 +188,43 @@ namespace smt::noodler {
 
         aut.tarjan_scc_discover(callback);
         return flat;
+    }
+
+    void AutAssignment::add_symbol_from_dummy(mata::Symbol sym) {
+        if(alphabet.contains(sym)) { return; }
+        bool is_there_some_dummy = false;
+        for (auto& [var, nfa] : *this) {
+            for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
+                const mata::nfa::StatePost& delta_from_state = nfa->delta[state];
+                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest, so should be at the back
+                    is_there_some_dummy = true;
+                    nfa->delta.add(state, sym, nfa->delta[state].back().targets);
+                }
+            }
+        }
+        if (is_there_some_dummy) {
+            alphabet.insert(sym);
+        }
+    }
+
+    void AutAssignment::replace_dummy_with_new_symbol() {
+        mata::Symbol new_symbol = regex::Alphabet(alphabet).get_unused_symbol();
+        bool is_there_some_dummy = false;
+        for (auto& [var, nfa] : *this) {
+            for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
+                const mata::nfa::StatePost& delta_from_state = nfa->delta[state];
+                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest, so should be at the back
+                    is_there_some_dummy = true;
+                    mata::nfa::StateSet targets = delta_from_state.back().targets;
+                    nfa->delta.add(state, new_symbol, targets);
+                    for (mata::nfa::State target : targets) {
+                        nfa->delta.remove(state, util::get_dummy_symbol(), target);
+                    }
+                }
+            }
+        }
+        if (is_there_some_dummy) {
+            alphabet.insert(new_symbol);
+        }
     }
 }

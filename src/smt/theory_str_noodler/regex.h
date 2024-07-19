@@ -54,8 +54,7 @@ namespace smt::noodler::regex {
     };
 
     /**
-     * @brief Alphabet wrapper for Z3 alphabet represented by 
-     * std::set<uint32_t> and a Mata alphabet.
+     * @brief Alphabet wrapper for Z3 alphabet represented by std::set<mata::Symbol> and a Mata alphabet.
      */
     struct Alphabet {
         std::set<mata::Symbol> alphabet;

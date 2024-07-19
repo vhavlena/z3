@@ -82,23 +82,6 @@ namespace smt::noodler::util {
         return m_util_s.is_string(expression->get_sort()) && is_variable(expression);
     }
 
-    std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to) {
-        std::set<uint32_t> dummy_symbols{};
-        uint32_t dummy_symbol{ 0 };
-        const size_t disequations_number{ new_symb_num };
-        for (size_t diseq_index{ 0 }; diseq_index < disequations_number; ++diseq_index) {
-            while (symbols_to_append_to.find(dummy_symbol) != symbols_to_append_to.end()) { ++dummy_symbol; }
-            dummy_symbols.insert(dummy_symbol);
-            ++dummy_symbol;
-        }
-        [[maybe_unused]] const size_t dummy_symbols_number{ dummy_symbols.size() };
-        assert(dummy_symbols_number == disequations_number);
-        [[maybe_unused]] const size_t symbols_in_formula_number{ symbols_to_append_to.size() };
-        symbols_to_append_to.insert(dummy_symbols.begin(), dummy_symbols.end());
-        assert(dummy_symbols_number + symbols_in_formula_number == symbols_to_append_to.size());
-        return dummy_symbols;
-    }
-
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::map<BasicTerm, expr_ref>& var_name, std::vector<BasicTerm>& terms) {
 

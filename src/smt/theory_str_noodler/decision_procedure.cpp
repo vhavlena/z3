@@ -1561,14 +1561,6 @@ namespace smt::noodler {
             mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
             nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
 
-            // Restrict code-conversion var
-            if (code_subst_vars.contains(var)) {
-                rational to_code_value = get_arith_model_of_var(code_version_of(var));
-                if (to_code_value != -1) {
-                    update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
-                } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
-            }
-
             // Restrict int-conversion var
             if (int_subst_vars.contains(var)) {
                 if (len == 0) {
@@ -1592,7 +1584,19 @@ namespace smt::noodler {
                     }
                 }
             }
+
+            // Restrict code-conversion var
+            if (code_subst_vars.contains(var)) {
+                rational to_code_value = get_arith_model_of_var(code_version_of(var));
+                if (to_code_value != -1) {
+                    solution.aut_ass.add_symbol_from_dummy(to_code_value.get_unsigned());
+                    update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
+                } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been already be restricted by lenght
+            }
         }
+
+        // we remove dummy symbol from automata, so we do not have to work with it
+        solution.aut_ass.replace_dummy_with_new_symbol();
         
         is_model_initialized = true;
 
