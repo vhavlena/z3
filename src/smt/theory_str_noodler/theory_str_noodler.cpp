@@ -1061,18 +1061,23 @@ namespace smt::noodler {
                 // for relevant (string) var, we get the model from the decision procedure that returned sat
                 return dec_proc->get_model(var, get_arith_model_of_var);
             } else {
-                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length)
-                // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
-                SASSERT(arith_model != nullptr);
-                expr_ref model(m);
-                arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
-                bool is_int;
-                rational val(0);
-                VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
-                while (res.length() != val.get_unsigned()) {
-                    res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
+                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
+                if (len_vars.contains(str_expr)) {
+                    // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
+                    SASSERT(arith_model != nullptr);
+                    expr_ref model(m);
+                    arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
+                    bool is_int;
+                    rational val(0);
+                    VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+                    while (res.length() != val.get_unsigned()) {
+                        res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
+                    }
+                    return res;
+                } else {
+                    // we return empty string for non-relevant non-length vars, their value does not matter
+                    return zstring();
                 }
-                return res;
             }
         } else if (m_util_s.str.is_concat(str_expr)) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
