@@ -728,7 +728,7 @@ namespace smt::noodler {
             Concat lit_concat(model_label.rule.second.begin(), model_label.rule.second.end() - 1);
             // rule is of the form x -> y x
             if(lit_concat[0].is_variable()) {
-                this->model[model_label.rule.first] = this->model[model_label.rule.first] + this->model[lit_concat[0]];
+                this->model[model_label.rule.first] = this->model[lit_concat[0]] + this->model[model_label.rule.first];
             } else {
                 // rule is of the form x -> str x (there might be a repetition variable)
                 zstring str_concat = "";
@@ -744,7 +744,7 @@ namespace smt::noodler {
                         str_concat = str_concat + base;
                     }
                 }
-                this->model[model_label.rule.first] = this->model[model_label.rule.first] + str_concat;
+                this->model[model_label.rule.first] = str_concat + this->model[model_label.rule.first];
             }
         }
     }
