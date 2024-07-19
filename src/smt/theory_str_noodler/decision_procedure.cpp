@@ -1728,6 +1728,11 @@ namespace smt::noodler {
                         }
                         ++index_of_right_var_that_is_not_yet_processed;
                     }
+                    while (index_of_right_var_that_is_not_yet_processed < vars_on_right_side.size()) {
+                        BasicTerm right_var_that_is_not_yet_processed = vars_on_right_side[index_of_right_var_that_is_not_yet_processed];
+                        update_model_and_aut_ass(right_var_that_is_not_yet_processed, zstring());
+                        ++index_of_right_var_that_is_not_yet_processed;
+                    }
                 }
                 return model_of_var.at(var);
             } else {
