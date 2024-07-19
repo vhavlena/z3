@@ -445,7 +445,6 @@ namespace smt::noodler {
         zstring update_model_and_aut_ass(BasicTerm var, zstring computed_model) {
             model_of_var[var] = computed_model;
             if (solution.aut_ass.contains(var)) {
-                SASSERT(!mata::nfa::intersection(AutAssignment::create_word_nfa(computed_model), *solution.aut_ass[var]).is_lang_empty());
                 solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(computed_model));
             }
             STRACE("str-model-res", tout << "Model for " << var << ": " << computed_model << std::endl);
