@@ -140,12 +140,12 @@ namespace smt::noodler {
         mata::Word word;
         if (unions.contains(var)) {
             if (intersections.contains(var)) {
-                word = *mata::nfa::get_word_from_lang_difference(intersections.at(var), unions.at(var));
+                word = mata::nfa::get_word_from_lang_difference(intersections.at(var), unions.at(var)).value();
             } else {
-                word = *unions.at(var).get_word_from_complement(&alph.mata_alphabet);
+                word = unions.at(var).get_word_from_complement(&alph.mata_alphabet).value();
             }
         } else {
-            word = *(intersections.at(var).get_word());
+            word = intersections.at(var).get_word().value();
         }
         return alph.get_string_from_mata_word(word);
     }

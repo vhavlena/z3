@@ -1685,12 +1685,30 @@ namespace smt::noodler {
                     for (const auto &right_side_var : vars_on_right_side) {
                         automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
                     }
+                    SASSERT(vars_on_right_side.size() == automata_on_right_side.size());
 
                     auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
                                                                                 left_side_string_aut,
-                                                                                true, 
+                                                                                false, 
                                                                                 {{"reduce", "forward"}});
                     SASSERT(!noodles.empty());
+                    STRACE("str-model-noodlification",
+                        tout << "Noodlification before and after in model generation:" << std::endl;
+                        tout << "Left side automaton for concatenation ";
+                        for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
+                            tout << " " << var_on_left_side;
+                        }
+                        tout << ":\n" << *left_side_string_aut[0];
+                        tout << "Right side automata:" << std::endl;
+                        for (unsigned i = 0; i < vars_on_right_side.size(); ++i) {
+                            tout << "Variable " << vars_on_right_side[i] << ":\n" << *automata_on_right_side[i];
+                        }
+                        tout << "Noodle:\n";
+                        for (const auto &noodle_aut : noodles[0]) {
+                            tout << "Automaton for right var with index " << noodle_aut.second[0] << ":\n";
+                            tout << *noodle_aut.first;
+                        }
+                    );
                     unsigned index_of_right_var_that_is_not_yet_processed = 0;
                     for (const auto &noodle_aut : noodles[0]) { // we can take any noodle, so we take the first one
                         // noodle_aut.second[0] is the index of the right var whose automaton is noodle_aut.first (see compute_next_solution() for better explanation)
@@ -1704,7 +1722,7 @@ namespace smt::noodler {
                         // update model based on noodle_aut
                         BasicTerm right_var_that_belongs_to_noodle_aut = vars_on_right_side[index_of_right_var_that_belongs_to_noodle_aut];
                         if (!right_var_that_belongs_to_noodle_aut.is_literal()) {
-                            zstring right_side_var_string = alph.get_string_from_mata_word(*(noodle_aut.first->get_word()));
+                            zstring right_side_var_string = alph.get_string_from_mata_word(noodle_aut.first->get_word().value());
                             SASSERT(index_of_right_var_that_is_not_yet_processed == index_of_right_var_that_belongs_to_noodle_aut);
                             update_model_and_aut_ass(right_var_that_belongs_to_noodle_aut, right_side_var_string);
                         }
@@ -1717,7 +1735,7 @@ namespace smt::noodler {
                 zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
                 STRACE("str-model-nfa", tout << "NFA for var " << var << " before getting some word:\n" << *nfa;);
-                mata::Word accepted_word = *(nfa->get_word());
+                mata::Word accepted_word = nfa->get_word().value();
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {
