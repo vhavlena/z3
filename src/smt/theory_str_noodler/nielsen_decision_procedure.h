@@ -269,6 +269,12 @@ namespace smt::noodler {
     // TODO: rename to model generator
     using ModelGenerator = std::vector<ModelLabel>;
 
+    /**
+     * @brief Class for a model generation. Model is generated from flat paths in counter systems. Flat path contains only self-loops. 
+     * The model generator applies the Nielsen rules on the path. If there is a self-loop, we get the number of loop repetitions (stored in 
+     * the loop variable of the LIA formula) and apply the Nielsen rule multiple times. We need multiple generators as there might be 
+     * multiple Nielsen graphs for the system. 
+     */
     class NielsenModel {
     private:
         // model generator for each Nielsen graph in the system
@@ -294,17 +300,37 @@ namespace smt::noodler {
 
 
     public:
+        NielsenModel() { }
         NielsenModel(size_t num_of_graphs, const std::set<BasicTerm> & vars) : graph_generators(num_of_graphs), vars(vars) { }
 
+        /**
+         * @brief Set model generator corresponding to Nielsen graph @p graph_index
+         * 
+         * @param graph_index Index of the Nielsen graph
+         * @param gen Model generator
+         */
         void set_generator(size_t graph_index, const ModelGenerator& gen) { 
             this->graph_generators[graph_index] = gen;
         }
 
         bool is_initialized() const { return this->model.size() > 0; }
 
+        /**
+         * @brief Compute assignments of variables based on stored generators and the LIA assignment.
+         * 
+         * @param get_arith_model_of_var LIA assignment.
+         */
         void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         static ModelGenerator simple_generator_from_path(const Path<CounterLabel>& path);
+
+        /**
+         * @brief Get already computed assignment of variable @p bt.
+         * 
+         * @param bt Variable
+         * @return zstring String assignment
+         */
+        zstring get_var_model(const BasicTerm& bt) { return this->model[bt]; }
     };
 
     /**
@@ -320,10 +346,8 @@ namespace smt::noodler {
 
         std::vector<NielsenGraph> graphs {};
         std::vector<std::vector<Path<CounterLabel>>> length_paths;
-        // model paths 
-        std::vector<std::vector<ModelGenerator>> model_paths;
-        std::map<BasicTerm, zstring> model {};
-
+        // model handler for generating models
+        NielsenModel model_handler {};
 
         size_t length_paths_index = 0;
 
@@ -374,8 +398,6 @@ namespace smt::noodler {
         bool get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts);
         bool generate_len_connection(const std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts);
 
-        void generate_current_model(const std::vector<ModelGenerator>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-
         /**
          * @brief Get a cost of the given formula. Implemented as a sum of literals/variables 
          * occurring inside the formula.
@@ -418,7 +440,7 @@ namespace smt::noodler {
          ) : init_length_sensitive_vars{ init_length_sensitive_vars },
              formula { equalities },
              init_aut_ass{ init_aut_ass },
-             m_params(par) { 
+             m_params(par), model_handler() { 
             
             // Nielsen currently supports only equations (no inequalities and not(contains))
             if(!this->formula.all_of_type(PredicateType::Equation)) {

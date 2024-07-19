@@ -28,6 +28,7 @@ namespace smt::noodler {
     lbool NielsenDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
         FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
+        // this does not affect the model generation
         prep_handler.separate_eqs();
 
         // Refresh the instance
@@ -55,6 +56,9 @@ namespace smt::noodler {
             });
 
             std::vector<Formula> instances = divide_independent_formula(this->formula);
+            // initialize model handler for computing models
+            this->model_handler = NielsenModel(instances.size(), this->formula.get_vars());
+            size_t graph_counter = 0; 
             for(const Formula& fle : instances) {
                 bool is_sat;
                 // create Nielsen graph and trim it
@@ -79,8 +83,20 @@ namespace smt::noodler {
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
-                this->model_paths.push_back({});
-                // TODO: modles: if there is no self-loop, we still need a path for model generation
+
+                // generate path from the counter system for potential model generation
+                if(this->m_params.m_produce_models) {
+                    // it suffices to take arbitrary path by default
+                    // if a different path is used for LIA generation, this path is set to model generation as well (later) 
+                    std::optional<Path<CounterLabel>> path = counter_system.shortest_path(counter_system.get_init(), *counter_system.get_fins().begin());
+                    if(!path.has_value()) {
+                        util::throw_error("there is no path in Nielsen graph");
+                        return l_undef;
+                    }
+                    this->model_handler.set_generator(graph_counter, NielsenModel::simple_generator_from_path(path.value()));
+                    graph_counter++;
+                }
+
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
                     Path<CounterLabel> path;
@@ -88,7 +104,6 @@ namespace smt::noodler {
                         return l_undef;
                     }
                     this->length_paths[this->length_paths.size() - 1].push_back(path);
-                    this->model_paths[this->length_paths.size() - 1].push_back({});
                 }
             }
         } else {
@@ -110,9 +125,15 @@ namespace smt::noodler {
                 if(this->length_paths_index >= this->length_paths[i].size()) {
                     continue;
                 }
-                // TODO: models: it suffices to keep only the last model path
-                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts, this->model_paths[i][this->length_paths_index])) {
+                ModelGenerator mod_gen;
+                // generate LIA formula for a path and create a model generator
+                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts, mod_gen)) {
                     return l_undef;
+                }
+                // set a new generator according to the length path
+                // we replace the original i-th generator
+                if(this->m_params.m_produce_models) {
+                    this->model_handler.set_generator(i, mod_gen);
                 }
             }
             if(!generate_len_connection(actual_var_map, conjuncts)) {
@@ -652,60 +673,23 @@ namespace smt::noodler {
         return false;
     }
 
-    void NielsenDecisionProcedure::generate_current_model(const std::vector<ModelGenerator>& model_generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        for(const BasicTerm& var : this->formula.get_vars()) {
-            // set epsilon to each variable
-            this->model[var] = "";
-        }
-        // for each inclusion graph there is a model generator
-        for(const ModelGenerator& model_path : model_generator) {
-            for(const ModelLabel& model_label : model_path) {
-                // we are processing rule x -> eps; all variables are already set to eps
-                if(model_label.rule.second.size() == 0) {
-                    continue;
-                }
-                // rules are of the form x -> alpha x
-                Concat lit_concat(model_label.rule.second.begin(), model_label.rule.second.end() - 1);
-                // rule is of the form x -> y x
-                if(lit_concat[0].is_variable()) {
-                    this->model[model_label.rule.first] = this->model[model_label.rule.first] + this->model[lit_concat[0]];
-                } else {
-                    // rule is of the form x -> str x (there might be a repetition variable)
-                    zstring str_concat = "";
-                    for(const BasicTerm& bt : lit_concat) {
-                        str_concat = str_concat + bt.get_name();
-                    }
-                    // repetite the string
-                    if(model_label.repetition_var.is_variable()) {
-                        rational repetitions = get_arith_model_of_var(model_label.repetition_var);
-                        zstring base = str_concat;
-                        str_concat = "";
-                        for(rational i = rational(0); i < repetitions; i++) {
-                            str_concat = str_concat + base;
-                        }
-                    }
-                    this->model[model_label.rule.first] = this->model[model_label.rule.first] + str_concat;
-                }
-            }
-        }
-    }
-
     zstring NielsenDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        // model was not initialized yet
-        if(this->model.size() == 0) {
-            std::vector<ModelGenerator> cur_model_path {};
-            for(size_t i = 0; i < this->length_paths.size(); i++) {
-                if(this->length_paths_index - 1 >= this->model_paths[i].size()) {
-                    continue;
-                }
-                cur_model_path.push_back(this->model_paths[i][this->length_paths_index-1]);
-            }
-            
-            generate_current_model(cur_model_path, get_arith_model_of_var);
+        if(!this->model_handler.is_initialized()) {
+            this->model_handler.compute_model(get_arith_model_of_var);
         }
-        return this->model[var];
+        return this->model_handler.get_var_model(var);
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * @brief Create a simple model generator from the path in a counter system. Simple generator contains NO loop iterations. 
+     * Basically it mimics model obtained from rules on transitions on the path. Used to generate models from Nielsen graphs with no
+     * length-aware variables (there we need only arbitrary path in the graph to get a valid model).
+     * 
+     * @param path Path in a counter system.
+     * @return ModelGenerator Model generator of path
+     */
     ModelGenerator NielsenModel::simple_generator_from_path(const Path<CounterLabel>& path) {
         ModelGenerator gen {};
         for(size_t i = 1; i < path.nodes.size(); i++) {
@@ -723,6 +707,14 @@ namespace smt::noodler {
         }
     }
 
+    /**
+     * @brief Generate assignments of variables generated by @p generator. It applies rules of the generator and creates a string model. 
+     * If there is a self-loop we repeat the self-loop by the number of times given by the integer model of the loop variable. 
+     * The assignments are stored in this->model.
+     * 
+     * @param generator Model generator
+     * @param get_arith_model_of_var LIA assignment of variables
+     */
     void NielsenModel::generate_submodel(const ModelGenerator& generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         // assumed to be called after initialize_model()
         for(const ModelLabel& model_label : generator) {
