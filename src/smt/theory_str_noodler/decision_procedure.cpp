@@ -1628,6 +1628,10 @@ namespace smt::noodler {
             return model_of_var.at(var);
         }
 
+        if (vars_whose_model_we_are_computing.contains(var)) {
+            util::throw_error("There is cycle in inclusion graph, cannot produce model");
+        }
+
         STRACE("str-model",
             tout << "Generating model for var " << var;
             if (solution.length_sensitive_vars.contains(var)) {
@@ -1635,6 +1639,8 @@ namespace smt::noodler {
             }
             tout << "\n";
         );
+
+        vars_whose_model_we_are_computing.insert(var);
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 

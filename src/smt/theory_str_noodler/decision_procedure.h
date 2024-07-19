@@ -434,6 +434,8 @@ namespace smt::noodler {
 
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;
+        // vars for which we already called get_model() at least once (used for cyclicity detection, will be removed when get_model() can handle cycles in inclusions)
+        std::set<BasicTerm> vars_whose_model_we_are_computing;
 
         /**
          * @brief Update the model and its language in the solution of the variable @p var to @p computed_model
