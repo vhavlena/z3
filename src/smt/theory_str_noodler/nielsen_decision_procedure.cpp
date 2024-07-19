@@ -63,7 +63,7 @@ namespace smt::noodler {
                 bool is_sat;
                 // create Nielsen graph and trim it
                 // we may early terminate only if it is not necessary to generate models
-                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty() && !this->m_params.m_produce_models, is_sat);
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), !this->m_params.m_produce_models, is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -238,10 +238,11 @@ namespace smt::noodler {
      * 
      * @param init Initial node (formula)
      * @param early_termination Stop generating graph when the final node is reached?
+     * @param add_edges Add edges to the Nielsen graph?
      * @param[out] is_sat Contains the Nielsen graph an accepting node?
      * @return NielsenGraph 
      */
-    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool & is_sat) const {
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool add_edges, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
 
@@ -284,7 +285,7 @@ namespace smt::noodler {
             std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
-                if(!early_termination) {
+                if(!add_edges) {
                     graph.add_edge(pr.second, rpl, label);
                 }
                 if(generated.find(rpl) == generated.end()) {

@@ -360,7 +360,7 @@ namespace smt::noodler {
             return pred.get_left_side().size() == 0 && pred.get_right_side().size() == 0;
         }
         std::set<NielsenLabel> get_rules_from_pred(const Predicate& pred) const;
-        NielsenGraph generate_from_formula(const Formula& formula, bool early_termination, bool & is_sat) const;
+        NielsenGraph generate_from_formula(const Formula& formula, bool early_termination, bool add_edges, bool & is_sat) const;
         Formula trim_formula(const Formula& formula) const;
         std::vector<Formula> divide_independent_formula(const Formula& formula) const;
 
