@@ -1122,18 +1122,39 @@ namespace smt::noodler {
                 auto left_set = pr.second.get_left_set();
                 if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
+                    this->add_to_len_formula(pr.second.get_formula_eq());
                     // we add the removed equation to removed_equations, but we have to swap
                     // sides so that the single occurring side is on the right (we are gonna
                     // pretend it is an inclusion and from left side compute the vars of
                     // the right side in the model generation)
                     removed_equations.push_back(pr.second.get_switched_sides_predicate());
+
+                    // if we need to produce models and left side contains some length variable,
+                    // we need to make all variables on the right side length too, so that we
+                    // select the correct lengths during the model generation
+                    if (!set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Left))
+                        && m_params.m_produce_models) {
+                        for (BasicTerm right_var : pr.second.get_side_vars(Predicate::EquationSideType::Right)) {
+                            len_variables.insert(right_var);
+                        }
+                    }
                 }
             }
             if(this->formula.single_occurr(pr.second.get_right_set())) {
                 auto right_set = pr.second.get_right_set();
                 if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
+                    this->add_to_len_formula(pr.second.get_formula_eq());
                     removed_equations.push_back(pr.second);
+                    // if we need to produce models and right side contains some length variable,
+                    // we need to make all variables on the left side length too, so that we
+                    // select the correct lengths during the model generation
+                    if (!set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right))
+                        && m_params.m_produce_models) {
+                        for (BasicTerm left_var : pr.second.get_side_vars(Predicate::EquationSideType::Left)) {
+                            len_variables.insert(left_var);
+                        }
+                    }
                 }               
             }
         }
