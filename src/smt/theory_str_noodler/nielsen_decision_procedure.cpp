@@ -359,14 +359,6 @@ namespace smt::noodler {
     bool NielsenDecisionProcedure::create_counter_system(const NielsenGraph& graph, CounterSystem& result) const {
         result = CounterSystem();
 
-        // auto nielsen_rule_concat = [](const NielsenLabel& lab) {
-        //     // nielsen rule is x -> ax, x -> yx or x -> []
-        //     if(lab.second.size() == 0) {
-        //         return Concat{};
-        //     }
-        //     return { Concat(lab.second.begin(), lab.second.end() - 1);
-        // };
-
         // conversion of a nielsen label to the counter label
         auto conv_fnc = [&](const NielsenLabel& lab, CounterLabel& result) {
             if(lab.second.size() == 0) {
@@ -421,9 +413,6 @@ namespace smt::noodler {
             l1.sum[1].get_type() == BasicTermType::Length && l2.sum[1].get_type() == BasicTermType::Length) {
             
             zstring sm = std::to_string(std::stoi(l1.sum[1].get_name().encode()) + std::stoi(l2.sum[1].get_name().encode()));
-            // concatenate symbols
-            //Concat symbols(l1.nielsen_rule.second.begin(), l1.nielsen_rule.second.end() - 1);
-            //symbols.insert(symbols.end(), l2.symbols.begin(), l2.symbols.end());
             res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)},join_nielsen_label(l2.nielsen_rule, l1.nielsen_rule)};
             return true;
         }
