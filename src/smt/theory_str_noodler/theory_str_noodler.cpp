@@ -1047,6 +1047,7 @@ namespace smt::noodler {
             arith_model->eval_expr(arg, model);
             bool is_int;
             rational val(0);
+            STRACE("str-model-verify", tout << "Model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
             VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
             return val;
         };
@@ -1128,7 +1129,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {
-        STRACE("str", tout << "init_model\n";);
+        STRACE("str", tout << "init_model\n" << *arith_model;);
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {
