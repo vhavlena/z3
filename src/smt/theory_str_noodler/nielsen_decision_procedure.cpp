@@ -28,6 +28,7 @@ namespace smt::noodler {
     lbool NielsenDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
         FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
 
+        // this does not affect the model generation
         prep_handler.separate_eqs();
 
         // Refresh the instance
@@ -55,10 +56,14 @@ namespace smt::noodler {
             });
 
             std::vector<Formula> instances = divide_independent_formula(this->formula);
+            // initialize model handler for computing models
+            this->model_handler = NielsenModel(instances.size(), this->formula.get_vars());
+            size_t graph_counter = 0; 
             for(const Formula& fle : instances) {
                 bool is_sat;
                 // create Nielsen graph and trim it
-                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), is_sat);
+                // we may early terminate only if it is not necessary to generate models
+                NielsenGraph graph = generate_from_formula(fle, this->init_length_sensitive_vars.empty(), this->m_params.m_produce_models || !this->init_length_sensitive_vars.empty(), is_sat);
                 if (!is_sat) {
                     // if some Nielsen graph is unsat --> unsat
                     return l_false;
@@ -66,18 +71,35 @@ namespace smt::noodler {
                 graph = graph.trim();
                 this->graphs.push_back(graph);
 
-                // if there are no length variables --> do not construct the counter system
-                if(this->init_length_sensitive_vars.size() == 0) {
-                    continue;
-                }
                 // create a counter system from the Nielsen graph a condensate it
                 CounterSystem counter_system;
                 if (!create_counter_system(graph, counter_system)) {
                     return l_undef;
                 }
+
+                // generate path from the counter system for potential model generation
+                if(this->m_params.m_produce_models) {
+                    // it suffices to take arbitrary path by default
+                    // if a different path is used for LIA generation, this path is set to model generation as well (later) 
+                    std::optional<Path<CounterLabel>> path = counter_system.shortest_path(counter_system.get_init(), trim_formula(fle));
+                    if(!path.has_value()) {
+                        // the formula is of the form x = x --> we know that x is not length (otherwise we get unknown), we can generate the default model x = eps
+                        this->model_handler.set_generator(graph_counter, {});
+                    } else {
+                        this->model_handler.set_generator(graph_counter, NielsenModel::simple_generator_from_path(path.value()));
+                    }
+                    graph_counter++;
+                }
+
+                // if there are no length variables --> do not construct the counter system
+                if(this->init_length_sensitive_vars.size() == 0) {
+                    continue;
+                }
+
                 condensate_counter_system(counter_system);
                 condensate_counter_system(counter_system);
                 this->length_paths.push_back({});
+
                 // create paths with self-loops containing the desired length variables
                 for(const auto& c : find_self_loops(counter_system)) {
                     Path<CounterLabel> path;
@@ -106,8 +128,15 @@ namespace smt::noodler {
                 if(this->length_paths_index >= this->length_paths[i].size()) {
                     continue;
                 }
-                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts)) {
+                ModelGenerator mod_gen;
+                // generate LIA formula for a path and create a model generator
+                if(!length_formula_path(this->length_paths[i][this->length_paths_index], actual_var_map, conjuncts, mod_gen)) {
                     return l_undef;
+                }
+                // set a new generator according to the length path
+                // we replace the original i-th generator
+                if(this->m_params.m_produce_models) {
+                    this->model_handler.set_generator(i, mod_gen);
                 }
             }
             if(!generate_len_connection(actual_var_map, conjuncts)) {
@@ -209,10 +238,11 @@ namespace smt::noodler {
      * 
      * @param init Initial node (formula)
      * @param early_termination Stop generating graph when the final node is reached?
+     * @param add_edges Add edges to the Nielsen graph?
      * @param[out] is_sat Contains the Nielsen graph an accepting node?
      * @return NielsenGraph 
      */
-    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool & is_sat) const {
+    NielsenGraph NielsenDecisionProcedure::generate_from_formula(const Formula& init, bool early_termination, bool add_edges, bool & is_sat) const {
         NielsenGraph graph;
         std::set<Formula> generated;
 
@@ -255,7 +285,7 @@ namespace smt::noodler {
             std::set<NielsenLabel> rules = get_rules_from_pred(predicates[index]);
             for(const auto& label : rules) {
                 Formula rpl = trim_formula(pr.second.replace(Concat({label.first}), label.second));
-                if(!early_termination) {
+                if(add_edges) {
                     graph.add_edge(pr.second, rpl, label);
                 }
                 if(generated.find(rpl) == generated.end()) {
@@ -330,14 +360,15 @@ namespace smt::noodler {
         result = CounterSystem();
 
         // conversion of a nielsen label to the counter label
-        auto conv_fnc = [](const NielsenLabel& lab, CounterLabel& result) {
+        auto conv_fnc = [&](const NielsenLabel& lab, CounterLabel& result) {
             if(lab.second.size() == 0) {
-                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}};
+                result = CounterLabel{lab.first, {BasicTerm(BasicTermType::Length, "0")}, lab};
             } else if(lab.second.size() == 2 && lab.second[0].is_literal()) {
-                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}};
+                result = CounterLabel{lab.first, {lab.second[1], BasicTerm(BasicTermType::Length, "1")}, lab};
             } else if(lab.second.size() == 2 && lab.second[0].is_variable()) {
-                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}};
+                result = CounterLabel{lab.first, {lab.second[1], lab.second[0]}, lab};
             } else {
+                std::cout << nielsen_label_to_string(lab) << std::endl;
                 return false;
             }
             return true;
@@ -351,7 +382,7 @@ namespace smt::noodler {
         // reverse edges
         for(const auto& pr : graph.edges) {
             for(const auto& trans : pr.second) {
-                CounterLabel target{BasicTerm(BasicTermType::Variable)}; // randomly initialize the variable, this has no meaning
+                CounterLabel target {BasicTerm(BasicTermType::Variable), {}, {BasicTerm(BasicTermType::Variable), {}}}; // randomly initialize the variable, this has no meaning
                 if (!conv_fnc(trans.second, target)) { // the value of target is set here
                     return false;
                 }
@@ -359,6 +390,12 @@ namespace smt::noodler {
             }
         }
         return true;
+    }
+
+    NielsenLabel NielsenDecisionProcedure::join_nielsen_label(const NielsenLabel& l1, const NielsenLabel& l2) {
+        Concat symbols(l1.second.begin(), l1.second.end() - 1);
+        symbols.insert(symbols.end(), l2.second.begin(), l2.second.end());
+        return {l1.first, symbols};
     }
 
     /**
@@ -376,7 +413,7 @@ namespace smt::noodler {
             l1.sum[1].get_type() == BasicTermType::Length && l2.sum[1].get_type() == BasicTermType::Length) {
             
             zstring sm = std::to_string(std::stoi(l1.sum[1].get_name().encode()) + std::stoi(l2.sum[1].get_name().encode()));
-            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)}};
+            res = CounterLabel{l1.left, {l1.sum[0], BasicTerm(BasicTermType::Length, sm)},join_nielsen_label(l2.nielsen_rule, l1.nielsen_rule)};
             return true;
         }
         return false;
@@ -396,7 +433,6 @@ namespace smt::noodler {
         // Compatible labels: labels of the form x := x + 1; x := x + 1 which can be 
         // simplified to x := x + 2. This edge is added to fl --> last
         for(const Formula& fl : cs.get_nodes()) {
-            // std::set<std::pair<Formula, CounterLabel>> add_edges;
             for(const auto& pr : cs.edges[fl]) {
                 Formula mid = pr.first;
                 CounterLabel mid_lab = pr.second;
@@ -406,7 +442,7 @@ namespace smt::noodler {
                         Formula last = dest_pr.first;
                         CounterLabel last_lab = dest_pr.second;
 
-                        CounterLabel res{BasicTerm(BasicTermType::Length)};
+                        CounterLabel res{BasicTerm(BasicTermType::Length), {}, {BasicTerm(BasicTermType::Length), {}}};
                         if(join_counter_label(mid_lab, last_lab, res)) {
                             add_edges.insert({fl, last, res});
                         }
@@ -492,7 +528,7 @@ namespace smt::noodler {
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.left) == in_vars.end()) {
                 BasicTerm tmp_var(BasicTermType::Variable);
-                if (!get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                if (!get_label_formula(CounterLabel{lab.left, {BasicTerm(BasicTermType::Length, "0")}, lab.nielsen_rule}, in_vars, tmp_var, conjuncts)) {
                     return false;
                 }
                 in_vars.insert_or_assign(lab.left, tmp_var);
@@ -502,7 +538,7 @@ namespace smt::noodler {
             // variable from the label is not found --> generrate var = 0 first
             if(in_vars.find(lab.sum[1]) == in_vars.end()) {
                 BasicTerm tmp_var(BasicTermType::Variable);
-                if (!get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}}, in_vars, tmp_var, conjuncts)) {
+                if (!get_label_formula(CounterLabel{lab.sum[1], {BasicTerm(BasicTermType::Length, "0")}, lab.nielsen_rule}, in_vars, tmp_var, conjuncts)) {
                     return false;
                 }
                 in_vars.insert_or_assign(lab.sum[1], tmp_var);
@@ -549,9 +585,10 @@ namespace smt::noodler {
      * @param path Part of the counter system contining only self-loops.
      * @param actual_var_map Var map assigning temporary int variables to the original string variables
      * @param[out] conjuncts A conjunction of atoms (LenNode) in a form of a vector.
+     * @param[out] model_path Model generator obtained from @p path allowing to generate a model.
      * @return bool True iff the formula was successfully created
      */
-    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts) {
+    bool NielsenDecisionProcedure::length_formula_path(const Path<CounterLabel>& path, std::map<BasicTerm, BasicTerm>& actual_var_map, std::vector<LenNode>& conjuncts, ModelGenerator& model_path) {
         // path of length 0 = true
         if(path.labels.size() == 0) {
             return true;
@@ -567,6 +604,8 @@ namespace smt::noodler {
                 return false;
             }
             actual_var_map.insert_or_assign(lab.left, out_var);
+            // add nielsen rule to the model generator
+            model_path.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
 
             // there is a self-loop
             if(it != path.self_loops.end()) {
@@ -574,6 +613,8 @@ namespace smt::noodler {
                 if (!get_label_sl_formula(it->second, actual_var_map, sl_var, conjuncts)) {
                     return false;
                 }
+                // assume that last conjunct is of the form 0 <= fresh, where fresh is a variable counting number of self-loop iterations
+                model_path.push_back({ it->second.nielsen_rule, conjuncts.back().succ[1].atom_val });
                 actual_var_map.insert_or_assign(it->second.left, sl_var);
             } 
         }
@@ -624,6 +665,87 @@ namespace smt::noodler {
         }
 
         return false;
+    }
+
+    zstring NielsenDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if(!this->model_handler.is_initialized()) {
+            this->model_handler.compute_model(get_arith_model_of_var);
+        }
+        return this->model_handler.get_var_model(var);
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * @brief Create a simple model generator from the path in a counter system. Simple generator contains NO loop iterations. 
+     * Basically it mimics model obtained from rules on transitions on the path. Used to generate models from Nielsen graphs with no
+     * length-aware variables (there we need only arbitrary path in the graph to get a valid model).
+     * 
+     * @param path Path in a counter system.
+     * @return ModelGenerator Model generator of path
+     */
+    ModelGenerator NielsenModel::simple_generator_from_path(const Path<CounterLabel>& path) {
+        ModelGenerator gen {};
+        for(size_t i = 1; i < path.nodes.size(); i++) {
+            CounterLabel lab = path.labels[i-1];
+            // add nielsen rule to the model generator
+            gen.push_back({ lab.nielsen_rule, BasicTerm(BasicTermType::Length) });
+        }
+        return gen;
+    }
+
+    void NielsenModel::initialize_model() {
+        for(const BasicTerm& var : this->vars) {
+            // set epsilon to each variable
+            this->model[var] = "";
+        }
+    }
+
+    /**
+     * @brief Generate assignments of variables generated by @p generator. It applies rules of the generator and creates a string model. 
+     * If there is a self-loop we repeat the self-loop by the number of times given by the integer model of the loop variable. 
+     * The assignments are stored in this->model.
+     * 
+     * @param generator Model generator
+     * @param get_arith_model_of_var LIA assignment of variables
+     */
+    void NielsenModel::generate_submodel(const ModelGenerator& generator, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        // assumed to be called after initialize_model()
+        for(const ModelLabel& model_label : generator) {
+            // we are processing rule x -> eps; all variables are already set to eps
+            if(model_label.rule.second.size() == 0) {
+                continue;
+            }
+            // rules are of the form x -> alpha x
+            Concat lit_concat(model_label.rule.second.begin(), model_label.rule.second.end() - 1);
+            // rule is of the form x -> y x
+            if(lit_concat[0].is_variable()) {
+                this->model[model_label.rule.first] = this->model[lit_concat[0]] + this->model[model_label.rule.first];
+            } else {
+                // rule is of the form x -> str x (there might be a repetition variable)
+                zstring str_concat = "";
+                for(const BasicTerm& bt : lit_concat) {
+                    str_concat = str_concat + bt.get_name();
+                }
+                // repetite the string
+                if(model_label.repetition_var.is_variable()) {
+                    rational repetitions = get_arith_model_of_var(model_label.repetition_var);
+                    zstring base = str_concat;
+                    str_concat = "";
+                    for(rational i = rational(0); i < repetitions; i++) {
+                        str_concat = str_concat + base;
+                    }
+                }
+                this->model[model_label.rule.first] = str_concat + this->model[model_label.rule.first];
+            }
+        }
+    }
+
+    void NielsenModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        initialize_model();
+        for(const ModelGenerator& gen : this->graph_generators) {
+            generate_submodel(gen, get_arith_model_of_var);
+        }
     }
 
 } // Namespace smt::noodler.
