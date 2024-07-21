@@ -1659,7 +1659,7 @@ namespace smt::noodler {
             if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
                 // TODO check if inclusion_with_var_on_right_side lays on a cycle.
                 // If it is on a cycle, then we need to use (and implement) the horrible proof (righ now the following will never finish)
-                // Right now if there is some cycle, this will never finish.
+                // Right now if there is some cycle (checked using vars_whose_model_we_are_computing), we throw error.
 
                 // We need to compute the vars on the right side from the vars on the left
                 //  - first we get the string model of the left side
