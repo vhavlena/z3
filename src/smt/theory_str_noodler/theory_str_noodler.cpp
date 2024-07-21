@@ -1129,7 +1129,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {
-        STRACE("str", tout << "init_model\n" << *arith_model;);
+        STRACE("str", tout << "init_model\n");
         CTRACE("str-arith-model", arith_model != nullptr, tout << "Arith model:\n" << *arith_model << std::endl;);
     }
 
