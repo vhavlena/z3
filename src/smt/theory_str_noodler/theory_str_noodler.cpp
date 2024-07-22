@@ -1060,7 +1060,14 @@ namespace smt::noodler {
             bool is_int;
             rational val(0);
             STRACE("str-arith-model", tout << "Model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
-            VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+            if (m.is_ite(model)) {
+                // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
+                // so we just assume that it does not matter and take the first argument
+                // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
+                VERIFY(m_util_a.is_numeral(to_app(model)->get_arg(1), val, is_int) && is_int);
+            } else {
+                VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+            }
             return val;
         };
 
@@ -1082,7 +1089,14 @@ namespace smt::noodler {
                     arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
                     bool is_int;
                     rational val(0);
-                    VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+                    if (m.is_ite(model)) {
+                        // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
+                        // so we just assume that it does not matter and take the first argument
+                        // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
+                        VERIFY(m_util_a.is_numeral(to_app(model)->get_arg(1), val, is_int) && is_int);
+                    } else {
+                        VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+                    }
                     while (res.length() != val.get_unsigned()) {
                         res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
                     }
