@@ -810,7 +810,8 @@ namespace smt::noodler {
         // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
             lbool result = run_loop_protection();
-            if(result == l_true) {
+            if(result == l_true && !m_params.m_produce_models) { // if we want to produce model, we need the exact solution in dec_proc, so we need to run procedure again 
+                last_run_was_sat = true;
                 return FC_DONE;
             } else if (result == l_false) {
                 return FC_CONTINUE;
