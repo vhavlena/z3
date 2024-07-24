@@ -547,7 +547,7 @@ namespace smt::noodler {
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions) {
 
-        dec_proc = std::make_unique<DecisionProcedure>(instance, aut_ass, init_length_sensitive_vars, m_params, conversions);
+        dec_proc = std::make_unique<UnaryDecisionProcedure>(instance, aut_ass, init_length_sensitive_vars, m_params);
         expr_ref lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);
