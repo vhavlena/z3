@@ -813,7 +813,9 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x (not)in RE', we use universality/emptiness
         // checking of the regex (using some heuristics) instead of constructing the automaton of RE. The construction (especially complement)
         // can sometimes blow up, so the check should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0) {
+        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0
+                && this->len_vars.empty() // TODO: handle length vars that are not x (i.e., there are no string constraints on them, other than length ones, we just need to compute arith model)
+        ) {
             const auto& reg_data = this->m_membership_todo_rel[0];
             // TODO: check if "xyz in RE" works correctly
             expr_ref var = std::get<0>(reg_data);
@@ -888,6 +890,7 @@ namespace smt::noodler {
         if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
+                last_run_was_sat = true;
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -898,6 +901,8 @@ namespace smt::noodler {
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
             lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -929,6 +934,8 @@ namespace smt::noodler {
         if(m_params.m_try_length_proc && contains_eqs_and_diseqs_only && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
             lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -940,6 +947,8 @@ namespace smt::noodler {
             STRACE("str", tout << "Try underapproximation" << std::endl);
             if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
                 return FC_DONE;
             }
             STRACE("str", tout << "Underapproximation did not help\n";);
@@ -983,6 +992,7 @@ namespace smt::noodler {
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
+                    propagate_lengths_from_arith_model();
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;
@@ -1019,6 +1029,7 @@ namespace smt::noodler {
     zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
         // function that returns either the length of str var or model of int var from arith_model
         std::function<rational(BasicTerm)> get_arith_model_of_var = [this](BasicTerm var) -> rational {
+            SASSERT(arith_model != nullptr);
             expr_ref arg(m);
             // the following is similar to code in util::len_to_expr()
             if(!var_name.contains(var)) {
@@ -1036,6 +1047,7 @@ namespace smt::noodler {
             arith_model->eval_expr(arg, model);
             bool is_int;
             rational val(0);
+            STRACE("str-arith-model", tout << "Model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
             VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
             return val;
         };
@@ -1050,17 +1062,23 @@ namespace smt::noodler {
                 // for relevant (string) var, we get the model from the decision procedure that returned sat
                 return dec_proc->get_model(var, get_arith_model_of_var);
             } else {
-                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length)
-                // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
-                expr_ref model(m);
-                arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
-                bool is_int;
-                rational val(0);
-                VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
-                while (res.length() != val.get_unsigned()) {
-                    res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
+                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
+                if (len_vars.contains(str_expr)) {
+                    // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
+                    SASSERT(arith_model != nullptr);
+                    expr_ref model(m);
+                    arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
+                    bool is_int;
+                    rational val(0);
+                    VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+                    while (res.length() != val.get_unsigned()) {
+                        res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
+                    }
+                    return res;
+                } else {
+                    // we return empty string for non-relevant non-length vars, their value does not matter
+                    return zstring();
                 }
-                return res;
             }
         } else if (m_util_s.str.is_concat(str_expr)) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
@@ -1111,7 +1129,8 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {
-        STRACE("str", tout << "init_model\n";);
+        STRACE("str", tout << "init_model\n");
+        CTRACE("str-arith-model", arith_model != nullptr, tout << "Arith model:\n" << *arith_model << std::endl;);
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {

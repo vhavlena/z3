@@ -114,7 +114,7 @@ public:
         if (ctx.ignore_check())
             return;
         if (!ctx.is_model_available(m) || !ctx.get_check_sat_result())
-            throw cmd_exception("model is not available");
+            throw cmd_exception("model is not available, did you forget to enable model generation with ''model=true'?");
         if (m_index > 0 && ctx.get_opt()) {
             ctx.get_opt()->get_box_model(m, m_index);
         }
@@ -129,7 +129,7 @@ public:
 ATOMIC_CMD(get_assignment_cmd, "get-assignment", "retrieve assignment", {
     model_ref m;
     if (!ctx.is_model_available(m) || ctx.get_check_sat_result() == 0)
-        throw cmd_exception("model is not available");
+        throw cmd_exception("model is not available, did you forget to enable model generation with 'model=true'?");
     ctx.regular_stream() << "(";
     dictionary<macro_decls> const & macros = ctx.get_macros();
     bool first = true;

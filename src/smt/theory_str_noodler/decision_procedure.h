@@ -434,6 +434,8 @@ namespace smt::noodler {
 
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;
+        // vars for which we already called get_model() at least once (used for cyclicity detection, will be removed when get_model() can handle cycles in inclusions)
+        std::set<BasicTerm> vars_whose_model_we_are_computing;
 
         /**
          * @brief Update the model and its language in the solution of the variable @p var to @p computed_model
@@ -445,9 +447,9 @@ namespace smt::noodler {
         zstring update_model_and_aut_ass(BasicTerm var, zstring computed_model) {
             model_of_var[var] = computed_model;
             if (solution.aut_ass.contains(var)) {
-                SASSERT(!mata::nfa::intersection(AutAssignment::create_word_nfa(computed_model), *solution.aut_ass[var]).is_lang_empty());
                 solution.aut_ass[var] = std::make_shared<mata::nfa::Nfa>(AutAssignment::create_word_nfa(computed_model));
             }
+            STRACE("str-model-res", tout << "Model for " << var << ": " << computed_model << std::endl);
             return computed_model;
         };
 

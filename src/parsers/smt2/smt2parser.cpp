@@ -2685,7 +2685,7 @@ namespace smt2 {
                 return;
             }
             if (!m_ctx.is_model_available(md) || m_ctx.get_check_sat_result() == nullptr)
-                throw cmd_exception("model is not available");
+                throw cmd_exception("model is not available, did you forget to enable model generation with 'model=true'?");
             if (index != 0) {
                 m_ctx.get_opt()->get_box_model(md, index);
             }

@@ -314,9 +314,9 @@ namespace smt::noodler {
         AutAssignment aut_ass;
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
-        // keeps equations that were removed during preprocessing and are needed to generate model
+        // keeps equations that were removed during preprocessing as inclusions that are needed to generate model
         // (the variables on the right should be propagated from the left variables during model generation)
-        std::vector<Predicate> removed_equations;
+        std::vector<Predicate> removed_inclusions_for_model;
 
         LenNode len_formula;
         std::unordered_set<BasicTerm> len_variables;
@@ -347,6 +347,8 @@ namespace smt::noodler {
         bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
+        std::string print_info(bool print_nfas = false);
+
 
     public:
         FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
@@ -363,12 +365,13 @@ namespace smt::noodler {
         void get_regular_sublists(std::map<Concat, unsigned>& res) const;
         void get_eps_terms(std::set<BasicTerm>& res) const;
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
+        const std::unordered_map<BasicTerm, std::vector<BasicTerm>>& get_substitution_map() const { return this->substitution_map; }
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
         const LenNode& get_len_formula() const { return this->len_formula; }
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
-        const std::vector<Predicate>& get_removed_equations() const {return this->removed_equations; }
+        const std::vector<Predicate>& get_removed_inclusions_for_model() const {return this->removed_inclusions_for_model; }
 
         Formula get_modified_formula() const;
 
@@ -386,6 +389,7 @@ namespace smt::noodler {
         void infer_alignment();
         void common_prefix_propagation();
         void common_suffix_propagation();
+        void conversions_validity(std::vector<TermConversion>& conversions);
 
         void refine_languages();
         void reduce_diseqalities();
@@ -401,7 +405,6 @@ namespace smt::noodler {
          */
         bool can_unify_not_contains();
 
-        void conversions_validity(std::vector<TermConversion>& conversions);
         /**
          * @brief Construct constraints to get rid of not_contains predicates.
          * @return false -> unsatisfiable constaint; true if it is not evident

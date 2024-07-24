@@ -15,7 +15,7 @@ For a brief overview of the architecture, see [SMT-COMP'24 Z3-Noodler descriptio
 
 ### Dependencies
 
-1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.6.3`.
+1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.6.6`.
     ```shell
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
@@ -47,16 +47,16 @@ make test-noodler
 ```
 
 ### Running Z3-Noodler
-To run Z3-Noodler, select Z3-Noodler as Z3's string solver when executing Z3.
+To run Z3-Noodler, use:
 ```shell
 cd build/
-./z3 smt.string_solver=noodler <instance_file.smt2> 
+./z3 <instance_file.smt2> 
 ```
 
-If you want to get a model for sat instances, you need to enable producing models (otherwise the resulting models are not usable).
+If you want to get a model for sat instances (using `get-model` or `get-value`), you need to enable model generation:
 ```shell
 cd build/
-./z3 smt.string_solver=noodler smt.str.produce_models=true <instance_file.smt2> 
+./z3 model=true <instance_file.smt2> 
 ```
 However, model generation is highly experimental, the models might be invalid or they cannot be computed (yet).
 

@@ -94,15 +94,6 @@ namespace smt::noodler::util {
     void get_variable_names(expr* ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res);
 
     /**
-     * Get dummy symbols.
-     *
-     * @param[in] new_symb_num Number of added symbols.
-     * @param[out] symbols_to_append_to Set of symbols where dummy symbols are appended to.
-     * @return Set of dummy symbols.
-     */
-    std::set<uint32_t> get_dummy_symbols(size_t new_symb_num, std::set<uint32_t>& symbols_to_append_to);
-
-    /**
      * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter
      *  @p terms.
      * @param ex Expression to be checked for basic terms.

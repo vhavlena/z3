@@ -37,7 +37,7 @@ public:
     bool             m_debug_ref_count { false };
     bool             m_trace { false };
     bool             m_well_sorted_check { false };
-    bool             m_model { true };
+    bool             m_model { false };
     bool             m_model_validate { false };
     bool             m_dump_models { false };
     bool             m_unsat_core { false };

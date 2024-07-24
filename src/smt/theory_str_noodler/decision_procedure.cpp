@@ -1393,9 +1393,10 @@ namespace smt::noodler {
          // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
+        this->init_substitution_map = prep_handler.get_substitution_map();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
-        this->inclusions_from_preprocessing = prep_handler.get_removed_equations();
+        this->inclusions_from_preprocessing = prep_handler.get_removed_inclusions_for_model();
 
         if (!this->init_aut_ass.is_sat()) {
             // some automaton in the assignment is empty => we won't find solution
@@ -1560,14 +1561,6 @@ namespace smt::noodler {
             mata::nfa::Nfa len_nfa = solution.aut_ass.sigma_automaton_of_length(len.get_unsigned());
             nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, len_nfa).trim());
 
-            // Restrict code-conversion var
-            if (code_subst_vars.contains(var)) {
-                rational to_code_value = get_arith_model_of_var(code_version_of(var));
-                if (to_code_value != -1) {
-                    update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
-                } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been done in restrict_languages_to_lengths()
-            }
-
             // Restrict int-conversion var
             if (int_subst_vars.contains(var)) {
                 if (len == 0) {
@@ -1591,7 +1584,19 @@ namespace smt::noodler {
                     }
                 }
             }
+
+            // Restrict code-conversion var
+            if (code_subst_vars.contains(var)) {
+                rational to_code_value = get_arith_model_of_var(code_version_of(var));
+                if (to_code_value != -1) {
+                    solution.aut_ass.add_symbol_from_dummy(to_code_value.get_unsigned());
+                    update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
+                } // for the case to_code_value == -1 we shoulh have (str.len var) != 1, so we do not need to restrict the language, as it should have been already be restricted by lenght
+            }
         }
+
+        // we remove dummy symbol from automata, so we do not have to work with it
+        solution.aut_ass.replace_dummy_with_new_symbol();
         
         is_model_initialized = true;
 
@@ -1627,6 +1632,10 @@ namespace smt::noodler {
             return model_of_var.at(var);
         }
 
+        if (vars_whose_model_we_are_computing.contains(var)) {
+            util::throw_error("There is cycle in inclusion graph, cannot produce model");
+        }
+
         STRACE("str-model",
             tout << "Generating model for var " << var;
             if (solution.length_sensitive_vars.contains(var)) {
@@ -1634,6 +1643,8 @@ namespace smt::noodler {
             }
             tout << "\n";
         );
+
+        vars_whose_model_we_are_computing.insert(var);
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
@@ -1646,9 +1657,9 @@ namespace smt::noodler {
         } else if (solution.aut_ass.contains(var)) {
             Predicate inclusion_with_var_on_right_side;
             if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
-                // TODO check if inclusion_with_var_on_right_side lays on a cycle (needs to be
-                // implemented solution.is_inclusion_on_cycle() is overapproximation)
+                // TODO check if inclusion_with_var_on_right_side lays on a cycle.
                 // If it is on a cycle, then we need to use (and implement) the horrible proof (righ now the following will never finish)
+                // Right now if there is some cycle (checked using vars_whose_model_we_are_computing), we throw error.
 
                 // We need to compute the vars on the right side from the vars on the left
                 //  - first we get the string model of the left side
@@ -1669,34 +1680,67 @@ namespace smt::noodler {
                 } else {
                     std::vector<std::shared_ptr<mata::nfa::Nfa>>left_side_string_aut{std::make_shared<mata::nfa::Nfa>(solution.aut_ass.create_word_nfa(left_side_string))};
 
+                    const auto& vars_on_right_side = inclusion_with_var_on_right_side.get_right_side(); // becase inclusion is not on cycle, all variables on the right side must be different
                     std::vector<std::shared_ptr<mata::nfa::Nfa>> automata_on_right_side;
-                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
+                    for (const auto &right_side_var : vars_on_right_side) {
                         automata_on_right_side.push_back(solution.aut_ass.at(right_side_var));
                     }
+                    SASSERT(vars_on_right_side.size() == automata_on_right_side.size());
 
                     auto noodles = mata::strings::seg_nfa::noodlify_for_equation(automata_on_right_side, 
                                                                                 left_side_string_aut,
-                                                                                true, 
+                                                                                false, 
                                                                                 {{"reduce", "forward"}});
                     SASSERT(!noodles.empty());
-                    SASSERT(automata_on_right_side.size() == noodles[0].size());
-                    unsigned i = 0;
-                    for (const auto &right_side_var : inclusion_with_var_on_right_side.get_right_side()) {
-                        if (right_side_var.is_literal()) { continue; }
-                        // becase inclusion is not on cycle, all variables on the right side must be different
-                        zstring right_side_var_string = alph.get_string_from_mata_word(*(noodles[0][i].first->get_word()));
-                        update_model_and_aut_ass(right_side_var, right_side_var_string);
-                        ++i;
+                    STRACE("str-model-noodlification",
+                        tout << "Noodlification before and after in model generation:" << std::endl;
+                        tout << "Left side automaton for concatenation ";
+                        for (const auto& var_on_left_side : inclusion_with_var_on_right_side.get_left_side()) {
+                            tout << " " << var_on_left_side;
+                        }
+                        tout << ":\n" << *left_side_string_aut[0];
+                        tout << "Right side automata:" << std::endl;
+                        for (unsigned i = 0; i < vars_on_right_side.size(); ++i) {
+                            tout << "Variable " << vars_on_right_side[i] << ":\n" << *automata_on_right_side[i];
+                        }
+                        tout << "Noodle:\n";
+                        for (const auto &noodle_aut : noodles[0]) {
+                            tout << "Automaton for right var with index " << noodle_aut.second[0] << ":\n";
+                            tout << *noodle_aut.first;
+                        }
+                    );
+                    unsigned index_of_right_var_that_is_not_yet_processed = 0;
+                    for (const auto &noodle_aut : noodles[0]) { // we can take any noodle, so we take the first one
+                        // noodle_aut.second[0] is the index of the right var whose automaton is noodle_aut.first (see compute_next_solution() for better explanation)
+                        unsigned index_of_right_var_that_belongs_to_noodle_aut = noodle_aut.second[0];
+                        while (index_of_right_var_that_is_not_yet_processed < index_of_right_var_that_belongs_to_noodle_aut) {
+                            // skipped vars means that they are empty strings
+                            BasicTerm right_var_that_is_not_yet_processed = vars_on_right_side[index_of_right_var_that_is_not_yet_processed];
+                            update_model_and_aut_ass(right_var_that_is_not_yet_processed, zstring());
+                            ++index_of_right_var_that_is_not_yet_processed;
+                        }
+                        // update model based on noodle_aut
+                        BasicTerm right_var_that_belongs_to_noodle_aut = vars_on_right_side[index_of_right_var_that_belongs_to_noodle_aut];
+                        if (!right_var_that_belongs_to_noodle_aut.is_literal()) {
+                            zstring right_side_var_string = alph.get_string_from_mata_word(noodle_aut.first->get_word().value());
+                            SASSERT(index_of_right_var_that_is_not_yet_processed == index_of_right_var_that_belongs_to_noodle_aut);
+                            update_model_and_aut_ass(right_var_that_belongs_to_noodle_aut, right_side_var_string);
+                        }
+                        ++index_of_right_var_that_is_not_yet_processed;
+                    }
+                    while (index_of_right_var_that_is_not_yet_processed < vars_on_right_side.size()) {
+                        BasicTerm right_var_that_is_not_yet_processed = vars_on_right_side[index_of_right_var_that_is_not_yet_processed];
+                        update_model_and_aut_ass(right_var_that_is_not_yet_processed, zstring());
+                        ++index_of_right_var_that_is_not_yet_processed;
                     }
                 }
                 return model_of_var.at(var);
             } else {
                 // var is only on the left side in the inclusion graph => we can return whatever
-
-                // TODO replace following with function that returns arbitary word from Mata
                 zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
-                mata::Word accepted_word = *(nfa->get_word());
+                STRACE("str-model-nfa", tout << "NFA for var " << var << " before getting some word:\n" << *nfa;);
+                mata::Word accepted_word = nfa->get_word().value();
                 return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
             }
         } else {

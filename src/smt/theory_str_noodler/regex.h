@@ -54,8 +54,7 @@ namespace smt::noodler::regex {
     };
 
     /**
-     * @brief Alphabet wrapper for Z3 alphabet represented by 
-     * std::set<uint32_t> and a Mata alphabet.
+     * @brief Alphabet wrapper for Z3 alphabet represented by std::set<mata::Symbol> and a Mata alphabet.
      */
     struct Alphabet {
         std::set<mata::Symbol> alphabet;
@@ -87,7 +86,7 @@ namespace smt::noodler::regex {
         }
 
         /// @brief Return zstring corresponding the the word @p word, where dummy symbol is replaced with some valid symbol not in the alphabet.
-        zstring get_string_from_mata_word(mata::Word word) const {
+        zstring get_string_from_mata_word(const mata::Word& word) const {
             zstring res;
             mata::Symbol unused_symbol = get_unused_symbol();
             for (mata::Symbol s : word) {

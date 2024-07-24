@@ -355,6 +355,9 @@ namespace smt::noodler {
          */
         void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
+        /// @brief Propagate the lenghts of len_vars from arith_model into Z3, so that it forces correct values for the LIA part of input formula
+        void propagate_lengths_from_arith_model();
+
         /**
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.
          * 

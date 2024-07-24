@@ -137,12 +137,16 @@ namespace smt::noodler {
     zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
         SASSERT(unions.contains(var) || intersections.contains(var));
+        mata::Word word;
         if (unions.contains(var)) {
-            // TODO: add support for getting some word from "intersections[var] \intersect \neg unions[var]" on the fly
-            util::throw_error("Unsupported for now");
+            if (intersections.contains(var)) {
+                word = mata::nfa::get_word_from_lang_difference(intersections.at(var), unions.at(var)).value();
+            } else {
+                word = unions.at(var).get_word_from_complement(&alph.mata_alphabet).value();
+            }
+        } else {
+            word = intersections.at(var).get_word().value();
         }
-
-        mata::Word word = *(intersections.at(var).get_word());
         return alph.get_string_from_mata_word(word);
     }
 }
