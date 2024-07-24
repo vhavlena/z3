@@ -31,7 +31,8 @@ namespace smt::noodler {
         m_util_s(m),
         var_eqs(m_util_a),
         m_length(m),
-        axiomatized_instances()  {
+        axiomatized_instances(),
+        sat_length_formula(m)  {
     }
 
     void theory_str_noodler::display(std::ostream &os) const {
@@ -760,15 +761,19 @@ namespace smt::noodler {
 
         if (last_run_was_sat) {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
+            if (m_params.m_produce_models) {
+                if (check_len_sat(sat_length_formula) != l_true) { // we need to run len sat check to compute new arith model
+                    util::throw_error("This should not happen");
+                }
+            }
             return FC_DONE;
         }
-        
+
         arith_model = nullptr;
         dec_proc = nullptr;
         relevant_vars.clear();
 
         remove_irrelevant_constr();
-
         STRACE("str",
             tout << "Relevant predicates:" << std::endl;
             tout << "  eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
@@ -903,7 +908,6 @@ namespace smt::noodler {
         if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
-                last_run_was_sat = true;
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -914,8 +918,6 @@ namespace smt::noodler {
         if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
             lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
-                last_run_was_sat = true;
-                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -947,8 +949,6 @@ namespace smt::noodler {
         if(m_params.m_try_length_proc && contains_eqs_and_diseqs_only && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
             lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
-                last_run_was_sat = true;
-                propagate_lengths_from_arith_model();
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -960,8 +960,6 @@ namespace smt::noodler {
             STRACE("str", tout << "Try underapproximation" << std::endl);
             if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
-                last_run_was_sat = true;
-                propagate_lengths_from_arith_model();
                 return FC_DONE;
             }
             STRACE("str", tout << "Underapproximation did not help\n";);
@@ -1006,6 +1004,7 @@ namespace smt::noodler {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
                     propagate_lengths_from_arith_model();
+                    sat_length_formula = lengths;
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;

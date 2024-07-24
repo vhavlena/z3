@@ -117,6 +117,8 @@ namespace smt::noodler {
 
         // true if last run of final_check_eh was sat (if it is true, then final_check_eh always return sat)
         bool last_run_was_sat = false;
+        // the length formula from the last run that was sat
+        expr_ref sat_length_formula;
 
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)

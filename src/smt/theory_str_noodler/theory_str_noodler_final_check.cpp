@@ -236,6 +236,9 @@ namespace smt::noodler {
         while(dec_proc->compute_next_solution() == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
+                sat_length_formula = lengths;
                 return l_true;
             }
         }
@@ -367,6 +370,9 @@ namespace smt::noodler {
             if (result == l_true) {
                 expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
+                    last_run_was_sat = true;
+                    propagate_lengths_from_arith_model();
+                    sat_length_formula = lengths;
                     return l_true;
                 } else {
                     STRACE("str", tout << "nielsen len unsat" <<  mk_pp(lengths, m) << std::endl;);
@@ -401,6 +407,9 @@ namespace smt::noodler {
             auto [formula, precision] = nproc.get_lengths();
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
+                last_run_was_sat = true;
+                propagate_lengths_from_arith_model();
+                sat_length_formula = lengths;
                 return l_true;
             } else {
                 STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
@@ -556,6 +565,9 @@ namespace smt::noodler {
             block_curr_len(lengths, true, true);
             return l_false;
         } else {
+            last_run_was_sat = true;
+            propagate_lengths_from_arith_model();
+            sat_length_formula = lengths;
             return l_true;
         }
     }
@@ -568,5 +580,13 @@ namespace smt::noodler {
             arith_model->eval_expr(m_util_s.str.mk_length(len_var), model);
             add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
         }
+
+        // for (auto& [noodler_var, z3_var] : var_name) {
+        //     add_axiom(m.mk_eq(z3_var, m_util_s.str.mk_string(model_of_string_expr(to_app(z3_var)))));
+        // }
+
+        // for (auto& [pred, var] : predicate_replace) {
+        //     add_axiom(m.mk_eq(pred, m_util_s.str.mk_string(model_of_string_expr(to_app(pred)))));
+        // }
     }
 }
