@@ -40,6 +40,7 @@ Eternal glory to Yu-Fang.
 #include "nielsen_decision_procedure.h"
 #include "counter_automaton.h"
 #include "length_decision_procedure.h"
+#include "unary_decision_procedure.h"
 
 namespace smt::noodler {
 
