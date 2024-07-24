@@ -196,7 +196,7 @@ namespace smt::noodler {
         for (auto& [var, nfa] : *this) {
             for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
                 const mata::nfa::StatePost& delta_from_state = nfa->delta[state];
-                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest, so should be at the back
+                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest (we do not have epsilons), so should be at the back
                     is_there_some_dummy = true;
                     nfa->delta.add(state, sym, nfa->delta[state].back().targets);
                 }
