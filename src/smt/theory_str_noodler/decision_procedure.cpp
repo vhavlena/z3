@@ -1396,7 +1396,7 @@ namespace smt::noodler {
         this->init_substitution_map = prep_handler.get_substitution_map();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
-        this->inclusions_from_preprocessing = prep_handler.get_removed_equations();
+        this->inclusions_from_preprocessing = prep_handler.get_removed_inclusions_for_model();
 
         if (!this->init_aut_ass.is_sat()) {
             // some automaton in the assignment is empty => we won't find solution

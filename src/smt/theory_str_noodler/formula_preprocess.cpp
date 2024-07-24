@@ -341,7 +341,7 @@ namespace smt::noodler {
                 this->add_to_len_formula(pr.second.get_formula_eq());
             }
             
-            removed_equations.push_back(pr.second);
+            removed_inclusions_for_model.push_back(pr.second);
 
             this->formula.remove_predicate(pr.first);
             STRACE("str-prep-remove_regular", tout << "removed" << std::endl;);
@@ -1123,11 +1123,11 @@ namespace smt::noodler {
                 if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
                     this->add_to_len_formula(pr.second.get_formula_eq());
-                    // we add the removed equation to removed_equations, but we have to swap
+                    // we add the removed equation to removed_inclusions_for_model, but we have to swap
                     // sides so that the single occurring side is on the right (we are gonna
                     // pretend it is an inclusion and from left side compute the vars of
                     // the right side in the model generation)
-                    removed_equations.push_back(pr.second.get_switched_sides_predicate());
+                    removed_inclusions_for_model.push_back(pr.second.get_switched_sides_predicate());
 
                     // if we need to produce models and left side contains some length variable,
                     // we need to make all variables on the right side length too, so that we
@@ -1145,7 +1145,7 @@ namespace smt::noodler {
                 if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
                     this->add_to_len_formula(pr.second.get_formula_eq());
-                    removed_equations.push_back(pr.second);
+                    removed_inclusions_for_model.push_back(pr.second);
                     // if we need to produce models and right side contains some length variable,
                     // we need to make all variables on the left side length too, so that we
                     // select the correct lengths during the model generation
@@ -1783,7 +1783,7 @@ namespace smt::noodler {
             res << std::endl;
         }
         res << "Current removed equations:\n";
-        for (const auto& rem_eq : removed_equations) {
+        for (const auto& rem_eq : removed_inclusions_for_model) {
             res << rem_eq << std::endl;
         }
         res << "Current length vars:";

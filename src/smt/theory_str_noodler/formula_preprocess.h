@@ -314,9 +314,9 @@ namespace smt::noodler {
         AutAssignment aut_ass;
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
-        // keeps equations that were removed during preprocessing and are needed to generate model
+        // keeps equations that were removed during preprocessing as inclusions that are needed to generate model
         // (the variables on the right should be propagated from the left variables during model generation)
-        std::vector<Predicate> removed_equations;
+        std::vector<Predicate> removed_inclusions_for_model;
 
         LenNode len_formula;
         std::unordered_set<BasicTerm> len_variables;
@@ -371,7 +371,7 @@ namespace smt::noodler {
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
         const LenNode& get_len_formula() const { return this->len_formula; }
         const std::unordered_set<BasicTerm>& get_len_variables() const { return this->len_variables; }
-        const std::vector<Predicate>& get_removed_equations() const {return this->removed_equations; }
+        const std::vector<Predicate>& get_removed_inclusions_for_model() const {return this->removed_inclusions_for_model; }
 
         Formula get_modified_formula() const;
 
