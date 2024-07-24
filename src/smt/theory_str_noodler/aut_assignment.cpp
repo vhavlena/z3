@@ -196,7 +196,7 @@ namespace smt::noodler {
         for (auto& [var, nfa] : *this) {
             for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
                 const mata::nfa::StatePost& delta_from_state = nfa->delta[state];
-                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest (we do not have epsilons), so should be at the back
+                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbol should be largest (we do not have epsilons), so should be at the back
                     is_there_some_dummy = true;
                     nfa->delta.add(state, sym, nfa->delta[state].back().targets);
                 }
@@ -212,13 +212,13 @@ namespace smt::noodler {
         bool is_there_some_dummy = false;
         for (auto& [var, nfa] : *this) {
             for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
-                const mata::nfa::StatePost& delta_from_state = nfa->delta[state];
-                if (!delta_from_state.empty() && delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbols should be largest, so should be at the back
-                    is_there_some_dummy = true;
-                    mata::nfa::StateSet targets = delta_from_state.back().targets;
-                    nfa->delta.add(state, new_symbol, targets);
-                    for (mata::nfa::State target : targets) {
-                        nfa->delta.remove(state, util::get_dummy_symbol(), target);
+                if (!nfa->delta[state].empty()) { // if there is some transition from state
+                    mata::nfa::StatePost& delta_from_state = nfa->delta.mutable_state_post(state); // then we can for sure get mutable transitions from state without side effect
+                    if (delta_from_state.back().symbol == util::get_dummy_symbol()) { // dummy symbol should be largest (we do not have epsilons), so should be at the back
+                        is_there_some_dummy = true;
+                        mata::nfa::StateSet targets = delta_from_state.back().targets;
+                        delta_from_state.pop_back();
+                        nfa->delta.add(state, new_symbol, targets);
                     }
                 }
             }
