@@ -561,7 +561,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::propagate_lengths_from_arith_model() {
-        if (!m_params.m_produce_models) { return; }
+        if (!m_params.m_produce_models || len_vars.empty()) { return; }
         SASSERT(arith_model != nullptr);
         expr_ref model(m);
         for (const auto& len_var : len_vars) {
