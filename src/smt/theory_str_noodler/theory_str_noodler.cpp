@@ -1800,8 +1800,9 @@ namespace smt::noodler {
      * @brief Handling of str.replace(s,R,t) = v ... s where to replace, R regex what to find, t replacement.
      * Translates to the following theory axioms (similar to handle_replace):
      * replace(s,R,t) = v
+     * eps \in R -> v = t.s
      * s \not\in \Sigma*R\Sigma* -> v = s
-     * s \in \Sigma*R\Sigma* -> (s = x.y.a.z && xy \not\in \Sigma*R\Sigma* && a \in \Sigma && ya \in R && v = x.t.z)
+     * s \in \Sigma*R\Sigma* && eps \not\in R -> (s = x.y.a.z && xy \not\in \Sigma*R\Sigma* && a \in \Sigma && ya \in R && v = x.t.z)
      *
      * @param e replace_re term
      */
@@ -1820,25 +1821,32 @@ namespace smt::noodler {
         expr_ref y = mk_str_var_fresh("replace_re_middle");
         expr_ref a = mk_str_var_fresh("replace_re_middle_char");
         expr_ref z = mk_str_var_fresh("replace_re_right");
+        expr_ref eps(m_util_s.str.mk_string(""), m);
         expr_ref xyaz = mk_concat(x, mk_concat(y, mk_concat(a, z)));
         expr_ref xy = mk_concat(x, y);
         expr_ref ya = mk_concat(y, a);
         expr_ref xtz = mk_concat(x, mk_concat(t, z));
+        expr_ref ts = mk_concat(t, s);
         expr_ref sigma_star(m_util_s.re.mk_full_seq(R->get_sort()), m);
         // \Sigma*R\Sigma*
         expr_ref SRS(m_util_s.re.mk_concat(sigma_star, m_util_s.re.mk_concat(R, sigma_star)), m);
         // s \in \Sigma*R\Sigma*
         literal s_in_SRS = mk_literal(m_util_s.re.mk_in_re(s, SRS));
+        // eps \in R
+        literal eps_in_R = mk_literal(m_util_s.re.mk_in_re(eps, R));
+
+        // eps \in R -> v = t.s
+        add_axiom({~eps_in_R, mk_literal(m.mk_eq(v, ts))});
 
         // s \not\in \Sigma*R\Sigma* -> v = s
         add_axiom({s_in_SRS, mk_eq(v, s, false)});
 
-        // s \in \Sigma*R\Sigma* -> (s = x.y.z && xy \not\in \Sigma*R\Sigma* && a \in \Sigma && ya \in R && v = x.t.z)
-        add_axiom({~s_in_SRS, mk_literal(m.mk_eq(s, xyaz))});
-        add_axiom({~s_in_SRS, mk_literal(m.mk_not(m_util_s.re.mk_in_re(xy, SRS)))});
-        add_axiom({~s_in_SRS, mk_literal(m_util_s.re.mk_in_re(a, m_util_s.re.mk_full_char(nullptr)))});
-        add_axiom({~s_in_SRS, mk_literal(m_util_s.re.mk_in_re(ya, R))});
-        add_axiom({~s_in_SRS, mk_eq(v, xtz, false)});
+        // s \in \Sigma*R\Sigma* && eps \not\in R -> (s = x.y.z && xy \not\in \Sigma*R\Sigma* && a \in \Sigma && ya \in R && v = x.t.z)
+        add_axiom({~s_in_SRS, eps_in_R, mk_literal(m.mk_eq(s, xyaz))});
+        add_axiom({~s_in_SRS, eps_in_R, mk_literal(m.mk_not(m_util_s.re.mk_in_re(xy, SRS)))});
+        add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(a, m_util_s.re.mk_full_char(R->get_sort())))});
+        add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(ya, R))});
+        add_axiom({~s_in_SRS, eps_in_R, mk_eq(v, xtz, false)});
         
         add_axiom({mk_eq(v, e, false)});
         predicate_replace.insert(e, v.get());
