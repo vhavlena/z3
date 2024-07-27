@@ -581,10 +581,11 @@ namespace smt::noodler {
             add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
         }
 
-        for (const auto& conv : m_conversion_todo) {
-            arith_model->eval_expr(var_name.at(conv.int_var), model);
-            add_axiom(m.mk_eq(var_name.at(conv.int_var), model));
-        }
+        // conversion propagation does not work for some reason
+        // for (const auto& conv : m_conversion_todo) {
+        //     arith_model->eval_expr(var_name.at(conv.int_var), model);
+        //     add_axiom(m.mk_eq(var_name.at(conv.int_var), model));
+        // }
 
         // for (auto& [noodler_var, z3_var] : var_name) {
         //     add_axiom(m.mk_eq(z3_var, m_util_s.str.mk_string(model_of_string_expr(to_app(z3_var)))));
