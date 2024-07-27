@@ -178,6 +178,9 @@ namespace smt::noodler {
         if(init && m_util_s.str.is_suffix(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
+        if(init && m_util_s.str.is_contains(expr) && neg) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
 
         // Check if we already axiomatized the expr
         if (propagated_string_theory.contains(expr)) {
