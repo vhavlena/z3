@@ -1003,7 +1003,7 @@ namespace smt::noodler {
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     last_run_was_sat = true;
-                    propagate_lengths_from_arith_model();
+                    propagate_from_arith_model();
                     sat_length_formula = lengths;
 
                     if(precision == LenNodePrecision::OVERAPPROX) {

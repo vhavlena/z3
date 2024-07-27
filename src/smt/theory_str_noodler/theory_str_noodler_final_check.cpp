@@ -237,7 +237,7 @@ namespace smt::noodler {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
                 last_run_was_sat = true;
-                propagate_lengths_from_arith_model();
+                propagate_from_arith_model();
                 sat_length_formula = lengths;
                 return l_true;
             }
@@ -371,7 +371,7 @@ namespace smt::noodler {
                 expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
                     last_run_was_sat = true;
-                    propagate_lengths_from_arith_model();
+                    propagate_from_arith_model();
                     sat_length_formula = lengths;
                     return l_true;
                 } else {
@@ -408,7 +408,7 @@ namespace smt::noodler {
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
                 last_run_was_sat = true;
-                propagate_lengths_from_arith_model();
+                propagate_from_arith_model();
                 sat_length_formula = lengths;
                 return l_true;
             } else {
@@ -566,19 +566,24 @@ namespace smt::noodler {
             return l_false;
         } else {
             last_run_was_sat = true;
-            propagate_lengths_from_arith_model();
+            propagate_from_arith_model();
             sat_length_formula = lengths;
             return l_true;
         }
     }
 
-    void theory_str_noodler::propagate_lengths_from_arith_model() {
+    void theory_str_noodler::propagate_from_arith_model() {
         if (!m_params.m_produce_models || len_vars.empty()) { return; }
         SASSERT(arith_model != nullptr);
         expr_ref model(m);
         for (const auto& len_var : len_vars) {
             arith_model->eval_expr(m_util_s.str.mk_length(len_var), model);
             add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
+        }
+
+        for (const auto& conv : m_conversion_todo) {
+            arith_model->eval_expr(var_name.at(conv.int_var), model);
+            add_axiom(m.mk_eq(var_name.at(conv.int_var), model));
         }
 
         // for (auto& [noodler_var, z3_var] : var_name) {
