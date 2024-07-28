@@ -154,7 +154,8 @@ namespace smt::noodler {
         context &ctx = get_context();
 
         if (!ctx.e_internalized(expr)) {
-            ctx.internalize(expr, false);
+            // expr might be in a logical context (e.g., and, or, not)
+            ctx.internalize(expr, true);
         }
         //We do not mark the expression as relevant since we do not want bias a
         //fresh SAT solution by the newly added theory axioms.
@@ -167,6 +168,17 @@ namespace smt::noodler {
 
         // TODO weird, we have to do it because inequations are handled differently as equations, and they might not have been set as relevant
         if(init && m.is_eq(expr) && neg) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
+        // we need to propagate not(prefix) and not(suffix) before the actual solve (in init_search), because we need to ensure these axioms are 
+        // generated only once on the decision level 0 (if they are generated on a higher level, they are removed after pop)
+        if(init && m_util_s.str.is_prefix(expr) && neg) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
+        if(init && m_util_s.str.is_suffix(expr) && neg) {
+            ctx.mark_as_relevant(m.mk_not(expr));
+        }
+        if(init && m_util_s.str.is_contains(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
 
