@@ -1059,7 +1059,7 @@ namespace smt::noodler {
             arith_model->eval_expr(arg, model);
             bool is_int;
             rational val(0);
-            STRACE("str-arith-model", tout << "Model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
+            STRACE("str-arith-model", tout << "Arith model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
             if (m.is_ite(model)) {
                 // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
                 // so we just assume that it does not matter and take the first argument
@@ -1089,6 +1089,7 @@ namespace smt::noodler {
                     arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
                     bool is_int;
                     rational val(0);
+                    STRACE("str-arith-model", tout << "Arith model for " << mk_pp(m_util_s.str.mk_length(str_expr), m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
                     if (m.is_ite(model)) {
                         // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
                         // so we just assume that it does not matter and take the first argument
