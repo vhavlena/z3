@@ -1387,6 +1387,9 @@ namespace smt::noodler {
             expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
             x = m_util_s.str.mk_concat(x, var);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            // TODO: add comment
+            add_axiom({~mk_literal(re), i_ge_0});
+            add_axiom({~mk_literal(re), ls_le_i});
             add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
         }
 
@@ -2123,6 +2126,7 @@ namespace smt::noodler {
             ) ), m);
             literal lit_e = mk_literal(e);
             add_axiom({lit_e, ~mk_literal(re)});
+            add_axiom({~lit_e, mk_literal(re)});
             return;
         }
         // handle the case not(prefix x "ABC")
@@ -2331,6 +2335,15 @@ namespace smt::noodler {
             expr_ref in_re(m_util_s.re.mk_in_re(y, re), m);
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
+            return;
+        // TODO: add comment
+        } else if(m_util_s.str.is_string(y, str)) {
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
+                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
+                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
+          
+            add_axiom({~mk_literal(e), mk_literal(re)});
+            add_axiom({mk_literal(e), ~mk_literal(re)});
             return;
         }
 
