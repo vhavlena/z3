@@ -586,7 +586,7 @@ namespace smt::noodler {
 
     lbool LengthDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
 
-        FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
+        FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params, {});
 
         STRACE("str", tout << "len: Preprocessing\n");
 

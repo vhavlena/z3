@@ -320,6 +320,7 @@ namespace smt::noodler {
 
         LenNode len_formula;
         std::unordered_set<BasicTerm> len_variables;
+        std::unordered_set<BasicTerm> conversion_vars; // all conversion vars should always be also in len vars, also it should not contain literals
 
         const theory_str_noodler_params& m_params;
 
@@ -351,12 +352,13 @@ namespace smt::noodler {
 
 
     public:
-        FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par) :
+        FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par, std::unordered_set<BasicTerm> conversion_vars) :
             formula(conj),
             fresh_var_cnt(0),
             aut_ass(ass),
             len_formula(LenFormulaType::AND, { } ),
             len_variables(lv),
+            conversion_vars(conversion_vars),
             m_params(par),
             dependency() { };
 
@@ -375,7 +377,7 @@ namespace smt::noodler {
 
         Formula get_modified_formula() const;
 
-        void remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars);
+        void remove_regular();
         void propagate_variables();
         void propagate_eps();
         void generate_identities();

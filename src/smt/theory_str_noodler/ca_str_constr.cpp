@@ -155,7 +155,7 @@ namespace smt::noodler::ca {
             return LenNode(LenFormulaType::TRUE);
         }
 
-        FormulaPreprocessor prep_handler{diseqs, autass, {}, {}};
+        FormulaPreprocessor prep_handler{diseqs, autass, {}, {}, {}};
         prep_handler.propagate_eps();
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -208,7 +208,7 @@ namespace smt::noodler::ca {
             return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
         }
 
-        FormulaPreprocessor prep_handler{not_conts, autass, {}, {}};
+        FormulaPreprocessor prep_handler{not_conts, autass, {}, {}, {}};
         prep_handler.propagate_eps();
         if(!prep_handler.replace_not_contains() || prep_handler.can_unify_not_contains()) {
             return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
