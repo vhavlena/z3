@@ -2336,7 +2336,7 @@ namespace smt::noodler {
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
             return;
-        // TODO: add comment
+        // handle contains of the form (contains x "abc")
         } else if(m_util_s.str.is_string(y, str)) {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
