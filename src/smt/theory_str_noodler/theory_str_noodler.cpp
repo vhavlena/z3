@@ -2126,7 +2126,6 @@ namespace smt::noodler {
             ) ), m);
             literal lit_e = mk_literal(e);
             add_axiom({lit_e, ~mk_literal(re)});
-            add_axiom({~lit_e, mk_literal(re)});
             return;
         }
         // handle the case not(prefix x "ABC")
