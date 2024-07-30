@@ -182,8 +182,7 @@ namespace smt::noodler {
             }
         }
 
-        const std::set<mata::Symbol> get_alphabet(bool recompute=false) {
-            if(recompute) update_alphabet();
+        const std::set<mata::Symbol>& get_alphabet() const {
             return this->alphabet;
         }
 
@@ -342,9 +341,8 @@ namespace smt::noodler {
          * @return mata::nfa::Nfa 
          */
         mata::nfa::Nfa complement_aut(mata::nfa::Nfa& aut) {
-            auto alphabet =  this->get_alphabet(false);
             mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : alphabet) {
+            for (const auto& symbol : get_alphabet()) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
             return mata::nfa::complement(aut, mata_alphabet);

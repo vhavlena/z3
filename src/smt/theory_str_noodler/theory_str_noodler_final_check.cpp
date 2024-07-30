@@ -245,8 +245,8 @@ namespace smt::noodler {
         return l_false;
     }
 
-    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core) {
-        if (len_formula == m.mk_true() && (len_vars.empty() || !m_params.m_produce_models)) {
+    lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core, bool force_sat_check) {
+        if (!force_sat_check && len_formula == m.mk_true() && (len_vars.empty() || !m_params.m_produce_models)) {
             // we assume here that existing length constraints are satisfiable, so adding true will do nothing
             // however, for model generation, we need to always produce models if we have some length vars
             return l_true;
@@ -558,9 +558,9 @@ namespace smt::noodler {
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions) {
 
-        dec_proc = std::make_unique<UnaryDecisionProcedure>(instance, aut_ass, init_length_sensitive_vars, m_params);
-        expr_ref lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
-        if(check_len_sat(lengths) == l_false) {
+        dec_proc = std::make_unique<UnaryDecisionProcedure>(instance, aut_ass, m_params);
+        expr_ref lengths(m.mk_true(), m); // it is assumed that lenght formulas from equations were added in new_eq_eh, so we can just have 'true'
+        if(check_len_sat(lengths, nullptr, true) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);
             block_curr_len(lengths, true, true);
             return l_false;
