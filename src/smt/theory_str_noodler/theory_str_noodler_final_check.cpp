@@ -237,7 +237,7 @@ namespace smt::noodler {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
                 last_run_was_sat = true;
-                propagate_from_arith_model();
+                // propagate_from_arith_model();
                 sat_length_formula = lengths;
                 return l_true;
             }
@@ -371,7 +371,7 @@ namespace smt::noodler {
                 expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
                     last_run_was_sat = true;
-                    propagate_from_arith_model();
+                    // propagate_from_arith_model();
                     sat_length_formula = lengths;
                     return l_true;
                 } else {
@@ -408,7 +408,7 @@ namespace smt::noodler {
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
                 last_run_was_sat = true;
-                propagate_from_arith_model();
+                // propagate_from_arith_model();
                 sat_length_formula = lengths;
                 return l_true;
             } else {
@@ -566,7 +566,7 @@ namespace smt::noodler {
             return l_false;
         } else {
             last_run_was_sat = true;
-            propagate_from_arith_model();
+            // propagate_from_arith_model();
             sat_length_formula = lengths;
             return l_true;
         }
