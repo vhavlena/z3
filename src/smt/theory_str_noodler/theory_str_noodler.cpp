@@ -2336,15 +2336,16 @@ namespace smt::noodler {
             add_axiom({not_e, mk_literal(in_re)});
             return;
         // handle contains of the form (contains x "abc")
-        } else if(m_util_s.str.is_string(y, str)) {
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
-                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
-                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
+        } 
+        // else if(m_util_s.str.is_string(y, str) && false) {
+        //     expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
+        //         m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
+        //         m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
           
-            add_axiom({~mk_literal(e), mk_literal(re)});
-            add_axiom({mk_literal(e), ~mk_literal(re)});
-            return;
-        }
+        //     add_axiom({~mk_literal(e), mk_literal(re)});
+        //     add_axiom({mk_literal(e), mk_literal(m.mk_not(re))});
+        //     return;
+        // }
 
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");
