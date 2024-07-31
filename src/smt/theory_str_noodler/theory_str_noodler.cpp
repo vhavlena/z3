@@ -761,11 +761,11 @@ namespace smt::noodler {
 
         if (last_run_was_sat) {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
-            if (m_params.m_produce_models) {
-                if (check_len_sat(sat_length_formula) != l_true) { // we need to run len sat check to compute new arith model
-                    util::throw_error("This should not happen");
-                }
-            }
+            // if (m_params.m_produce_models) {
+            //     if (check_len_sat(sat_length_formula) != l_true) { // we need to run len sat check to compute new arith model
+            //         util::throw_error("This should not happen");
+            //     }
+            // }
             return FC_DONE;
         }
 
@@ -1002,9 +1002,7 @@ namespace smt::noodler {
                 
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
-                    last_run_was_sat = true;
-                    // propagate_from_arith_model();
-                    sat_length_formula = lengths;
+                    do_sat_shit(lengths);
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;
@@ -1041,7 +1039,7 @@ namespace smt::noodler {
     zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
         // function that returns either the length of str var or model of int var from arith_model
         std::function<rational(BasicTerm)> get_arith_model_of_var = [this](BasicTerm var) -> rational {
-            SASSERT(arith_model != nullptr);
+            // SASSERT(arith_model != nullptr);
             expr_ref arg(m);
             // the following is similar to code in util::len_to_expr()
             if(!var_name.contains(var)) {
@@ -1055,12 +1053,14 @@ namespace smt::noodler {
                     arg = expr_ref(m_util_s.str.mk_length(arg), m);
                 }
             }
-            expr_ref model(m);
-            arith_model->eval_expr(arg, model);
+            smt::model_generator tmp_mg(m);
+            // super hackish, we get arithmetic theory, call mk_value with the argument, which returns hopefully expr_wrapper_proc which does not need any dependencies and should be int numeral
+            expr_ref model(ctx.get_theory(ctx.get_manager().get_family_id("arith"))->mk_value(ctx.get_enode(arg), tmp_mg)->mk_value(tmp_mg, expr_ref_vector(m)), m);
+            // arith_model->eval_expr(arg, model);
             bool is_int;
             rational val(0);
             STRACE("str-arith-model", tout << "Arith model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
-            if (m.is_ite(model)) {
+            if (false && m.is_ite(model)) {
                 // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
                 // so we just assume that it does not matter and take the first argument
                 // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
@@ -1084,13 +1084,15 @@ namespace smt::noodler {
                 // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
                 if (len_vars.contains(str_expr)) {
                     // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
-                    SASSERT(arith_model != nullptr);
-                    expr_ref model(m);
-                    arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
+                    // SASSERT(arith_model != nullptr);
+                    smt::model_generator tmp_mg(m);
+                    // super hackish, we get arithmetic theory, call mk_value with the argument, which returns hopefully expr_wrapper_proc which does not need any dependencies and should be int numeral
+                    expr_ref model(ctx.get_theory(ctx.get_manager().get_family_id("arith"))->mk_value(ctx.get_enode(m_util_s.str.mk_length(str_expr)), tmp_mg)->mk_value(tmp_mg, expr_ref_vector(m)), m);
+                    // arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
                     bool is_int;
                     rational val(0);
                     STRACE("str-arith-model", tout << "Arith model for " << mk_pp(m_util_s.str.mk_length(str_expr), m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
-                    if (m.is_ite(model)) {
+                    if (false && m.is_ite(model)) {
                         // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
                         // so we just assume that it does not matter and take the first argument
                         // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
@@ -1157,7 +1159,7 @@ namespace smt::noodler {
 
     void theory_str_noodler::init_model(model_generator &mg) {
         STRACE("str", tout << "init_model\n");
-        CTRACE("str-arith-model", arith_model != nullptr, tout << "Arith model:\n" << *arith_model << std::endl;);
+        // CTRACE("str-arith-model", arith_model != nullptr, tout << "Arith model:\n" << *arith_model << std::endl;);
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {

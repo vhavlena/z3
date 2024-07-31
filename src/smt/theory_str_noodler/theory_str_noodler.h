@@ -449,6 +449,8 @@ namespace smt::noodler {
         lbool run_length_sat(const Formula& instance, const AutAssignment& aut_ass,
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions);
+        
+        void do_sat_shit(expr_ref length_formula);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };
