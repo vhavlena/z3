@@ -1387,6 +1387,11 @@ namespace smt::noodler {
             expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
             x = m_util_s.str.mk_concat(x, var);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            // strenghtening the axiom to equivalence
+            // for multiple substrs, the SAT solver keeps guessing re and ~re until all possibilities are covered. 
+            // Now the choice of re is bound together with the substr axiom
+            add_axiom({~mk_literal(re), i_ge_0});
+            add_axiom({~mk_literal(re), ls_le_i});
             add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
         }
 
@@ -2106,7 +2111,16 @@ namespace smt::noodler {
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
+        expr * sub_str = nullptr, *sub_ind = nullptr, *sub_len = nullptr;
+        rational val;
         zstring str;
+        // handle the special case of the form (not (str.prefix "a" (str.substr s 5 2))) <-> (str.at s 5) != "a"
+        if(m_util_s.str.is_string(x, str) && str.length() == 1 && m_util_s.str.is_extract(y, sub_str, sub_ind, sub_len) && m_util_a.is_numeral(sub_ind) && m_util_a.is_numeral(sub_len, val) && val.get_int32() >= 1) {
+            add_axiom({mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), ~mk_literal(e) });
+            add_axiom({~mk_eq(x, m_util_s.str.mk_at(sub_str, sub_ind), false), mk_literal(e) });
+            return;
+        }
+
         // handle the case not(prefix "ABC" y)
         if(m_util_s.str.is_string(x, str)) {
             expr_ref re(m_util_s.re.mk_in_re(y, m_util_s.re.mk_concat(
@@ -2324,7 +2338,7 @@ namespace smt::noodler {
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
             return;
-        }
+        } 
 
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");
