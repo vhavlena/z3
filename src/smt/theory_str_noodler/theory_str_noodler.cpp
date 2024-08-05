@@ -1045,7 +1045,7 @@ namespace smt::noodler {
             if(!var_name.contains(var)) {
                 // if the variable is not found, it was introduced in the preprocessing/decision procedure
                 // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
-                arg = util::mk_int_var(var.get_name().encode(), m, m_util_a);
+                arg = mk_int_var(var.get_name().encode());
             } else {
                 arg = var_name.at(var); // for int vars, we just take the var
                 if (m_util_s.is_string(arg->get_sort())) {
@@ -2756,7 +2756,6 @@ namespace smt::noodler {
             var_for_conversion = util::mk_noodler_var_fresh(name_of_type + "_result");
             var_name.insert({var_for_conversion, expr_ref(conversion, m)});
 
-
             // To help LIA solver, we give some bounds on the results of to_* functions
             if (type == ConversionType::TO_CODE) {
                 // the result of str.to_code must be between -1 and zstring::max_char
@@ -2844,22 +2843,5 @@ namespace smt::noodler {
         }
 
         return expr_ref(refinement, m);
-    }
-
-    expr_ref theory_str_noodler::mk_str_var_fresh(const std::string& name) {
-        // TODO move the function from util completely here?
-        return util::mk_str_var_fresh(name, m, m_util_s);
-    }
-
-    expr_ref theory_str_noodler::mk_int_var_fresh(const std::string& name) {
-        // TODO move the function from util here?
-        return util::mk_int_var_fresh(name, m, m_util_a);
-    }
-
-    expr_ref theory_str_noodler::len_node_to_z3_formula(const LenNode& len_formula) {
-        return util::len_to_expr(
-                len_formula,
-                this->var_name,
-                this->m, this->m_util_s, this->m_util_a );
     }
 }

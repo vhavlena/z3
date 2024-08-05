@@ -184,20 +184,69 @@ namespace smt::noodler {
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
-        /**
-         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
-         *
-         * @param name Infix of the name (rest is added to get a unique name)
-         * FIXME same function is in theory_str_noodler, decide which to keep
-         */
-        expr_ref mk_str_var_fresh(const std::string& name);
+
+        unsigned fresh_var_counter = 0;
+
         /**
          * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
          *
          * @param name Infix of the name (rest is added to get a unique name)
-         * FIXME same function is in theory_str_noodler, decide which to keep
          */
-        expr_ref mk_int_var_fresh(const std::string& name);
+        expr_ref mk_int_var_fresh(std::string name) {
+            app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
+
+            // name = name + std::string("!noodler") + std::to_string(fresh_var_counter);
+            // ++fresh_var_counter;
+            // func_decl_info info(ctx.get_manager().get_family_id("arith"));
+            // info.set_skolem(true);
+            // app* fresh_var = m.mk_const(m.mk_func_decl(symbol(name.c_str()), static_cast<unsigned>(0), nullptr, m_util_a.mk_int(), info));
+            // SASSERT(fresh_var->get_family_id() == ctx.get_manager().get_family_id("arith"));
+
+            // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
+            ctx.internalize(fresh_var, false);
+            ctx.mark_as_relevant(fresh_var);
+            return expr_ref(fresh_var, m);
+        }
+        
+        /**
+         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
+         *
+         * @param name Infix of the name (rest is added to get a unique name)
+         */
+        expr_ref mk_str_var_fresh(const std::string& name) {
+            app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(fresh_var, m);
+        }
+
+        /**
+         * @brief Get Z3 int var with exact given @p name
+         *
+         * @param name Name of the var
+         */
+        expr_ref mk_int_var(const std::string& name) {
+            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
+
+            // func_decl_info info(ctx.get_manager().get_family_id("arith"));
+            // info.set_skolem(true);
+            // app* var = m.mk_const(m.mk_func_decl(symbol(name.c_str()), static_cast<unsigned>(0), nullptr, m_util_a.mk_int(), info));
+            // SASSERT(var->get_family_id() == ctx.get_manager().get_family_id("arith"));
+
+            // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
+            ctx.internalize(var, false);
+            ctx.mark_as_relevant(var);
+
+            return expr_ref(var, m);
+        }
+
+        /**
+         * @brief Get Z3 string var with exact given @p name
+         *
+         * @param name Name of the var
+         */
+        expr_ref mk_str_var(const std::string& name) {
+            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_s.mk_string_sort()); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(var, m);
+        }
 
         /**
          * @brief Transforms LenNode to the z3 formula

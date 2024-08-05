@@ -594,4 +594,170 @@ namespace smt::noodler {
         // sat_length_formula = length_formula;
         add_axiom(length_formula);
     }
+
+    expr_ref theory_str_noodler::len_node_to_z3_formula(const LenNode &node) {
+        switch(node.type) {
+        case LenFormulaType::LEAF:
+            if(node.atom_val.get_type() == BasicTermType::Length)
+                return expr_ref(m_util_a.mk_int(rational(node.atom_val.get_name().encode().c_str())), m);
+            else if (node.atom_val.get_type() == BasicTermType::Literal) {
+                // for literal, get the exact length of it
+                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
+            } else {
+                auto it = var_name.find(node.atom_val);
+                expr_ref var_expr(m);
+                if(it == var_name.end()) {
+                    // if the variable is not found, it was introduced in the preprocessing/decision procedure
+                    // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
+                    var_expr = mk_int_var(node.atom_val.get_name().encode());
+                } else {
+                    if (m_util_s.is_string(it->second.get()->get_sort())) {
+                        // for string variables we want its length
+                        var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
+                    } else {
+                        // we assume here that all other variables are int, so they map into the predicate they represent 
+                        var_expr = it->second;
+                    }
+                }
+                return var_expr;
+            }
+
+        case LenFormulaType::PLUS: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(0), m);
+            expr_ref plus = len_node_to_z3_formula(node.succ[0]);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                plus = m_util_a.mk_add(plus, len_node_to_z3_formula(node.succ[i]));
+            }
+            ctx.internalize(plus, false);
+            ctx.mark_as_relevant(plus.get());
+            return plus;
+        }
+
+        case LenFormulaType::MINUS: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(0), m);
+            expr_ref minus = len_node_to_z3_formula(node.succ[0]);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                minus = m_util_a.mk_sub(minus, len_node_to_z3_formula(node.succ[i]));
+            }
+            ctx.internalize(minus, false);
+            ctx.mark_as_relevant(minus.get());
+            return minus;
+        }
+
+        case LenFormulaType::TIMES: {
+            if (node.succ.size() == 0)
+                return expr_ref(m_util_a.mk_int(1), m);
+            expr_ref times = len_node_to_z3_formula(node.succ[0]);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                times = m_util_a.mk_mul(times, len_node_to_z3_formula(node.succ[i]));
+            }
+            ctx.internalize(times, false);
+            ctx.mark_as_relevant(times.get());
+            return times;
+        }
+
+        case LenFormulaType::EQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_node_to_z3_formula(node.succ[0]);
+            expr_ref right = len_node_to_z3_formula(node.succ[1]);
+            expr_ref eq(m_util_a.mk_eq(left, right), m);
+            ctx.internalize(eq, false);
+            ctx.mark_as_relevant(eq.get());
+            return eq;
+        }
+
+        case LenFormulaType::NEQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_node_to_z3_formula(node.succ[0]);
+            expr_ref right = len_node_to_z3_formula(node.succ[1]);
+            expr_ref neq(m.mk_not(m_util_a.mk_eq(left, right)), m);
+            ctx.internalize(neq, false);
+            ctx.mark_as_relevant(neq.get());
+            return neq;
+        }
+
+        case LenFormulaType::LEQ: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_node_to_z3_formula(node.succ[0]);
+            expr_ref right = len_node_to_z3_formula(node.succ[1]);
+            expr_ref leq(m_util_a.mk_le(left, right), m);
+            ctx.internalize(leq, false);
+            ctx.mark_as_relevant(leq.get());
+            return leq;
+        }
+
+        case LenFormulaType::LT: {
+            assert(node.succ.size() == 2);
+            expr_ref left = len_node_to_z3_formula(node.succ[0]);
+            expr_ref right = len_node_to_z3_formula(node.succ[1]);
+            // LIA solver fails if we use "L < R" for some reason (it cannot be internalized in smt::theory_lra::imp::internalize_atom, as it expects only <= or >=); we use "!(R <= L)" instead
+            expr_ref lt(m.mk_not(m_util_a.mk_le(right, left)), m);
+            ctx.internalize(lt, false);
+            ctx.mark_as_relevant(lt.get());
+            return lt;
+        }
+
+        case LenFormulaType::NOT: {
+            assert(node.succ.size() == 1);
+            expr_ref no(m.mk_not(len_node_to_z3_formula(node.succ[0])), m);
+            ctx.internalize(no, false);
+            ctx.mark_as_relevant(no.get());
+            return no;
+        }
+
+        case LenFormulaType::AND: {
+            if(node.succ.size() == 0)
+                return expr_ref(m.mk_true(), m);
+            expr_ref andref = len_node_to_z3_formula(node.succ[0]);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                andref = m.mk_and(andref, len_node_to_z3_formula(node.succ[i]));
+            }
+            ctx.internalize(andref, false);
+            ctx.mark_as_relevant(andref.get());
+            return andref;
+        }
+
+        case LenFormulaType::OR: {
+            if(node.succ.size() == 0)
+                return expr_ref(m.mk_false(), m);
+            expr_ref orref = len_node_to_z3_formula(node.succ[0]);
+            for(size_t i = 1; i < node.succ.size(); i++) {
+                orref = m.mk_or(orref, len_node_to_z3_formula(node.succ[i]));
+            }
+            ctx.internalize(orref, false);
+            ctx.mark_as_relevant(orref.get());
+            return orref;
+        }
+
+        case LenFormulaType::FORALL: {
+            expr_ref varref = len_node_to_z3_formula(node.succ[0]);
+            expr_ref bodyref = len_node_to_z3_formula(node.succ[1]);
+
+            ptr_vector<sort> sorts;
+            svector<symbol> names;
+            app * var = to_app(varref);
+            sorts.push_back(var->get_sort());
+            names.push_back(var->get_name());
+
+            expr_ref forall(m.mk_quantifier(quantifier_kind::forall_k, sorts.size(), sorts.data(), names.data(), bodyref), m);
+            ctx.internalize(forall, false);
+            ctx.mark_as_relevant(forall.get());
+            return forall;
+        }
+
+        case LenFormulaType::TRUE: {
+            return expr_ref(m.mk_true(), m);
+        }
+
+        case LenFormulaType::FALSE: {
+            return expr_ref(m.mk_false(), m);
+        }
+
+        default:
+            util::throw_error("Unexpected length formula type");
+            return {{}, m};
+        }
+    }
 }
