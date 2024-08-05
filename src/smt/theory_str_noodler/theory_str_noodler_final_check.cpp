@@ -211,7 +211,7 @@ namespace smt::noodler {
                 app_ref lang_eq(m.mk_eq(left_side, right_side), m);
                 if(is_equation){
                     STRACE("str", tout << mk_pp(lang_eq, m) << " is unsat" << std::endl);
-                    add_axiom({mk_literal(m.mk_not(lang_eq))});
+                    add_axiom({~mk_literal(lang_eq)});
                 } else {
                     STRACE("str", tout << mk_pp(m.mk_not(lang_eq), m) << " is unsat" << std::endl);
                     add_axiom({mk_literal(lang_eq)});
@@ -529,7 +529,7 @@ namespace smt::noodler {
                     if (check_len_sat(len_formula, &unsat_core) == l_false) {
                         unsat_core = m.mk_not(unsat_core);
                         ctx.internalize(unsat_core.get(), true);
-                        add_axiom({mk_literal(unsat_core)});
+                        add_axiom(unsat_core);
                         block_curr_len(len_formula, false);
                         STRACE("str", tout << "loop-protection: unsat " << std::endl;);
                         return l_false;
@@ -570,7 +570,7 @@ namespace smt::noodler {
         expr_ref model(m);
         for (const auto& len_var : len_vars) {
             arith_model->eval_expr(m_util_s.str.mk_length(len_var), model);
-            add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
+            add_axiom({mk_literal(m.mk_eq(m_util_s.str.mk_length(len_var), model))});
         }
 
         // conversion propagation does not work for some reason
