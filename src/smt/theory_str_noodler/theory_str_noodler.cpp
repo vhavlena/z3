@@ -534,7 +534,7 @@ namespace smt::noodler {
             app* equation_atom = ctx.mk_eq_atom(l, r);
             if (m.is_false(equation_atom)) {
                 // if we have two distinct literals, we immediately stop by not allowing this equation
-                add_axiom({~mk_literal(equation)});
+                add_axiom({mk_literal(m.mk_not(equation))});
             } else if (!m.is_true(equation_atom)) {
                 // if equation is not trivially true, we add it for later check
                 m_word_eq_todo.push_back({l, r});
@@ -1767,9 +1767,12 @@ namespace smt::noodler {
         // str.replace "A" s t where a = "A"
         if(m_util_s.str.is_string(a, str_a) && str_a.length() == 1) {
             // s = emp -> v = t.a
-            add_axiom({~s_emp, mk_eq(r, mk_concat(t, a), false)});
+            // NOTE: if we use ~s_emp, this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_literal(m.mk_eq(r, mk_concat(t, a)))});
             // s = a -> v = t
-            add_axiom({~mk_eq(s, a, false), mk_eq(v, t, false)});
+            // NOTE: if we use ~mk_eq(s, a), this diseqation does not become relevant
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
+            // add_axiom({~mk_eq(s, a, false), mk_eq(v, t,false)});
             // s != eps && s != a -> v = a
             add_axiom({mk_eq(s, a, false), s_emp, mk_eq(v, a,false)});
             
@@ -1778,7 +1781,7 @@ namespace smt::noodler {
             // they can relate the contains predicate from the general replace (and thence the SAT solver can help a lot).
             literal cnt = mk_literal(m_util_s.str.mk_contains(s, a));
             // strenghten not contains axiom with s = a
-            add_axiom({~cnt, ~mk_literal(m.mk_eq(s, a)), mk_eq(v, t,false)});
+            add_axiom({~cnt, mk_literal(m.mk_not(m.mk_eq(s, a))), mk_eq(v, t,false)});
             add_axiom({cnt, s_emp, mk_eq(v, a,false)});
             ctx.force_phase(cnt);
 
@@ -1789,8 +1792,8 @@ namespace smt::noodler {
         // str.replace "" s t where a = ""
         } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
             // s = emp -> v = t.a
-            add_axiom({~s_emp, mk_eq(v,t,false)});
-            // s != emp -> v = emp
+            add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v,t,false)});
+            // s = emp -> v = t.a
             add_axiom({s_emp, mk_eq_empty(v)});
             // replace(a,s,t) = v
             add_axiom({mk_eq(v, r, false)});
@@ -1871,7 +1874,7 @@ namespace smt::noodler {
 
         // s \in \Sigma*R\Sigma* && eps \not\in R -> (s = x.y.z && xy \not\in \Sigma*R\Sigma* && a \in \Sigma && ya \in R && v = x.t.z)
         add_axiom({~s_in_SRS, eps_in_R, mk_literal(m.mk_eq(s, xyaz))});
-        add_axiom({~s_in_SRS, eps_in_R, ~mk_literal(m_util_s.re.mk_in_re(xy, SRS))});
+        add_axiom({~s_in_SRS, eps_in_R, mk_literal(m.mk_not(m_util_s.re.mk_in_re(xy, SRS)))});
         add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(a, m_util_s.re.mk_full_char(R->get_sort())))});
         add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(ya, R))});
         add_axiom({~s_in_SRS, eps_in_R, mk_eq(v, xtz, false)});
@@ -2147,7 +2150,7 @@ namespace smt::noodler {
             literal lit_e = mk_literal(e);
             for(size_t i = 0; i <= str.length(); i++) {
                 zstring substr = str.extract(0, i);
-                add_axiom({lit_e, ~mk_eq(x, m_util_s.str.mk_string(substr), false)});
+                add_axiom({lit_e, mk_literal(m.mk_not(m.mk_eq(x, m_util_s.str.mk_string(substr))))});
             }
             return;
         }
@@ -2177,13 +2180,13 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pmxqx,false);
         literal y_eq_pmq = mk_eq(y,pmyqy,false);
-        literal eq_mx_my = ~mk_eq(mx,my,false);
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref rey(m_util_s.re.mk_in_re(my, m_util_s.re.mk_full_char(nullptr)), m);
 
         literal lit_e = mk_literal(e);
-        literal len_y_gt_len_x = ~mk_literal(len_x_gt_len_y);
+        literal len_y_gt_len_x = mk_literal(m.mk_not(len_x_gt_len_y));
         // not(e) && |x| <= |y| -> x = p.mx.qx
         add_axiom({lit_e, len_y_gt_len_x, x_eq_pmq});
         // not(e) && |x| <= |y| -> y = p.my.qy
@@ -2262,7 +2265,7 @@ namespace smt::noodler {
             str = str.reverse();
             for(size_t i = 0; i <= str.length(); i++) {
                 zstring substr = str.extract(0, i);
-                add_axiom({lit_e, ~mk_literal(m.mk_eq(x, m_util_s.str.mk_string(substr)))});
+                add_axiom({lit_e, mk_literal(m.mk_not(m.mk_eq(x, m_util_s.str.mk_string(substr))))});
             }
             return;
         }
@@ -2286,7 +2289,7 @@ namespace smt::noodler {
 
         literal x_eq_pmq = mk_eq(x,pxmxq,false);
         literal y_eq_pmq = mk_eq(y,pymyq,false);
-        literal eq_mx_my = ~mk_eq(mx,my,false);
+        literal eq_mx_my = mk_literal(m.mk_not(ctx.mk_eq_atom(mx,my)));
         literal lit_e = mk_literal(e);
 
         expr_ref rex(m_util_s.re.mk_in_re(mx, m_util_s.re.mk_full_char(nullptr)), m);
