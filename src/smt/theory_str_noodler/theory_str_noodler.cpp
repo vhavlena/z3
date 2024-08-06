@@ -252,7 +252,7 @@ namespace smt::noodler {
         app_ref eq(m.mk_eq(len_xy, len_x_plus_len_y), m);
         //ctx.internalize(eq, false);
         SASSERT(eq);
-        add_axiom({mk_literal(eq)});
+        add_axiom(eq);
         // std::cout << mk_pp(eq, m) << std::endl;
         this->axiomatized_len_axioms.push_back(eq);
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
@@ -295,7 +295,7 @@ namespace smt::noodler {
             expr_ref len(m_util_a.mk_numeral(rational(l), true), m);
 
             expr_ref eq(m.mk_eq(len_str, len), m);
-            add_axiom({mk_literal(eq)});
+            add_axiom(eq);
             return;
         } else if(!m.is_ite(a_str)) {
             // build axiom 1: Length(a_str) >= 0
@@ -361,9 +361,9 @@ namespace smt::noodler {
                 // ctx.mark_as_relevant(lhs.get());
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
-                add_axiom({~literal(lhs), literal(rhs)});
+                add_axiom(m.mk_or(m.mk_not(lhs), rhs));
                 if(var_lengths) {
-                    add_axiom({literal(lhs), ~literal(rhs)});
+                    add_axiom(m.mk_or(m.mk_not(rhs), lhs));
                 }
             }
 
@@ -375,7 +375,7 @@ namespace smt::noodler {
     void theory_str_noodler::add_length_axiom(expr *n) {
         app_ref ln(m_util_a.mk_ge(n, m_util_a.mk_int(0)), m);
         ctx.internalize(ln, false);
-        add_axiom({mk_literal(ln)});
+        add_axiom(ln);
         this->axiomatized_len_axioms.push_back(ln);
     }
 
@@ -1221,6 +1221,9 @@ namespace smt::noodler {
 //        string_theory_propagation(e);
             context &ctx = get_context();
 //        SASSERT(!ctx.b_internalized(e));
+            if (!ctx.b_internalized(e)) {
+                ctx.internalize(e, false);
+            }
             ctx.internalize(e, false);
             literal l{ctx.get_literal(e)};
             ctx.mark_as_relevant(l);
