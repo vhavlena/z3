@@ -1637,11 +1637,7 @@ namespace smt::noodler {
         }
 
         STRACE("str-model",
-            tout << "Generating model for var " << var;
-            if (solution.length_sensitive_vars.contains(var)) {
-                tout << " with length " << get_arith_model_of_var(var);
-            }
-            tout << "\n";
+            tout << "Generating model for var " << var << "\n";
         );
 
         vars_whose_model_we_are_computing.insert(var);
@@ -1747,6 +1743,25 @@ namespace smt::noodler {
             UNREACHABLE();
             return zstring();
         }
+    }
+
+    std::vector<BasicTerm> DecisionProcedure::get_len_vars_for_model(BasicTerm str_var) {
+        // we always need (for initialization) all len_vars that are in aut_ass, so we ignore str_var
+        std::vector<BasicTerm> needed_vars;
+        for (BasicTerm len_var : solution.length_sensitive_vars) {
+            if (solution.aut_ass.contains(len_var)) {
+                needed_vars.push_back(len_var);
+
+                if (int_subst_vars.contains(len_var)) {
+                    needed_vars.push_back(int_version_of(len_var));
+                }
+
+                if (code_subst_vars.contains(len_var)) {
+                    needed_vars.push_back(code_version_of(len_var));
+                }
+            }
+        }
+        return needed_vars;
     }
 
 } // Namespace smt::noodler.

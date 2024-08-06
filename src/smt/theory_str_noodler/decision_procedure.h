@@ -79,6 +79,13 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Get a vector of variables whose lengths are needed for generating the model of @p str_var
+         */
+        virtual std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) {
+            throw std::runtime_error("Unimplemented");
+        }
+
+        /**
          * @brief Get string model for the string variable @p var
          * 
          * @param get_arith_model_of_var Returns either the length of a str variable or the value of the int variable in the model
@@ -498,6 +505,8 @@ namespace smt::noodler {
         LenNode get_initial_lengths(bool all_vars = false) override;
 
         std::pair<LenNode, LenNodePrecision> get_lengths() override;
+
+        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override;
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
     };

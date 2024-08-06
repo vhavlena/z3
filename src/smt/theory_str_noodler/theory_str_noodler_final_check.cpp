@@ -227,7 +227,7 @@ namespace smt::noodler {
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<TermConversion> conversions) {
-        dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
             return l_false;
         }
@@ -359,7 +359,7 @@ namespace smt::noodler {
 
     lbool theory_str_noodler::run_nielsen(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         STRACE("str", tout << "Trying nielsen" << std::endl);
-        dec_proc = std::make_unique<NielsenDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        dec_proc = std::make_shared<NielsenDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         dec_proc->preprocess();
         expr_ref block_len(m.mk_false(), m);
         dec_proc->init_computation();
@@ -496,7 +496,7 @@ namespace smt::noodler {
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
         }
 
-        dec_proc = std::make_unique<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m);
+        dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m);
         return dec_proc->compute_next_solution();
     }
 
@@ -552,7 +552,7 @@ namespace smt::noodler {
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions) {
 
-        dec_proc = std::make_unique<UnaryDecisionProcedure>(instance, aut_ass, m_params);
+        dec_proc = std::make_shared<UnaryDecisionProcedure>(instance, aut_ass, m_params);
         expr_ref lengths(m.mk_true(), m); // it is assumed that lenght formulas from equations were added in new_eq_eh, so we can just have 'true'
         if(check_len_sat(lengths, nullptr, true) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);

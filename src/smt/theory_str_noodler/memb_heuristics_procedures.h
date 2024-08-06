@@ -30,6 +30,11 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override;
 
+        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override {
+            // heuristic should be used only if we do not have length vars, so nothing is needed
+            return {};
+        }
+
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
     };
 
@@ -46,6 +51,11 @@ namespace smt::noodler {
             : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s), m(m) {}
 
         lbool compute_next_solution() override;
+
+        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override {
+            // heuristic should be used only if we do not have length vars, so nothing is needed
+            return {};
+        }
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
     };

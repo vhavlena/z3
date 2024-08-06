@@ -122,8 +122,11 @@ namespace smt::noodler {
 
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
-        std::unique_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
+        std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
         model_ref arith_model; // keeps the arithmethic model from sat solution
+        class noodler_var_value_proc;
+        class str_var_value_proc;
+        class concat_var_value_proc;
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -205,7 +208,7 @@ namespace smt::noodler {
             // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
             // ctx.internalize(fresh_var, false);
             // ctx.mark_as_relevant(fresh_var);
-            
+
             return expr_ref(fresh_var, m);
         }
         
@@ -329,8 +332,8 @@ namespace smt::noodler {
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
-        /// @brief Returns the model for @p str_expr using dec_proc and arith_model
-        zstring model_of_string_expr(app* str_expr);
+        /// @brief Returns the model_value_proc for string variable @p str_expr based on whether it is used in dec_proc or not
+        model_value_proc* model_of_string_var(app* str_var);
 
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 

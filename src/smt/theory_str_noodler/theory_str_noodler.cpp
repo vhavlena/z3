@@ -841,7 +841,7 @@ namespace smt::noodler {
                 STRACE("str", tout << "trying one membership heuristics\n";);
                 BasicTerm noodler_var = util::get_variable_basic_term(var);
                 relevant_vars.insert(noodler_var);
-                dec_proc = std::make_unique<MembHeuristicProcedure>(
+                dec_proc = std::make_shared<MembHeuristicProcedure>(
                     noodler_var,
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
@@ -925,7 +925,7 @@ namespace smt::noodler {
         }
 
         // we do not put into dec_proc directly, because we might do underapproximation that saves into dec_proc
-        std::unique_ptr<DecisionProcedure> main_dec_proc = std::make_unique<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         // is formula length unsatisfiable?
         bool length_unsat = false;
 
@@ -1036,101 +1036,120 @@ namespace smt::noodler {
         }
     }
 
-    zstring theory_str_noodler::model_of_string_expr(app* str_expr) {
-        // function that returns either the length of str var or model of int var from arith_model
-        std::function<rational(BasicTerm)> get_arith_model_of_var = [this](BasicTerm var) -> rational {
-            // SASSERT(arith_model != nullptr);
-            expr_ref arg(m);
-            // the following is similar to code in util::len_to_expr()
-            if(!var_name.contains(var)) {
-                // if the variable is not found, it was introduced in the preprocessing/decision procedure
-                // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
-                arg = mk_int_var(var.get_name().encode());
-            } else {
-                arg = var_name.at(var); // for int vars, we just take the var
-                if (m_util_s.is_string(arg->get_sort())) {
-                    // for string vars, we want its length
-                    arg = expr_ref(m_util_s.str.mk_length(arg), m);
+    class theory_str_noodler::noodler_var_value_proc : public model_value_proc {
+        BasicTerm str_var;
+        theory_str_noodler& th;
+        std::vector<BasicTerm> needed_vars;
+    public:
+        noodler_var_value_proc(BasicTerm str_var, theory_str_noodler& th) : str_var(str_var), th(th), needed_vars(th.dec_proc->get_len_vars_for_model(str_var)) {}
+
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            for (BasicTerm var : needed_vars) {
+                expr_ref arith_var(th.m);
+                if(!th.var_name.contains(var)) {
+                    // if the variable is not found, it was introduced in the preprocessing/decision procedure
+                    // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
+                    arith_var = th.mk_int_var(var.get_name().encode());
+                } else {
+                    arith_var = th.var_name.at(var); // for int vars, we just take the var
+                    if (th.m_util_s.is_string(arith_var->get_sort())) {
+                        // for string vars, we want its length
+                        arith_var = expr_ref(th.m_util_s.str.mk_length(arith_var), th.m);
+                    }
                 }
+                result.push_back(model_value_dependency(th.ctx.get_enode(arith_var)));
             }
-            smt::model_generator tmp_mg(m);
-            // super hackish, we get arithmetic theory, call mk_value with the argument, which returns hopefully expr_wrapper_proc which does not need any dependencies and should be int numeral
-            expr_ref model(ctx.get_theory(ctx.get_manager().get_family_id("arith"))->mk_value(ctx.get_enode(arg), tmp_mg)->mk_value(tmp_mg, expr_ref_vector(m)), m);
-            // arith_model->eval_expr(arg, model);
+        }
+
+        app * mk_value(model_generator & m, expr_ref_vector const & values) override {
+            std::map<BasicTerm,rational> var_to_arith_model;
+            SASSERT(values.size() == needed_vars.size());
+            for (unsigned i = 0; i < needed_vars.size(); ++i) {
+                bool is_int;
+                rational val(0);
+                VERIFY(th.m_util_a.is_numeral(values[i], val, is_int) && is_int);
+                STRACE("str-model", tout << "Arith model of " << needed_vars[i] << " is " << val << std::endl;);
+                var_to_arith_model[needed_vars[i]] = val;
+            }
+            std::function<rational(BasicTerm)> get_arith_model_of_var = [&var_to_arith_model](BasicTerm var) -> rational {
+                return var_to_arith_model.at(var);
+            };
+            return th.m_util_s.str.mk_string(th.dec_proc->get_model(str_var, get_arith_model_of_var));
+        }
+    };
+
+    class theory_str_noodler::str_var_value_proc : public model_value_proc {
+        expr* str_var;
+        enode* str_var_length_enode;
+        seq_util& m_util_s;
+        arith_util& m_util_a;
+    public:
+        str_var_value_proc(expr* str_var, context& ctx, seq_util& m_util_s, arith_util& m_util_a) : str_var(str_var), str_var_length_enode(ctx.get_enode(m_util_s.str.mk_length(str_var))), m_util_s(m_util_s), m_util_a(m_util_a) {}
+
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            result.push_back(model_value_dependency(str_var_length_enode));
+        }
+    
+        app * mk_value(model_generator & m, expr_ref_vector const & values) override {
+            // values[0] contain the length of str_var, so we return some string of this length
             bool is_int;
             rational val(0);
-            STRACE("str-arith-model", tout << "Arith model for " << mk_pp(arg, m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
-            if (false && m.is_ite(model)) {
-                // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
-                // so we just assume that it does not matter and take the first argument
-                // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
-                VERIFY(m_util_a.is_numeral(to_app(model)->get_arg(1), val, is_int) && is_int);
-            } else {
-                VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
+            SASSERT(values.size() == 1);
+            VERIFY(m_util_a.is_numeral(values[0], val, is_int) && is_int);
+            zstring res;
+            while (res.length() != val.get_unsigned()) {
+                res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
             }
-            return val;
-        };
+            return m_util_s.str.mk_string(res);
+        }
+    };
 
-        zstring res;
-        if (m_util_s.str.is_string(str_expr, res)) {
-            // for string literal, we just return the string
-            return res;
-        } else if (util::is_str_variable(str_expr, m_util_s)) {
-            BasicTerm var = util::get_variable_basic_term(str_expr);
-            if (relevant_vars.contains(var)) {
-                // for relevant (string) var, we get the model from the decision procedure that returned sat
-                return dec_proc->get_model(var, get_arith_model_of_var);
-            } else {
-                // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
-                if (len_vars.contains(str_expr)) {
-                    // to get length, we cannot use get_arith_model_of_var, because it works with var_name, that contains only relevant vars
-                    // SASSERT(arith_model != nullptr);
-                    smt::model_generator tmp_mg(m);
-                    // super hackish, we get arithmetic theory, call mk_value with the argument, which returns hopefully expr_wrapper_proc which does not need any dependencies and should be int numeral
-                    expr_ref model(ctx.get_theory(ctx.get_manager().get_family_id("arith"))->mk_value(ctx.get_enode(m_util_s.str.mk_length(str_expr)), tmp_mg)->mk_value(tmp_mg, expr_ref_vector(m)), m);
-                    // arith_model->eval_expr(m_util_s.str.mk_length(str_expr), model);
-                    bool is_int;
-                    rational val(0);
-                    STRACE("str-arith-model", tout << "Arith model for " << mk_pp(m_util_s.str.mk_length(str_expr), m) << std::flush << " is " << mk_pp(model, m) << std::endl;);
-                    if (false && m.is_ite(model)) {
-                        // sometimes arith model can be ITE for string vars (example: QF_SLIA/20180523-Reynolds/kaluza/unsat/small/23772.corecstrs.readable.smt2)
-                        // so we just assume that it does not matter and take the first argument
-                        // TODO: we should probably fix this in different way, maybe by changing all (str.len ...) and probably also (str.to_int ...) by some int variable in expr_solv so that it does not work with string vars
-                        VERIFY(m_util_a.is_numeral(to_app(model)->get_arg(1), val, is_int) && is_int);
-                    } else {
-                        VERIFY(m_util_a.is_numeral(model, val, is_int) && is_int);
-                    }
-                    while (res.length() != val.get_unsigned()) {
-                        res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
-                    }
-                    return res;
-                } else {
-                    // we return empty string for non-relevant non-length vars, their value does not matter
-                    return zstring();
-                }
-            }
-        } else if (m_util_s.str.is_concat(str_expr)) {
+    class theory_str_noodler::concat_var_value_proc : public model_value_proc {
+        seq_util& m_util_s;
+        svector<model_value_dependency> m_dependencies;
+    public:
+        concat_var_value_proc(expr* str_concat, ast_manager& m, context& ctx, seq_util& m_util_s) : m_util_s(m_util_s) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
             expr_ref_vector concats(m);
-            m_util_s.str.get_concat(str_expr, concats);
+            m_util_s.str.get_concat(str_concat, concats);
             for (auto concat : concats) {
-                res = res + model_of_string_expr(to_app(concat));
+                m_dependencies.push_back(model_value_dependency(ctx.get_enode(concat)));
             }
-            return res;
+        }
+
+        void get_dependencies(buffer<model_value_dependency> & result) override {
+            result.append(m_dependencies.size(), m_dependencies.data());
+        }
+    
+        app * mk_value(model_generator & m, expr_ref_vector const & values) override {
+            zstring res;
+            for (auto value : values) {
+                zstring value_string;
+                VERIFY(m_util_s.str.is_string(value, value_string));
+                res = res + value_string;
+            }
+            return m_util_s.str.mk_string(res);
+        }
+    };
+
+
+    model_value_proc* theory_str_noodler::model_of_string_var(app* str_var) {
+        BasicTerm var = util::get_variable_basic_term(str_var);
+        if (relevant_vars.contains(var)) {
+            // for relevant (string) var, we get the model from the decision procedure that returned sat
+            return alloc(noodler_var_value_proc, var, *this);
         } else {
-            // for complex string functions, we should be able to find vars that replace them in predicate_replace
-            if (predicate_replace.contains(str_expr)) {
-                expr* str_var = predicate_replace[to_expr(str_expr)];
-                return model_of_string_expr(to_app(str_var));
+            // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
+            if (len_vars.contains(str_var)) {
+                return alloc(str_var_value_proc, str_var, ctx, m_util_s, m_util_a);
             } else {
-                // we should not get some string complex function that is not in predicate_replace
-                UNREACHABLE();
-                return zstring();
+                // we return empty string for non-relevant non-length vars, their value does not matter
+                return alloc(expr_wrapper_proc, m_util_s.str.mk_string(zstring()));
             }
         }
     }
-    
-    model_value_proc *theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
+
+    model_value_proc* theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
         // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), from_int/from_code and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: getting model for " << mk_pp(tgt, m) << " sort is " << mk_pp(tgt->get_sort(), m) << "\n";);
@@ -1140,21 +1159,33 @@ namespace smt::noodler {
             return alloc(expr_wrapper_proc, tgt);
         }
 
-        app* res = nullptr;
         if (m_util_s.is_re(tgt)) {
             // if tgt is regular
             if (util::is_variable(tgt)) {
                 util::throw_error("unrestricted regex vars unsupported"); // (should not be able to come here, as this should be handled by dec proc)
+                return alloc(expr_wrapper_proc, tgt); // we return something so that we do not get warning
             } else {
                 // for regex literal (regex stuff in z3 is either regex var or literal), we just return the regex
-                res = tgt;
+                return alloc(expr_wrapper_proc, tgt);
             }
+        } else if (m_util_s.str.is_string(tgt)) {
+            // for string literal, we just return the string
+            return alloc(expr_wrapper_proc, tgt);
+        } else if (util::is_str_variable(tgt, m_util_s)) {
+            return model_of_string_var(tgt);
+        } else if (m_util_s.str.is_concat(tgt)) {
+            return alloc(concat_var_value_proc, tgt, m, ctx, m_util_s);
         } else {
-            // if tgt is string (nothing else should be able to come into mk_value)
-            res = m_util_s.str.mk_string(model_of_string_expr(tgt));
+            // for complex string functions (nothing else should be able to come into mk_value), we should be able to find vars that replace them in predicate_replace
+            if (predicate_replace.contains(tgt)) {
+                expr* str_var = predicate_replace[to_expr(tgt)];
+                return model_of_string_var(to_app(str_var));
+            } else {
+                // we should not get some string complex function that is not in predicate_replace
+                UNREACHABLE();
+                return alloc(expr_wrapper_proc, tgt); // we return something so that we do not get warning
+            }
         }
-        STRACE("str", tout << "model for " << mk_pp(tgt, m) << " is " << mk_pp(res,m) << "\n";);
-        return alloc(expr_wrapper_proc, res);
     }
 
     void theory_str_noodler::init_model(model_generator &mg) {

@@ -31,6 +31,10 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override { return l_false; };
 
+        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override {
+            return {str_var};
+        }
+
         /**
          * @brief Get model of the variable @p var. Since there is only a single symbol a in the system, the assignment is 
          * generated as a^n, where n is LIA length model of @p var. 
