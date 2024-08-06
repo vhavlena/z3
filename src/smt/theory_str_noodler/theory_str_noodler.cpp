@@ -1213,22 +1213,46 @@ namespace smt::noodler {
 
     void theory_str_noodler::add_axiom(expr *const e) {
         STRACE("str_axiom", tout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
+        if (e == nullptr || get_manager().is_true(e)) return;
+        
+        // (ab)use asserted_formulas to create CNF from e
+        smt_params s_p; // we need to enable only CNF reductions (and disable all others), so that it does not reduce too aggressively, especially propagate_values)
+        s_p.m_nnf_cnf = true;
+        s_p.m_quasi_macros = false;
+        s_p.m_macro_finder = false;
+        s_p.m_max_bv_sharing = false;
+        s_p.m_propagate_values = false;
+        s_p.m_bv_size_reduce = false;
+        params_ref p_r;
+        asserted_formulas cnf_transformer(m, s_p, p_r);
+        cnf_transformer.assert_expr(e);
+        cnf_transformer.reduce(); // transform to cnf, each cnf_transformer.get_formula(id) should should be a clause
+        STRACE("str_axiom", tout << "CNF version of axiom:\n"; cnf_transformer.display(tout););
 
-
-        if (!axiomatized_terms.contains(e)) {
-            axiomatized_terms.insert(e);
-            if (e == nullptr || get_manager().is_true(e)) return;
-//        string_theory_propagation(e);
-            context &ctx = get_context();
-//        SASSERT(!ctx.b_internalized(e));
-            ctx.internalize(e, false);
-            literal l{ctx.get_literal(e)};
-            ctx.mark_as_relevant(l);
-            ctx.mk_th_axiom(get_id(), 1, &l);
-            STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
-        } else {
-            //STRACE("str", tout << __LINE__ << " " << __FUNCTION__ << "already contains " << mk_pp(e, m) << std::endl;);
+        for(unsigned clause_id = 0; clause_id < cnf_transformer.get_num_formulas(); ++clause_id) {
+            expr* clause = cnf_transformer.get_formula(clause_id);
+            expr_ref_vector expr_literals(m);
+            if (m.is_or(clause)) {
+                // clause contains multiple literals
+                for (unsigned lit_id = 0; lit_id < to_app(clause)->get_num_args(); ++lit_id) {
+                    expr_literals.push_back(to_app(clause)->get_arg(lit_id));
+                }
+            } else {
+                // clause is only one literal
+                expr_literals.push_back(clause);
+            }
+            std::vector<literal> literals;
+            for (expr* expr_literal : expr_literals) {
+                expr* atom;
+                if (m.is_not(expr_literal, atom)) {
+                    literals.push_back(~mk_literal(atom));
+                } else {
+                    literals.push_back(mk_literal(expr_literal));
+                }
+            }
+            add_axiom(literals);
         }
+        return;
     }
 
     void theory_str_noodler::add_axiom(std::vector<literal> ls) {
