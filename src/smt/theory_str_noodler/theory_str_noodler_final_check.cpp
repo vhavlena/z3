@@ -591,7 +591,7 @@ namespace smt::noodler {
     void theory_str_noodler::do_sat_shit(expr_ref length_formula) {
         last_run_was_sat = true;
         // propagate_from_arith_model();
-        // sat_length_formula = length_formula;
+        sat_length_formula = length_formula;
         add_axiom(length_formula);
     }
 

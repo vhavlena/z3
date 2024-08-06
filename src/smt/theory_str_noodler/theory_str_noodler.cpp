@@ -761,11 +761,10 @@ namespace smt::noodler {
 
         if (last_run_was_sat) {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
-            // if (m_params.m_produce_models) {
-            //     if (check_len_sat(sat_length_formula) != l_true) { // we need to run len sat check to compute new arith model
-            //         util::throw_error("This should not happen");
-            //     }
-            // }
+            if (m_params.m_produce_models) {
+                // we need to add previous axioms, so that z3 arith solver returns correct model
+                do_sat_shit(sat_length_formula);
+            }
             return FC_DONE;
         }
 

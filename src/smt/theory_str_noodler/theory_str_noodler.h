@@ -236,7 +236,9 @@ namespace smt::noodler {
             // SASSERT(var->get_family_id() == ctx.get_manager().get_family_id("arith"));
 
             // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
-            // ctx.internalize(var, false);
+            // if (!ctx.e_internalized(var)) {
+            //     ctx.internalize(var, false);
+            // }
             // ctx.mark_as_relevant(var);
 
             return expr_ref(var, m);
