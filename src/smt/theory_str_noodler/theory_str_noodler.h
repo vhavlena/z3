@@ -55,6 +55,7 @@ namespace smt::noodler {
         struct stored_instance {
             expr_ref lengths; // length formula 
             bool initial_length; // was the length formula obtained from the initial length checking?
+            // TODO we could also keep here the decision procedure and immediately get the model when loop protection gets sat
         };
 
         int m_scope_level = 0;
@@ -123,10 +124,10 @@ namespace smt::noodler {
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
         std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
-        model_ref arith_model; // keeps the arithmethic model from sat solution
-        class noodler_var_value_proc;
-        class str_var_value_proc;
-        class concat_var_value_proc;
+        // classes for creating model dependencies
+        class noodler_var_value_proc; // for noodler vars used in decision procedure
+        class str_var_value_proc; // for string vars that are not used in decision procedure
+        class concat_var_value_proc; // for concatenation
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -197,18 +198,6 @@ namespace smt::noodler {
          */
         expr_ref mk_int_var_fresh(std::string name) {
             app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
-
-            // name = name + std::string("!noodler") + std::to_string(fresh_var_counter);
-            // ++fresh_var_counter;
-            // func_decl_info info(ctx.get_manager().get_family_id("arith"));
-            // info.set_skolem(true);
-            // app* fresh_var = m.mk_const(m.mk_func_decl(symbol(name.c_str()), static_cast<unsigned>(0), nullptr, m_util_a.mk_int(), info));
-            // SASSERT(fresh_var->get_family_id() == ctx.get_manager().get_family_id("arith"));
-
-            // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
-            // ctx.internalize(fresh_var, false);
-            // ctx.mark_as_relevant(fresh_var);
-
             return expr_ref(fresh_var, m);
         }
         
@@ -229,18 +218,6 @@ namespace smt::noodler {
          */
         expr_ref mk_int_var(const std::string& name) {
             app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
-
-            // func_decl_info info(ctx.get_manager().get_family_id("arith"));
-            // info.set_skolem(true);
-            // app* var = m.mk_const(m.mk_func_decl(symbol(name.c_str()), static_cast<unsigned>(0), nullptr, m_util_a.mk_int(), info));
-            // SASSERT(var->get_family_id() == ctx.get_manager().get_family_id("arith"));
-
-            // internalizing and marking as relevant so that arith solver does not ignore it (hopefully)
-            // if (!ctx.e_internalized(var)) {
-            //     ctx.internalize(var, false);
-            // }
-            // ctx.mark_as_relevant(var);
-
             return expr_ref(var, m);
         }
 
@@ -415,13 +392,6 @@ namespace smt::noodler {
         void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
 
         /**
-         * @brief Propagate the LIA arith model into internal LIA solver
-         * 
-         * Propagates the lengths of len_vars and the models of int vars from conversions
-         */
-        void propagate_from_arith_model();
-
-        /**
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.
          * 
          * @param instance Current instance converted to Formula
@@ -504,8 +474,13 @@ namespace smt::noodler {
         lbool run_length_sat(const Formula& instance, const AutAssignment& aut_ass,
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions);
-        
-        void do_sat_shit(expr_ref length_formula);
+
+        /**
+         * @brief This function should always be called after decision procedure decides SAT
+         * 
+         * @param length_formula - formula with which we got sat
+         */
+        void sat_handling(expr_ref length_formula);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };

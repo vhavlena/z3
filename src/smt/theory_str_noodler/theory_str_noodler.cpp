@@ -763,14 +763,14 @@ namespace smt::noodler {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
-                do_sat_shit(sat_length_formula);
+                sat_handling(sat_length_formula);
             }
             return FC_DONE;
         }
 
-        arith_model = nullptr;
         dec_proc = nullptr;
         relevant_vars.clear();
+        sat_length_formula = expr_ref(m);
 
         remove_irrelevant_constr();
         STRACE("str",
@@ -1001,7 +1001,7 @@ namespace smt::noodler {
                 
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
-                    do_sat_shit(lengths);
+                    sat_handling(lengths);
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;

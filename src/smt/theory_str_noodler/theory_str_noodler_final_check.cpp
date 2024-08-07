@@ -236,7 +236,7 @@ namespace smt::noodler {
         while(dec_proc->compute_next_solution() == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
-                do_sat_shit(lengths);
+                sat_handling(lengths);
                 return l_true;
             }
         }
@@ -368,7 +368,7 @@ namespace smt::noodler {
             if (result == l_true) {
                 expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
-                    do_sat_shit(lengths);
+                    sat_handling(lengths);
                     return l_true;
                 } else {
                     STRACE("str", tout << "nielsen len unsat" <<  mk_pp(lengths, m) << std::endl;);
@@ -403,7 +403,7 @@ namespace smt::noodler {
             auto [formula, precision] = nproc.get_lengths();
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
-                do_sat_shit(lengths);
+                sat_handling(lengths);
                 return l_true;
             } else {
                 STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
@@ -559,38 +559,13 @@ namespace smt::noodler {
             block_curr_len(lengths, true, true);
             return l_false;
         } else {
-            do_sat_shit(lengths);
+            sat_handling(lengths);
             return l_true;
         }
     }
 
-    void theory_str_noodler::propagate_from_arith_model() {
-        if (!m_params.m_produce_models || len_vars.empty()) { return; }
-        SASSERT(arith_model != nullptr);
-        expr_ref model(m);
-        for (const auto& len_var : len_vars) {
-            arith_model->eval_expr(m_util_s.str.mk_length(len_var), model);
-            add_axiom(m.mk_eq(m_util_s.str.mk_length(len_var), model));
-        }
-
-        // conversion propagation does not work for some reason
-        // for (const auto& conv : m_conversion_todo) {
-        //     arith_model->eval_expr(var_name.at(conv.int_var), model);
-        //     add_axiom(m.mk_eq(var_name.at(conv.int_var), model));
-        // }
-
-        // for (auto& [noodler_var, z3_var] : var_name) {
-        //     add_axiom(m.mk_eq(z3_var, m_util_s.str.mk_string(model_of_string_expr(to_app(z3_var)))));
-        // }
-
-        // for (auto& [pred, var] : predicate_replace) {
-        //     add_axiom(m.mk_eq(pred, m_util_s.str.mk_string(model_of_string_expr(to_app(pred)))));
-        // }
-    }
-
-    void theory_str_noodler::do_sat_shit(expr_ref length_formula) {
+    void theory_str_noodler::sat_handling(expr_ref length_formula) {
         last_run_was_sat = true;
-        // propagate_from_arith_model();
         sat_length_formula = length_formula;
         add_axiom(length_formula);
     }
@@ -629,8 +604,6 @@ namespace smt::noodler {
             for(size_t i = 1; i < node.succ.size(); i++) {
                 plus = m_util_a.mk_add(plus, len_node_to_z3_formula(node.succ[i]));
             }
-            // ctx.internalize(plus, false);
-            // ctx.mark_as_relevant(plus.get());
             return plus;
         }
 
@@ -641,8 +614,6 @@ namespace smt::noodler {
             for(size_t i = 1; i < node.succ.size(); i++) {
                 minus = m_util_a.mk_sub(minus, len_node_to_z3_formula(node.succ[i]));
             }
-            // ctx.internalize(minus, false);
-            // ctx.mark_as_relevant(minus.get());
             return minus;
         }
 
@@ -653,8 +624,6 @@ namespace smt::noodler {
             for(size_t i = 1; i < node.succ.size(); i++) {
                 times = m_util_a.mk_mul(times, len_node_to_z3_formula(node.succ[i]));
             }
-            // ctx.internalize(times, false);
-            // ctx.mark_as_relevant(times.get());
             return times;
         }
 
@@ -663,8 +632,6 @@ namespace smt::noodler {
             expr_ref left = len_node_to_z3_formula(node.succ[0]);
             expr_ref right = len_node_to_z3_formula(node.succ[1]);
             expr_ref eq(m_util_a.mk_eq(left, right), m);
-            // ctx.internalize(eq, false);
-            // ctx.mark_as_relevant(eq.get());
             return eq;
         }
 
@@ -673,8 +640,6 @@ namespace smt::noodler {
             expr_ref left = len_node_to_z3_formula(node.succ[0]);
             expr_ref right = len_node_to_z3_formula(node.succ[1]);
             expr_ref neq(m.mk_not(m_util_a.mk_eq(left, right)), m);
-            // ctx.internalize(neq, false);
-            // ctx.mark_as_relevant(neq.get());
             return neq;
         }
 
@@ -683,8 +648,6 @@ namespace smt::noodler {
             expr_ref left = len_node_to_z3_formula(node.succ[0]);
             expr_ref right = len_node_to_z3_formula(node.succ[1]);
             expr_ref leq(m_util_a.mk_le(left, right), m);
-            // ctx.internalize(leq, false);
-            // ctx.mark_as_relevant(leq.get());
             return leq;
         }
 
@@ -694,16 +657,12 @@ namespace smt::noodler {
             expr_ref right = len_node_to_z3_formula(node.succ[1]);
             // LIA solver fails if we use "L < R" for some reason (it cannot be internalized in smt::theory_lra::imp::internalize_atom, as it expects only <= or >=); we use "!(R <= L)" instead
             expr_ref lt(m.mk_not(m_util_a.mk_le(right, left)), m);
-            // ctx.internalize(lt, false);
-            // ctx.mark_as_relevant(lt.get());
             return lt;
         }
 
         case LenFormulaType::NOT: {
             assert(node.succ.size() == 1);
             expr_ref no(m.mk_not(len_node_to_z3_formula(node.succ[0])), m);
-            // ctx.internalize(no, false);
-            // ctx.mark_as_relevant(no.get());
             return no;
         }
 
@@ -714,8 +673,6 @@ namespace smt::noodler {
             for(size_t i = 1; i < node.succ.size(); i++) {
                 andref = m.mk_and(andref, len_node_to_z3_formula(node.succ[i]));
             }
-            // ctx.internalize(andref, false);
-            // ctx.mark_as_relevant(andref.get());
             return andref;
         }
 
@@ -726,8 +683,6 @@ namespace smt::noodler {
             for(size_t i = 1; i < node.succ.size(); i++) {
                 orref = m.mk_or(orref, len_node_to_z3_formula(node.succ[i]));
             }
-            // ctx.internalize(orref, false);
-            // ctx.mark_as_relevant(orref.get());
             return orref;
         }
 
@@ -742,8 +697,6 @@ namespace smt::noodler {
             names.push_back(var->get_name());
 
             expr_ref forall(m.mk_quantifier(quantifier_kind::forall_k, sorts.size(), sorts.data(), names.data(), bodyref), m);
-            // ctx.internalize(forall, false);
-            // ctx.mark_as_relevant(forall.get());
             return forall;
         }
 
