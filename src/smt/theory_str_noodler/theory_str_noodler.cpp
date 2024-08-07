@@ -1174,6 +1174,7 @@ namespace smt::noodler {
             // for complex string functions (nothing else should be able to come into mk_value), we should be able to find vars that replace them in predicate_replace
             if (predicate_replace.contains(tgt)) {
                 expr* str_var = predicate_replace[to_expr(tgt)];
+                // NOTE maybe we should create another version of model_value_proc that takes str_var and just add it as a dependency, so that we are not trying to get model of str_var twice (once here, once for a call mk_value(str_var))
                 return model_of_string_var(to_app(str_var));
             } else {
                 // we should not get some string complex function that is not in predicate_replace
