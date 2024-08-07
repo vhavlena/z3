@@ -1043,7 +1043,7 @@ namespace smt::noodler {
         noodler_var_value_proc(BasicTerm str_var, theory_str_noodler& th) : str_var(str_var), th(th), needed_vars(th.dec_proc->get_len_vars_for_model(str_var)) {}
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
-            for (BasicTerm var : needed_vars) {
+            for (const BasicTerm& var : needed_vars) {
                 expr_ref arith_var(th.m);
                 // the following is similar to code in len_node_to_z3_formula()
                 if(!th.var_name.contains(var)) {

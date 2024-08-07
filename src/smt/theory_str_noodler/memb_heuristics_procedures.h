@@ -30,7 +30,7 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override;
 
-        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override {
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override {
             // heuristic should be used only if we do not have length vars, so nothing is needed
             return {};
         }
@@ -52,7 +52,7 @@ namespace smt::noodler {
 
         lbool compute_next_solution() override;
 
-        std::vector<BasicTerm> get_len_vars_for_model(BasicTerm str_var) override {
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override {
             // heuristic should be used only if we do not have length vars, so nothing is needed
             return {};
         }

@@ -1748,7 +1748,7 @@ namespace smt::noodler {
     std::vector<BasicTerm> DecisionProcedure::get_len_vars_for_model(const BasicTerm& str_var) {
         // we always need (for initialization) all len_vars that are in aut_ass, so we ignore str_var
         std::vector<BasicTerm> needed_vars;
-        for (BasicTerm len_var : solution.length_sensitive_vars) {
+        for (const BasicTerm& len_var : solution.length_sensitive_vars) {
             if (solution.aut_ass.contains(len_var)) {
                 needed_vars.push_back(len_var);
 
