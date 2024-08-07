@@ -1045,14 +1045,15 @@ namespace smt::noodler {
         void get_dependencies(buffer<model_value_dependency> & result) override {
             for (BasicTerm var : needed_vars) {
                 expr_ref arith_var(th.m);
+                // the following is similar to code in len_node_to_z3_formula()
                 if(!th.var_name.contains(var)) {
                     // if the variable is not found, it was introduced in the preprocessing/decision procedure
                     // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
                     arith_var = th.mk_int_var(var.get_name().encode());
                 } else {
-                    arith_var = th.var_name.at(var); // for int vars, we just take the var
+                    arith_var = th.var_name.at(var); // for int var, we just take the var
                     if (th.m_util_s.is_string(arith_var->get_sort())) {
-                        // for string vars, we want its length
+                        // for string var, we want its length
                         arith_var = expr_ref(th.m_util_s.str.mk_length(arith_var), th.m);
                     }
                 }
@@ -1153,11 +1154,6 @@ namespace smt::noodler {
         app *tgt = n->get_expr();
         STRACE("str", tout << "mk_value: getting model for " << mk_pp(tgt, m) << " sort is " << mk_pp(tgt->get_sort(), m) << "\n";);
 
-        if (!m_params.m_produce_models) {
-            // if producing models is not enabled, we just return the target, the model is then not valid
-            return alloc(expr_wrapper_proc, tgt);
-        }
-
         if (m_util_s.is_re(tgt)) {
             // if tgt is regular
             if (util::is_variable(tgt)) {
@@ -1189,7 +1185,6 @@ namespace smt::noodler {
 
     void theory_str_noodler::init_model(model_generator &mg) {
         STRACE("str", tout << "init_model\n");
-        // CTRACE("str-arith-model", arith_model != nullptr, tout << "Arith model:\n" << *arith_model << std::endl;);
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {

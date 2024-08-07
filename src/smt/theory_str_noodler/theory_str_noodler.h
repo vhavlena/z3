@@ -126,7 +126,7 @@ namespace smt::noodler {
         std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
         // classes for creating model dependencies
         class noodler_var_value_proc; // for noodler vars used in decision procedure
-        class str_var_value_proc; // for string vars that are not used in decision procedure
+        class str_var_value_proc; // for string vars (whose length is important) that are not used in decision procedure
         class concat_var_value_proc; // for concatenation
 
     public:
