@@ -1035,12 +1035,15 @@ namespace smt::noodler {
         }
     }
 
+    /// @brief Class for model generation of string variables that are in decision procedure dec_proc
     class theory_str_noodler::noodler_var_value_proc : public model_value_proc {
+        // the variable whose model we want to generate
         BasicTerm str_var;
-        theory_str_noodler& th;
+        // all variables whose arithmetic model we need (if they are string, we need their length) to generate mdoel for str_var
         std::vector<BasicTerm> needed_vars;
+        theory_str_noodler& th;
     public:
-        noodler_var_value_proc(BasicTerm str_var, theory_str_noodler& th) : str_var(str_var), th(th), needed_vars(th.dec_proc->get_len_vars_for_model(str_var)) {}
+        noodler_var_value_proc(BasicTerm str_var, theory_str_noodler& th) : str_var(str_var), needed_vars(th.dec_proc->get_len_vars_for_model(str_var)), th(th) {}
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
             for (const BasicTerm& var : needed_vars) {
@@ -1062,6 +1065,7 @@ namespace smt::noodler {
         }
 
         app * mk_value(model_generator & m, expr_ref_vector const & values) override {
+            // we create a function that takes some var from needed_vars and returns their model
             std::map<BasicTerm,rational> var_to_arith_model;
             SASSERT(values.size() == needed_vars.size());
             for (unsigned i = 0; i < needed_vars.size(); ++i) {
@@ -1074,12 +1078,16 @@ namespace smt::noodler {
             std::function<rational(BasicTerm)> get_arith_model_of_var = [&var_to_arith_model](BasicTerm var) -> rational {
                 return var_to_arith_model.at(var);
             };
+
             return th.m_util_s.str.mk_string(th.dec_proc->get_model(str_var, get_arith_model_of_var));
         }
     };
 
+    /// @brief Class for model generation of string variables that are length and are not in decision procedure dec_proc (so their value does not matter, only their length)
     class theory_str_noodler::str_var_value_proc : public model_value_proc {
+        // the variable whose model we want to generate
         expr* str_var;
+        // the enode value of '(str.len str_var)'
         enode* str_var_length_enode;
         seq_util& m_util_s;
         arith_util& m_util_a;
@@ -1087,6 +1095,7 @@ namespace smt::noodler {
         str_var_value_proc(expr* str_var, context& ctx, seq_util& m_util_s, arith_util& m_util_a) : str_var(str_var), str_var_length_enode(ctx.get_enode(m_util_s.str.mk_length(str_var))), m_util_s(m_util_s), m_util_a(m_util_a) {}
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
+            // we just need the length of str_var
             result.push_back(model_value_dependency(str_var_length_enode));
         }
     
@@ -1104,6 +1113,7 @@ namespace smt::noodler {
         }
     };
 
+    /// @brief Class for model generation of concatenation
     class theory_str_noodler::concat_var_value_proc : public model_value_proc {
         seq_util& m_util_s;
         svector<model_value_dependency> m_dependencies;
@@ -1118,10 +1128,12 @@ namespace smt::noodler {
         }
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
+            // the dependencies are the arguments
             result.append(m_dependencies.size(), m_dependencies.data());
         }
     
         app * mk_value(model_generator & m, expr_ref_vector const & values) override {
+            // concatenate the models of arguments
             zstring res;
             for (auto value : values) {
                 zstring value_string;

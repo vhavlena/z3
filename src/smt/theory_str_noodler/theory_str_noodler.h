@@ -124,7 +124,7 @@ namespace smt::noodler {
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
         std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
-        // classes for creating model dependencies
+        // classes for creating model dependencies, see their usage in mk_value
         class noodler_var_value_proc; // for noodler vars used in decision procedure
         class str_var_value_proc; // for string vars (whose length is important) that are not used in decision procedure
         class concat_var_value_proc; // for concatenation
