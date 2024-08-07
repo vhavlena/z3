@@ -189,8 +189,6 @@ namespace smt::noodler {
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
 
-        unsigned fresh_var_counter = 0;
-
         /**
          * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
          *
