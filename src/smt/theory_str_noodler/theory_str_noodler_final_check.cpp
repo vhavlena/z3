@@ -3,6 +3,401 @@
 #include "memb_heuristics_procedures.h"
 
 namespace smt::noodler {
+    /**
+     * @brief Checks satisfiability of constraints in _todo member variables (e.g. m_word_eq_todo, m_membership_todo,...)
+     * 
+     * It follows these steps:
+     *   1) Remove constraints that are not relevant for the solution, adding all relevant constraints to *_todo_rel, ending with
+     *        - language equations and diseqations (m_lang_eq_or_diseq_todo_rel)
+     *        - word equations and diseqations (m_word_eq_todo_rel and m_word_diseq_todo_rel)
+     *        - membership constraints (m_membership_todo_rel)
+     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown) 
+     *   2) Check if all language eqations and disequations are true (the sides are given as regexes)
+     *   3) Create the formula instance and automata assignment from word (dis)eqautions and membership constraints
+     *   4) Check if it is satisfiable which consists of
+     *        - preprocessing the formula (simplifying (dis)equations, reducing the number of variables etc.)
+     *        - iteratively running the decision procedure until a satisfiable solution and length constraint is found or until
+     *          it finishes wihtout result
+     */
+    final_check_status theory_str_noodler::final_check_eh() {
+        TRACE("str", tout << "final_check starts" << std::endl;);
+
+        if (last_run_was_sat) {
+            // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
+            if (m_params.m_produce_models) {
+                // we need to add previous axioms, so that z3 arith solver returns correct model
+                sat_handling(sat_length_formula);
+            }
+            return FC_DONE;
+        }
+
+        dec_proc = nullptr;
+        relevant_vars.clear();
+        sat_length_formula = expr_ref(m);
+
+        remove_irrelevant_constr();
+        STRACE("str",
+            tout << "Relevant predicates:" << std::endl;
+            tout << "  eqs(" << this->m_word_eq_todo_rel.size() << "):" << std::endl;
+            for (const auto &we: this->m_word_eq_todo_rel) {
+                tout << "    " << mk_pp(we.first, m) << " == " << mk_pp(we.second, m) << std::endl;
+            }
+            tout << "  diseqs(" << this->m_word_diseq_todo_rel.size() << "):" << std::endl;
+            for (const auto &wd: this->m_word_diseq_todo_rel) {
+                tout << "    " << mk_pp(wd.first, m) << " != " << mk_pp(wd.second, m) << std::endl;
+            }
+            tout << "  membs(" << this->m_membership_todo_rel.size() << "):" << std::endl;
+            for (const auto &memb: this->m_membership_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(memb), m) << (std::get<2>(memb) ? "" : " not") << " in " << mk_pp(std::get<1>(memb), m) << std::endl;
+            }
+            tout << "  lang (dis)eqs(" << this->m_lang_eq_or_diseq_todo_rel.size() << "):" << std::endl;
+            for (const auto &led: this->m_lang_eq_or_diseq_todo_rel) {
+                tout << "    " << mk_pp(std::get<0>(led), m) << (std::get<2>(led) ? " == " : " != ") << mk_pp(std::get<1>(led), m) << std::endl;
+            }
+            tout << "  not_contains(" << this->m_not_contains_todo_rel.size() << "):" << std::endl;
+            for (const auto &notc: this->m_not_contains_todo_rel) {
+                tout << "    " << mk_pp(notc.first, m) << "; " << mk_pp(notc.second, m) << std::endl;
+            }
+            tout << " conversions(" << this->m_conversion_todo.size() << "):" << std::endl;
+            for (const auto &conv: this->m_conversion_todo) {
+                tout << "    " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
+            }
+        );
+
+        // Solve Language (dis)equations
+        if (!solve_lang_eqs_diseqs()) {
+            // one of the (dis)equations is unsat
+            return FC_CONTINUE;
+        }
+
+        /***************************** SOLVE WORD (DIS)EQUATIONS + REGULAR MEMBERSHIPS ******************************/
+
+        // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
+        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
+        // we get the same formula up to alpha reduction).
+        if(m_params.m_loop_protect) {
+            lbool result = run_loop_protection();
+            if(result == l_true && !m_params.m_produce_models) { // if we want to produce model, we need the exact solution in dec_proc, so we need to run procedure again 
+                last_run_was_sat = true;
+                return FC_DONE;
+            } else if (result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
+        bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
+        bool contains_conversions = !this->m_conversion_todo.empty();
+        bool contains_eqs_and_diseqs_only = this->m_not_contains_todo_rel.empty() && this->m_conversion_todo.empty();
+
+        // As a heuristic, for the case we have exactly one constraint, which is of type 'x (not)in RE', we use universality/emptiness
+        // checking of the regex (using some heuristics) instead of constructing the automaton of RE. The construction (especially complement)
+        // can sometimes blow up, so the check should be faster.
+        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0
+                && this->len_vars.empty() // TODO: handle length vars that are not x (i.e., there are no string constraints on them, other than length ones, we just need to compute arith model)
+        ) {
+            const auto& reg_data = this->m_membership_todo_rel[0];
+            // TODO: check if "xyz in RE" works correctly
+            expr_ref var = std::get<0>(reg_data);
+            if (util::is_str_variable(var, m_util_s) && !this->len_vars.contains(var)) { // the variable cannot be length one
+                STRACE("str", tout << "trying one membership heuristics\n";);
+                BasicTerm noodler_var = util::get_variable_basic_term(var);
+                relevant_vars.insert(noodler_var);
+                dec_proc = std::make_shared<MembHeuristicProcedure>(
+                    noodler_var,
+                    std::get<1>(reg_data),
+                    std::get<2>(reg_data),
+                    m_util_s, m
+                );
+                lbool result = dec_proc->compute_next_solution();
+                if(result == l_true) {
+                    return FC_DONE;
+                } else if(result == l_false) {
+                    block_curr_len(expr_ref(this->m.mk_false(), this->m)); // the variable is not legnth one, so we block fully
+                    return FC_CONTINUE;
+                }
+            }
+        }
+
+        if (is_mult_membership_suitable()) {
+            lbool result = run_mult_membership_heur();
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                block_curr_len(expr_ref(this->m.mk_false(), this->m)); // there should not be any length vars, so we block fully
+                return FC_CONTINUE;
+            }
+        }
+
+        // Gather relevant word (dis)equations to noodler formula
+        Formula instance = get_word_formula_from_relevant();
+        STRACE("str",
+            for(const auto& f : instance.get_predicates()) {
+                tout << f.to_string() << std::endl;
+            }
+        );
+
+        // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
+        std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
+        // For the case that it is possible we have to_int/from_int, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle to_int/from_int
+        if (!m_conversion_todo.empty()) {
+            for (mata::Symbol s = 48; s <= 57; ++s) {
+                symbols_in_formula.insert(s);
+            }
+        }
+
+        // Create automata assignment for the formula
+        AutAssignment aut_assignment{create_aut_assignment_for_formula(instance, symbols_in_formula)};
+
+        std::vector<TermConversion> conversions = get_conversions_as_basicterms(aut_assignment, symbols_in_formula);
+
+        for (const auto& [var, nfa] : aut_assignment) {
+            relevant_vars.insert(var);
+        }
+
+        // Get the initial length vars that are needed here (i.e they are in aut_assignment)
+        std::unordered_set<BasicTerm> init_length_sensitive_vars{ get_init_length_vars(aut_assignment) };
+        STRACE("str",
+            tout << "Length variables:";
+            for (const auto &len_var : init_length_sensitive_vars) {
+                tout << " " << len_var;
+            }
+            tout << std::endl
+        );
+
+
+        // There is only one symbol in the equation. The system is SAT iff lengths are SAT
+        if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
+            lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        // try Nielsen transformation (if enabled) to solve
+        if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
+            lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        // we do not put into dec_proc directly, because we might do underapproximation that saves into dec_proc
+        std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        // is formula length unsatisfiable?
+        bool length_unsat = false;
+
+        // the skip_len_sat preprocessing rule requires that the input formula is length satisfiable
+        // --> before we apply the preprocessing, we need to be sure that it is indeed true.
+        // length constraints from initial assignment
+        // we want to include all variables from the formula --> e.g.
+        // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
+        // to include also length of |u| to propagate the value to |s|
+        expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
+        if(check_len_sat(lengths) == l_false) {
+            STRACE("str", tout << "Unsat from initial lengths" << std::endl);
+            // we postpone the decision. If the instance is both length unsatisfiable and 
+            // unsatisfiable from preprocessing, we want to kill it after preprocessing as it
+            //  generates stronger theory lemma (negation of the string part).
+            length_unsat = true;
+        }
+
+        // now we know that the initial formula is length-satisfiable
+        // try length-based decision procedure (if enabled) to solve
+        if(m_params.m_try_length_proc && contains_eqs_and_diseqs_only && LengthDecisionProcedure::is_suitable(instance, aut_assignment)) {
+            lbool result = run_length_proc(instance, aut_assignment, init_length_sensitive_vars);
+            if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        // try underapproximation (if enabled) to solve
+        if(!length_unsat && m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment, conversions)) {
+            STRACE("str", tout << "Try underapproximation" << std::endl);
+            if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
+                STRACE("str", tout << "Sat from underapproximation" << std::endl;);
+                return FC_DONE;
+            }
+            STRACE("str", tout << "Underapproximation did not help\n";);
+        }
+
+        dec_proc = std::move(main_dec_proc);
+
+        STRACE("str", tout << "Starting preprocessing" << std::endl);
+        lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
+        if (result == l_false) {
+            STRACE("str", tout << "Unsat from preprocessing" << std::endl);
+            block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
+            return FC_CONTINUE;
+        } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
+
+        // instance is length unsat --> generate theory lemma
+        if(length_unsat) {
+            block_curr_len(lengths, true, true);
+            return FC_CONTINUE;
+        }
+        // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
+        // length constraints from initial assignment
+        lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
+        if(check_len_sat(lengths) == l_false) {
+            STRACE("str", tout << "Unsat from initial lengths" << std::endl);
+            block_curr_len(lengths, true, true);
+            return FC_CONTINUE;
+        }
+
+        STRACE("str", tout << "Starting main decision procedure" << std::endl);
+        dec_proc->init_computation();
+
+        expr_ref block_len(m.mk_false(), m);
+        while (true) {
+            result = dec_proc->compute_next_solution();
+            if (result == l_true) {
+                auto [noodler_lengths, precision] = dec_proc->get_lengths();
+                lengths = len_node_to_z3_formula(noodler_lengths);
+                lbool is_lengths_sat = check_len_sat(lengths);
+                
+                if (is_lengths_sat == l_true) {
+                    STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
+                    sat_handling(lengths);
+
+                    if(precision == LenNodePrecision::OVERAPPROX) {
+                        ctx.get_fparams().is_overapprox = true;
+                    }
+
+                    return FC_DONE;
+                } else if (is_lengths_sat == l_false) {
+                    STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
+                    block_len = m.mk_or(block_len, lengths);
+
+                    if(precision == LenNodePrecision::UNDERAPPROX) {
+                        ctx.get_fparams().is_underapprox = true;
+                    }
+                }
+            } else if (result == l_false) {
+                // we did not find a solution (with satisfiable length constraints)
+                // we need to block current assignment
+                STRACE("str", tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
+
+                if(m.is_false(block_len)) {
+                    block_curr_len(block_len, false, true);
+                } else {
+                    block_curr_len(block_len);
+                }
+                return FC_CONTINUE;
+            } else {
+                // we could not decide if there is solution, let's just give up
+                STRACE("str", tout << "giving up" << std::endl);
+                return FC_GIVEUP;
+            }
+        }
+    }
+
+    void theory_str_noodler::remove_irrelevant_constr() {
+        STRACE("str", tout << "Remove irrevelant" << std::endl);
+
+        this->m_word_eq_todo_rel.clear();
+        this->m_word_diseq_todo_rel.clear();
+        this->m_membership_todo_rel.clear();
+        this->m_lang_eq_or_diseq_todo_rel.clear();
+        this->m_not_contains_todo_rel.clear();
+
+        for (const auto& we : m_word_eq_todo) {
+            app_ref eq(m.mk_eq(we.first, we.second), m);
+            app_ref eq_rev(m.mk_eq(we.second, we.first), m);
+
+            STRACE("str",
+                tout << "  Eq " << mk_pp(eq.get(), m) << " is " << (ctx.is_relevant(eq.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(eq.get())
+                     << " and its reverse is " << (ctx.is_relevant(eq_rev.get()) ? "" : "not ") << "relevant" << std::endl;
+            );
+            
+            // check if equation or its reverse are relevant (we check reverse to be safe) and...
+            if((ctx.is_relevant(eq.get()) || ctx.is_relevant(eq_rev.get())) &&
+               // ...neither equation nor its reverse are saved as relevant yet
+               !this->m_word_eq_todo_rel.contains(we) && !this->m_word_eq_todo_rel.contains({we.second, we.first})
+               ) {
+                // save it as relevant
+                this->m_word_eq_todo_rel.push_back(we);
+            }
+        }
+
+        for (const auto& wd : m_word_diseq_todo) {
+            app_ref dis(m.mk_not(m.mk_eq(wd.first, wd.second)), m);
+            app_ref dis_rev(m.mk_not(m.mk_eq(wd.second, wd.first)), m);
+
+            STRACE("str",
+                tout << "  Diseq " << mk_pp(dis.get(), m) << " is " << (ctx.is_relevant(dis.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(dis.get())
+                     << " and its reverse is " << (ctx.is_relevant(dis_rev.get()) ? "" : "not ") << "relevant" << std::endl;
+            );
+            
+            // check if disequation or its reverse are relevant (we check reverse to be safe) and...
+            if((ctx.is_relevant(dis.get()) || ctx.is_relevant(dis_rev.get())) &&
+               // ...neither disequation nor its reverse are saved as relevant yet
+               !this->m_word_diseq_todo_rel.contains(wd) && !this->m_word_diseq_todo_rel.contains({wd.second, wd.first})
+               ) {
+                // save it as relevant
+                this->m_word_diseq_todo_rel.push_back(wd);
+            }
+        }
+
+        for (const auto& memb : this->m_membership_todo) {
+            app_ref memb_app(m_util_s.re.mk_in_re(std::get<0>(memb), std::get<1>(memb)), m);
+            app_ref memb_app_orig(m_util_s.re.mk_in_re(std::get<0>(memb), std::get<1>(memb)), m);
+            if(!std::get<2>(memb)){
+                memb_app = m.mk_not(memb_app);
+
+            }
+            
+            STRACE("str",
+                tout << "  " << mk_pp(memb_app.get(), m) << " is " << (ctx.is_relevant(memb_app.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(memb_app.get())
+                     << ", " << mk_pp(memb_app_orig.get(), m) << " is " << (ctx.is_relevant(memb_app_orig.get()) ? "" : "not ") << "relevant"
+                     << std::endl;
+            );
+
+            // check if membership (or if we have negation, its negated form) is relevant and...
+            if((ctx.is_relevant(memb_app.get()) || ctx.is_relevant(memb_app_orig.get())) &&
+               // this membership constraint is not added to relevant yet
+               !this->m_membership_todo_rel.contains(memb)
+               ) {
+                this->m_membership_todo_rel.push_back(memb);
+            }
+        }
+
+        // not contains
+        for(const auto& not_con_pair: this->m_not_contains_todo) {
+            app_ref con_expr(m_util_s.str.mk_contains(not_con_pair.first, not_con_pair.second), m);
+            app_ref not_con_expr(m.mk_not(con_expr), m);
+
+            STRACE("str",
+                tout << "  NOT contains " << mk_pp(con_expr.get(), m) << " is " << (ctx.is_relevant(con_expr.get()) ? "" : "not ") << "relevant"
+                     << " with assignment " << ctx.find_assignment(con_expr.get())
+                     << ", " << mk_pp(not_con_expr.get(), m) << " is " << (ctx.is_relevant(not_con_expr.get()) ? "" : "not ") << "relevant"
+                     << std::endl;
+            );
+
+            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) && 
+                !this->m_not_contains_todo_rel.contains(not_con_pair)) {
+                this->m_not_contains_todo_rel.push_back(not_con_pair);
+            }
+        }
+
+        // TODO check for relevancy of language (dis)equations, right now we assume everything is relevant
+        for(const auto& le : m_lang_eq_todo) {
+            this->m_lang_eq_or_diseq_todo_rel.push_back({le.first, le.second, true});
+        }
+        for(const auto& ld : m_lang_diseq_todo) {
+            this->m_lang_eq_or_diseq_todo_rel.push_back({ld.first, ld.second, false});
+        }
+    }
+
     Predicate theory_str_noodler::conv_eq_pred(app* const ex) {
         STRACE("str-conv-eq", tout << "conv_eq_pred: " << mk_pp(ex, m) << std::endl);
         const app* eq = ex;
