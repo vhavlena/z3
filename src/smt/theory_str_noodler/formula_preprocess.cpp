@@ -321,7 +321,7 @@ namespace smt::noodler {
 
             // if right side contains multiple len vars we must do splitting => cannot remove (we can remove if we have only one length var with possibly literals)
             bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
-            if(is_right_side_len && pr.second.get_side_vars(Predicate::EquationSideType::Right).size()) {
+            if(is_right_side_len && pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1) {
                 continue;
             }
 
