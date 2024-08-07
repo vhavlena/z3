@@ -376,9 +376,8 @@ namespace smt::noodler {
          * 
          * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of 
          * the current @p len_formula. If the parameter is nullptr, the unsat core is not computed.
-         * @param force_sat_check if true, calls the arith solver even if len_formula=true (useful when we need to generate model)
          */
-        lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr, bool force_sat_check = false);
+        lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr);
 
         /**
          * @brief Blocks current SAT assignment for given @p len_formula
