@@ -117,50 +117,6 @@ namespace smt::noodler::util {
     void get_len_exprs(app* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<app>& res);
 
     /**
-     * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
-     *
-     * @param name Infix of the name (rest is added to get a unique name)
-     * FIXME same function is in theory_str_noodler, decide which to keep
-     */
-    static expr_ref mk_int_var_fresh(const std::string& name, ast_manager& m, arith_util& m_util_a) {
-        app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
-        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
-        return expr_ref(fresh_var, m);
-    }
-    
-    /**
-     * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
-     *
-     * @param name Infix of the name (rest is added to get a unique name)
-     * FIXME same function is in theory_str_noodler, decide which to keep
-     */
-    static expr_ref mk_str_var_fresh(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
-        return expr_ref(fresh_var, m);
-    }
-
-    /**
-     * @brief Get Z3 int var with exact given @p name
-     *
-     * @param name Name of the var
-     */
-    static expr_ref mk_int_var(const std::string& name, ast_manager& m, arith_util& m_util_a) {
-        app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
-        // TODO maybe we need to internalize and mark as relevant, so that arith solver can handle it (see mk_int_var in theory_str.h of z3str3)
-        return expr_ref(var, m);
-    }
-
-    /**
-     * @brief Get Z3 string var with exact given @p name
-     *
-     * @param name Name of the var
-     */
-    static expr_ref mk_str_var(const std::string& name, ast_manager& m, seq_util& m_util_s) {
-        app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_s.mk_string_sort()); // need to be skolem, because it seems they are not printed for models
-        return expr_ref(var, m);
-    }
-
-    /**
      * @brief Create a fresh noodler (BasicTerm) variable with a given @p name followed by a unique suffix.
      * 
      * The suffix contains a number which is incremented for each use of this function for a given @p name
@@ -186,18 +142,6 @@ namespace smt::noodler::util {
      * @return Is of the form.
      */
     bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res);
-
-    /**
-     * @brief Convert Length node to z3 length formula
-     *
-     * @param node Length node
-     * @param variable_map mapping of variables(BasicTerms) to the corresponding z3 variables(expr_ref)
-     * @param m ast manager
-     * @param m_util_s string ast util
-     * @param m_util_a arith ast util
-     * @return expr_ref
-     */
-    expr_ref len_to_expr(const LenNode &node, const std::map<BasicTerm, expr_ref>& variable_map, ast_manager &m, seq_util& m_util_s, arith_util& m_util_a);
 }
 
 #endif

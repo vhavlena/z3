@@ -25,7 +25,7 @@ namespace smt::noodler {
             initialized=false;
        }
 
-        lbool check_sat(expr* e, bool produce_model, model_ref &res_model);
+        lbool check_sat(expr* e);
         void initialize(context& ctx, bool include_ass = true);
         void assert_expr(expr * e);
     };

@@ -298,14 +298,14 @@ namespace smt::noodler {
     }
 
     /**
-     * Iteratively remove regular predicates. A regular predicate is of the form X = X_1 X_2 ... X_n where
-     * X_1 ... X_n does not occurr elsewhere in the system. Formally, L = R is regular if |L| = 1 and each variable
-     * from Vars(R) has a single occurrence in the system only. Regular predicates can be removed from the system
-     * provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X) is the automaton assigned to variable X.
+     * @brief Iteratively remove regular predicates.
      * 
-     * @param disallowed_vars - if any of these var occurs in equation, it cannot be removed
+     * A regular predicate is of the form X = X_1 X_2 ... X_n where X_1 ... X_n does not occurr elsewhere in the system.
+     * Formally, L = R is regular if |L| = 1 and each variable from Vars(R) has a single occurrence in the system only.
+     * Regular predicates can be removed from the system provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X)
+     * is the automaton assigned to variable X.
      */
-    void FormulaPreprocessor::remove_regular(const std::unordered_set<BasicTerm>& disallowed_vars) {
+    void FormulaPreprocessor::remove_regular() {
         STRACE("str-prep", tout << "Preprocessing step - remove_regular\n";);
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
@@ -319,14 +319,16 @@ namespace smt::noodler {
 
             assert(pr.second.get_left_side().size() == 1);
 
-            bool contains_disallowed = !set_disjoint(disallowed_vars, pr.second.get_vars());
-            if (contains_disallowed) {
+            // if right side contains multiple len vars we must do splitting => cannot remove (we can remove if we have only one length var with possibly literals)
+            bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
+            if(is_right_side_len && pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1) {
                 continue;
             }
 
-            // if right side contains multiple len vars we must do splitting => cannot remove (we can remove if we have only one length var with possibly literals)
-            bool is_right_side_len = !set_disjoint(this->len_variables, pr.second.get_side_vars(Predicate::EquationSideType::Right));
-            if(pr.second.get_side_vars(Predicate::EquationSideType::Right).size() > 1 && is_right_side_len) {
+            // if right side contains conversion variable, then we can only handle the case X = Y, i.e., we have only one var on the right side AND there are NO literals (othewise we need to do proper splitting)
+            // note that if this is true, then Y is also len var and is_right_side_len is true
+            bool is_right_side_conv = !set_disjoint(this->conversion_vars, pr.second.get_side_vars(Predicate::EquationSideType::Right));
+            if(is_right_side_conv && pr.second.get_right_side().size() > 1) {
                 continue;
             }
 
@@ -334,14 +336,22 @@ namespace smt::noodler {
             update_reg_constr(left_var, pr.second.get_right_side());
 
             if(is_right_side_len) {
-                // In the situation where we have X = Y and Y is length
+                // In the situation where we have X = Y (with possibly some literals around) and Y is length
                 // we propagate the lengthness of right side variable to the left side
                 this->len_variables.insert(left_var);
                 // and add len constraint |X| = |Y|
                 this->add_to_len_formula(pr.second.get_formula_eq());
             }
-            
-            removed_inclusions_for_model.push_back(pr.second);
+
+            if(is_right_side_conv) {
+                // if we also have that Y is conversion var, then there cannot be any literals around
+                // and we can add Y -> X to subst map (+ propagate that X is also conversion var)
+                this->conversion_vars.insert(left_var);
+                this->substitution_map[pr.second.get_right_side()[0]] = {left_var};
+            } else {
+                // otherwise we do not need to put anything in substitution map and we just need to remember the inclusion for model generation
+                removed_inclusions_for_model.push_back(pr.second);
+            }
 
             this->formula.remove_predicate(pr.first);
             STRACE("str-prep-remove_regular", tout << "removed" << std::endl;);
@@ -408,8 +418,12 @@ namespace smt::noodler {
             update_reg_constr(v_left, eq.get_right_side()); // L(X) = L(X) cap L(Y)
             this->add_to_len_formula(eq.get_formula_eq()); // add len constraint |X| = |Y|
             // propagate len variables: if Y is in len_variables, include also X
-            if(this->len_variables.find(eq.get_right_side()[0]) != this->len_variables.end()) {
+            if(this->len_variables.find(v_right) != this->len_variables.end()) {
                 this->len_variables.insert(v_left);
+            }
+            // propagate conv variables
+            if(this->conversion_vars.find(v_right) != this->conversion_vars.end()) {
+                this->conversion_vars.insert(v_left);
             }
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
@@ -1097,8 +1111,10 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable. 
-     * Remove L=R if single_occur(R) and L(R) = \Sigma^*.
+     * @brief Skip irrelevant word equations. Assume that the original formula is length-satisfiable.
+     * 
+     * Remove L=R if single_occur(R) and L(R) = \Sigma^* and R does not contain conversion vars (for these,
+     * we need to do proper splitting).
      */
     void FormulaPreprocessor::skip_len_sat() {
         STRACE("str-prep", tout << "Preprocessing step - skip_len_sat\n";);
@@ -1118,7 +1134,8 @@ namespace smt::noodler {
             if(!pr.second.is_equation())
                 continue;
 
-            if(this->formula.single_occurr(pr.second.get_left_set())) {
+            if(this->formula.single_occurr(pr.second.get_left_set())
+                && set_disjoint(this->conversion_vars, pr.second.get_side_vars(Predicate::EquationSideType::Left))) {
                 auto left_set = pr.second.get_left_set();
                 if(left_set.size() > 0 && is_sigma_star(left_set)) {
                     rem_ids.insert(pr.first);
@@ -1140,7 +1157,8 @@ namespace smt::noodler {
                     }
                 }
             }
-            if(this->formula.single_occurr(pr.second.get_right_set())) {
+            if(this->formula.single_occurr(pr.second.get_right_set())
+                && set_disjoint(this->conversion_vars, pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
                 auto right_set = pr.second.get_right_set();
                 if(right_set.size() > 0 && is_sigma_star(right_set)) {
                     rem_ids.insert(pr.first);
@@ -1789,6 +1807,10 @@ namespace smt::noodler {
         res << "Current length vars:";
         for (const auto& len_var : len_variables) {
             res << " " << len_var;
+        }
+        res << "Current conversion vars:";
+        for (const auto& conv_var : conversion_vars) {
+            res << " " << conv_var;
         }
         res << std::endl;
         res << "Current length formula: " << len_formula << std::endl;

@@ -1307,13 +1307,13 @@ namespace smt::noodler {
     }
 
     lbool DecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
-        FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params};
-
         // we collect variables used in conversions, some preprocessing rules cannot be applied for them
         std::unordered_set<BasicTerm> conv_vars;
         for (const auto &conv : conversions) {
             conv_vars.insert(conv.string_var);
         }
+
+        FormulaPreprocessor prep_handler{std::move(this->formula), std::move(this->init_aut_ass), std::move(this->init_length_sensitive_vars), m_params, conv_vars};
 
         // try to replace the not contains predicates (so-far we replace it by regular constraints)
         if(prep_handler.can_unify_not_contains()) {
@@ -1340,7 +1340,7 @@ namespace smt::noodler {
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular();
         // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
         // inside not(contains)/conversion.
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
@@ -1352,7 +1352,7 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities();
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular();
 
         // the following should help with Leetcode
         /// TODO: should be simplyfied? So many preprocessing steps now
@@ -1370,18 +1370,18 @@ namespace smt::noodler {
         prep_handler.common_suffix_propagation();
         prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular();
         prep_handler.propagate_variables();
         // underapproximation
         if(opt == PreprocessType::UNDERAPPROX) {
             prep_handler.underapprox_languages();
             prep_handler.skip_len_sat(); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
             prep_handler.reduce_regular_sequence(3);
-            prep_handler.remove_regular(conv_vars);
+            prep_handler.remove_regular();
             prep_handler.skip_len_sat(); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
         }
         prep_handler.reduce_regular_sequence(1);
-        prep_handler.remove_regular(conv_vars);
+        prep_handler.remove_regular();
 
         prep_handler.conversions_validity(conversions);
 
@@ -1637,11 +1637,7 @@ namespace smt::noodler {
         }
 
         STRACE("str-model",
-            tout << "Generating model for var " << var;
-            if (solution.length_sensitive_vars.contains(var)) {
-                tout << " with length " << get_arith_model_of_var(var);
-            }
-            tout << "\n";
+            tout << "Generating model for var " << var << "\n";
         );
 
         vars_whose_model_we_are_computing.insert(var);
@@ -1747,6 +1743,25 @@ namespace smt::noodler {
             UNREACHABLE();
             return zstring();
         }
+    }
+
+    std::vector<BasicTerm> DecisionProcedure::get_len_vars_for_model(const BasicTerm& str_var) {
+        // we always need (for initialization) all len_vars that are in aut_ass, so we ignore str_var
+        std::vector<BasicTerm> needed_vars;
+        for (const BasicTerm& len_var : solution.length_sensitive_vars) {
+            if (solution.aut_ass.contains(len_var)) {
+                needed_vars.push_back(len_var);
+
+                if (int_subst_vars.contains(len_var)) {
+                    needed_vars.push_back(int_version_of(len_var));
+                }
+
+                if (code_subst_vars.contains(len_var)) {
+                    needed_vars.push_back(code_version_of(len_var));
+                }
+            }
+        }
+        return needed_vars;
     }
 
 } // Namespace smt::noodler.

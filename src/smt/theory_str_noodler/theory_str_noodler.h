@@ -55,6 +55,7 @@ namespace smt::noodler {
         struct stored_instance {
             expr_ref lengths; // length formula 
             bool initial_length; // was the length formula obtained from the initial length checking?
+            // TODO we could also keep here the decision procedure and immediately get the model when loop protection gets sat
         };
 
         int m_scope_level = 0;
@@ -117,11 +118,16 @@ namespace smt::noodler {
 
         // true if last run of final_check_eh was sat (if it is true, then final_check_eh always return sat)
         bool last_run_was_sat = false;
+        // the length formula from the last run that was sat
+        expr_ref sat_length_formula;
 
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
-        std::unique_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
-        model_ref arith_model; // keeps the arithmethic model from sat solution
+        std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
+        // classes for creating model dependencies, see their usage in mk_value
+        class noodler_var_value_proc; // for noodler vars used in decision procedure
+        class str_var_value_proc; // for string vars (whose length is important) that are not used in decision procedure
+        class concat_var_value_proc; // for concatenation
 
     public:
         char const * get_name() const override { return "noodler"; }
@@ -182,20 +188,46 @@ namespace smt::noodler {
 
         literal mk_literal(expr *e);
         bool_var mk_bool_var(expr *e);
-        /**
-         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
-         *
-         * @param name Infix of the name (rest is added to get a unique name)
-         * FIXME same function is in theory_str_noodler, decide which to keep
-         */
-        expr_ref mk_str_var_fresh(const std::string& name);
+
         /**
          * @brief Create a fresh Z3 int variable with a given @p name followed by a unique suffix.
          *
          * @param name Infix of the name (rest is added to get a unique name)
-         * FIXME same function is in theory_str_noodler, decide which to keep
          */
-        expr_ref mk_int_var_fresh(const std::string& name);
+        expr_ref mk_int_var_fresh(const std::string& name) {
+            app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(fresh_var, m);
+        }
+        
+        /**
+         * @brief Create a fresh Z3 string variable with a given @p name followed by a unique suffix.
+         *
+         * @param name Infix of the name (rest is added to get a unique name)
+         */
+        expr_ref mk_str_var_fresh(const std::string& name) {
+            app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(fresh_var, m);
+        }
+
+        /**
+         * @brief Get Z3 int var with exact given @p name
+         *
+         * @param name Name of the var
+         */
+        expr_ref mk_int_var(const std::string& name) {
+            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(var, m);
+        }
+
+        /**
+         * @brief Get Z3 string var with exact given @p name
+         *
+         * @param name Name of the var
+         */
+        expr_ref mk_str_var(const std::string& name) {
+            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_s.mk_string_sort()); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(var, m);
+        }
 
         /**
          * @brief Transforms LenNode to the z3 formula
@@ -277,8 +309,8 @@ namespace smt::noodler {
          */
         void tightest_prefix(expr* s, expr* x, std::vector<literal> neg_assumptions);
 
-        /// @brief Returns the model for @p str_expr using dec_proc and arith_model
-        zstring model_of_string_expr(app* str_expr);
+        /// @brief Returns the model_value_proc for string variable @p str_expr based on whether it is used in dec_proc or not
+        model_value_proc* model_of_string_var(app* str_var);
 
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 
@@ -355,9 +387,6 @@ namespace smt::noodler {
          * TODO explain better
          */
         void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
-
-        /// @brief Propagate the lenghts of len_vars from arith_model into Z3, so that it forces correct values for the LIA part of input formula
-        void propagate_lengths_from_arith_model();
 
         /**
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.
@@ -442,6 +471,13 @@ namespace smt::noodler {
         lbool run_length_sat(const Formula& instance, const AutAssignment& aut_ass,
                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                 std::vector<TermConversion> conversions);
+
+        /**
+         * @brief This function should always be called after decision procedure decides SAT
+         * 
+         * @param length_formula - formula with which we got sat
+         */
+        void sat_handling(expr_ref length_formula);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
     };

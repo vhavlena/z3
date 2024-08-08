@@ -26,7 +26,7 @@ namespace smt::noodler {
      * @brief Preprocessing.
      */
     lbool NielsenDecisionProcedure::preprocess(PreprocessType opt, const BasicTermEqiv &len_eq_vars) {
-        FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params);
+        FormulaPreprocessor prep_handler(this->formula, this->init_aut_ass, this->init_length_sensitive_vars, m_params, {});
 
         // this does not affect the model generation
         prep_handler.separate_eqs();
