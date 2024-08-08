@@ -150,4 +150,116 @@ namespace smt::noodler::util {
         
         return true;
     }
+
+    bool split_word_to_automata(const zstring& word, const std::vector<std::shared_ptr<mata::nfa::Nfa>>& automata, std::vector<zstring>& words) {
+        STRACE("str-split-word-to-automata",
+            tout << "split_word_to_automata with word:\n" << word << "\n";
+            tout << "and " << automata.size() << " automata\n";
+            if (is_trace_enabled("str-nfa")) {
+                for (auto aut : automata) {
+                    tout << *aut << "\n";
+                }
+            }
+        );
+
+        const unsigned NUM_OF_AUTOMATA = automata.size();
+        const unsigned LENGTH_OF_WORD = word.length();
+
+        unsigned current_automaton = 0; // index in automata, of an automaton whose word we are now computing
+        unsigned index_in_word = 0; // where in the word we are
+        std::vector<unsigned> backtracking_indexes; // vector that remembers to which index in word to backtrack to
+        mata::nfa::StateSet current_states{automata[0]->initial}; // the set of states where we are now in the current automaton
+        std::vector<mata::nfa::StateSet> backtracking_state_sets; // vector that remembers to which set of states to backtrack to
+        zstring current_word; // word we are currently building for current automaton
+        bool is_backtracked = false; // whether we just backtracked
+        
+        while (current_automaton != NUM_OF_AUTOMATA || index_in_word != LENGTH_OF_WORD) {
+            STRACE("str-split-word-to-automata", tout << "Current automaton and index in word: " << current_automaton << " " << index_in_word << "\n";);
+
+            // if we did not backtrack, we need to first check whether we can currently accept (if we are backtracking, we need to instead get longer word for the current automaton)
+            // also if the current automaton is the last automaton, we need to finish reading the word, so in that case, we only check after we read the whole word
+            if (!is_backtracked && (current_automaton != NUM_OF_AUTOMATA-1 || index_in_word == LENGTH_OF_WORD) && automata[current_automaton]->final.intersects_with(current_states)) {
+                // if we can accept, we save the current index, states, and word and move to the next automaton
+                STRACE("str-split-word-to-automata", tout << "Moving to next automaton\n";);
+                backtracking_indexes.push_back(index_in_word);
+                backtracking_state_sets.push_back(current_states);
+                words.push_back(current_word);
+                STRACE("str-split-word-to-automata",
+                    tout << "Current words:";
+                    for (const auto& word : words) {
+                        tout << " " << word;
+                    }
+                    tout << "\n";
+                );
+
+                ++current_automaton;
+                if (current_automaton != NUM_OF_AUTOMATA) {
+                    // index_in_word is not updated, as we stay at the same position
+                    current_states = mata::nfa::StateSet(automata[current_automaton]->initial);
+                    current_word = zstring();
+                }
+                continue;
+            }
+
+            if (index_in_word == LENGTH_OF_WORD) {
+                // we read the whole word, but we have still some automata left, we need to backtrack
+                if (current_automaton == 0) { return false; } // we cannot backtrack, i.e., the word is not accepted by the concatenation of automata
+                STRACE("str-split-word-to-automata", tout << "Backtracking at the end of the word\n";);
+
+                --current_automaton;
+                index_in_word = backtracking_indexes.back();
+                backtracking_indexes.pop_back();
+                current_states = std::move(backtracking_state_sets.back());
+                backtracking_state_sets.pop_back();
+                current_word = std::move(words.back());
+                words.pop_back();
+                is_backtracked = true;
+                continue;
+            }
+            
+            // we move by one in word and compute the new set of states
+            mata::Symbol current_symbol = word[index_in_word];
+            mata::nfa::StateSet new_current_states;
+            for (mata::nfa::State s : current_states) {
+                const mata::nfa::StatePost& transitions_from_s = automata[current_automaton]->delta[s];
+                auto transitions_from_current_symbol_it = transitions_from_s.find(current_symbol);
+                if (transitions_from_current_symbol_it != transitions_from_s.end()) {
+                    SASSERT(transitions_from_current_symbol_it->symbol == current_symbol);
+                    new_current_states = mata::nfa::StateSet::set_union(new_current_states, transitions_from_current_symbol_it->targets);
+                }
+            }
+
+            if (new_current_states.empty()) {
+                // we need to backtrack, the word is not accepted by the current automaton
+                if (current_automaton == 0) { return false; } // we cannot backtrack, i.e., the word is not accepted by the concatenation of automata
+                STRACE("str-split-word-to-automata", tout << "Backtracking because the current automaton does not accept\n";);
+
+                --current_automaton;
+                index_in_word = backtracking_indexes.back();
+                backtracking_indexes.pop_back();
+                current_states = std::move(backtracking_state_sets.back());
+                backtracking_state_sets.pop_back();
+                current_word = std::move(words.back());
+                words.pop_back();
+                is_backtracked = true;
+            } else {
+                // otherwise we just move to the next symbol
+                STRACE("str-split-word-to-automata", tout << "Moving to the next symbol\n";);
+                ++index_in_word;
+                current_states = new_current_states;
+                current_word = current_word + zstring(current_symbol);
+                is_backtracked = false;
+            }
+        }
+
+        STRACE("str-split-word-to-automata",
+            tout << "str-split-word-to-automata ended with the following words:";
+            for (const auto& word : words) {
+                tout << " " << word;
+            }
+            tout << "\n";
+        );
+
+        return true;
+    }
 }

@@ -142,6 +142,13 @@ namespace smt::noodler::util {
      * @return Is of the form.
      */
     bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res);
+
+    /**
+     * @brief Assuming that concatenation of automata in @p automata accepts @p word, returns in @p words splitted @p word, where @p word[i] is accepted by @p automata[i]
+     * 
+     * @return boolean indicating whether we can split the @p word to @p automata (true if we can)
+     */
+    bool split_word_to_automata(const zstring& word, const std::vector<std::shared_ptr<mata::nfa::Nfa>>& automata, std::vector<zstring>& words);
 }
 
 #endif
