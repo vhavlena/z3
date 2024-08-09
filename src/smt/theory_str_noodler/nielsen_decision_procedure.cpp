@@ -674,6 +674,10 @@ namespace smt::noodler {
         return this->model_handler.get_var_model(var);
     }
 
+    std::vector<BasicTerm> NielsenDecisionProcedure::get_len_vars_for_model(const BasicTerm& str_var) {
+        return this->model_handler.get_len_vars_for_model(str_var);
+    }
+
     // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
     /**
@@ -746,6 +750,25 @@ namespace smt::noodler {
         for(const ModelGenerator& gen : this->graph_generators) {
             generate_submodel(gen, get_arith_model_of_var);
         }
+    }
+
+    std::vector<BasicTerm> NielsenModel::get_len_vars_for_model(const BasicTerm& str_var) {
+        std::vector<BasicTerm> needed_vars{};
+        // needed_vars.push_back(str_var);
+        for(const ModelGenerator& gen : this->graph_generators) {
+            for(const ModelLabel& model_label : gen) {
+                needed_vars.push_back(model_label.rule.first);
+                if(model_label.repetition_var.is_variable()) {
+                    needed_vars.push_back(model_label.repetition_var);
+                }
+                for(const BasicTerm& bt : model_label.rule.second) {
+                    if(bt.is_variable()) {
+                        needed_vars.push_back(bt);
+                    }
+                }
+            }
+        }
+        return needed_vars;
     }
 
 } // Namespace smt::noodler.
