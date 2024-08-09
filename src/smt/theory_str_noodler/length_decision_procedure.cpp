@@ -526,6 +526,7 @@ namespace smt::noodler {
                 return l_undef;	// We cannot solve this formula
             }
         }
+        this->len_model = LengthProcModel(this->pool);
 
         // Change if there is filler var filter
         for (const BasicTerm& v : this->formula.get_vars()) {
@@ -676,6 +677,79 @@ namespace smt::noodler {
 
         STRACE("str", tout << "True\n"; );
         return true;
+    }
+
+    zstring LengthDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if(!this->len_model.is_initialized()) {
+            this->len_model.compute_model(get_arith_model_of_var);
+        }
+        return this->len_model.get_var_model(var);
+    }
+
+    std::vector<BasicTerm> LengthDecisionProcedure::get_len_vars_for_model(const BasicTerm& str_var) {
+        return this->len_model.get_len_vars_for_model(str_var);
+    }
+
+
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool) : model() {
+        std::set<BasicTerm> len_vars{};
+        this->lit_conversion = block_pool.get_lit_conversion();
+        this->block_models = std::map<BasicTerm, BlockModel>();
+        for(const auto& [block_var, var_constr] : block_pool) {
+            std::set<BasicTerm> terms{};
+            for (const Concat& con : var_constr.get_side_eqs()) {
+                for(const BasicTerm& bt : con) {
+                    terms.insert(bt);
+                }
+            }
+            for(const BasicTerm& bt : terms) {
+                if(bt.is_variable()) {
+                    len_vars.insert(bt);
+                }
+                len_vars.insert(begin_of(bt.get_name(), block_var.get_name()));
+            }
+            len_vars.insert(block_var);
+            this->block_models[block_var] = { "", terms };
+        }
+        this->length_vars = std::vector<BasicTerm>(len_vars.begin(), len_vars.end());
+    }
+
+    void LengthProcModel::generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        rational total_length = get_arith_model_of_var(block_var);
+        std::vector<unsigned> solution_str(total_length.get_int32());
+        for(size_t i = 0; i < total_length; i++) {
+            solution_str[i] = 97; // a
+        }
+        for(const BasicTerm& bt : block_model.terms) {
+            if(bt.is_variable()) continue;
+            int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+            zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
+            for(size_t i = lit_pos; i < lit_pos + lit_val.length(); i++) {
+                solution_str[i] = lit_val[i - lit_pos];
+            }
+        }
+        // convert vector of numbers to zstring
+        for(size_t i = 0; i < solution_str.size(); i++) {
+            block_model.solution = block_model.solution + zstring(solution_str[i]);
+        }
+        // so-far solution_str contains solution for x
+        this->model[block_var] = block_model.solution;
+
+        for(const BasicTerm& bt : block_model.terms) {
+            if(bt.is_literal()) continue;
+            int var_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+            int var_length = get_arith_model_of_var(bt).get_int32();
+
+            zstring var_model = block_model.solution.extract(var_pos, var_length);
+            this->model[bt] = var_model;
+        }
+    }
+
+    void LengthProcModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        this->model.clear();
+        for(auto& [block_var, block_model] : this->block_models) {
+            generate_block_models(block_var, block_model, get_arith_model_of_var);
+        }
     }
 
 }

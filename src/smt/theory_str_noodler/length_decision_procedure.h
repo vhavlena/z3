@@ -176,6 +176,52 @@ namespace smt::noodler {
          * @return LenNode LIA formula
          */
         LenNode get_multi_var_lia(const ConstraintPool& pool, const BasicTerm& multi_var, const BasicTerm& source_var) const;
+
+        std::vector<Concat> get_side_eqs() const { return this->_constr_eqs; }
+    };
+
+    struct BlockModel {
+        zstring solution;
+        std::set<BasicTerm> terms {};
+    };
+
+    class LengthProcModel {
+
+    private:
+        std::vector<BasicTerm> length_vars {};
+        std::map<BasicTerm, zstring> model {};
+        std::map<BasicTerm, BlockModel> block_models {};
+        std::map<zstring, BasicTerm> lit_conversion {};
+
+    public:
+
+        LengthProcModel() { LengthProcModel(ConstraintPool{}); };
+        LengthProcModel(const ConstraintPool& block_pool);
+
+        void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var); 
+
+        bool is_initialized() const { return !this->model.empty(); }
+
+        /**
+         * @brief Get already computed assignment of variable @p bt.
+         * 
+         * @param bt Variable
+         * @return zstring String assignment
+         */
+        zstring get_var_model(const BasicTerm& bt) { return this->model[bt]; }
+
+        /**
+         * @brief Get length variables that are relevant for model of @p str_var in the current model generators.
+         * In fact we overapproximate and for each variable @p str_var we return all variables occurring 
+         * in the model generators.
+         * 
+         * @param str_var String variable
+         * @return std::vector<BasicTerm> Relevant variables (including temporary int variables) 
+         */
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) { return this->length_vars; };
+
     };
 
     /**
@@ -196,6 +242,8 @@ namespace smt::noodler {
 
         // pool of variable constraints
         ConstraintPool pool {};
+
+        LengthProcModel len_model;
 
     protected:
         /**
@@ -234,7 +282,8 @@ namespace smt::noodler {
          ) : init_length_sensitive_vars{ init_length_sensitive_vars },
              formula { form },
              init_aut_ass{ init_aut_ass },
-             m_params(par) { 
+             m_params(par),
+             len_model() { 
         }
 
         lbool compute_next_solution() override;
@@ -252,6 +301,23 @@ namespace smt::noodler {
         const Formula& get_formula() const {
             return this->formula;
         } 
+
+         /**
+         * @brief Get string model based on integer constraints.
+         * 
+         * @param var Variable whose model is obtained.
+         * @param get_arith_model_of_var LIA model.
+         * @return zstring String model of @p var
+         */
+        zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
+        /**
+         * @brief Get length variables that are relevant for model of @p str_var. 
+         * 
+         * @param str_var String variable
+         * @return std::vector<BasicTerm> Relevant variables (including temporary int variables) 
+         */
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override;
     };
 }
 
