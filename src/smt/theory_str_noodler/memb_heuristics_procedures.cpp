@@ -48,12 +48,21 @@ namespace smt::noodler {
         SASSERT(var == this->var);
 
         if (!reg_nfa) {
-            // TODO: compute model directly from regex instead of creating nfa
+            if (is_regex_positive) {
+                try {
+                    return regex::get_model_from_regex(to_app(regex), m_util_s);
+                } catch (const regex::regex_model_fail& exc) {
+                    // fall trough, we need to create nfa
+                }
+            }
+
+            // TODO try handling also complement of regex directly
             
             // create alphabet (start with minterm representing symbols not ocurring in the regex)
             std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
             regex::extract_symbols(regex, m_util_s, symbols_in_regex);
             alph = std::make_unique<regex::Alphabet>(symbols_in_regex);
+
             reg_nfa = std::make_unique<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(regex), m_util_s, m, *alph, false, false));
         }
         

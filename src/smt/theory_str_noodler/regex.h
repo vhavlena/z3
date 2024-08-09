@@ -148,6 +148,21 @@ namespace smt::noodler::regex {
      * @return sum of loops inside @p regex, with nested loops multiplied 
      */
     unsigned get_loop_sum(const app* reg, const seq_util& m_util_s);
+
+    class regex_model_fail : public default_exception {
+    public:
+        regex_model_fail() : default_exception("Failed to find model of a regex") {}
+    };
+
+    /**
+     * @brief Get some word accepted by @p regex (assumes that regex accepts something)
+     * 
+     * @param regex Regex to be checked
+     * @param m_util_s string ast util
+     * @return word accepted by @p regex
+     * @throws regex_model_fail if the model cannot be found (it does not mean it does not exists, regex might contain for example complement which this function ignores)
+     */
+    zstring get_model_from_regex(const app *regex, const seq_util& m_util_s);
 }
 
 #endif
