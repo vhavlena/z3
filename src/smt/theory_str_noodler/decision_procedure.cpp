@@ -1707,7 +1707,7 @@ namespace smt::noodler {
         // we always need (for initialization) all len_vars that are in aut_ass, so we ignore str_var
         std::vector<BasicTerm> needed_vars;
         for (const BasicTerm& len_var : solution.length_sensitive_vars) {
-            if (solution.aut_ass.contains(len_var)) {
+            if (!len_var.is_literal() && solution.aut_ass.contains(len_var)) {
                 needed_vars.push_back(len_var);
 
                 if (int_subst_vars.contains(len_var)) {
