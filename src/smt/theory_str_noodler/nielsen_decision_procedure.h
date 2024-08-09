@@ -331,6 +331,16 @@ namespace smt::noodler {
          * @return zstring String assignment
          */
         zstring get_var_model(const BasicTerm& bt) { return this->model[bt]; }
+
+        /**
+         * @brief Get length variables that are relevant for model of @p str_var in the current model generators.
+         * In fact we overapproximate and for each variable @p str_var we return all variables occurring 
+         * in the model generators.
+         * 
+         * @param str_var String variable
+         * @return std::vector<BasicTerm> Relevant variables (including temporary int variables) 
+         */
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var);
     };
 
     /**
@@ -465,6 +475,14 @@ namespace smt::noodler {
          * @return zstring String model of @p var
          */
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
+        /**
+         * @brief Get length variables that are relevant for model of @p str_var. 
+         * 
+         * @param str_var String variable
+         * @return std::vector<BasicTerm> Relevant variables (including temporary int variables) 
+         */
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override;
 
     };
 
