@@ -63,6 +63,7 @@ namespace smt::noodler {
         } else {
             word = reg_nfa->get_word_from_complement(&alph->mata_alphabet).value();
         }
+        return alph->get_string_from_mata_word(word);
     }
 
     lbool MultMembHeuristicProcedure::compute_next_solution() {
