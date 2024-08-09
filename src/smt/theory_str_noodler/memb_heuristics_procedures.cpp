@@ -21,7 +21,7 @@ namespace smt::noodler {
                 // but we won't complement it, instead we will compare it with
                 // the universal automaton (as complementation can blow up)
 
-                // start with minterm representing symbols not ocurring in the regex
+                // create alphabet (start with minterm representing symbols not ocurring in the regex)
                 std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
                 regex::extract_symbols(regex, m_util_s, symbols_in_regex);
                 alph = std::make_unique<regex::Alphabet>(symbols_in_regex);
@@ -48,14 +48,20 @@ namespace smt::noodler {
         SASSERT(var == this->var);
 
         if (!reg_nfa) {
-            // TODO: compute model from regex
-            util::throw_error("Cannot compute model from regex directly");
-            return zstring();
+            // TODO: compute model directly from regex instead of creating nfa
+            
+            // create alphabet (start with minterm representing symbols not ocurring in the regex)
+            std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
+            regex::extract_symbols(regex, m_util_s, symbols_in_regex);
+            alph = std::make_unique<regex::Alphabet>(symbols_in_regex);
+            reg_nfa = std::make_unique<mata::nfa::Nfa>(regex::conv_to_nfa(to_app(regex), m_util_s, m, *alph, false, false));
+        }
+        
+        mata::Word word;
+        if (is_regex_positive) {
+            word = reg_nfa->get_word().value();
         } else {
-            SASSERT(!is_regex_positive);
-            // TODO: get word that is NOT in reg_nfa (do not forget dummy symbol, use alph->get_string_from_mata_word)
-            util::throw_error("Unsupported for now");
-            return zstring();
+            word = reg_nfa->get_word_from_complement(&alph->mata_alphabet).value();
         }
     }
 
