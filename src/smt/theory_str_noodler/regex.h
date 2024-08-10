@@ -89,14 +89,9 @@ namespace smt::noodler::regex {
         zstring get_string_from_mata_word(const mata::Word& word) const {
             zstring res;
             mata::Symbol unused_symbol = get_unused_symbol();
-            for (mata::Symbol s : word) {
-                if (util::is_dummy_symbol(s)) {
-                    res = res + zstring(unsigned(unused_symbol));
-                } else {
-                    res = res + zstring(unsigned(s));
-                }
-            }
-            return res;
+            mata::Word new_word{ word };
+            std::replace(new_word.begin(), new_word.end(), util::get_dummy_symbol(), unused_symbol);
+            return zstring(new_word.size(), new_word.data());
         }
     };
 
