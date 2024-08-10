@@ -1691,7 +1691,6 @@ namespace smt::noodler {
                 return model_of_var.at(var);
             } else {
                 // var is only on the left side in the inclusion graph => we can return whatever
-                zstring result;
                 const auto& nfa = solution.aut_ass.at(var);
                 STRACE("str-model-nfa", tout << "NFA for var " << var << " before getting some word:\n" << *nfa;);
                 mata::Word accepted_word = nfa->get_word().value();

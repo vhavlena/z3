@@ -26,7 +26,7 @@ namespace smt::noodler {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
-                sat_handling(sat_length_formula);
+                add_axiom(sat_length_formula);
             }
             return FC_DONE;
         }
@@ -961,6 +961,21 @@ namespace smt::noodler {
 
     void theory_str_noodler::sat_handling(expr_ref length_formula) {
         last_run_was_sat = true;
+        if (m_params.m_produce_models) {
+            // If we want to produce models, we would like to constraint the lengths more significantly,
+            // so that Z3 arith solver does not give us some large numbers.
+            // We therefore check if we can still get a model if we constraint all lengths by some number (right now 100).
+            expr_ref_vector len_constraints(m);
+            for (expr* len_var : len_vars) {
+                // |len_var| <= 100
+                len_constraints.push_back(expr_ref(m_util_a.mk_le(m_util_s.str.mk_length(len_var), m_util_a.mk_int(100)), m));
+            }
+            expr_ref length_formula_underapprox(m.mk_and(length_formula, m.mk_and(len_constraints)), m);
+            if (check_len_sat(length_formula_underapprox)) {
+                // we can constraint the lengths => add it to the resulting length formula
+                length_formula = length_formula_underapprox;
+            }
+        }
         sat_length_formula = length_formula;
         add_axiom(length_formula);
     }
