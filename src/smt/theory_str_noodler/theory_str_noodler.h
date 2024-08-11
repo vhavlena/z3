@@ -473,7 +473,9 @@ namespace smt::noodler {
                                 std::vector<TermConversion> conversions);
 
         /**
-         * @brief This function should always be called after decision procedure decides SAT
+         * @brief This function should always be called after decision procedure decides SAT with non-trivial length formula
+         * 
+         * It pushes the length formula into Z3, so that we can generate correct model.
          * 
          * @param length_formula - formula with which we got sat
          */
