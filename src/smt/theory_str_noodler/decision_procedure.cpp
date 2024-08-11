@@ -1552,7 +1552,7 @@ namespace smt::noodler {
         }
         inclusions_from_preprocessing.clear();
 
-        // Restrict the languages in solution of length variables and code/int conversion variables by their words
+        // Restrict the languages in solution of length variables and code/int conversion variables by their models
         for (auto& [var, nfa] : solution.aut_ass) {
             if (var.is_literal() || !solution.length_sensitive_vars.contains(var)) { continue; } // literals should have the correct language + we restrict only length vars
 
