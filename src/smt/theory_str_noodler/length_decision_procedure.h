@@ -180,9 +180,14 @@ namespace smt::noodler {
         std::vector<Concat> get_side_eqs() const { return this->_constr_eqs; }
     };
 
+    /**
+     * @brief Structure for a representation of a block model. 
+     * Block are equations of the form x = R_i. A model of these equations can be computed from 
+     * a model of x @p solution. 
+     */
     struct BlockModel {
-        zstring solution;
-        std::set<BasicTerm> terms {};
+        zstring solution; // model of the block variable
+        std::set<BasicTerm> terms {}; // other terms occurring in the equational block.
     };
 
     class LengthProcModel {

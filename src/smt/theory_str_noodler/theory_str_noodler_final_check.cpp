@@ -784,7 +784,9 @@ namespace smt::noodler {
 
     lbool theory_str_noodler::run_length_proc(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         STRACE("str", tout << "Trying length-based procedure" << std::endl);
-        dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        // we need a method get_formula from LengthDecisionProcedure
+        std::shared_ptr<LengthDecisionProcedure> len_dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        dec_proc = len_dec_proc;
         // LengthDecisionProcedure nproc();
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
@@ -809,12 +811,11 @@ namespace smt::noodler {
                     block_curr_len(lengths);
                     return l_false;
                 } 
-                // TODO: fix
-                // else if (dec_proc->get_formula().get_predicates().size() > 10) {
-                //     ctx.get_fparams().is_underapprox = true;
-                //     block_curr_len(expr_ref(m.mk_false(), m));
-                //     return l_false;
-                // } 
+                else if (len_dec_proc->get_formula().get_predicates().size() > 10) {
+                    ctx.get_fparams().is_underapprox = true;
+                    block_curr_len(expr_ref(m.mk_false(), m));
+                    return l_false;
+                } 
                 else {
                     return l_undef;
                 }
