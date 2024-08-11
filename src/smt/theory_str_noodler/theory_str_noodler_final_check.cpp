@@ -971,9 +971,13 @@ namespace smt::noodler {
                 len_constraints.push_back(expr_ref(m_util_a.mk_le(m_util_s.str.mk_length(len_var), m_util_a.mk_int(100)), m));
             }
             expr_ref length_formula_underapprox(m.mk_and(length_formula, m.mk_and(len_constraints)), m);
-            if (check_len_sat(length_formula_underapprox)) {
+            STRACE("str-sat-handling", tout << "Checking if we can put stronger limits on lengths with formula " << mk_pp(length_formula_underapprox, m) << " which is ";);
+            if (check_len_sat(length_formula_underapprox) == lbool::l_true) {
                 // we can constraint the lengths => add it to the resulting length formula
+                STRACE("str-sat-handling", tout << "sat\n");
                 length_formula = length_formula_underapprox;
+            } else {
+                STRACE("str-sat-handling", tout << "unsat\n");
             }
         }
         sat_length_formula = length_formula;
