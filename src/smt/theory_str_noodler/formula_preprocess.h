@@ -393,6 +393,7 @@ namespace smt::noodler {
         void common_suffix_propagation();
         void conversions_validity(std::vector<TermConversion>& conversions);
 
+        void underapprox_var_language(const BasicTerm& var);
         void refine_languages();
         void reduce_diseqalities();
 

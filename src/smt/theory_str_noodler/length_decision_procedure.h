@@ -207,7 +207,14 @@ namespace smt::noodler {
 
         void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var); 
 
+        void assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
         bool is_initialized() const { return !this->model.empty(); }
+
+
+        void add_len_var(const BasicTerm& var) {
+            this->length_vars.push_back(var);
+        }
 
         /**
          * @brief Get already computed assignment of variable @p bt.
@@ -215,7 +222,7 @@ namespace smt::noodler {
          * @param bt Variable
          * @return zstring String assignment
          */
-        zstring get_var_model(const BasicTerm& bt) { return this->model[bt]; }
+        zstring get_var_model(const BasicTerm& bt) { return this->model.at(bt); }
 
         /**
          * @brief Get length variables that are relevant for model of @p str_var in the current model generators.

@@ -527,6 +527,9 @@ namespace smt::noodler {
             }
         }
         this->len_model = LengthProcModel(this->pool);
+        for(const BasicTerm& var : this->init_length_sensitive_vars) {
+            this->len_model.add_len_var(var);
+        }
 
         // Change if there is filler var filter
         for (const BasicTerm& v : this->formula.get_vars()) {
@@ -597,7 +600,7 @@ namespace smt::noodler {
         // Underapproximate if it contains inequations
         for (const BasicTerm& t : this->formula.get_vars()) {
             if (prep_handler.get_aut_assignment().is_co_finite(t)) {
-                prep_handler.underapprox_languages();
+                prep_handler.underapprox_var_language(t);
                 this->precision = LenNodePrecision::UNDERAPPROX;
                 STRACE("str", tout << " - UNDERAPPROXIMATE languages\n";);
                 break;
@@ -749,6 +752,20 @@ namespace smt::noodler {
         this->model.clear();
         for(auto& [block_var, block_model] : this->block_models) {
             generate_block_models(block_var, block_model, get_arith_model_of_var);
+        }
+        assign_free_vars(get_arith_model_of_var);
+    }
+
+    void LengthProcModel::assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        for(const BasicTerm& var : this->length_vars) {
+            if(this->model.contains(var)) continue;
+            rational total_length = get_arith_model_of_var(var);
+            std::vector<unsigned> solution_str(total_length.get_int32());
+            for(size_t i = 0; i < total_length; i++) {
+                solution_str[i] = 97; // a
+            }
+            zstring res = zstring(solution_str.size(), solution_str.data());
+            this->model[var] = res;
         }
     }
 

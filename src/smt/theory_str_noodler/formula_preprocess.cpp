@@ -1550,16 +1550,20 @@ namespace smt::noodler {
         for(const Predicate& pred : this->formula.get_predicates_set()) {
             for(const BasicTerm& var : pred.get_vars()) {
                 if(this->aut_ass.is_co_finite(var)) {
-                    mata::nfa::Nfa aut_compl = this->aut_ass.complement_lang(var);
-                    LenNode lengths = AutAssignment::get_lengths(aut_compl, var);
-                    this->add_to_len_formula(LenNode(LenFormulaType::NOT, {lengths}));
-                    this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
-                    this->len_variables.insert(var);
+                    underapprox_var_language(var);
                 }
             }
         }
         STRACE("str-prep", tout << print_info(is_trace_enabled("str-nfa")));
     } 
+
+    void FormulaPreprocessor::underapprox_var_language(const BasicTerm& var) {
+        mata::nfa::Nfa aut_compl = this->aut_ass.complement_lang(var);
+        LenNode lengths = AutAssignment::get_lengths(aut_compl, var);
+        this->add_to_len_formula(LenNode(LenFormulaType::NOT, {lengths}));
+        this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(this->aut_ass.sigma_star_automaton());
+        this->len_variables.insert(var);
+    }
 
     /**
      * @brief Reduce the number of diseqalities.
