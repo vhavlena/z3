@@ -159,7 +159,8 @@ namespace smt::noodler {
             for (const BasicTerm& t : side) {
                 // assume that the current left variable is y (_name). Then
                 // b_y(t) = b_y(last) + |last| if last is not undef otherwise b(t) = 0
-                form.emplace_back(generate_begin(t.get_name(), last));
+                form.emplace_back(generate_begin(t.get_name(), last, conv));
+                
                 // if the system is of the form y (_name) = ... x ... && x = l1 x2 l2
                 // we generate b_y(l1) = b_x(l1) + b_y(x)
                 if (t.is_variable() && pool.contains(t)) {
@@ -342,10 +343,10 @@ namespace smt::noodler {
         return formula;
     }
 
-    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) const {
+    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last, const std::map<zstring, BasicTerm>& lit_conversion) const {
         LenNode end_of_last = (last.get_type() == BasicTermType::Length)
             ? LenNode(0)
-            : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last});
+            : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last.is_literal() ? lit_conversion.at(last.get_name()) : last});
 
         LenNode out = LenNode(LenFormulaType::EQ, {end_of_last, begin_of(var_name, this->_name)});
         return out;

@@ -71,13 +71,14 @@ namespace smt::noodler {
 
         /**
          * @brief Generate LIA formula b_x(var_name) = b_x(last) + |last| if last is not undef otherwise b(t) = 0
-         * Expressing that the begin of var_name is directly after last
+         * Expressing that the begin of var_name is directly after last. We need to convert |last| to |lit_conversion[last]| if last is literal. Otherwise |last| is interpreted as number of characters of the temporary literal name.
          * 
          * @param var_name Variable name
          * @param last Variable/Literal preceeding var_name
+         * @param lit_conversion Literal conversion 
          * @return LenNode 
          */
-        LenNode generate_begin(const zstring& var_name, const BasicTerm& last) const;
+        LenNode generate_begin(const zstring& var_name, const BasicTerm& last, const std::map<zstring, BasicTerm>& lit_conversion) const;
 
         /**
          * @brief Generate the LIA formula b_x(lit) = b_from(lit) + b_x(from) where 
