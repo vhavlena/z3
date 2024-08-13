@@ -706,6 +706,10 @@ namespace smt::noodler {
                     terms.insert(bt);
                 }
             }
+            // var_constr contains also literals from children blocks (those do not occurr in the equations of the block)
+            for(const zstring& lit : var_constr.get_lits()) {
+                terms.insert(BasicTerm(BasicTermType::Literal, lit));
+            }
             for(const BasicTerm& bt : terms) {
                 if(bt.is_variable()) {
                     len_vars.insert(bt);
