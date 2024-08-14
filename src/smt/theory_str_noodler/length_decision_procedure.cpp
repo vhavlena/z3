@@ -599,12 +599,11 @@ namespace smt::noodler {
         prep_handler.reduce_diseqalities(); // only makes variable a literal or removes the disequation 
 
         // Underapproximate if it contains inequations
-        for (const BasicTerm& t : this->formula.get_vars()) {
-            if (prep_handler.get_aut_assignment().is_co_finite(t)) {
-                prep_handler.underapprox_var_language(t);
+        for (const auto& [term, aut] : prep_handler.get_aut_assignment()) {
+            if (prep_handler.get_aut_assignment().is_co_finite(term)) {
+                prep_handler.underapprox_var_language(term);
                 this->precision = LenNodePrecision::UNDERAPPROX;
-                STRACE("str", tout << " - UNDERAPPROXIMATE languages\n";);
-                break;
+                STRACE("str", tout << term.to_string() << " - UNDERAPPROXIMATE languages\n";);
             }
         }
 
