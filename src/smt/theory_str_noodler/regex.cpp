@@ -677,16 +677,22 @@ namespace smt::noodler::regex {
             const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
             const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
             if (range_begin_value > range_end_value) {
-                return zstring(); // if range is invalid, according to standart, it means empty string
+                return zstring(); // if range is invalid, it means empty string
             } else {
-                return to_app(range_begin)->get_parameter(0).get_zstring(); // we return the start of the range
+                return to_app(range_begin)->get_parameter(0).get_zstring(); // otherwise, we return the start of the range
             }
         } else if (m_util_s.re.is_union(regex)) { // Handle union (= or; A|B).
             SASSERT(regex->get_num_args() == 2);
             const auto left{ regex->get_arg(0) };
             SASSERT(is_app(left));
-            // TODO we should maybe catch error, left might not accept anything and then we should return model from right
-            return get_model_from_regex(to_app(left), m_util_s); // we can return model from any of the arguments
+            const auto right{ regex->get_arg(1) };
+            SASSERT(is_app(right));
+            // try getting a model from left, if it is not possible, then try right
+            try {
+                return regex::get_model_from_regex(to_app(left), m_util_s);
+            } catch (const regex::regex_model_fail& exc) {
+                return regex::get_model_from_regex(to_app(right), m_util_s);
+            }
         } else if (m_util_s.re.is_star(regex)) { // Handle star iteration.
             return zstring(); // empty string is always accepted by star
         } else if (m_util_s.re.is_plus(regex)) { // Handle positive iteration.

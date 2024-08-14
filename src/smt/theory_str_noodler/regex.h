@@ -150,12 +150,14 @@ namespace smt::noodler::regex {
     };
 
     /**
-     * @brief Get some word accepted by @p regex (assumes that regex accepts something)
+     * @brief Try to g et some word accepted by @p regex
+     * 
+     * It currently cannot handle intersection, complement, or string variables inside regex.
      * 
      * @param regex Regex to be checked
      * @param m_util_s string ast util
      * @return word accepted by @p regex
-     * @throws regex_model_fail if the model cannot be found (it does not mean it does not exists, regex might contain for example complement which this function ignores)
+     * @throws regex_model_fail if the model cannot be found (either regex represents empty language, or it contains intersection/complement/string variables, which this function currently cannot handle)
      */
     zstring get_model_from_regex(const app *regex, const seq_util& m_util_s);
 }
