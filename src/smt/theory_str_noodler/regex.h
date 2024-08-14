@@ -89,14 +89,9 @@ namespace smt::noodler::regex {
         zstring get_string_from_mata_word(const mata::Word& word) const {
             zstring res;
             mata::Symbol unused_symbol = get_unused_symbol();
-            for (mata::Symbol s : word) {
-                if (util::is_dummy_symbol(s)) {
-                    res = res + zstring(unsigned(unused_symbol));
-                } else {
-                    res = res + zstring(unsigned(s));
-                }
-            }
-            return res;
+            mata::Word new_word{ word };
+            std::replace(new_word.begin(), new_word.end(), util::get_dummy_symbol(), unused_symbol);
+            return zstring(new_word.size(), new_word.data());
         }
     };
 
@@ -148,6 +143,23 @@ namespace smt::noodler::regex {
      * @return sum of loops inside @p regex, with nested loops multiplied 
      */
     unsigned get_loop_sum(const app* reg, const seq_util& m_util_s);
+
+    class regex_model_fail : public default_exception {
+    public:
+        regex_model_fail() : default_exception("Failed to find model of a regex") {}
+    };
+
+    /**
+     * @brief Try to g et some word accepted by @p regex
+     * 
+     * It currently cannot handle intersection, complement, or string variables inside regex.
+     * 
+     * @param regex Regex to be checked
+     * @param m_util_s string ast util
+     * @return word accepted by @p regex
+     * @throws regex_model_fail if the model cannot be found (either regex represents empty language, or it contains intersection/complement/string variables, which this function currently cannot handle)
+     */
+    zstring get_model_from_regex(const app *regex, const seq_util& m_util_s);
 }
 
 #endif

@@ -611,4 +611,100 @@ namespace smt::noodler::regex {
             return sum;
         }
     }
+
+    zstring get_model_from_regex(const app *regex, const seq_util& m_util_s) {
+        if (m_util_s.re.is_to_re(regex)) { // Handle conversion of to regex function call.
+            SASSERT(regex->get_num_args() == 1);
+            const auto arg{ regex->get_arg(0) };
+            // Assume that regex inside re.to_re() function is a string of characters.
+            if (!m_util_s.str.is_string(arg)) { // if to_re has something other than string literal
+                throw regex_model_fail();
+            }
+            return get_model_from_regex(to_app(arg), m_util_s);
+        } else if (m_util_s.re.is_concat(regex)) { // Handle regex concatenation.
+            SASSERT(regex->get_num_args() > 0);
+            zstring result;
+            for (unsigned int i = 0; i < regex->get_num_args(); ++i) {
+                result = result + get_model_from_regex(to_app(regex->get_arg(i)), m_util_s);
+            }
+            return result;
+        } else if (m_util_s.re.is_complement(regex)) { // Handle complement.
+            SASSERT(regex->get_num_args() == 1);
+            throw regex_model_fail();
+        } else if (m_util_s.re.is_diff(regex)) { // Handle diff.
+            throw regex_model_fail();
+        } else if (m_util_s.re.is_dot_plus(regex)) { // Handle dot plus.
+            return zstring("a"); // return one iteration, i.e., arbitrary char
+        } else if (m_util_s.re.is_empty(regex)) { // Handle empty language.
+            throw regex_model_fail();
+        } else if (m_util_s.re.is_epsilon(regex)) { // Handle epsilon.
+            return zstring();
+        } else if (m_util_s.re.is_full_char(regex)) { // Handle full char (single occurrence of any string symbol, '.').
+            return zstring("a"); // return arbitrary char
+        } else if (m_util_s.re.is_full_seq(regex)) {
+            return zstring(); // return arbitrary word
+        } else if (m_util_s.re.is_intersection(regex)) { // Handle intersection.
+            SASSERT(regex->get_num_args() > 0);
+            // TODO we could possibly handle this by creating automata, their intersection and returning their model
+            throw regex_model_fail();
+        } else if (m_util_s.re.is_loop(regex)) { // Handle loop.
+            unsigned low, high;
+            expr *body;
+            VERIFY(m_util_s.re.is_loop(regex, body, low, high) || m_util_s.re.is_loop(regex, body, low));
+
+            // return model from body iterated low times
+            if (low == 0 || low > high) {
+                return zstring();
+            } else {
+                const zstring inside = get_model_from_regex(to_app(body), m_util_s);
+                std::vector<unsigned> result; // to make it more effecient, we use vector instead of zstring, using only zstring concatenation was very slow
+                result.reserve(inside.length()*low);
+                for (unsigned i = 0; i < low; ++i) {
+                    for (unsigned j = 0; j < inside.length(); ++j) {
+                        result.push_back(inside[j]);
+                    }
+                }
+                return zstring(result.size(), result.data());
+            }
+        } else if (m_util_s.re.is_opt(regex)) { // Handle optional.
+            return zstring(); // we can ignore inside and just return empty string, 
+        } else if (m_util_s.re.is_range(regex)) { // Handle range.
+            SASSERT(regex->get_num_args() == 2);
+            const auto range_begin{ regex->get_arg(0) };
+            const auto range_end{ regex->get_arg(1) };
+            SASSERT(is_app(range_begin));
+            SASSERT(is_app(range_end));
+            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
+            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
+            if (range_begin_value > range_end_value) {
+                return zstring(); // if range is invalid, it means empty string
+            } else {
+                return to_app(range_begin)->get_parameter(0).get_zstring(); // otherwise, we return the start of the range
+            }
+        } else if (m_util_s.re.is_union(regex)) { // Handle union (= or; A|B).
+            SASSERT(regex->get_num_args() == 2);
+            const auto left{ regex->get_arg(0) };
+            SASSERT(is_app(left));
+            const auto right{ regex->get_arg(1) };
+            SASSERT(is_app(right));
+            // try getting a model from left, if it is not possible, then try right
+            try {
+                return regex::get_model_from_regex(to_app(left), m_util_s);
+            } catch (const regex::regex_model_fail& exc) {
+                return regex::get_model_from_regex(to_app(right), m_util_s);
+            }
+        } else if (m_util_s.re.is_star(regex)) { // Handle star iteration.
+            return zstring(); // empty string is always accepted by star
+        } else if (m_util_s.re.is_plus(regex)) { // Handle positive iteration.
+            SASSERT(regex->get_num_args() == 1);
+            const auto child{ regex->get_arg(0) };
+            SASSERT(is_app(child));
+            return get_model_from_regex(to_app(child), m_util_s); // we just return one iteration
+        } else if(m_util_s.str.is_string(regex)) { // Handle string literal.
+            SASSERT(regex->get_num_parameters() == 1);
+            return regex->get_parameter(0).get_zstring();
+        } else {
+            throw regex_model_fail();
+        }
+    }
 }

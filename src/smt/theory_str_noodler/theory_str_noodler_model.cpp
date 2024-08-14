@@ -75,11 +75,8 @@ namespace smt::noodler {
             rational val(0);
             SASSERT(values.size() == 1);
             VERIFY(m_util_a.is_numeral(values[0], val, is_int) && is_int);
-            zstring res;
-            while (res.length() != val.get_unsigned()) {
-                res = res + zstring("a"); // we can return anything, so we will just fill it with 'a'
-            }
-            return m_util_s.str.mk_string(res);
+            std::vector<unsigned> res(val.get_unsigned(), 'a'); // we can return anything, so we will just fill it with 'a'
+            return m_util_s.str.mk_string(zstring(res.size(), res.data()));
         }
     };
 

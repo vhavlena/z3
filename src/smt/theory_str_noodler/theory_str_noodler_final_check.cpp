@@ -26,7 +26,7 @@ namespace smt::noodler {
             // if we returned previously sat, then we should always return sat (final_check_eh should not be called again, but for some reason Z3 calls it)
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
-                sat_handling(sat_length_formula);
+                add_axiom(sat_length_formula);
             }
             return FC_DONE;
         }
@@ -961,6 +961,27 @@ namespace smt::noodler {
 
     void theory_str_noodler::sat_handling(expr_ref length_formula) {
         last_run_was_sat = true;
+        if (m_params.m_produce_models) {
+            // If we want to produce models, we would like to limit the lengths more significantly,
+            // so that Z3 arith solver does not give us some large numbers (for example it can give 60000
+            // and returning such a long model can take a long time).
+            // We therefore check if we can still get a model if we limit all lengths by some number.
+            const int LENGTH_LIMIT = 100; // this seems a small enough number so that model generation is easy, while allowing model to pass trough for most benchmarks
+            expr_ref_vector len_constraints(m);
+            for (expr* len_var : len_vars) {
+                // |len_var| <= LENGTH_LIMIT
+                len_constraints.push_back(expr_ref(m_util_a.mk_le(m_util_s.str.mk_length(len_var), m_util_a.mk_int(LENGTH_LIMIT)), m));
+            }
+            expr_ref length_formula_underapprox(m.mk_and(length_formula, m.mk_and(len_constraints)), m);
+            STRACE("str-sat-handling", tout << "Checking if we can put stronger limits on lengths with formula " << mk_pp(length_formula_underapprox, m) << " which is ";);
+            if (check_len_sat(length_formula_underapprox) == lbool::l_true) {
+                // we can limit the lengths => add it to the resulting length formula
+                STRACE("str-sat-handling", tout << "sat\n");
+                length_formula = length_formula_underapprox;
+            } else {
+                STRACE("str-sat-handling", tout << "unsat\n");
+            }
+        }
         sat_length_formula = length_formula;
         add_axiom(length_formula);
     }
