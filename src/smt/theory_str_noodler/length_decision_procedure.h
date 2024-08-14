@@ -199,11 +199,12 @@ namespace smt::noodler {
         std::map<BasicTerm, BlockModel> block_models {};
         std::map<zstring, BasicTerm> lit_conversion {};
         SubstitutionMap subst_map {};
+        AutAssignment aut_ass {};
 
     public:
 
-        LengthProcModel() { LengthProcModel(ConstraintPool{}, {}); };
-        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst);
+        LengthProcModel() { LengthProcModel(ConstraintPool{}, {}, {}); };
+        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass);
 
         void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 

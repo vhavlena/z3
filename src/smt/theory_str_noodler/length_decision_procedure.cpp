@@ -527,7 +527,7 @@ namespace smt::noodler {
                 return l_undef;	// We cannot solve this formula
             }
         }
-        this->len_model = LengthProcModel(this->pool, this->subst_map);
+        this->len_model = LengthProcModel(this->pool, this->subst_map, this->init_aut_ass);
         for(const BasicTerm& var : this->init_length_sensitive_vars) {
             this->len_model.add_len_var(var);
         }
@@ -626,8 +626,9 @@ namespace smt::noodler {
 
         // propagate_eps does not mark eps variables as length variables (it is fine). If we have such variables, 
         // we need to add them to length variables explicitely (otherwise it causes probles in model generation). 
+        // We also need to add remaining free variables from aut_ass in order to get their models.
         for(const auto& [term, aut] : this->init_aut_ass) {
-            if(term.is_variable() && this->init_aut_ass.is_epsilon(term)) {
+            if(term.is_variable()) {
                 this->init_length_sensitive_vars.insert(term);
             }
         }
@@ -707,7 +708,7 @@ namespace smt::noodler {
     }
 
 
-    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst) : model(), subst_map(subst) {
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass) : model(), subst_map(subst), aut_ass(aut_ass) {
         std::set<BasicTerm> len_vars{};
         this->lit_conversion = block_pool.get_lit_conversion();
         this->block_models = std::map<BasicTerm, BlockModel>();
@@ -778,11 +779,14 @@ namespace smt::noodler {
         for(const BasicTerm& var : this->length_vars) {
             if(this->model.contains(var)) continue;
             rational total_length = get_arith_model_of_var(var);
-            std::vector<unsigned> solution_str(total_length.get_int32());
-            for(size_t i = 0; i < total_length; i++) {
-                solution_str[i] = 97; // a
+
+            mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+            auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
+            if(!maybe_word.has_value()) {
+                util::throw_error("empty NFA during the model generation");
             }
-            zstring res = zstring(solution_str.size(), solution_str.data());
+            mata::Word word = maybe_word.value();
+            zstring res = zstring(word.size(), word.data());
             this->model[var] = res;
         }
     }
