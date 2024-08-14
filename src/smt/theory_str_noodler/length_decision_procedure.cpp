@@ -616,13 +616,21 @@ namespace smt::noodler {
         prep_handler.generate_identities();
         prep_handler.propagate_variables(true);
         prep_handler.remove_trivial();
-        
+
         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
         this->subst_map = prep_handler.get_substitution_map();
+
+        // propagate_eps does not mark eps variables as length variables (it is fine). If we have such variables, 
+        // we need to add them to length variables explicitely (otherwise it causes probles in model generation). 
+        for(const auto& [term, aut] : this->init_aut_ass) {
+            if(term.is_variable() && this->init_aut_ass.is_epsilon(term)) {
+                this->init_length_sensitive_vars.insert(term);
+            }
+        }
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
