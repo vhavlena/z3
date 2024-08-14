@@ -198,17 +198,20 @@ namespace smt::noodler {
         std::map<BasicTerm, zstring> model {};
         std::map<BasicTerm, BlockModel> block_models {};
         std::map<zstring, BasicTerm> lit_conversion {};
+        SubstitutionMap subst_map {};
 
     public:
 
-        LengthProcModel() { LengthProcModel(ConstraintPool{}); };
-        LengthProcModel(const ConstraintPool& block_pool);
+        LengthProcModel() { LengthProcModel(ConstraintPool{}, {}); };
+        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst);
 
         void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var); 
 
         void assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        void assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         bool is_initialized() const { return !this->model.empty(); }
 
@@ -257,6 +260,7 @@ namespace smt::noodler {
         ConstraintPool pool {};
 
         LengthProcModel len_model;
+        SubstitutionMap subst_map {};
 
     protected:
         /**

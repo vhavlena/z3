@@ -527,7 +527,7 @@ namespace smt::noodler {
                 return l_undef;	// We cannot solve this formula
             }
         }
-        this->len_model = LengthProcModel(this->pool);
+        this->len_model = LengthProcModel(this->pool, this->subst_map);
         for(const BasicTerm& var : this->init_length_sensitive_vars) {
             this->len_model.add_len_var(var);
         }
@@ -598,8 +598,12 @@ namespace smt::noodler {
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities(); // only makes variable a literal or removes the disequation 
 
+        AutAssignment current_ass = prep_handler.get_aut_assignment();
+        mata::nfa::Nfa sigma_star = current_ass.sigma_star_automaton();
         // Underapproximate if it contains inequations
-        for (const auto& [term, aut] : prep_handler.get_aut_assignment()) {
+        for (const auto& [term, aut] : current_ass) {
+            // we skip sigma_star automata
+            if(current_ass.are_quivalent(term, sigma_star)) continue;
             if (prep_handler.get_aut_assignment().is_co_finite(term)) {
                 prep_handler.underapprox_var_language(term);
                 this->precision = LenNodePrecision::UNDERAPPROX;
@@ -608,9 +612,9 @@ namespace smt::noodler {
         }
 
         prep_handler.propagate_eps();
-        prep_handler.propagate_variables();
+        prep_handler.propagate_variables(true);
         prep_handler.generate_identities();
-        prep_handler.propagate_variables();
+        prep_handler.propagate_variables(true);
         prep_handler.remove_trivial();
         
         // Refresh the instance
@@ -618,6 +622,7 @@ namespace smt::noodler {
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
+        this->subst_map = prep_handler.get_substitution_map();
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
@@ -694,7 +699,7 @@ namespace smt::noodler {
     }
 
 
-    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool) : model() {
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst) : model(), subst_map(subst) {
         std::set<BasicTerm> len_vars{};
         this->lit_conversion = block_pool.get_lit_conversion();
         this->block_models = std::map<BasicTerm, BlockModel>();
@@ -757,6 +762,7 @@ namespace smt::noodler {
         for(auto& [block_var, block_model] : this->block_models) {
             generate_block_models(block_var, block_model, get_arith_model_of_var);
         }
+        assign_subst_map_vars(get_arith_model_of_var);
         assign_free_vars(get_arith_model_of_var);
     }
 
@@ -770,6 +776,17 @@ namespace smt::noodler {
             }
             zstring res = zstring(solution_str.size(), solution_str.data());
             this->model[var] = res;
+        }
+    }
+
+    void LengthProcModel::assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        // TODO: flattening
+        for(const auto& [term, subst] : this->subst_map) {
+            if(!term.is_variable()) continue;
+            if(subst.size() > 1 || !subst[0].is_literal()) {
+                util::throw_error("unimplemented");
+            }
+            this->model[term] = subst[0].get_name();
         }
     }
 
