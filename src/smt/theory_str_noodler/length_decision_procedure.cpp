@@ -778,6 +778,7 @@ namespace smt::noodler {
     void LengthProcModel::assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         for(const BasicTerm& var : this->length_vars) {
             if(this->model.contains(var)) continue;
+            if(!this->aut_ass.contains(var)) continue;
             rational total_length = get_arith_model_of_var(var);
 
             mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
