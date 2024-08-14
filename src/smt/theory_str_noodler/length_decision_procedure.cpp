@@ -112,10 +112,14 @@ namespace smt::noodler {
 
         // l1 is completely before l2
         // b(l1) + |l1| <= b(l2)
-        LenNode before (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l1, this->_name), rational(l1_val.length())}), begin_of(l2, this->_name)});
+        // z3 internal LIA solver (not the external one) requires LEQ constraints of the form term  <= const. 
+        //The external LIA solver does some preprocessing to match the required form.
+        LenNode before (LenFormulaType::LEQ, {LenNode(LenFormulaType::MINUS, {begin_of(l1, this->_name),begin_of(l2, this->_name) }), -rational(l1_val.length())});
+
         // l2 is completely before l1
         // b(l2) + |l2| <= b(l1)
-        LenNode after (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l2, this->_name), rational(l2_val.length())}), begin_of(l1, this->_name)});
+        LenNode after (LenFormulaType::LEQ, {LenNode(LenFormulaType::MINUS, {begin_of(l2, this->_name),  begin_of(l1, this->_name)}),-rational(l2_val.length())});
+
         std::vector<LenNode> align{before, after};
         for (unsigned i : overlays) {
             // b(l1) = b(l2) + |l2| - i
@@ -193,15 +197,17 @@ namespace smt::noodler {
             LenNode formula(LenFormulaType::AND);
             for(const zstring& lit : other_lits) {
                 LenNode or_fle(LenFormulaType::OR);
-                // b_x(lit) + |lit| <= begin
+                // b_x(lit) + |lit| <= begin hence
+                // b_x(lit) - begin <= -|lit|
                 or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                    LenNode(LenFormulaType::PLUS, { begin_of(lit, this->_name), conv.at(lit) }), 
-                    begin, 
+                    LenNode(LenFormulaType::MINUS, { begin_of(lit, this->_name), begin }), 
+                    LenNode(LenFormulaType::TIMES, {-1, conv.at(lit)}), 
                 }) );
                 // end <= b_x(lit)
+                // end - b_x(lit) <= 0
                 or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                    end,
-                    begin_of(lit, this->_name), 
+                    LenNode(LenFormulaType::MINUS, { end, begin_of(lit, this->_name) }), 
+                    0
                 }) );
                 formula.succ.push_back(or_fle);
             }
@@ -212,14 +218,22 @@ namespace smt::noodler {
         auto in_formula_case1 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(var) <= b_y(lit)
+            // b_y(var) - b_y(lit) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(var.get_name(), source_var.get_name()),
-                begin_of(lit, source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(var.get_name(), source_var.get_name()),
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(lit) + |lit| <= b_y(var) + |var|
+            // b_y(lit) + |lit| - b_y(var) <= |var|
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }) 
+                LenNode(LenFormulaType::PLUS, { 
+                        begin_of(lit, source_var.get_name()), 
+                        LenNode(LenFormulaType::MINUS, {conv.at(lit), begin_of(var.get_name(), source_var.get_name())})  
+                }), 
+                var
             }) );
 
             // begin = b_x(var) + ( b_y(lit) - b_y(var) )
@@ -246,14 +260,22 @@ namespace smt::noodler {
         auto in_formula_case2 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(lit) <= b_y(var)
+            // b_y(lit) - b_y(var) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(lit, source_var.get_name()), 
-                begin_of(var.get_name(), source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()), 
+                    begin_of(var.get_name(), source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(var) < b_y(lit) + |lit|
-            pre1.succ.push_back( LenNode(LenFormulaType::LT, { 
-                begin_of(var.get_name(), source_var.get_name()),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+            // b_y(var) - b_y(lit) < |lit|
+            pre1.succ.push_back( LenNode(LenFormulaType::LT, {
+                LenNode(LenFormulaType::MINUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                conv.at(lit)
             }) );
             // begin = b_x(var)
             LenNode begin = begin_of(var.get_name(), this->_name);
@@ -277,14 +299,25 @@ namespace smt::noodler {
         auto in_formula_case3 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(var) <= b_y(lit)
+            // b_y(var) - b_y(lit) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(var.get_name(), source_var.get_name()), 
-                begin_of(lit, source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(var) + |var| <= b_y(lit) + |lit|
+            // b_y(var) + |var| - b_y(lit) <= |lit|
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+                LenNode(LenFormulaType::PLUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, {
+                        var, 
+                        begin_of(lit, source_var.get_name())
+                    })
+                }),
+                conv.at(lit),
             }) );
             // begin = b_x(var) + ( b_y(lit) - b_y(var) )
             LenNode begin = LenNode(LenFormulaType::PLUS, { 
@@ -310,14 +343,25 @@ namespace smt::noodler {
         auto in_formula_case4 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             //  b_y(lit) <= b_y(var)
+            //  b_y(lit) - b_y(var) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(lit, source_var.get_name()),
-                begin_of(var.get_name(), source_var.get_name()), 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()),
+                    begin_of(var.get_name(), source_var.get_name()), 
+                }),
+                0
             }) );
             // b_y(var) + |var| <= b_y(lit) + |lit|
+            // b_y(var) + |var| - b_y(lit) <=  |lit|
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+                LenNode(LenFormulaType::PLUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, { 
+                        var, 
+                        begin_of(lit, source_var.get_name())
+                    }) 
+                }),
+                conv.at(lit)
             }) );
             // begin = b_x(var)
             LenNode begin = begin_of(var.get_name(), this->_name);
