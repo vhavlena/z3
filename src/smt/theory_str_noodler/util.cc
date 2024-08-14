@@ -172,6 +172,17 @@ namespace smt::noodler::util {
         std::vector<mata::nfa::StateSet> backtracking_state_sets; // vector that remembers to which set of states to backtrack to
         zstring current_word; // word we are currently building for current automaton
         bool is_backtracked = false; // whether we just backtracked
+
+        auto backtrack = [&]() {
+            --current_automaton;
+            index_in_word = backtracking_indexes.back();
+            backtracking_indexes.pop_back();
+            current_states = std::move(backtracking_state_sets.back());
+            backtracking_state_sets.pop_back();
+            current_word = std::move(words.back());
+            words.pop_back();
+            is_backtracked = true;
+        };
         
         while (current_automaton != NUM_OF_AUTOMATA || index_in_word != LENGTH_OF_WORD) {
             STRACE("str-split-word-to-automata", tout << "Current automaton and index in word: " << current_automaton << " " << index_in_word << "\n";);
@@ -195,7 +206,7 @@ namespace smt::noodler::util {
                 ++current_automaton;
                 if (current_automaton != NUM_OF_AUTOMATA) {
                     // index_in_word is not updated, as we stay at the same position
-                    current_states = mata::nfa::StateSet(automata[current_automaton]->initial);
+                    current_states = mata::nfa::StateSet(automata[current_automaton]->initial); // we can imagine this as each final state in previous automaton is connected by epsilon move to initial state of following one
                     current_word = zstring();
                 }
                 continue;
@@ -205,21 +216,13 @@ namespace smt::noodler::util {
                 // we read the whole word, but we have still some automata left, we need to backtrack
                 if (current_automaton == 0) { return false; } // we cannot backtrack, i.e., the word is not accepted by the concatenation of automata
                 STRACE("str-split-word-to-automata", tout << "Backtracking at the end of the word\n";);
-
-                --current_automaton;
-                index_in_word = backtracking_indexes.back();
-                backtracking_indexes.pop_back();
-                current_states = std::move(backtracking_state_sets.back());
-                backtracking_state_sets.pop_back();
-                current_word = std::move(words.back());
-                words.pop_back();
-                is_backtracked = true;
+                backtrack();
                 continue;
             }
             
             // we move by one in word and compute the new set of states
             mata::Symbol current_symbol = word[index_in_word];
-            mata::nfa::StateSet new_current_states;
+            mata::nfa::StateSet new_current_states; // we save here post over current symbol from the set of current states
             for (mata::nfa::State s : current_states) {
                 const mata::nfa::StatePost& transitions_from_s = automata[current_automaton]->delta[s];
                 auto transitions_from_current_symbol_it = transitions_from_s.find(current_symbol);
@@ -233,15 +236,7 @@ namespace smt::noodler::util {
                 // we need to backtrack, the word is not accepted by the current automaton
                 if (current_automaton == 0) { return false; } // we cannot backtrack, i.e., the word is not accepted by the concatenation of automata
                 STRACE("str-split-word-to-automata", tout << "Backtracking because the current automaton does not accept\n";);
-
-                --current_automaton;
-                index_in_word = backtracking_indexes.back();
-                backtracking_indexes.pop_back();
-                current_states = std::move(backtracking_state_sets.back());
-                backtracking_state_sets.pop_back();
-                current_word = std::move(words.back());
-                words.pop_back();
-                is_backtracked = true;
+                backtrack();
             } else {
                 // otherwise we just move to the next symbol
                 STRACE("str-split-word-to-automata", tout << "Moving to the next symbol\n";);
