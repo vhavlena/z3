@@ -201,6 +201,11 @@ namespace smt::noodler {
         SubstitutionMap subst_map {};
         AutAssignment aut_ass {};
 
+    protected:
+        zstring assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        zstring assign_subst_map_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
     public:
 
         LengthProcModel() { LengthProcModel(ConstraintPool{}, {}, {}); };

@@ -793,14 +793,45 @@ namespace smt::noodler {
     }
 
     void LengthProcModel::assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        // TODO: flattening
         for(const auto& [term, subst] : this->subst_map) {
             if(!term.is_variable()) continue;
-            if(subst.size() > 1 || !subst[0].is_literal()) {
-                util::throw_error("unimplemented");
-            }
-            this->model[term] = subst[0].get_name();
+            this->model[term] = assign_subst_map_var(term, get_arith_model_of_var);
         }
+    }
+
+    zstring LengthProcModel::assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        rational total_length = get_arith_model_of_var(var);
+        mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+        auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
+        if(!maybe_word.has_value()) {
+            util::throw_error("empty NFA during the model generation");
+        }
+        mata::Word word = maybe_word.value();
+        return zstring(word.size(), word.data());
+    }
+
+    zstring LengthProcModel::assign_subst_map_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        Concat subst = this->subst_map.at(var);
+        zstring res = "";
+        for(const BasicTerm& term : subst) {
+            zstring val = "";
+            if(term.is_literal()) {
+                val = val + term.get_name();
+            } else {
+                // if the term is in the substitution map -> recursive call
+                if(this->subst_map.contains(term)) {
+                    val = assign_subst_map_var(term, get_arith_model_of_var);
+                // otherwise we take the already computed model
+                } else if(this->model.contains(term)) {
+                    val = this->model.at(term);
+                // or it is a free variable not occurring in the system solved by the length procedure
+                } else {
+                    val = assign_aut_ass_var(term, get_arith_model_of_var);
+                }
+            }
+            res = res + val;
+        }
+        return res;
     }
 
 }
