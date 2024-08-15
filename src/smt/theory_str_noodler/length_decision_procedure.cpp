@@ -227,13 +227,19 @@ namespace smt::noodler {
                 0
             }) );
             // b_y(lit) + |lit| <= b_y(var) + |var|
-            // b_y(lit) + |lit| - b_y(var) <= |var|
+            // b_y(lit) + |lit| - (b_y(var) + |var|) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
                 LenNode(LenFormulaType::PLUS, { 
-                        begin_of(lit, source_var.get_name()), 
-                        LenNode(LenFormulaType::MINUS, {conv.at(lit), begin_of(var.get_name(), source_var.get_name())})  
+                    begin_of(lit, source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, {
+                        conv.at(lit),
+                        LenNode(LenFormulaType::PLUS, {
+                            begin_of(var.get_name(), source_var.get_name()),
+                            var,
+                        }),
+                    }),
                 }), 
-                var
+                0
             }) );
 
             // begin = b_x(var) + ( b_y(lit) - b_y(var) )
