@@ -579,7 +579,7 @@ namespace smt::noodler {
                 return l_undef;	// We cannot solve this formula
             }
         }
-        this->len_model = LengthProcModel(this->pool, this->subst_map, this->init_aut_ass);
+        this->len_model = LengthProcModel(this->pool, this->subst_map, this->init_aut_ass, multi_vars);
         for(const BasicTerm& var : this->init_length_sensitive_vars) {
             this->len_model.add_len_var(var);
         }
@@ -760,7 +760,7 @@ namespace smt::noodler {
     }
 
 
-    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass) : model(), subst_map(subst), aut_ass(aut_ass), block_pool(block_pool) {
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass, const std::set<BasicTerm>& multi_var_set) : model(), subst_map(subst), aut_ass(aut_ass), block_pool(block_pool), multi_var_set(multi_var_set) {
         std::set<BasicTerm> len_vars{};
         this->lit_conversion = block_pool.get_lit_conversion();
         this->block_models = std::map<BasicTerm, BlockModel>();
@@ -796,6 +796,16 @@ namespace smt::noodler {
             for(size_t i = 0; i < total_length; i++) {
                 solution_str[i] = 97; // a
             }
+
+            // we have a support for a single multi_var
+            if(this->multi_var_set.size() != 0) {
+                BasicTerm multi_var = *this->multi_var_set.begin();
+                zstring multi_var_model = this->model.at(multi_var);
+                int multi_var_pos = get_arith_model_of_var(begin_of(multi_var.get_name(), block_var.get_name())).get_int32();
+                for(size_t i = 0; i < multi_var_model.length(); i++) {
+                    solution_str[multi_var_pos + i] = multi_var_model[i];
+                }
+            }
             for(const BasicTerm& bt : block_model.terms) {
                 if(bt.is_variable()) continue;
                 int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
@@ -815,6 +825,8 @@ namespace smt::noodler {
         // so-far solution_str contains solution for x
         for(const BasicTerm& bt : block_model.terms) {
             if(bt.is_literal()) continue;
+            if(this->model.contains(bt)) continue;
+
             int var_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
             int var_length = get_arith_model_of_var(bt).get_int32();
 
@@ -829,6 +841,9 @@ namespace smt::noodler {
 
     void LengthProcModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         this->model.clear();
+
+        assign_multi_vars(get_arith_model_of_var);
+
         std::set<BasicTerm> block_vars {};
         // take all block variables
         for(const auto& it : this->block_models) {
@@ -906,6 +921,61 @@ namespace smt::noodler {
             res = res + val;
         }
         return res;
+    }
+
+    void LengthProcModel::assign_multi_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if(this->multi_var_set.size() == 0) {
+            return;
+        }
+        BasicTerm multi_var = *this->multi_var_set.begin();
+        this->model[multi_var] = get_multivar_model(multi_var, get_arith_model_of_var);
+    }
+
+    std::vector<long> LengthProcModel::get_multivar_skeleton(const BasicTerm& block_var, const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        rational total_length = get_arith_model_of_var(block_var);
+        auto block_model = this->block_models.at(block_var);
+
+        std::vector<long> solution_str(total_length.get_int32());
+        for(size_t i = 0; i < total_length; i++) {
+            solution_str[i] = -1; // a
+        }
+        for(const BasicTerm& bt : block_model.terms) {
+            if(bt.is_variable()) continue;
+            int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+            zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
+            for(size_t i = lit_pos; i < lit_pos + lit_val.length(); i++) {
+                solution_str[i] = lit_val[i - lit_pos];
+            }
+        }
+
+        int var_pos = get_arith_model_of_var(begin_of(multi_var.get_name(), block_var.get_name())).get_int32();
+        int var_length = get_arith_model_of_var(multi_var).get_int32();
+
+        return std::vector<long>(solution_str.begin()+var_pos, solution_str.begin()+var_pos+var_length);
+    }
+
+    zstring LengthProcModel::get_multivar_model(const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        std::vector<long> res_skeleton(get_arith_model_of_var(multi_var).get_int32());
+        for(const auto& [block_var, var_constr] : this->block_pool) {
+            if(var_constr.get_vars().contains(multi_var)) {
+                std::vector<long> act_skeleton = get_multivar_skeleton(block_var, multi_var, get_arith_model_of_var);
+                // the vectors should have the same size
+                for(size_t i = 0; i < res_skeleton.size(); i++) {
+                    if(act_skeleton[i] != -1) {
+                        res_skeleton[i] = act_skeleton[i];
+                    }
+                }
+            }
+        }
+        zstring solution = "";
+        for(size_t i = 0; i < res_skeleton.size(); i++) {
+            if(res_skeleton[i] != -1) {
+                solution = solution + zstring(unsigned(res_skeleton[i]));
+            } else {
+                solution = solution + "a";
+            }
+        }
+        return solution;
     }
 
 }

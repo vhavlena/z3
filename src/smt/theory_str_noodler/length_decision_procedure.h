@@ -205,16 +205,20 @@ namespace smt::noodler {
         SubstitutionMap subst_map {};
         AutAssignment aut_ass {};
         ConstraintPool block_pool;
+        std::set<BasicTerm> multi_var_set{};
 
     protected:
         zstring assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         zstring assign_subst_map_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        std::vector<long> get_multivar_skeleton(const BasicTerm& block_var, const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+        zstring get_multivar_model(const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
     public:
 
-        LengthProcModel() { LengthProcModel(ConstraintPool{}, {}, {}); };
-        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass);
+        LengthProcModel() : LengthProcModel(ConstraintPool{}, {}, {}, {}) {};
+        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass, const std::set<BasicTerm>& multi_var_set);
 
         void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
@@ -223,6 +227,8 @@ namespace smt::noodler {
         void assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         void assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        void assign_multi_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
         bool is_initialized() const { return !this->model.empty(); }
 
