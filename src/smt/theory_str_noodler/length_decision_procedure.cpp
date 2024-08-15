@@ -421,6 +421,8 @@ namespace smt::noodler {
                     // parse constrained variables
                     // the variable X occurrs on the left side of some equation
                     if (pool.count(t) > 0) {
+                        // current block depends on a nested block represented by t
+                        this->depend_on_block_var.insert(t);
                         if (pool[t].parse(pool) == false) {
                             return false;	// There is a cycle
                         }
@@ -752,7 +754,7 @@ namespace smt::noodler {
     }
 
 
-    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass) : model(), subst_map(subst), aut_ass(aut_ass) {
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass) : model(), subst_map(subst), aut_ass(aut_ass), block_pool(block_pool) {
         std::set<BasicTerm> len_vars{};
         this->lit_conversion = block_pool.get_lit_conversion();
         this->block_models = std::map<BasicTerm, BlockModel>();
@@ -780,26 +782,31 @@ namespace smt::noodler {
     }
 
     void LengthProcModel::generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
-        rational total_length = get_arith_model_of_var(block_var);
-        std::vector<unsigned> solution_str(total_length.get_int32());
-        for(size_t i = 0; i < total_length; i++) {
-            solution_str[i] = 97; // a
-        }
-        for(const BasicTerm& bt : block_model.terms) {
-            if(bt.is_variable()) continue;
-            int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
-            zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
-            for(size_t i = lit_pos; i < lit_pos + lit_val.length(); i++) {
-                solution_str[i] = lit_val[i - lit_pos];
+        // if we already set the variable model --> continue with the stored model
+        if(!this->model.contains(block_var)) {
+            // create model for block_var, based on positions of all literals
+            rational total_length = get_arith_model_of_var(block_var);
+            std::vector<unsigned> solution_str(total_length.get_int32());
+            for(size_t i = 0; i < total_length; i++) {
+                solution_str[i] = 97; // a
             }
-        }
-        // convert vector of numbers to zstring
-        for(size_t i = 0; i < solution_str.size(); i++) {
-            block_model.solution = block_model.solution + zstring(solution_str[i]);
+            for(const BasicTerm& bt : block_model.terms) {
+                if(bt.is_variable()) continue;
+                int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+                zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
+                for(size_t i = lit_pos; i < lit_pos + lit_val.length(); i++) {
+                    solution_str[i] = lit_val[i - lit_pos];
+                }
+            }
+            // convert vector of numbers to zstring
+            for(size_t i = 0; i < solution_str.size(); i++) {
+                block_model.solution = block_model.solution + zstring(solution_str[i]);
+            }
+            this->model[block_var] = block_model.solution;
+        } else {
+            block_model.solution = this->model[block_var];
         }
         // so-far solution_str contains solution for x
-        this->model[block_var] = block_model.solution;
-
         for(const BasicTerm& bt : block_model.terms) {
             if(bt.is_literal()) continue;
             int var_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
@@ -807,13 +814,30 @@ namespace smt::noodler {
 
             zstring var_model = block_model.solution.extract(var_pos, var_length);
             this->model[bt] = var_model;
+            // if we set a block variable, propagate the value to all variables in the block
+            if(this->block_models.contains(bt)) {
+                generate_block_models(bt, this->block_models[bt], get_arith_model_of_var);
+            }
         }
     }
 
     void LengthProcModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         this->model.clear();
-        for(auto& [block_var, block_model] : this->block_models) {
-            generate_block_models(block_var, block_model, get_arith_model_of_var);
+        std::set<BasicTerm> block_vars {};
+        // take all block variables
+        for(const auto& it : this->block_models) {
+            block_vars.insert(it.first);
+        }
+        // remove from block_vars variables that are dependent
+        // we keep only to top-level blocks
+        for(auto& [block_var, var_constraint] : this->block_pool) {
+            for(const BasicTerm& depend : var_constraint.get_dependencies()) {
+                block_vars.erase(depend);
+            }
+        }
+        // call a recursive procedure for abtaining model of block_var and all dependent blocks
+        for(const BasicTerm& block_var : block_vars) {
+            generate_block_models(block_var, this->block_models[block_var], get_arith_model_of_var);
         }
         assign_subst_map_vars(get_arith_model_of_var);
         assign_free_vars(get_arith_model_of_var);

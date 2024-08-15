@@ -53,6 +53,8 @@ namespace smt::noodler {
         // variables occurring in the variable constraint
         std::set<BasicTerm> vars {};
 
+        std::set<BasicTerm> depend_on_block_var {};
+
         /**
          * @brief Check if @p side is of the form [_name]
          * 
@@ -179,6 +181,8 @@ namespace smt::noodler {
         LenNode get_multi_var_lia(const ConstraintPool& pool, const BasicTerm& multi_var, const BasicTerm& source_var) const;
 
         std::vector<Concat> get_side_eqs() const { return this->_constr_eqs; }
+
+        std::set<BasicTerm> get_dependencies() const { return this->depend_on_block_var; }
     };
 
     /**
@@ -200,6 +204,7 @@ namespace smt::noodler {
         std::map<zstring, BasicTerm> lit_conversion {};
         SubstitutionMap subst_map {};
         AutAssignment aut_ass {};
+        ConstraintPool block_pool;
 
     protected:
         zstring assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
