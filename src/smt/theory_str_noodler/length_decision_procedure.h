@@ -195,44 +195,131 @@ namespace smt::noodler {
         std::set<BasicTerm> terms {}; // other terms occurring in the equational block.
     };
 
+    /**
+     * @brief Model generation module for the length decision procedure.
+     */
     class LengthProcModel {
-
     private:
         std::vector<BasicTerm> length_vars {};
         std::map<BasicTerm, zstring> model {};
+        // model for each block variable
         std::map<BasicTerm, BlockModel> block_models {};
+        // each literal has a fresh name --> we need to convert them back in the generation
         std::map<zstring, BasicTerm> lit_conversion {};
         SubstitutionMap subst_map {};
         AutAssignment aut_ass {};
+        // blocks
         ConstraintPool block_pool;
+        // set of multi vars (we assume at most one multi var)
         std::set<BasicTerm> multi_var_set{};
 
     protected:
+       /**
+         * @brief Get model for variable from its automata assignment (respecting the computed length). 
+         * 
+         * @param var Variable
+         * @param get_arith_model_of_var Length model of variables
+         * @return zstring Word from automaton corresponding to @p var.
+         */
         zstring assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        /**
+         * @brief Assign model for variable @p var s.t. it is not in the block system but it is in the 
+         * substitution map.
+         * 
+         * @param var Variable from the substitution map for getting a model
+         * @param get_arith_model_of_var Length model of variables
+         * @return zstring Model of @p var
+         */
         zstring assign_subst_map_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        /**
+         * @brief Get skeleton from block represented by @p block_var for the mutli var @p multi_var.
+         * 
+         * @param block_var Block variable
+         * @param multi_var Multi var
+         * @param get_arith_model_of_var Length model of variables
+         * @return std::vector<long> Skeleton
+         */
         std::vector<long> get_multivar_skeleton(const BasicTerm& block_var, const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+        /**
+         * @brief Get model for the multi var @p multi_var.
+         * 
+         * @param multi_var Multi var
+         * @param get_arith_model_of_var Length model of variables
+         * @return zstring Model of @p multi_var
+         */
         zstring get_multivar_model(const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
-    public:
-
-        LengthProcModel() : LengthProcModel(ConstraintPool{}, {}, {}, {}) {};
-        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass, const std::set<BasicTerm>& multi_var_set);
-
-        void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
-
-        void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var); 
-
+        /**
+         * @brief Assign free variables. Variables that are free in the system (meaning that they are not in 
+         * the block system neither in substitution map) are assigned according to their length.
+         * 
+         * @param get_arith_model_of_var Length model of variables
+         */
         void assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        /**
+         * @brief Create models for variables in the substitution map (created in preprocessing).  
+         * 
+         * @param get_arith_model_of_var Length model of variables
+         */
         void assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        /**
+         * @brief Assign model to multi var. So far we support only a single multi var (checked in the 
+         * compute_next_solution).
+         * 
+         * @param get_arith_model_of_var Length model of variables
+         */
         void assign_multi_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var);
 
+        /**
+         * @brief Generate models for variable in the block given by @p block_var.
+         * 
+         * @param block_var Block var
+         * @param block_model Block model to be set
+         * @param get_arith_model_of_var Length model of variables
+         */
+        void generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var);
+
+
+    public:
+        /**
+         * @brief Default constructor
+         */
+        LengthProcModel() : LengthProcModel(ConstraintPool{}, {}, {}, {}) {};
+
+        /**
+         * @brief Create model generation module for the given instance.
+         * 
+         * @param block_pool Blocks
+         * @param subst Substitution map from preprocessing
+         * @param aut_ass Automata assignment after preprocessing
+         * @param multi_var_set Set of multi vars
+         */
+        LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass, const std::set<BasicTerm>& multi_var_set);
+
+        /**
+         * @brief Compute model for each variable in the system. 
+         * 
+         * @param get_arith_model_of_var Length model of variables
+         */
+        void compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var); 
+
+        /**
+         * @brief Is the model initialized
+         * 
+         * @return true <-> initialized
+         */
         bool is_initialized() const { return !this->model.empty(); }
 
-
+        /**
+         * @brief Add length variable to the model generation (those variables are assigned in the model generation).
+         * 
+         * @param var Variable
+         */
         void add_len_var(const BasicTerm& var) {
             this->length_vars.push_back(var);
         }
@@ -275,8 +362,9 @@ namespace smt::noodler {
 
         // pool of variable constraints
         ConstraintPool pool {};
-
+        // model generation module
         LengthProcModel len_model;
+        // substitution map from preprocessing
         SubstitutionMap subst_map {};
 
     protected:
@@ -292,15 +380,6 @@ namespace smt::noodler {
     
     public:
         LenNodePrecision precision = LenNodePrecision::PRECISE;
-
-        /**
-         * @brief Create fresh name for the given literal @p lit. 
-         * 
-         * @param lit Literal
-         * @param lit_conversion Mapping of fresh names to the original literals
-         * @return zstring 
-         */
-        // static zstring generate_lit_alias(const BasicTerm& lit, std::map<zstring, BasicTerm>& lit_conversion);
 
         /**
          * Initialize a new decision procedure that can solve language (dis)equality constraints.
