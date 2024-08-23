@@ -124,6 +124,13 @@ namespace smt::noodler {
         mk_var(n);
     }
 
+    void theory_str_noodler::collect_statistics(::statistics & st) const {
+        STRACE("str", tout << "collecting statistics" << std::endl;);
+        st.update("num-underapprox", this->statistics.num_underapprox);
+        st.update("num-stabilization", this->statistics.num_stabilization);
+        st.update("num-nielsen", this->statistics.num_nielsen);
+    }
+
     void theory_str_noodler::init_search_eh() {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
         context &ctx = get_context();
