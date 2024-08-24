@@ -787,7 +787,6 @@ namespace smt::noodler {
         // we need a method get_formula from LengthDecisionProcedure
         std::shared_ptr<LengthDecisionProcedure> len_dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         dec_proc = len_dec_proc;
-        // LengthDecisionProcedure nproc();
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
             STRACE("str", tout << "len: unsat from preprocessing\n");

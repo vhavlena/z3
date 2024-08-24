@@ -52,7 +52,8 @@ namespace smt::noodler {
         lbool is_parsed;
         // variables occurring in the variable constraint
         std::set<BasicTerm> vars {};
-
+        // set of block vars that are dependant on the current block. 
+        // In a block graph they are successors of the current block.
         std::set<BasicTerm> depend_on_block_var {};
 
         /**
