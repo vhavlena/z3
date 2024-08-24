@@ -377,7 +377,7 @@ namespace smt::noodler {
         Formula get_modified_formula() const;
 
         void remove_regular();
-        void propagate_variables(bool store_lit_subst = false);
+        void propagate_variables(bool store_lit_subst = true);
         void propagate_eps();
         void generate_identities();
         void reduce_regular_sequence(unsigned mn);
