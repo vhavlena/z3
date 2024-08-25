@@ -664,9 +664,9 @@ namespace smt::noodler {
         }
 
         prep_handler.propagate_eps();
-        prep_handler.propagate_variables(true);
+        prep_handler.propagate_variables();
         prep_handler.generate_identities();
-        prep_handler.propagate_variables(true);
+        prep_handler.propagate_variables();
         prep_handler.remove_trivial();
 
         // Refresh the instance

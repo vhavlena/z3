@@ -375,10 +375,8 @@ namespace smt::noodler {
     /**
      * @brief Propagate variables. Propagate all equations of the form X=Y
      * (find all Y in the formula and replace with X).
-     * 
-     * @param store_lit_subst Store to substitution map also removed equations of the form X = lit?
      */
-    void FormulaPreprocessor::propagate_variables(bool store_lit_subst) {
+    void FormulaPreprocessor::propagate_variables() {
         STRACE("str-prep", tout << "Preprocessing step - propagate_variables\n";);
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_simple_eqs(regs);
@@ -411,10 +409,8 @@ namespace smt::noodler {
                 update_reg_constr(v_left, eq.get_right_side());
                 this->formula.replace(eq.get_left_side(), eq.get_right_side());
                 this->formula.remove_predicate(index);
-                if(store_lit_subst) {
-                    this->add_to_len_formula(eq.get_formula_eq());
-                    substitution_map[v_left] = {eq.get_right_side()[0]};
-                }
+                this->add_to_len_formula(eq.get_formula_eq());
+                substitution_map[v_left] = {eq.get_right_side()[0]};
                 continue;
             }
 
