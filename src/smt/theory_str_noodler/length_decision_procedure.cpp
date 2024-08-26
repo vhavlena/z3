@@ -112,10 +112,14 @@ namespace smt::noodler {
 
         // l1 is completely before l2
         // b(l1) + |l1| <= b(l2)
-        LenNode before (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l1, this->_name), rational(l1_val.length())}), begin_of(l2, this->_name)});
+        // z3 internal LIA solver (not the external one) requires LEQ constraints of the form term  <= const. 
+        //The external LIA solver does some preprocessing to match the required form.
+        LenNode before (LenFormulaType::LEQ, {LenNode(LenFormulaType::MINUS, {begin_of(l1, this->_name),begin_of(l2, this->_name) }), -rational(l1_val.length())});
+
         // l2 is completely before l1
         // b(l2) + |l2| <= b(l1)
-        LenNode after (LenFormulaType::LEQ, {LenNode(LenFormulaType::PLUS, {begin_of(l2, this->_name), rational(l2_val.length())}), begin_of(l1, this->_name)});
+        LenNode after (LenFormulaType::LEQ, {LenNode(LenFormulaType::MINUS, {begin_of(l2, this->_name),  begin_of(l1, this->_name)}),-rational(l2_val.length())});
+
         std::vector<LenNode> align{before, after};
         for (unsigned i : overlays) {
             // b(l1) = b(l2) + |l2| - i
@@ -159,7 +163,8 @@ namespace smt::noodler {
             for (const BasicTerm& t : side) {
                 // assume that the current left variable is y (_name). Then
                 // b_y(t) = b_y(last) + |last| if last is not undef otherwise b(t) = 0
-                form.emplace_back(generate_begin(t.get_name(), last));
+                form.emplace_back(generate_begin(t.get_name(), last, conv));
+                
                 // if the system is of the form y (_name) = ... x ... && x = l1 x2 l2
                 // we generate b_y(l1) = b_x(l1) + b_y(x)
                 if (t.is_variable() && pool.contains(t)) {
@@ -192,15 +197,17 @@ namespace smt::noodler {
             LenNode formula(LenFormulaType::AND);
             for(const zstring& lit : other_lits) {
                 LenNode or_fle(LenFormulaType::OR);
-                // b_x(lit) + |lit| <= begin
+                // b_x(lit) + |lit| <= begin hence
+                // b_x(lit) - begin <= -|lit|
                 or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                    LenNode(LenFormulaType::PLUS, { begin_of(lit, this->_name), conv.at(lit) }), 
-                    begin, 
+                    LenNode(LenFormulaType::MINUS, { begin_of(lit, this->_name), begin }), 
+                    LenNode(LenFormulaType::TIMES, {-1, conv.at(lit)}), 
                 }) );
                 // end <= b_x(lit)
+                // end - b_x(lit) <= 0
                 or_fle.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                    end,
-                    begin_of(lit, this->_name), 
+                    LenNode(LenFormulaType::MINUS, { end, begin_of(lit, this->_name) }), 
+                    0
                 }) );
                 formula.succ.push_back(or_fle);
             }
@@ -211,14 +218,28 @@ namespace smt::noodler {
         auto in_formula_case1 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(var) <= b_y(lit)
+            // b_y(var) - b_y(lit) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(var.get_name(), source_var.get_name()),
-                begin_of(lit, source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(var.get_name(), source_var.get_name()),
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(lit) + |lit| <= b_y(var) + |var|
+            // b_y(lit) + |lit| - (b_y(var) + |var|) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }) 
+                LenNode(LenFormulaType::PLUS, { 
+                    begin_of(lit, source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, {
+                        conv.at(lit),
+                        LenNode(LenFormulaType::PLUS, {
+                            begin_of(var.get_name(), source_var.get_name()),
+                            var,
+                        }),
+                    }),
+                }), 
+                0
             }) );
 
             // begin = b_x(var) + ( b_y(lit) - b_y(var) )
@@ -245,14 +266,22 @@ namespace smt::noodler {
         auto in_formula_case2 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(lit) <= b_y(var)
+            // b_y(lit) - b_y(var) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(lit, source_var.get_name()), 
-                begin_of(var.get_name(), source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()), 
+                    begin_of(var.get_name(), source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(var) < b_y(lit) + |lit|
-            pre1.succ.push_back( LenNode(LenFormulaType::LT, { 
-                begin_of(var.get_name(), source_var.get_name()),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+            // b_y(var) - b_y(lit) < |lit|
+            pre1.succ.push_back( LenNode(LenFormulaType::LT, {
+                LenNode(LenFormulaType::MINUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                conv.at(lit)
             }) );
             // begin = b_x(var)
             LenNode begin = begin_of(var.get_name(), this->_name);
@@ -276,14 +305,25 @@ namespace smt::noodler {
         auto in_formula_case3 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             // b_y(var) <= b_y(lit)
+            // b_y(var) - b_y(lit) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(var.get_name(), source_var.get_name()), 
-                begin_of(lit, source_var.get_name()) 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    begin_of(lit, source_var.get_name()) 
+                }),
+                0
             }) );
             // b_y(var) + |var| <= b_y(lit) + |lit|
+            // b_y(var) + |var| - b_y(lit) <= |lit|
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+                LenNode(LenFormulaType::PLUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, {
+                        var, 
+                        begin_of(lit, source_var.get_name())
+                    })
+                }),
+                conv.at(lit),
             }) );
             // begin = b_x(var) + ( b_y(lit) - b_y(var) )
             LenNode begin = LenNode(LenFormulaType::PLUS, { 
@@ -309,14 +349,25 @@ namespace smt::noodler {
         auto in_formula_case4 = [&](const BasicTerm& var, const zstring& lit) -> LenNode {
             LenNode pre1(LenFormulaType::AND);
             //  b_y(lit) <= b_y(var)
+            //  b_y(lit) - b_y(var) <= 0
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                begin_of(lit, source_var.get_name()),
-                begin_of(var.get_name(), source_var.get_name()), 
+                LenNode(LenFormulaType::MINUS, {
+                    begin_of(lit, source_var.get_name()),
+                    begin_of(var.get_name(), source_var.get_name()), 
+                }),
+                0
             }) );
             // b_y(var) + |var| <= b_y(lit) + |lit|
+            // b_y(var) + |var| - b_y(lit) <=  |lit|
             pre1.succ.push_back( LenNode(LenFormulaType::LEQ, { 
-                LenNode(LenFormulaType::PLUS, { begin_of(var.get_name(), source_var.get_name()), var }),
-                LenNode(LenFormulaType::PLUS, { begin_of(lit, source_var.get_name()), conv.at(lit) }), 
+                LenNode(LenFormulaType::PLUS, { 
+                    begin_of(var.get_name(), source_var.get_name()), 
+                    LenNode(LenFormulaType::MINUS, { 
+                        var, 
+                        begin_of(lit, source_var.get_name())
+                    }) 
+                }),
+                conv.at(lit)
             }) );
             // begin = b_x(var)
             LenNode begin = begin_of(var.get_name(), this->_name);
@@ -342,10 +393,10 @@ namespace smt::noodler {
         return formula;
     }
 
-    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last) const {
+    LenNode VarConstraint::generate_begin(const zstring& var_name, const BasicTerm& last, const std::map<zstring, BasicTerm>& lit_conversion) const {
         LenNode end_of_last = (last.get_type() == BasicTermType::Length)
             ? LenNode(0)
-            : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last});
+            : LenNode(LenFormulaType::PLUS, {begin_of(last.get_name(), this->_name), last.is_literal() ? lit_conversion.at(last.get_name()) : last});
 
         LenNode out = LenNode(LenFormulaType::EQ, {end_of_last, begin_of(var_name, this->_name)});
         return out;
@@ -376,6 +427,8 @@ namespace smt::noodler {
                     // parse constrained variables
                     // the variable X occurrs on the left side of some equation
                     if (pool.count(t) > 0) {
+                        // current block depends on a nested block represented by t
+                        this->depend_on_block_var.insert(t);
                         if (pool[t].parse(pool) == false) {
                             return false;	// There is a cycle
                         }
@@ -526,6 +579,10 @@ namespace smt::noodler {
                 return l_undef;	// We cannot solve this formula
             }
         }
+        this->len_model = LengthProcModel(this->pool, this->subst_map, this->init_aut_ass, multi_vars);
+        for(const BasicTerm& var : this->init_length_sensitive_vars) {
+            this->len_model.add_len_var(var);
+        }
 
         // Change if there is filler var filter
         for (const BasicTerm& v : this->formula.get_vars()) {
@@ -593,13 +650,16 @@ namespace smt::noodler {
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities(); // only makes variable a literal or removes the disequation 
 
+        AutAssignment current_ass = prep_handler.get_aut_assignment();
+        mata::nfa::Nfa sigma_star = current_ass.sigma_star_automaton();
         // Underapproximate if it contains inequations
-        for (const BasicTerm& t : this->formula.get_vars()) {
-            if (prep_handler.get_aut_assignment().is_co_finite(t)) {
-                prep_handler.underapprox_languages();
+        for (const auto& [term, aut] : current_ass) {
+            // we skip sigma_star automata
+            if(current_ass.are_quivalent(term, sigma_star)) continue;
+            if (prep_handler.get_aut_assignment().is_co_finite(term)) {
+                prep_handler.underapprox_var_language(term);
                 this->precision = LenNodePrecision::UNDERAPPROX;
-                STRACE("str", tout << " - UNDERAPPROXIMATE languages\n";);
-                break;
+                STRACE("str", tout << term.to_string() << " - UNDERAPPROXIMATE languages\n";);
             }
         }
 
@@ -608,12 +668,22 @@ namespace smt::noodler {
         prep_handler.generate_identities();
         prep_handler.propagate_variables();
         prep_handler.remove_trivial();
-        
+
         // Refresh the instance
         this->formula = prep_handler.get_modified_formula();
         this->init_aut_ass = prep_handler.get_aut_assignment();
         this->init_length_sensitive_vars = prep_handler.get_len_variables();
         this->preprocessing_len_formula = prep_handler.get_len_formula();
+        this->subst_map = prep_handler.get_substitution_map();
+
+        // propagate_eps does not mark eps variables as length variables (it is fine). If we have such variables, 
+        // we need to add them to length variables explicitely (otherwise it causes probles in model generation). 
+        // We also need to add remaining free variables from aut_ass in order to get their models.
+        for(const auto& [term, aut] : this->init_aut_ass) {
+            if(term.is_variable()) {
+                this->init_length_sensitive_vars.insert(term);
+            }
+        }
 
         if(this->formula.get_predicates().size() > 0) {
             this->init_aut_ass.reduce(); // reduce all automata in the automata assignment
@@ -676,6 +746,326 @@ namespace smt::noodler {
 
         STRACE("str", tout << "True\n"; );
         return true;
+    }
+
+    zstring LengthDecisionProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if(!this->len_model.is_initialized()) {
+            this->len_model.compute_model(get_arith_model_of_var);
+        }
+        return this->len_model.get_var_model(var);
+    }
+
+    std::vector<BasicTerm> LengthDecisionProcedure::get_len_vars_for_model(const BasicTerm& str_var) {
+        return this->len_model.get_len_vars_for_model(str_var);
+    }
+
+
+    LengthProcModel::LengthProcModel(const ConstraintPool& block_pool, const SubstitutionMap& subst, const AutAssignment& aut_ass, const std::set<BasicTerm>& multi_var_set) : model(), subst_map(subst), aut_ass(aut_ass), block_pool(block_pool), multi_var_set(multi_var_set) {
+        std::set<BasicTerm> len_vars{};
+        this->lit_conversion = block_pool.get_lit_conversion();
+        this->block_models = std::map<BasicTerm, BlockModel>();
+        for(const auto& [block_var, var_constr] : block_pool) {
+            std::set<BasicTerm> terms{};
+            for (const Concat& con : var_constr.get_side_eqs()) {
+                for(const BasicTerm& bt : con) {
+                    terms.insert(bt);
+                }
+            }
+            // var_constr contains also literals from children blocks (those do not occurr in the equations of the block)
+            for(const zstring& lit : var_constr.get_lits()) {
+                terms.insert(BasicTerm(BasicTermType::Literal, lit));
+            }
+            for(const BasicTerm& bt : terms) {
+                if(bt.is_variable()) {
+                    len_vars.insert(bt);
+                }
+                len_vars.insert(begin_of(bt.get_name(), block_var.get_name()));
+            }
+            len_vars.insert(block_var);
+            this->block_models[block_var] = { "", terms };
+        }
+        this->length_vars = std::vector<BasicTerm>(len_vars.begin(), len_vars.end());
+    }
+
+    /**
+     * @brief Generate models for variable in the block given by @p block_var. (1) we take assignments 
+     * to multi vars (we assume that it was already set) and literals and create a model for @p block_var.
+     *  (2) we create models for each variable occurring in the block from @p block_var (by extracting 
+     * the model based on position and length of each variable). (3) if there is a block variable from 
+     * another block, set its value and recursively call generate_block_models to set values of their 
+     * variables.
+     * 
+     * @param block_var Block var
+     * @param block_model Block model to be set
+     * @param get_arith_model_of_var Length model of variables
+     */
+    void LengthProcModel::generate_block_models(const BasicTerm& block_var, BlockModel& block_model, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        // function storing str to solution_str from postion position
+        auto update_res = [&](std::vector<unsigned>& solution_str, const zstring& str, int position) -> void {
+            for(size_t i = 0; i < str.length(); i++) {
+                solution_str[position + i] = str[i];
+            }
+        };
+
+        // if we already set the variable model --> continue with the stored model
+        if(!this->model.contains(block_var)) {
+            // create model for block_var, based on positions of all literals
+            rational total_length = get_arith_model_of_var(block_var);
+            std::vector<unsigned> solution_str(total_length.get_int32());
+            for(size_t i = 0; i < total_length; i++) {
+                solution_str[i] = 97; // a
+            }
+
+            // we have a support for a single multi_var
+            // get model for the multi var and propagate them to the model of the block var (as literals)
+            if(this->multi_var_set.size() != 0) {
+                BasicTerm multi_var = *this->multi_var_set.begin();
+                zstring multi_var_model = this->model.at(multi_var);
+                int multi_var_pos = get_arith_model_of_var(begin_of(multi_var.get_name(), block_var.get_name())).get_int32();
+                update_res(solution_str, multi_var_model, multi_var_pos);
+            }
+            // filter literals and propagate them to the model of the block var
+            for(const BasicTerm& bt : block_model.terms) {
+                if(bt.is_variable()) continue;
+                int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+                zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
+                update_res(solution_str, lit_val, lit_pos);
+            }
+            // convert vector of numbers to zstring
+            block_model.solution = zstring(solution_str.size(), solution_str.data());
+            this->model[block_var] = block_model.solution;
+        } else {
+            block_model.solution = this->model[block_var];
+        }
+        // so-far solution_str contains solution for the block var
+        for(const BasicTerm& bt : block_model.terms) {
+            if(bt.is_literal()) continue;
+            if(this->model.contains(bt)) continue;
+
+            // for each variable computea the model from model of the block var
+            int var_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+            int var_length = get_arith_model_of_var(bt).get_int32();
+            zstring var_model = block_model.solution.extract(var_pos, var_length);
+            this->model[bt] = var_model;
+            // if we set a block variable, propagate the value to all variables in the block
+            if(this->block_models.contains(bt)) {
+                // in the successor block, we need to keep the model for the block var, which was set in this block
+                // we propagate values to the remaining variables in the successor block
+                generate_block_models(bt, this->block_models[bt], get_arith_model_of_var);
+            }
+        }
+    }
+
+    /**
+     * @brief Compute model for each variable in the system. (1) create model for multi vars (2) create models for blocks (starting with the
+     * root blocks --> they are recursively propagated the the successsor/dependent blocks). (3) create models for variables in the 
+     * substitution map (4) create models for remaining free variables.
+     * 
+     * @param get_arith_model_of_var Length model of variables
+     */
+    void LengthProcModel::compute_model(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        this->model.clear();
+
+        assign_multi_vars(get_arith_model_of_var);
+
+        std::set<BasicTerm> block_vars {};
+        // take all block variables
+        for(const auto& it : this->block_models) {
+            block_vars.insert(it.first);
+        }
+        // remove from block_vars variables that are dependent
+        // we keep only to top-level blocks
+        for(auto& [block_var, var_constraint] : this->block_pool) {
+            for(const BasicTerm& depend : var_constraint.get_dependencies()) {
+                block_vars.erase(depend);
+            }
+        }
+        // call a recursive procedure for abtaining model of block_var and all dependent blocks
+        for(const BasicTerm& block_var : block_vars) {
+            generate_block_models(block_var, this->block_models[block_var], get_arith_model_of_var);
+        }
+        // if there are variables with in the substittuion map with no model --> assign
+        assign_subst_map_vars(get_arith_model_of_var);
+        assign_free_vars(get_arith_model_of_var);
+    }
+
+    /**
+     * @brief Assign free variables. Variables that are free in the system (meaning that they are not in 
+     * the block system neither in substitution map) are assigned according to their length. The model is
+     * taken from the automata assignment. Although length procedure requires that all variables are 
+     * sigma-star, free variables may have arbitrary regex constraits. If the automaton is empty, error 
+     * is thrown (should not occur since after preprocessing we check if all variables in automata 
+     * assignment have nonempty language).
+     * 
+     * @param get_arith_model_of_var Length model of variables
+     */
+    void LengthProcModel::assign_free_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        for(const BasicTerm& var : this->length_vars) {
+            // already assigned model --> skip
+            if(this->model.contains(var)) continue;
+            if(!this->aut_ass.contains(var)) continue;
+
+            rational total_length = get_arith_model_of_var(var);
+            // intersection with automaton having 
+            mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+            auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
+            if(!maybe_word.has_value()) {
+                util::throw_error("empty NFA during the model generation");
+            }
+            mata::Word word = maybe_word.value();
+            zstring res = zstring(word.size(), word.data());
+            this->model[var] = res;
+        }
+    }
+
+    /**
+     * @brief Create models for variables in the substitution map (created in preprocessing).  
+     * 
+     * @param get_arith_model_of_var Length model of variables
+     */
+    void LengthProcModel::assign_subst_map_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        for(const auto& [term, subst] : this->subst_map) {
+            if(!term.is_variable()) continue;
+            this->model[term] = assign_subst_map_var(term, get_arith_model_of_var);
+        }
+    }
+
+    /**
+     * @brief Get model for variable from its automata assignment (respecting the computed length). 
+     * 
+     * @param var Variable
+     * @param get_arith_model_of_var Length model of variables
+     * @return zstring Word from automaton corresponding to @p var.
+     */
+    zstring LengthProcModel::assign_aut_ass_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        rational total_length = get_arith_model_of_var(var);
+        mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+        auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
+        if(!maybe_word.has_value()) {
+            util::throw_error("empty NFA during the model generation");
+        }
+        mata::Word word = maybe_word.value();
+        return zstring(word.size(), word.data());
+    }
+
+    /**
+     * @brief Assign model for variable @p var s.t. it is not in the block system but it is in the 
+     * substitution map. In that case we take the substitution (concat) and for each element we get its 
+     * model. It is either (a) literal --> direct value is given, (b) variable occurring in the 
+     * substitution map --> recursively we call assign_subst_map_var (there should not be cyclic 
+     * dependencies) (c) variable with already assigned model (e.g. from block system that is handled 
+     * before variables from the substitution map) (d) free variable in the system --> a word from 
+     * automaton is taken.
+     * 
+     * @param var Variable from the substitution map for getting a model
+     * @param get_arith_model_of_var Length model of variables
+     * @return zstring Model of @p var
+     */
+    zstring LengthProcModel::assign_subst_map_var(const BasicTerm& var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        Concat subst = this->subst_map.at(var);
+        zstring res = "";
+        for(const BasicTerm& term : subst) {
+            zstring val = "";
+            if(term.is_literal()) {
+                val = val + term.get_name();
+            } else {
+                // if the term is in the substitution map -> recursive call
+                if(this->subst_map.contains(term)) {
+                    val = assign_subst_map_var(term, get_arith_model_of_var);
+                // otherwise we take the already computed model
+                } else if(this->model.contains(term)) {
+                    val = this->model.at(term);
+                // or it is a free variable not occurring in the system solved by the length procedure
+                } else {
+                    val = assign_aut_ass_var(term, get_arith_model_of_var);
+                }
+            }
+            res = res + val;
+        }
+        return res;
+    }
+
+    /**
+     * @brief Assign model to multi var. So far we support only a single multi var (checked in the 
+     * compute_next_solution). First, a skeleton is obtained from each block containing the multi var. 
+     * Skeleton is an assignment of multi var based on literals positions s.t. the unassigned positions
+     * are marked by -1. Since the multi var contains completely misaligned literals, the skeletons 
+     * from each block are put together forming a model of the multi var.
+     * 
+     * @param get_arith_model_of_var Length model of variables
+     */
+    void LengthProcModel::assign_multi_vars(const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        if(this->multi_var_set.size() == 0) {
+            return;
+        }
+        BasicTerm multi_var = *this->multi_var_set.begin();
+        this->model[multi_var] = get_multivar_model(multi_var, get_arith_model_of_var);
+    }
+
+    /**
+     * @brief Get skeleton from block represented by @p block_var for the mutli var @p multi_var.
+     * The skeleton is computed: (1) get model for @p block_var (by getting positions of literals) but 
+     * keeping empty positions with -1. (2) get model for multivar based on its position in @p block_var.
+     * 
+     * @param block_var Block variable
+     * @param multi_var Multi var
+     * @param get_arith_model_of_var Length model of variables
+     * @return std::vector<long> Skeleton
+     */
+    std::vector<long> LengthProcModel::get_multivar_skeleton(const BasicTerm& block_var, const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        rational total_length = get_arith_model_of_var(block_var);
+        auto block_model = this->block_models.at(block_var);
+
+        std::vector<long> solution_str(total_length.get_int32());
+        for(size_t i = 0; i < total_length; i++) {
+            solution_str[i] = -1; 
+        }
+        // propagate each literal to the solution of the block
+        for(const BasicTerm& bt : block_model.terms) {
+            if(bt.is_variable()) continue;
+            int lit_pos = get_arith_model_of_var(begin_of(bt.get_name(), block_var.get_name())).get_int32();
+            zstring lit_val = this->lit_conversion.at(bt.get_name()).get_name();
+            for(size_t i = lit_pos; i < lit_pos + lit_val.length(); i++) {
+                solution_str[i] = lit_val[i - lit_pos];
+            }
+        }
+        // get skeleton for multivar
+        int var_pos = get_arith_model_of_var(begin_of(multi_var.get_name(), block_var.get_name())).get_int32();
+        int var_length = get_arith_model_of_var(multi_var).get_int32();
+        return std::vector<long>(solution_str.begin()+var_pos, solution_str.begin()+var_pos+var_length);
+    }
+
+    /**
+     * @brief Get model for multi var @p multi_var. Iterate through all blocks and if there is a multi 
+     * var, get its skeleton and merge them together. 
+     * 
+     * @param multi_var Multi var
+     * @param get_arith_model_of_var Length model of variables
+     * @return zstring Model of @p multi_var
+     */
+    zstring LengthProcModel::get_multivar_model(const BasicTerm& multi_var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
+        std::vector<long> res_skeleton(get_arith_model_of_var(multi_var).get_int32());
+        for(const auto& [block_var, var_constr] : this->block_pool) {
+            if(var_constr.get_vars().contains(multi_var)) {
+                std::vector<long> act_skeleton = get_multivar_skeleton(block_var, multi_var, get_arith_model_of_var);
+                // the vectors should have the same size
+                for(size_t i = 0; i < res_skeleton.size(); i++) {
+                    if(act_skeleton[i] != -1) {
+                        res_skeleton[i] = act_skeleton[i];
+                    }
+                }
+            }
+        }
+        // each free place marked by -1 replace by "a"
+        zstring solution = "";
+        for(size_t i = 0; i < res_skeleton.size(); i++) {
+            if(res_skeleton[i] != -1) {
+                solution = solution + zstring(unsigned(res_skeleton[i]));
+            } else {
+                solution = solution + "a";
+            }
+        }
+        return solution;
     }
 
 }

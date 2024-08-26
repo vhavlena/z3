@@ -784,18 +784,20 @@ namespace smt::noodler {
 
     lbool theory_str_noodler::run_length_proc(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         STRACE("str", tout << "Trying length-based procedure" << std::endl);
-        LengthDecisionProcedure nproc(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        // we need a method get_formula from LengthDecisionProcedure
+        std::shared_ptr<LengthDecisionProcedure> len_dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
+        dec_proc = len_dec_proc;
         expr_ref block_len(m.mk_false(), m);
-        if (nproc.preprocess() == l_false) {
+        if (dec_proc->preprocess() == l_false) {
             STRACE("str", tout << "len: unsat from preprocessing\n");
             block_curr_len(block_len);
             return l_false;
         }
-        nproc.init_computation();
+        dec_proc->init_computation();
         
-        lbool result = nproc.compute_next_solution();
+        lbool result = dec_proc->compute_next_solution();
         if (result == l_true) {
-            auto [formula, precision] = nproc.get_lengths();
+            auto [formula, precision] = dec_proc->get_lengths();
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
                 sat_handling(lengths);
@@ -807,11 +809,13 @@ namespace smt::noodler {
                 if (precision != LenNodePrecision::UNDERAPPROX) {
                     block_curr_len(lengths);
                     return l_false;
-                } else if (nproc.get_formula().get_predicates().size() > 10) {
+                } 
+                else if (len_dec_proc->get_formula().get_predicates().size() > 10) {
                     ctx.get_fparams().is_underapprox = true;
                     block_curr_len(expr_ref(m.mk_false(), m));
                     return l_false;
-                } else {
+                } 
+                else {
                     return l_undef;
                 }
             }

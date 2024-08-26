@@ -231,6 +231,17 @@ namespace smt::noodler {
         }
 
         /**
+         * @brief Check if automaton of the @p t is equivalent to the NFA @p aut
+         * 
+         * @param t Variable
+         * @param aut NFA to be compared
+         * @return true <-> L(t) = L(aut)
+         */
+        bool are_quivalent(const BasicTerm& t, const mata::nfa::Nfa& aut) const {
+            return mata::nfa::are_equivalent(*this->at(t), aut);
+        }
+
+        /**
          * @brief Check if the given terms have disjoint languages.
          * 
          * @param t1 First term

@@ -119,6 +119,7 @@ namespace smt::noodler {
     //----------------------------------------------------------------------------------------------------------------------------------
 
     using ConcatGraphEdges = std::map<std::pair<BasicTerm,BasicTerm>, unsigned>;
+    using SubstitutionMap = std::unordered_map<BasicTerm, std::vector<BasicTerm>>;
 
     /**
      * @brief Concatenation graph. Oriented graph where each term (literal/variable) is node and two terms
@@ -312,7 +313,7 @@ namespace smt::noodler {
 
         // same meaning as in SolvingState (see decision_procedure.h)
         AutAssignment aut_ass;
-        std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
+        SubstitutionMap substitution_map;
 
         // keeps equations that were removed during preprocessing as inclusions that are needed to generate model
         // (the variables on the right should be propagated from the left variables during model generation)
@@ -348,8 +349,6 @@ namespace smt::noodler {
         bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
-        std::string print_info(bool print_nfas = false);
-
 
     public:
         FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par, std::unordered_set<BasicTerm> conversion_vars) :
@@ -367,7 +366,7 @@ namespace smt::noodler {
         void get_regular_sublists(std::map<Concat, unsigned>& res) const;
         void get_eps_terms(std::set<BasicTerm>& res) const;
         const AutAssignment& get_aut_assignment() const { return this->aut_ass; }
-        const std::unordered_map<BasicTerm, std::vector<BasicTerm>>& get_substitution_map() const { return this->substitution_map; }
+        const SubstitutionMap& get_substitution_map() const { return this->substitution_map; }
         const Dependency& get_dependency() const { return this->dependency; }
         Dependency get_flat_dependency() const;
         void add_to_len_formula(LenNode len_to_add) { len_formula.succ.push_back(std::move(len_to_add)); }
@@ -393,6 +392,7 @@ namespace smt::noodler {
         void common_suffix_propagation();
         void conversions_validity(std::vector<TermConversion>& conversions);
 
+        void underapprox_var_language(const BasicTerm& var);
         void refine_languages();
         void reduce_diseqalities();
 
@@ -431,6 +431,8 @@ namespace smt::noodler {
             this->formula.add_predicate(pred, index);
         }
         void clean_varmap() { this->formula.clean_varmap(); };
+
+        std::string print_info(bool print_nfas = false);
     };
 
 

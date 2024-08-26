@@ -58,7 +58,6 @@ If you want to get a model for sat instances (using `get-model` or `get-value`),
 cd build/
 ./z3 model=true <instance_file.smt2> 
 ```
-However, model generation is highly experimental, the models might be invalid or they cannot be computed (yet).
 
 To run tests for Z3-Noodler, execute
 ```shell
