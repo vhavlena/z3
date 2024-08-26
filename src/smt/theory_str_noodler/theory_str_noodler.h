@@ -62,9 +62,13 @@ namespace smt::noodler {
          * @brief Statistics for noodler.
          */
         struct stats {
-            unsigned num_underapprox = 0;
-            unsigned num_stabilization = 0;
-            unsigned num_nielsen = 0;
+            unsigned num_proc_underapprox = 0; // underapprox of the stabilization-based procedure
+            unsigned num_proc_stabilization = 0; // stabilization-based procedure
+            unsigned num_proc_nielsen = 0; // nielsen procedure
+            unsigned num_proc_length = 0; // length-based procedure
+            unsigned num_proc_unary = 0; // unary decision procedure
+            unsigned num_proc_single_memb_heur = 0; // membership heuristic
+            unsigned num_proc_multi_memb_heur = 0; // multiple memberhip heuritstic
         };
 
         int m_scope_level = 0;

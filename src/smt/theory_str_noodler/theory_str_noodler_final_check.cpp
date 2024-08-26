@@ -109,6 +109,7 @@ namespace smt::noodler {
                     std::get<2>(reg_data),
                     m_util_s, m
                 );
+                this->statistics.num_proc_single_memb_heur++;
                 lbool result = dec_proc->compute_next_solution();
                 if(result == l_true) {
                     return FC_DONE;
@@ -253,7 +254,7 @@ namespace smt::noodler {
 
         STRACE("str", tout << "Starting main decision procedure" << std::endl);
         dec_proc->init_computation();
-        this->statistics.num_stabilization++;
+        this->statistics.num_proc_stabilization++;
 
         expr_ref block_len(m.mk_false(), m);
         while (true) {
@@ -629,7 +630,7 @@ namespace smt::noodler {
         }
 
         dec_proc->init_computation();
-        this->statistics.num_underapprox++;
+        this->statistics.num_proc_underapprox++;
 
         while(dec_proc->compute_next_solution() == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
@@ -761,7 +762,7 @@ namespace smt::noodler {
         dec_proc->preprocess();
         expr_ref block_len(m.mk_false(), m);
         dec_proc->init_computation();
-        this->statistics.num_nielsen++;
+        this->statistics.num_proc_nielsen++;
 
         while (true) {
             lbool result = dec_proc->compute_next_solution();
@@ -792,6 +793,7 @@ namespace smt::noodler {
         // we need a method get_formula from LengthDecisionProcedure
         std::shared_ptr<LengthDecisionProcedure> len_dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         dec_proc = len_dec_proc;
+        this->statistics.num_proc_length++;
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
             STRACE("str", tout << "len: unsat from preprocessing\n");
@@ -901,6 +903,7 @@ namespace smt::noodler {
         }
 
         dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m);
+        this->statistics.num_proc_multi_memb_heur++;
         return dec_proc->compute_next_solution();
     }
 
@@ -958,6 +961,7 @@ namespace smt::noodler {
 
         dec_proc = std::make_shared<UnaryDecisionProcedure>(instance, aut_ass, m_params);
         expr_ref lengths(m.mk_true(), m); // it is assumed that lenght formulas from equations were added in new_eq_eh, so we can just have 'true'
+        this->statistics.num_proc_unary++;
         if(check_len_sat(lengths, nullptr) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);
             block_curr_len(lengths, true, true);
