@@ -69,6 +69,7 @@ namespace smt::noodler {
             unsigned num_proc_unary = 0; // unary decision procedure
             unsigned num_proc_single_memb_heur = 0; // membership heuristic
             unsigned num_proc_multi_memb_heur = 0; // multiple memberhip heuritstic
+            unsigned num_solved_preprocess = 0; // number of instances solved by preprocessing
         };
 
         int m_scope_level = 0;

@@ -233,6 +233,7 @@ namespace smt::noodler {
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
         if (result == l_false) {
+            this->statistics.num_solved_preprocess++;
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
             return FC_CONTINUE;
@@ -626,6 +627,7 @@ namespace smt::noodler {
                                                 std::vector<TermConversion> conversions) {
         dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
+            this->statistics.num_solved_preprocess++;
             return l_false;
         }
 
@@ -793,13 +795,15 @@ namespace smt::noodler {
         // we need a method get_formula from LengthDecisionProcedure
         std::shared_ptr<LengthDecisionProcedure> len_dec_proc = std::make_shared<LengthDecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         dec_proc = len_dec_proc;
-        this->statistics.num_proc_length++;
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
+            this->statistics.num_solved_preprocess++;
             STRACE("str", tout << "len: unsat from preprocessing\n");
             block_curr_len(block_len);
             return l_false;
         }
+
+        this->statistics.num_proc_length++;
         dec_proc->init_computation();
         
         lbool result = dec_proc->compute_next_solution();

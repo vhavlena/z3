@@ -126,13 +126,14 @@ namespace smt::noodler {
 
     void theory_str_noodler::collect_statistics(::statistics & st) const {
         STRACE("str", tout << "collecting statistics" << std::endl;);
-        st.update("num-proc-underapprox", this->statistics.num_proc_underapprox);
-        st.update("num-proc-stabilization", this->statistics.num_proc_stabilization);
-        st.update("num-proc-nielsen", this->statistics.num_proc_nielsen);
-        st.update("num-proc-length", this->statistics.num_proc_length);
-        st.update("num-proc-unary", this->statistics.num_proc_unary);
-        st.update("num-proc-single-memb-heur", this->statistics.num_proc_single_memb_heur);
-        st.update("num-proc-multi-memb-heur", this->statistics.num_proc_multi_memb_heur);
+        st.update("str-num-proc-underapprox", this->statistics.num_proc_underapprox);
+        st.update("str-num-proc-stabilization", this->statistics.num_proc_stabilization);
+        st.update("str-num-proc-nielsen", this->statistics.num_proc_nielsen);
+        st.update("str-num-proc-length", this->statistics.num_proc_length);
+        st.update("str-num-proc-unary", this->statistics.num_proc_unary);
+        st.update("str-num-proc-single-memb-heur", this->statistics.num_proc_single_memb_heur);
+        st.update("str-num-proc-multi-memb-heur", this->statistics.num_proc_multi_memb_heur);
+        st.update("str-num-solved-preprocess", this->statistics.num_solved_preprocess);
     }
 
     void theory_str_noodler::init_search_eh() {
