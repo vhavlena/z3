@@ -74,6 +74,7 @@ str.replace_re_all
 Furthermore, we do not support string variables as arguments of `str.to_re` and `re.range`.
 
 ## Publications
+- V. Havlena, L. Holík, O. Lengál, and J. Síč. [Cooking String-Integer Conversions with Noodles](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SAT.2024.14). In *Proc. of SAT'24*, LIPIcs, Volume 305, pp. 14:1-14:19, 2024. Schloss Dagstuhl – Leibniz-Zentrum für Informatik.
 - Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Z3-Noodler: An Automata-based String Solver](https://doi.org/10.1007/978-3-031-57246-3_2). In *Proc. of TACAS'24*, volume 14570 of LNCS, pages 24-33, 2024. Springer. 
 - Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Solving String Constraints with Lengths by Stabilization](https://doi.org/10.1145/3622872). In *Proc. of OOPSLA'23*, Volume 7, Issue OOPSLA2, pages  2112–2141, 2023. ACM.
 - F. Blahoudek, Y. Chen, D. Chocholatý, V. Havlena, L. Holík, O. Lengál, and J. Síč. [Word Equations in Synergy with Regular Constraints](https://doi.org/10.1007/978-3-031-27481-7_23).  In *Proc. of FM’23*, volume 14000 of LNCS, pages 403–423, 2023. Springer.
