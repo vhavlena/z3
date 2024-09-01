@@ -2119,10 +2119,6 @@ namespace smt::noodler {
      * of the term and puts them in m_conversion_todo.
      */
     void theory_str_noodler::handle_conversion(expr *conversion) {
-        if(axiomatized_persist_terms.contains(conversion))
-            return;
-        axiomatized_persist_terms.insert(conversion);
-
         expr *arg = nullptr;
 
         ConversionType type;
