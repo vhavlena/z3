@@ -241,6 +241,7 @@ namespace smt::noodler {
 
         // instance is length unsat --> generate theory lemma
         if(length_unsat) {
+            this->statistics.num_solved_preprocess++;
             block_curr_len(lengths, true, true);
             return FC_CONTINUE;
         }
@@ -248,6 +249,7 @@ namespace smt::noodler {
         // length constraints from initial assignment
         lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
+            this->statistics.num_solved_preprocess++;
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths, true, true);
             return FC_CONTINUE;
