@@ -61,14 +61,20 @@ namespace smt::noodler {
         /**
          * @brief Statistics for noodler.
          */
+
+        struct DecProcStats {
+            unsigned num_start = 0; // number of times the procedure was started
+            unsigned num_finish = 0; // number of times the procedure gave an answer (no undef)
+        };
+
         struct stats {
-            unsigned num_proc_underapprox = 0; // underapprox of the stabilization-based procedure
-            unsigned num_proc_stabilization = 0; // stabilization-based procedure
-            unsigned num_proc_nielsen = 0; // nielsen procedure
-            unsigned num_proc_length = 0; // length-based procedure
-            unsigned num_proc_unary = 0; // unary decision procedure
-            unsigned num_proc_single_memb_heur = 0; // membership heuristic
-            unsigned num_proc_multi_memb_heur = 0; // multiple memberhip heuritstic
+            DecProcStats stat_proc_underapprox = {}; // underapprox of the stabilization-based procedure
+            DecProcStats stat_proc_stabilization = {}; // stabilization-based procedure
+            DecProcStats stat_proc_nielsen = {}; // nielsen procedure
+            DecProcStats stat_proc_length = {}; // length-based procedure
+            DecProcStats stat_proc_unary = {}; // unary decision procedure
+            DecProcStats stat_proc_single_memb_heur = {}; // membership heuristic
+            DecProcStats stat_proc_multi_memb_heur = {}; // multiple memberhip heuritstic
             unsigned num_solved_preprocess = 0; // number of instances solved by preprocessing
         };
 

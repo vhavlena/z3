@@ -126,13 +126,20 @@ namespace smt::noodler {
 
     void theory_str_noodler::collect_statistics(::statistics & st) const {
         STRACE("str", tout << "collecting statistics" << std::endl;);
-        st.update("str-num-proc-underapprox", this->statistics.num_proc_underapprox);
-        st.update("str-num-proc-stabilization", this->statistics.num_proc_stabilization);
-        st.update("str-num-proc-nielsen", this->statistics.num_proc_nielsen);
-        st.update("str-num-proc-length", this->statistics.num_proc_length);
-        st.update("str-num-proc-unary", this->statistics.num_proc_unary);
-        st.update("str-num-proc-single-memb-heur", this->statistics.num_proc_single_memb_heur);
-        st.update("str-num-proc-multi-memb-heur", this->statistics.num_proc_multi_memb_heur);
+        st.update("str-num-proc-underapprox-start", this->statistics.stat_proc_underapprox.num_start);
+        st.update("str-num-proc-underapprox-finish", this->statistics.stat_proc_underapprox.num_finish);
+        st.update("str-num-proc-stabilization-start", this->statistics.stat_proc_stabilization.num_start);
+        st.update("str-num-proc-stabilization-finish", this->statistics.stat_proc_stabilization.num_finish);
+        st.update("str-num-proc-nielsen-start", this->statistics.stat_proc_nielsen.num_start);
+        st.update("str-num-proc-nielsen-finish", this->statistics.stat_proc_nielsen.num_finish);
+        st.update("str-num-proc-length-start", this->statistics.stat_proc_length.num_start);
+        st.update("str-num-proc-length-finish", this->statistics.stat_proc_length.num_finish);
+        st.update("str-num-proc-unary-start", this->statistics.stat_proc_unary.num_start);
+        st.update("str-num-proc-unary-finish", this->statistics.stat_proc_unary.num_finish);
+        st.update("str-num-proc-single-memb-heur-start", this->statistics.stat_proc_single_memb_heur.num_start);
+        st.update("str-num-proc-single-memb-heur-finish", this->statistics.stat_proc_single_memb_heur.num_finish);
+        st.update("str-num-proc-multi-memb-heur-start", this->statistics.stat_proc_multi_memb_heur.num_start);
+        st.update("str-num-proc-multi-memb-heur-finish", this->statistics.stat_proc_multi_memb_heur.num_finish);
         st.update("str-num-solved-preprocess", this->statistics.num_solved_preprocess);
     }
 
