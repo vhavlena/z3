@@ -58,6 +58,26 @@ namespace smt::noodler {
             // TODO we could also keep here the decision procedure and immediately get the model when loop protection gets sat
         };
 
+        /**
+         * @brief Statistics for noodler.
+         */
+
+        struct DecProcStats {
+            unsigned num_start = 0; // number of times the procedure was started
+            unsigned num_finish = 0; // number of times the procedure gave an answer (no undef)
+        };
+
+        struct stats {
+            DecProcStats stat_proc_underapprox = {}; // underapprox of the stabilization-based procedure
+            DecProcStats stat_proc_stabilization = {}; // stabilization-based procedure
+            DecProcStats stat_proc_nielsen = {}; // nielsen procedure
+            DecProcStats stat_proc_length = {}; // length-based procedure
+            DecProcStats stat_proc_unary = {}; // unary decision procedure
+            DecProcStats stat_proc_single_memb_heur = {}; // membership heuristic
+            DecProcStats stat_proc_multi_memb_heur = {}; // multiple memberhip heuritstic
+            unsigned num_solved_preprocess = 0; // number of instances solved by preprocessing
+        };
+
         int m_scope_level = 0;
         const theory_str_noodler_params& m_params;
         th_rewriter m_rewrite;
@@ -121,6 +141,9 @@ namespace smt::noodler {
         // the length formula from the last run that was sat
         expr_ref sat_length_formula;
 
+        // statistics
+        stats statistics {};
+
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
         std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat
@@ -154,6 +177,13 @@ namespace smt::noodler {
         void init_model(model_generator& m) override;
         void finalize_model(model_generator& mg) override;
         lbool validate_unsat_core(expr_ref_vector& unsat_core) override;
+
+        /**
+         * @brief Collect statistics (called at the end of the run)
+         * 
+         * @param st 
+         */
+        void collect_statistics(::statistics & st) const override;
 
         // FIXME ensure_enode is non-virtual function of theory, why are we redegfining it?
         enode* ensure_enode(expr* e);
