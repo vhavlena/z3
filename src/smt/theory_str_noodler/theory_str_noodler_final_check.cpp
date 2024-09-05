@@ -190,8 +190,6 @@ namespace smt::noodler {
 
         // we do not put into dec_proc directly, because we might do underapproximation that saves into dec_proc
         std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
-        // is formula length unsatisfiable?
-        bool length_unsat = false;
 
         // the skip_len_sat preprocessing rule requires that the input formula is length satisfiable
         // --> before we apply the preprocessing, we need to be sure that it is indeed true.
@@ -202,10 +200,16 @@ namespace smt::noodler {
         expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
-            // we postpone the decision. If the instance is both length unsatisfiable and 
-            // unsatisfiable from preprocessing, we want to kill it after preprocessing as it
-            //  generates stronger theory lemma (negation of the string part).
-            length_unsat = true;
+            this->statistics.num_solved_preprocess++;
+            // If the instance is both length unsatisfiable and unsatisfiable from preprocessing,
+            // we want to kill it after preprocessing as it generates stronger theory lemma (negation of the string part).
+            lbool result = main_dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
+            if (result == l_false) {
+                block_curr_len(expr_ref(m.mk_false(), m), false, true);
+            } else {
+                block_curr_len(lengths, true, true);
+            }
+            return FC_CONTINUE;
         }
 
         // now we know that the initial formula is length-satisfiable
@@ -220,7 +224,7 @@ namespace smt::noodler {
         }
 
         // try underapproximation (if enabled) to solve
-        if(!length_unsat && m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment, conversions)) {
+        if(m_params.m_underapproximation && is_underapprox_suitable(instance, aut_assignment, conversions)) {
             STRACE("str", tout << "Try underapproximation" << std::endl);
             if (solve_underapprox(instance, aut_assignment, init_length_sensitive_vars, conversions) == l_true) {
                 STRACE("str", tout << "Sat from underapproximation" << std::endl;);
@@ -240,12 +244,6 @@ namespace smt::noodler {
             return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
-        // instance is length unsat --> generate theory lemma
-        if(length_unsat) {
-            this->statistics.num_solved_preprocess++;
-            block_curr_len(lengths, true, true);
-            return FC_CONTINUE;
-        }
         // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
         // length constraints from initial assignment
         lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
