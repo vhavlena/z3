@@ -310,10 +310,14 @@ namespace smt::noodler {
         std::vector<std::pair<size_t, Predicate>> regs;
         this->formula.get_side_regulars(regs);
         std::deque<std::pair<size_t, Predicate>> worklist(regs.begin(), regs.end());
+        // keeps the ids of removed equations
+        std::set<size_t> removed;
 
         while(!worklist.empty()) {
             std::pair<size_t, Predicate> pr = worklist.front();
             worklist.pop_front();
+
+            if (removed.contains(pr.first)) continue; // if the equation was already removed, we do not remove it again
 
             STRACE("str-prep-remove_regular", tout << "Remove regular:" << pr.second << std::endl;);
 
@@ -354,6 +358,7 @@ namespace smt::noodler {
             }
 
             this->formula.remove_predicate(pr.first);
+            removed.insert(pr.first);
             STRACE("str-prep-remove_regular", tout << "removed" << std::endl;);
 
             // check if by removing the regular equation, some other equations did not become regular
