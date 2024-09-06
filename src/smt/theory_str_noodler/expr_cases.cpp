@@ -110,9 +110,26 @@ bool is_len_num_leq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_u
 
 bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s) {
     expr *at_str, *at_pos;
-    if(m_util_s.str.is_at(index_param, at_str, at_pos) && index_str->hash() == at_str->hash()) {
+    if (m_util_s.str.is_at(index_param, at_str, at_pos) && index_str->hash() == at_str->hash()) {
         return true;
     }
+    return false;
+}
+
+bool has_quantifier(expr* e, ast_manager& m) {
+    if (is_quantifier(e)) {
+        return true;
+    }
+    if (is_app(e)) {
+        app *app_term = to_app(e);
+        unsigned num_args = app_term->get_num_args();
+        for (unsigned i = 0; i < num_args; i++) {
+            if (has_quantifier(app_term->get_arg(i), m)) {
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
