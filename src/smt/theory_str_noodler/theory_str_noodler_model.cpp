@@ -88,10 +88,13 @@ namespace smt::noodler {
         concat_var_value_proc(expr* str_concat, ast_manager& m, context& ctx, seq_util& m_util_s) : m_util_s(m_util_s) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
             expr_ref_vector concats(m);
+            STRACE("str-model-concat", tout << "Dependencies for concat " << mk_pp(str_concat, m) << " (#" << ctx.get_enode(str_concat)->get_owner_id() << "):";);
             m_util_s.str.get_concat(str_concat, concats);
             for (auto concat : concats) {
+                STRACE("str-model-concat", tout << " " << mk_pp(concat, m) << " (#" << ctx.get_enode(concat)->get_root()->get_owner_id() << ")";);
                 m_dependencies.push_back(model_value_dependency(ctx.get_enode(concat)));
             }
+            STRACE("str-model-concat", tout << "\n";);
         }
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
@@ -148,6 +151,13 @@ namespace smt::noodler {
         } else if (util::is_str_variable(tgt, m_util_s)) {
             return model_of_string_var(tgt);
         } else if (m_util_s.str.is_concat(tgt)) {
+            enode* e = ctx.get_enode(tgt);
+            for (auto i = e->begin(); i != e->end(); ++i) {
+                app* asef = (*i)->get_expr();
+                if (m_util_s.str.is_string(asef)) {
+                    return alloc(expr_wrapper_proc, asef);
+                }
+            }
             return alloc(concat_var_value_proc, tgt, m, ctx, m_util_s);
         } else {
             // for complex string functions (nothing else should be able to come into mk_value), we should be able to find vars that replace them in predicate_replace
