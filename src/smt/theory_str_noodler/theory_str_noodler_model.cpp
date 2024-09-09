@@ -88,11 +88,17 @@ namespace smt::noodler {
         concat_var_value_proc(expr* str_concat, ast_manager& m, context& ctx, seq_util& m_util_s) : m_util_s(m_util_s) {
             // for concatenation, we just recursively get the models for arguments and then concatenate them
             expr_ref_vector concats(m);
-            STRACE("str-model-concat", tout << "Dependencies for concat " << mk_pp(str_concat, m) << " (#" << ctx.get_enode(str_concat)->get_owner_id() << "):";);
+            enode* str_concat_enode = ctx.get_enode(str_concat);
+            STRACE("str-model-concat", tout << "Dependencies for concat " << mk_pp(str_concat, m) << " (#" << str_concat_enode->get_owner_id() << "):";);
             m_util_s.str.get_concat(str_concat, concats);
             for (auto concat : concats) {
-                STRACE("str-model-concat", tout << " " << mk_pp(concat, m) << " (#" << ctx.get_enode(concat)->get_root()->get_owner_id() << ")";);
-                m_dependencies.push_back(model_value_dependency(ctx.get_enode(concat)));
+                enode* concat_enode = ctx.get_enode(concat);
+                STRACE("str-model-concat", tout << " " << mk_pp(concat, m) << " (#" << concat_enode->get_root()->get_owner_id() << ")";);
+                if (concat_enode->get_root() == str_concat_enode) {
+                    // this should not happen
+                    util::throw_error("Enode for some concatenation is the representant of enode of one of its arguments");
+                }
+                m_dependencies.push_back(model_value_dependency(concat_enode));
             }
             STRACE("str-model-concat", tout << "\n";);
         }
