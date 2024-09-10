@@ -157,11 +157,13 @@ namespace smt::noodler {
         } else if (util::is_str_variable(tgt, m_util_s)) {
             return model_of_string_var(tgt);
         } else if (m_util_s.str.is_concat(tgt)) {
-            enode* e = ctx.get_enode(tgt);
-            for (auto i = e->begin(); i != e->end(); ++i) {
-                app* asef = (*i)->get_expr();
-                if (m_util_s.str.is_string(asef)) {
-                    return alloc(expr_wrapper_proc, asef);
+            // check if tgt is not in a class of enodes that contain some string literal (see PR #174)
+            enode* tgt_enode = ctx.get_enode(tgt);
+            for (auto tgt_enode_it = tgt_enode->begin(); i != tgt_enode->end(); ++tgt_enode_it) {
+                app* cur_app = (*tgt_enode_it)->get_expr();
+                if (m_util_s.str.is_string(cur_app)) {
+                    // if the class contains string literal, return it directly
+                    return alloc(expr_wrapper_proc, cur_app);
                 }
             }
             return alloc(concat_var_value_proc, tgt, m, ctx, m_util_s);
