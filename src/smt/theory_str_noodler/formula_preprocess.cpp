@@ -1162,8 +1162,12 @@ namespace smt::noodler {
                             len_variables.insert(right_var);
                         }
                     }
+
+                    continue; // we removed the equation, continue with next predicate
                 }
-            } else if(this->formula.single_occurr(pr.second.get_right_set())
+            }
+            
+            if(this->formula.single_occurr(pr.second.get_right_set())
                 && set_disjoint(this->conversion_vars, pr.second.get_side_vars(Predicate::EquationSideType::Right))) {
                 auto right_set = pr.second.get_right_set();
                 if(right_set.size() > 0 && is_sigma_star(right_set)) {
