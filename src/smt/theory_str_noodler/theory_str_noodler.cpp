@@ -189,7 +189,7 @@ namespace smt::noodler {
         if(init && m.is_eq(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
-        // we need to propagate not(prefix) and not(suffix) before the actual solve (in init_search), because we need to ensure these axioms are 
+        // we need to propagate prefix, suffix, and contains (including their negated forms) before the actual solve (in init_search), because we need to ensure these axioms are 
         // generated only once on the decision level 0 (if they are generated on a higher level, they are removed after pop)
         if(init && m_util_s.str.is_prefix(expr)) {
             if(neg) ctx.mark_as_relevant(m.mk_not(expr));
