@@ -189,17 +189,18 @@ namespace smt::noodler {
         if(init && m.is_eq(expr) && neg) {
             ctx.mark_as_relevant(m.mk_not(expr));
         }
-        // we need to propagate prefix, suffix, and contains (including their negated forms) before the actual solve (in init_search), because we need to ensure these axioms are 
+        // we need to propagate all string predicates (including their negated forms) before the actual solve (in init_search), because we need to ensure these axioms are 
         // generated only once on the decision level 0 (if they are generated on a higher level, they are removed after pop)
-        if(init && m_util_s.str.is_prefix(expr)) {
-            if(neg) ctx.mark_as_relevant(m.mk_not(expr));
-            else ctx.mark_as_relevant(expr);
-        }
-        if(init && m_util_s.str.is_suffix(expr)) {
-            if(neg) ctx.mark_as_relevant(m.mk_not(expr));
-            else ctx.mark_as_relevant(expr);
-        }
-        if(init && m_util_s.str.is_contains(expr)) {
+        if(init && (
+                m_util_s.str.is_prefix(expr) ||
+                m_util_s.str.is_suffix(expr) ||
+                m_util_s.str.is_contains(expr) ||
+                m_util_s.str.is_is_digit(expr) ||
+                m_util_s.str.is_stoi(expr) ||
+                m_util_s.str.is_itos(expr) ||
+                m_util_s.str.is_le(expr) ||
+                m_util_s.str.is_lt(expr)
+            )) {
             if(neg) ctx.mark_as_relevant(m.mk_not(expr));
             else ctx.mark_as_relevant(expr);
         }
@@ -2141,6 +2142,10 @@ namespace smt::noodler {
      * of the term and puts them in m_conversion_todo.
      */
     void theory_str_noodler::handle_conversion(expr *conversion) {
+        if(axiomatized_persist_terms.contains(conversion))
+            return;
+        axiomatized_persist_terms.insert(conversion);
+
         expr *arg = nullptr;
 
         ConversionType type;
