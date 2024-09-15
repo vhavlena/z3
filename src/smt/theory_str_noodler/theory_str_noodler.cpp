@@ -2183,6 +2183,7 @@ namespace smt::noodler {
             } else if(this->predicate_replace.contains(arg)) {
                 // argument is some function that already has a replacing variable
                 z3_var_for_arg = this->predicate_replace[arg];
+                add_axiom({mk_literal(m.mk_eq(arg, z3_var_for_arg))});
             } else {
                 // argument does not have a replacing variable (probably concatenation)
                 // we need to create one
