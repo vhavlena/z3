@@ -2196,6 +2196,9 @@ namespace smt::noodler {
             // we need exact solution for the argument, so that we can compute
             // the arithmetic formula for the result in final_check_eh
             len_vars.insert(z3_var_for_arg);
+            if(!ctx.e_internalized(m_util_s.str.mk_length(z3_var_for_arg))) {
+                ctx.internalize(m_util_s.str.mk_length(z3_var_for_arg), false);
+            }
         }
 
         // create var for the result
@@ -2205,6 +2208,9 @@ namespace smt::noodler {
             add_axiom({mk_literal(m.mk_eq(z3_var_for_conversion, conversion))});
             this->predicate_replace.insert(conversion, z3_var_for_conversion);
             len_vars.insert(z3_var_for_conversion); // dunno if this is needed
+            if(!ctx.e_internalized(m_util_s.str.mk_length(z3_var_for_conversion))) {
+                ctx.internalize(m_util_s.str.mk_length(z3_var_for_conversion), false);
+            }
             var_for_conversion = util::get_variable_basic_term(z3_var_for_conversion);
             var_name.insert({var_for_conversion, z3_var_for_conversion}); // I have no idea why I am doing this, but it is probably important
 
