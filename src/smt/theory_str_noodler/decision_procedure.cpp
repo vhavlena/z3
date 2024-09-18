@@ -1632,13 +1632,13 @@ namespace smt::noodler {
             return model_of_var.at(var);
         }
 
-        if (vars_whose_model_we_are_computing.contains(var)) {
-            util::throw_error("There is cycle in inclusion graph, cannot produce model");
-        }
-
         STRACE("str-model",
             tout << "Generating model for var " << var << "\n";
         );
+
+        if (vars_whose_model_we_are_computing.contains(var)) {
+            util::throw_error("There is cycle in inclusion graph, cannot produce model");
+        }
 
         vars_whose_model_we_are_computing.insert(var);
 
