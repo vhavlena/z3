@@ -216,10 +216,11 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Check if the automaton accepts only a single word. It is only underapproximation,
-         * as is_singleton is false for the NFA p1 -a-> p2, q1 -a-> q2 where p1, q1 are initial and p2, q2 are final.
-         * To get a precise information, the determinization+minimization might be necessary, which is often 
-         * expensive. 
+         * @brief Check if the automaton for @p t accepts only a single word.
+         * 
+         * It is only underapproximation, as is_singleton is false for the NFA p1 -a-> p2, q1 -a-> q2 where
+         * p1, q1 are initial and p2, q2 are final. To get precise information, you determinization+minimization
+         * might be necessary, which is often expensive.
          * 
          * @param t Variable
          * @return True -> is surely singleton, False -> inconclusive
