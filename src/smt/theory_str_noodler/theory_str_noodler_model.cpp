@@ -128,7 +128,7 @@ namespace smt::noodler {
             return alloc(noodler_var_value_proc, var, *this);
         } else {
             // for non-relevant, we cannot get them from the decision procedure, but because they are not relevant, we can return anything (restricted by length, if it is length var)
-            if (len_vars.contains(str_var)) {
+            if (len_vars.contains(str_var) && ctx.e_internalized(m_util_s.str.mk_length(str_var))) {
                 return alloc(str_var_value_proc, str_var, ctx, m_util_s, m_util_a);
             } else {
                 // we return empty string for non-relevant non-length vars, their value does not matter
