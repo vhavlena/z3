@@ -195,12 +195,13 @@ namespace smt::noodler {
                 m_util_s.str.is_prefix(expr) ||
                 m_util_s.str.is_suffix(expr) ||
                 m_util_s.str.is_contains(expr) ||
-                m_util_s.str.is_is_digit(expr) ||
-                m_util_s.str.is_le(expr) ||
-                m_util_s.str.is_lt(expr)
-                // we cannot do it for conversions because otherwise all conversions become relevant and there is a degradation on benchmarks
+                m_util_s.str.is_is_digit(expr)
+                // we cannot do it for conversions (and for string inequalities which lead to to_code conversions) because otherwise all conversions become relevant and there is a degradation on benchmarks
+                // (this degradation should not happen for other predicates, because they are transformed into simpler atoms such as equation, regular membership... whose relevancy we can check when it is needed)
                 // m_util_s.str.is_stoi(expr) ||
-                // m_util_s.str.is_itos(expr)
+                // m_util_s.str.is_itos(expr) ||
+                // m_util_s.str.is_le(expr) ||
+                // m_util_s.str.is_lt(expr)
             )) {
             if(neg) ctx.mark_as_relevant(m.mk_not(expr));
             else ctx.mark_as_relevant(expr);
@@ -1921,10 +1922,6 @@ namespace smt::noodler {
      * @param e str.<= predicate
      */
     void theory_str_noodler::handle_lex_leq(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
-        axiomatized_persist_terms.insert(e);
         STRACE("str", tout  << "handle str.<= " << mk_pp(e, m) << std::endl;);
 
         expr *x = nullptr, *y = nullptr;
@@ -1956,10 +1953,6 @@ namespace smt::noodler {
      * @param e str.< predicate
      */
     void theory_str_noodler::handle_lex_lt(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
-        axiomatized_persist_terms.insert(e);
         STRACE("str", tout  << "handle str.< " << mk_pp(e, m) << std::endl;);
 
         expr *x = nullptr, *y = nullptr;
