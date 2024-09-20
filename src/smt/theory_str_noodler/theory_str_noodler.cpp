@@ -2183,6 +2183,11 @@ namespace smt::noodler {
             } else if(this->predicate_replace.contains(arg)) {
                 // argument is some function that already has a replacing variable
                 z3_var_for_arg = this->predicate_replace[arg];
+                // FIXME this equation should not really be here, whenever we add something to predicate_replace, we also add this equation.
+                // However, conversions can be axiomatized on different level than 0 (other predicates are always on 0, see string_theory_propagation) and
+                // the next branch adds something to predicate_replace with the equation, which can be lost after popping from the level in which we axiomatized.
+                // This should be probably handled in a different way, see issue https://github.com/VeriFIT/z3-noodler/issues/175
+                add_axiom({mk_literal(m.mk_eq(arg, z3_var_for_arg))});
             } else {
                 // argument does not have a replacing variable (probably concatenation)
                 // we need to create one
