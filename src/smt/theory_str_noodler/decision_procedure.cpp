@@ -1632,13 +1632,13 @@ namespace smt::noodler {
             return model_of_var.at(var);
         }
 
-        if (vars_whose_model_we_are_computing.contains(var)) {
-            util::throw_error("There is cycle in inclusion graph, cannot produce model");
-        }
-
         STRACE("str-model",
             tout << "Generating model for var " << var << "\n";
         );
+
+        if (vars_whose_model_we_are_computing.contains(var)) {
+            util::throw_error("There is cycle in inclusion graph, cannot produce model");
+        }
 
         vars_whose_model_we_are_computing.insert(var);
 
@@ -1651,6 +1651,12 @@ namespace smt::noodler {
             }
             return update_model_and_aut_ass(var, result);
         } else if (solution.aut_ass.contains(var)) {
+            // as a heuristic, we check if the automaton for var contains exactly one word, if yes, we immediately return this word instead of going trough inclusions (this can sometimes help if there is a cycle in inclusions)
+            if (solution.aut_ass.is_singleton(var)) {
+                mata::Word accepted_word = solution.aut_ass.at(var)->get_word().value();
+                return update_model_and_aut_ass(var, alph.get_string_from_mata_word(accepted_word));
+            }
+
             Predicate inclusion_with_var_on_right_side;
             if (solution.get_inclusion_with_var_on_right_side(var, inclusion_with_var_on_right_side)) {
                 // TODO check if inclusion_with_var_on_right_side lays on a cycle.
