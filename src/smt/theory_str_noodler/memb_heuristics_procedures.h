@@ -43,7 +43,7 @@ namespace smt::noodler {
         const seq_util& m_util_s;
         const ast_manager& m;
 
-        std::map<BasicTerm, mata::Word> models;
+        std::map<BasicTerm, zstring> models;
     public:
         MultMembHeuristicProcedure(std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag, regex::Alphabet alph, const seq_util& m_util_s, const ast_manager& m)
             : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s), m(m) {}

@@ -138,7 +138,7 @@ namespace smt::noodler {
                 return l_false;
             } else {
                 // otherwise, the counterexample for why inclusion does not hold is a model
-                models[var] = std::move(model_run.word);
+                models[var] = alph.get_string_from_mata_word(std::move(model_run.word));
             }
         }
 
@@ -148,6 +148,6 @@ namespace smt::noodler {
     
     zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
-        return alph.get_string_from_mata_word(models[var]);
+        return models[var];
     }
 }
