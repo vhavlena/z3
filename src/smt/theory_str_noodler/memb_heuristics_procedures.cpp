@@ -148,6 +148,6 @@ namespace smt::noodler {
     
     zstring MultMembHeuristicProcedure::get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) {
         STRACE("str-mult-memb-heur", tout << "getting model for " << var << std::endl;);
-        return models[var];
+        return models.at(var);
     }
 }
