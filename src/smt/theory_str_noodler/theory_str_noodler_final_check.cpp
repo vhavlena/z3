@@ -93,7 +93,7 @@ namespace smt::noodler {
         // As a heuristic, for the case we have exactly one constraint, which is of type 'x (not)in RE', we use universality/emptiness
         // checking of the regex (using some heuristics) instead of constructing the automaton of RE. The construction (especially complement)
         // can sometimes blow up, so the check should be faster.
-        if(this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0
+        if(m_params.m_try_memb_heur && this->m_membership_todo_rel.size() == 1 && !contains_word_equations && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0
                 && this->len_vars.empty() // TODO: handle length vars that are not x (i.e., there are no string constraints on them, other than length ones, we just need to compute arith model)
         ) {
             const auto& reg_data = this->m_membership_todo_rel[0];
@@ -121,7 +121,7 @@ namespace smt::noodler {
             }
         }
 
-        if (is_mult_membership_suitable()) {
+        if (m_params.m_try_memb_heur && is_mult_membership_suitable()) {
             lbool result = run_mult_membership_heur();
             if(result == l_true) {
                 return FC_DONE;
@@ -169,7 +169,7 @@ namespace smt::noodler {
 
 
         // There is only one symbol in the equation. The system is SAT iff lengths are SAT
-        if(symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
+        if(m_params.m_try_unary_proc && symbols_in_formula.size() == 2 && !contains_word_disequations && !contains_conversions && this->m_not_contains_todo_rel.size() == 0 && this->m_membership_todo_rel.empty()) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
                 return FC_DONE;
