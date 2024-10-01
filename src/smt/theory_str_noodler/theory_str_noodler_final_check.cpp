@@ -109,9 +109,9 @@ namespace smt::noodler {
                     std::get<2>(reg_data),
                     m_util_s, m
                 );
-                this->statistics.stat_proc_single_memb_heur.num_start++;
+                this->statistics.at("single-memb-heur").num_start++;
                 lbool result = dec_proc->compute_next_solution();
-                if(result != l_undef) this->statistics.stat_proc_single_memb_heur.num_finish++;
+                if(result != l_undef) this->statistics.at("single-memb-heur").num_finish++;
                 if(result == l_true) {
                     return FC_DONE;
                 } else if(result == l_false) {
@@ -200,7 +200,7 @@ namespace smt::noodler {
         expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
-            this->statistics.num_solved_preprocess++;
+            this->statistics.at("stabilization").num_solved_preprocess++;
             // If the instance is both length unsatisfiable and unsatisfiable from preprocessing,
             // we want to kill it after preprocessing as it generates stronger theory lemma (negation of the string part).
             lbool result = main_dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
@@ -238,17 +238,17 @@ namespace smt::noodler {
         STRACE("str", tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
         if (result == l_false) {
-            this->statistics.num_solved_preprocess++;
+            this->statistics.at("stabilization").num_solved_preprocess++;
             STRACE("str", tout << "Unsat from preprocessing" << std::endl);
             block_curr_len(expr_ref(m.mk_false(), m), false, true); // we do not store for loop protection
             return FC_CONTINUE;
         } // we do not check for l_true, because we will get it in get_another_solution() anyway TODO: should we check?
 
-        // it is possible that the arithmetic formula becomes unsatisfiable already by adding the (underapproximating)
+        // it is possible that the arithmetic formula becomes unsatisfiable already by adding the
         // length constraints from initial assignment
         lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
         if(check_len_sat(lengths) == l_false) {
-            this->statistics.num_solved_preprocess++;
+            this->statistics.at("stabilization").num_solved_preprocess++;
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
             block_curr_len(lengths, true, true);
             return FC_CONTINUE;
@@ -256,7 +256,7 @@ namespace smt::noodler {
 
         STRACE("str", tout << "Starting main decision procedure" << std::endl);
         dec_proc->init_computation();
-        this->statistics.stat_proc_stabilization.num_start++;
+        this->statistics.at("stabilization").num_start++;
 
         expr_ref block_len(m.mk_false(), m);
         while (true) {
@@ -274,7 +274,7 @@ namespace smt::noodler {
                         ctx.get_fparams().is_overapprox = true;
                     }
 
-                    this->statistics.stat_proc_stabilization.num_finish++;
+                    this->statistics.at("stabilization").num_finish++;
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE("str", tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
@@ -294,7 +294,7 @@ namespace smt::noodler {
                 } else {
                     block_curr_len(block_len);
                 }
-                this->statistics.stat_proc_stabilization.num_finish++;
+                this->statistics.at("stabilization").num_finish++;
                 return FC_CONTINUE;
             } else {
                 // we could not decide if there is solution, let's just give up
@@ -630,18 +630,18 @@ namespace smt::noodler {
                                                 std::vector<TermConversion> conversions) {
         dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
-            this->statistics.num_solved_preprocess++;
+            this->statistics.at("underapprox").num_solved_preprocess++;
             return l_false;
         }
 
         dec_proc->init_computation();
-        this->statistics.stat_proc_underapprox.num_start++;
+        this->statistics.at("underapprox").num_start++;
 
         while(dec_proc->compute_next_solution() == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths) == l_true) {
                 sat_handling(lengths);
-                this->statistics.stat_proc_underapprox.num_finish++;
+                this->statistics.at("underapprox").num_finish++;
                 return l_true;
             }
         }
@@ -768,7 +768,7 @@ namespace smt::noodler {
         dec_proc->preprocess();
         expr_ref block_len(m.mk_false(), m);
         dec_proc->init_computation();
-        this->statistics.stat_proc_nielsen.num_start++;
+        this->statistics.at("nielsen").num_start++;
 
         while (true) {
             lbool result = dec_proc->compute_next_solution();
@@ -776,7 +776,7 @@ namespace smt::noodler {
                 expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
                 if (check_len_sat(lengths) == l_true) {
                     sat_handling(lengths);
-                    this->statistics.stat_proc_nielsen.num_finish++;
+                    this->statistics.at("nielsen").num_finish++;
                     return l_true;
                 } else {
                     STRACE("str", tout << "nielsen len unsat" <<  mk_pp(lengths, m) << std::endl;);
@@ -786,7 +786,7 @@ namespace smt::noodler {
                 // we did not find a solution (with satisfiable length constraints)
                 // we need to block current assignment
                 block_curr_len(block_len);
-                this->statistics.stat_proc_nielsen.num_finish++;
+                this->statistics.at("nielsen").num_finish++;
                 return l_false;
             } else {
                 // we could not decide if there is solution, continue with noodler decision procedure
@@ -803,13 +803,13 @@ namespace smt::noodler {
         dec_proc = len_dec_proc;
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
-            this->statistics.num_solved_preprocess++;
+            this->statistics.at("underapprox").num_solved_preprocess++;
             STRACE("str", tout << "len: unsat from preprocessing\n");
             block_curr_len(block_len);
             return l_false;
         }
 
-        this->statistics.stat_proc_length.num_start++;
+        this->statistics.at("length").num_start++;
         dec_proc->init_computation();
         
         lbool result = dec_proc->compute_next_solution();
@@ -818,7 +818,7 @@ namespace smt::noodler {
             expr_ref lengths = len_node_to_z3_formula(formula);
             if (check_len_sat(lengths) == l_true) {
                 sat_handling(lengths);
-                this->statistics.stat_proc_length.num_finish++;
+                this->statistics.at("length").num_finish++;
                 return l_true;
             } else {
                 STRACE("str", tout << "len: unsat from lengths:" <<  mk_pp(lengths, m) << std::endl;);
@@ -826,13 +826,13 @@ namespace smt::noodler {
 
                 if (precision != LenNodePrecision::UNDERAPPROX) {
                     block_curr_len(lengths);
-                    this->statistics.stat_proc_length.num_finish++;
+                    this->statistics.at("length").num_finish++;
                     return l_false;
                 } 
                 else if (len_dec_proc->get_formula().get_predicates().size() > 10) {
                     ctx.get_fparams().is_underapprox = true;
                     block_curr_len(expr_ref(m.mk_false(), m));
-                    this->statistics.stat_proc_length.num_finish++;
+                    this->statistics.at("length").num_finish++;
                     return l_false;
                 } 
                 else {
@@ -916,10 +916,10 @@ namespace smt::noodler {
         }
 
         dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m);
-        this->statistics.stat_proc_multi_memb_heur.num_start++;
+        this->statistics.at("multi-memb-heur").num_start++;
         lbool result = dec_proc->compute_next_solution();
         
-        if(result != l_undef) this->statistics.stat_proc_multi_memb_heur.num_finish++;
+        if(result != l_undef) this->statistics.at("multi-memb-heur").num_finish++;
         return result;
     }
 
@@ -977,8 +977,8 @@ namespace smt::noodler {
 
         dec_proc = std::make_shared<UnaryDecisionProcedure>(instance, aut_ass, m_params);
         expr_ref lengths(m.mk_true(), m); // it is assumed that lenght formulas from equations were added in new_eq_eh, so we can just have 'true'
-        this->statistics.stat_proc_unary.num_start++;
-        this->statistics.stat_proc_unary.num_finish++;
+        this->statistics.at("unary").num_start++;
+        this->statistics.at("unary").num_finish++;
         if(check_len_sat(lengths, nullptr) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths (one symbol)" << std::endl);
             block_curr_len(lengths, true, true);

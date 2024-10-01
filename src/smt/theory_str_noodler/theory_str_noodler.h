@@ -63,19 +63,9 @@ namespace smt::noodler {
          */
 
         struct DecProcStats {
-            unsigned num_start = 0; // number of times the procedure was started
+            unsigned num_solved_preprocess = 0; // number of instances solved by preprocessing of the procedure
+            unsigned num_start = 0; // number of times the procedure was started (after preprocessing)
             unsigned num_finish = 0; // number of times the procedure gave an answer (no undef)
-        };
-
-        struct stats {
-            DecProcStats stat_proc_underapprox = {}; // underapprox of the stabilization-based procedure
-            DecProcStats stat_proc_stabilization = {}; // stabilization-based procedure
-            DecProcStats stat_proc_nielsen = {}; // nielsen procedure
-            DecProcStats stat_proc_length = {}; // length-based procedure
-            DecProcStats stat_proc_unary = {}; // unary decision procedure
-            DecProcStats stat_proc_single_memb_heur = {}; // membership heuristic
-            DecProcStats stat_proc_multi_memb_heur = {}; // multiple memberhip heuritstic
-            unsigned num_solved_preprocess = 0; // number of instances solved by preprocessing
         };
 
         int m_scope_level = 0;
@@ -141,8 +131,15 @@ namespace smt::noodler {
         // the length formula from the last run that was sat
         expr_ref sat_length_formula;
 
-        // statistics
-        stats statistics {};
+        std::map<std::string, DecProcStats> statistics {
+            {"underapprox", {0, 0, 0}}, // underapprox of the stabilization-based procedure
+            {"stabilization", {0, 0, 0}}, // stabilization-based procedure
+            {"nielsen", {0 ,0 ,0}}, // nielsen procedure
+            {"length", {0 ,0 ,0}}, // length-based procedure
+            {"unary", {0 ,0 ,0}}, // unary decision procedure
+            {"single-memb-heur", {0 ,0 ,0}}, // membership heuristic
+            {"multi-memb-heur", {0 ,0 ,0}}, // multiple memberhip heuritstic
+        };
 
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
