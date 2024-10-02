@@ -130,9 +130,9 @@ namespace smt::noodler {
             std::string heur_stat_name = std::string("str-num-proc-") + heur_name;
             std::string output = heur_stat_name + std::string("-start");
             st.update(output.c_str(), heur_stats.num_start);
-            std::string output = heur_stat_name + std::string("-finish");
+            output = heur_stat_name + std::string("-finish");
             st.update(output.c_str(), heur_stats.num_finish);
-            std::string output = heur_stat_name + std::string("-solved-preprocess");
+            output = heur_stat_name + std::string("-solved-preprocess");
             st.update(output.c_str(), heur_stats.num_solved_preprocess);
         }
     }
