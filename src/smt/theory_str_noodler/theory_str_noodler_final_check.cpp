@@ -630,8 +630,7 @@ namespace smt::noodler {
                                                 std::vector<TermConversion> conversions) {
         dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
-            this->statistics.at("underapprox").num_solved_preprocess++;
-            return l_false;
+            return l_undef;
         }
 
         dec_proc->init_computation();
@@ -645,7 +644,7 @@ namespace smt::noodler {
                 return l_true;
             }
         }
-        return l_false;
+        return l_undef;
     }
 
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, expr_ref* unsat_core) {
