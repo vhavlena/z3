@@ -141,6 +141,17 @@ namespace smt::noodler {
             {"multi-memb-heur", {0 ,0 ,0}}, // multiple memberhip heuritstic
         };
 
+        // we need this because part of Z3 is written like C, and statistic takes 'const char*', which has to be kept somewhere
+        std::map<std::string, std::vector<const char*>> statistics_bullshit_names {
+            {"underapprox", {"str-num-proc-underapprox-start", "str-num-proc-underapprox-finish", "str-num-proc-underapprox-solved-preprocess"}}, // underapprox of the stabilization-based procedure
+            {"stabilization", {"str-num-proc-stabilization-start", "str-num-proc-stabilization-finish", "str-num-proc-stabilization-solved-preprocess"}}, // stabilization-based procedure
+            {"nielsen", {"str-num-proc-nielsen-start", "str-num-proc-nielsen-finish", "str-num-proc-nielsen-solved-preprocess"}}, // nielsen procedure
+            {"length", {"str-num-proc-length-start", "str-num-proc-length-finish", "str-num-proc-length-solved-preprocess"}}, // length-based procedure
+            {"unary", {"str-num-proc-unary-start", "str-num-proc-unary-finish", "str-num-proc-unary-solved-preprocess"}}, // unary decision procedure
+            {"single-memb-heur", {"str-num-proc-single-memb-heur-start", "str-num-proc-single-memb-heur-finish", "str-num-proc-single-memb-heur-solved-preprocess"}}, // membership heuristic
+            {"multi-memb-heur", {"str-num-proc-multi-memb-heur-start", "str-num-proc-multi-memb-heur-finish", "str-num-proc-multi-memb-heur-solved-preprocess"}}, // multiple memberhip heuritstic
+        };
+
         // Stuff for model generation
         std::set<BasicTerm> relevant_vars; // vars that are in the formula used in decision procedure (we cannot used dec_proc to generate models for those that are not in here)
         std::shared_ptr<AbstractDecisionProcedure> dec_proc = nullptr; // keeps the decision procedure that returned sat

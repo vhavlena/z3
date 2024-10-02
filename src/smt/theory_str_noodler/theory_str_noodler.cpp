@@ -127,13 +127,9 @@ namespace smt::noodler {
     void theory_str_noodler::collect_statistics(::statistics & st) const {
         STRACE("str", tout << "collecting statistics" << std::endl;);
         for (const auto& [heur_name, heur_stats] : this->statistics) {
-            std::string heur_stat_name = std::string("str-num-proc-") + heur_name;
-            std::string output = heur_stat_name + std::string("-start");
-            st.update(output.c_str(), heur_stats.num_start);
-            output = heur_stat_name + std::string("-finish");
-            st.update(output.c_str(), heur_stats.num_finish);
-            output = heur_stat_name + std::string("-solved-preprocess");
-            st.update(output.c_str(), heur_stats.num_solved_preprocess);
+            st.update(statistics_bullshit_names.at(heur_name)[0], heur_stats.num_start);
+            st.update(statistics_bullshit_names.at(heur_name)[1], heur_stats.num_finish);
+            st.update(statistics_bullshit_names.at(heur_name)[2], heur_stats.num_solved_preprocess);
         }
     }
 
