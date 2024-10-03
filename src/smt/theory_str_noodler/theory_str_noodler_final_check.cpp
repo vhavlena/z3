@@ -802,7 +802,7 @@ namespace smt::noodler {
         dec_proc = len_dec_proc;
         expr_ref block_len(m.mk_false(), m);
         if (dec_proc->preprocess() == l_false) {
-            this->statistics.at("underapprox").num_solved_preprocess++;
+            this->statistics.at("length").num_solved_preprocess++;
             STRACE("str", tout << "len: unsat from preprocessing\n");
             block_curr_len(block_len);
             return l_false;
