@@ -126,6 +126,7 @@ namespace smt::noodler {
 
     void theory_str_noodler::collect_statistics(::statistics & st) const {
         STRACE("str", tout << "collecting statistics" << std::endl;);
+        st.update("noodler-final_checks", num_of_solving_final_checks);
         for (const auto& [heur_name, heur_stats] : this->statistics) {
             st.update(statistics_bullshit_names.at(heur_name)[0], heur_stats.num_start);
             st.update(statistics_bullshit_names.at(heur_name)[1], heur_stats.num_finish);

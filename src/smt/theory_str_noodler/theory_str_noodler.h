@@ -131,6 +131,7 @@ namespace smt::noodler {
         // the length formula from the last run that was sat
         expr_ref sat_length_formula;
 
+        unsigned num_of_solving_final_checks = 0; // number of final checks that lead to solving string formula (i.e. not solved by loop protection nor by language (dis)equalities)
         std::map<std::string, DecProcStats> statistics {
             {"underapprox", {0, 0, 0}}, // underapprox of the stabilization-based procedure
             {"stabilization", {0, 0, 0}}, // stabilization-based procedure

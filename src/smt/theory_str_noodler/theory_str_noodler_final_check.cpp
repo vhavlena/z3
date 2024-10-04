@@ -85,6 +85,8 @@ namespace smt::noodler {
             }
         }
 
+        ++num_of_solving_final_checks;
+
         bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
