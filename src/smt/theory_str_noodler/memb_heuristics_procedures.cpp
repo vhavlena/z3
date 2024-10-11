@@ -128,7 +128,14 @@ namespace smt::noodler {
                 first = false;
             }
             
-            STRACE("str-mult-memb-heur", tout << "computing inclusion" << std::endl;);
+            STRACE("str-mult-memb-heur",
+                tout << "computing inclusion";
+                if (is_trace_enabled("str-nfa")) {
+                    tout << " of automaton\n" << intersection << "within automaton\n" << unionn;
+                } else {
+                    tout << "\n";
+                }
+            );
 
             // We want to know if L \intersect \neg L' is empty, which is same as asking if L is subset of L'
             mata::nfa::Run model_run;
