@@ -30,14 +30,22 @@ namespace smt::noodler {
 
                 mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
 
-                mata::nfa::Run model_run;
-                if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.mata_alphabet, &model_run)) {
-                    // x does not belong to universal automaton -> it must be unsat
-                    return l_false;
+                if (produce_model) {
+                    mata::nfa::Run model_run;
+                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.mata_alphabet, &model_run)) {
+                        // x does not belong to universal automaton -> it must be unsat
+                        return l_false;
+                    } else {
+                        // otherwise x does not belong to something nonuniversal -> it is sat, counterexample is a model
+                        model = alph.get_string_from_mata_word(std::move(model_run.word));
+                        return l_true;
+                    }
                 } else {
-                    // otherwise x does not belong to something nonuniversal -> it is sat, counterexample is a model
-                    model = alph.get_string_from_mata_word(std::move(model_run.word));
-                    return l_true;
+                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.mata_alphabet, nullptr)) {
+                        return l_false;
+                    } else {
+                        return l_true;
+                    }
                 }
             }
         }
@@ -138,14 +146,22 @@ namespace smt::noodler {
             );
 
             // We want to know if L \intersect \neg L' is empty, which is same as asking if L is subset of L'
-            mata::nfa::Run model_run;
-            if (mata::nfa::algorithms::is_included_antichains(intersection, unionn, nullptr, &model_run)) {
-                // if inclusion holds, the intersection is empty => UNSAT
-                STRACE("str-mult-memb-heur", tout << "inclusion holds => UNSAT" << std::endl;);
-                return l_false;
+            if (produce_model) {
+                mata::nfa::Run model_run;
+                if (mata::nfa::algorithms::is_included_antichains(intersection, unionn, nullptr, &model_run)) {
+                    // if inclusion holds, the intersection is empty => UNSAT
+                    STRACE("str-mult-memb-heur", tout << "inclusion holds => UNSAT" << std::endl;);
+                    return l_false;
+                } else {
+                    // otherwise, the counterexample for why inclusion does not hold is a model
+                    models[var] = alph.get_string_from_mata_word(std::move(model_run.word));
+                }
             } else {
-                // otherwise, the counterexample for why inclusion does not hold is a model
-                models[var] = alph.get_string_from_mata_word(std::move(model_run.word));
+                if (mata::nfa::algorithms::is_included_antichains(intersection, unionn, nullptr, nullptr)) {
+                    // if inclusion holds, the intersection is empty => UNSAT
+                    STRACE("str-mult-memb-heur", tout << "inclusion holds => UNSAT" << std::endl;);
+                    return l_false;
+                }
             }
         }
 
