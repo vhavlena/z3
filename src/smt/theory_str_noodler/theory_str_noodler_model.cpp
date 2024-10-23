@@ -55,15 +55,18 @@ namespace smt::noodler {
 
     /// @brief Class for model generation of string variables that are not in decision procedure dec_proc (so their value does not matter, only cosntraint is their length)
     class theory_str_noodler::str_var_value_proc : public model_value_proc {
-        // the variable whose model we want to generate
-        expr* str_var;
-        // the enode value of '(str.len str_var)'
-        enode* str_var_length_enode;
-        bool length_relevant;
+        expr* str_var; // the variable whose model we want to generate
+        enode* str_var_length_enode; // the enode value of '(str.len str_var)'
+        bool length_relevant = false; // do we actually need the length of str_var?
         seq_util& m_util_s;
         arith_util& m_util_a;
     public:
-        str_var_value_proc(expr* str_var, context& ctx, seq_util& m_util_s, arith_util& m_util_a) : str_var(str_var), str_var_length_enode(ctx.get_enode(m_util_s.str.mk_length(str_var))), length_relevant(ctx.is_relevant(str_var_length_enode)), m_util_s(m_util_s), m_util_a(m_util_a) {}
+        str_var_value_proc(expr* str_var, context& ctx, seq_util& m_util_s, arith_util& m_util_a) : str_var(str_var), m_util_s(m_util_s), m_util_a(m_util_a) {
+            if (ctx.e_internalized(m_util_s.str.mk_length(str_var))) {
+                str_var_length_enode = ctx.get_enode(m_util_s.str.mk_length(str_var));
+                length_relevant = ctx.is_relevant(str_var_length_enode);
+            }
+        }
 
         void get_dependencies(buffer<model_value_dependency> & result) override {
             // we just need the length of str_var (if the length is relevant)
