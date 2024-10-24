@@ -53,7 +53,7 @@ namespace smt::noodler {
         }
     };
 
-    /// @brief Class for model generation of string variables that are not in decision procedure dec_proc (so their value does not matter, only cosntraint is their length)
+    /// @brief Class for model generation of string variables that are not in decision procedure dec_proc (so their value does not matter, only constraint is their length)
     class theory_str_noodler::str_var_value_proc : public model_value_proc {
         expr* str_var; // the variable whose model we want to generate
         enode* str_var_length_enode; // the enode value of '(str.len str_var)'
