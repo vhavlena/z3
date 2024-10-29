@@ -88,9 +88,10 @@ Tests for Z3-Noodler are located in [src/test/noodler](src/test/noodler).
 
 ## Licensing
 
-The code of Z3-Noodler is distributed under the MIT License. See [LICENSE.md](./LICENSE.md).
+Z3-Noodler is licensed under the MIT License. See [LICENSE.md](./LICENSE.md).
 
-Z3-Noodler is a derivative work of Z3, distributed under the MIT License. See [LICENSE_Z3.txt](./LICENSE_Z3.txt).
+Z3-Noodler is a derivative work of the SMT solver Z3.
+The original SMT solver Z3 from the [Z3 repository](https://github.com/Z3Prover/z3) is licensed under the MIT License. See [LICENSE_Z3.txt](./LICENSE_Z3.txt).
 
 ## Original Z3 README
 
@@ -103,4 +104,3 @@ For the original Z3 README, see [README-Z3.md](README-Z3.md).
 - [David Chocholatý](mailto:xchoch08@stud.fit.vutbr.cz?subject=[GitHub]%20Z3-Noodler),
 - [Lukáš Holík](mailto:holik@fit.vut.cz?subject=[GitHub]%20Z3-Noodler),
 - [Ondřej Lengál](mailto:lengal@fit.vut.cz?subject=[GitHub]%20Z3-Noodler).
-
