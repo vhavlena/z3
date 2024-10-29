@@ -1,8 +1,9 @@
 # Z3-Noodler
 
-This project is an SMT string solver, a modified version of Z3 SMT Solver, distributed under the MIT License.
+This project, the SMT solver Z3-Noodler, is licensed under the MIT License.
 
-The original Z3 code from the [Z3 repository](https://github.com/Z3Prover/z3) is distributed under the MIT License in [LICENSE_Z3.txt](./LICENSE_Z3.txt).
+Z3-Noodler is a derivative work of the SMT solver Z3.
+The original SMT solver Z3 from the [Z3 repository](https://github.com/Z3Prover/z3) is licensed under the MIT License. See [LICENSE_Z3.txt](./LICENSE_Z3.txt).
 
 MIT License
 
