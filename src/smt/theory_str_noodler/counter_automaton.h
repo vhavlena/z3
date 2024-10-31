@@ -17,6 +17,13 @@
 #include "formula.h"
 #include "util.h"
 
+#define INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(cmp_expr) \
+    {                                       \
+        auto cmp_res = cmp_expr;            \
+        if (cmp_res < 0) return true;       \
+        else if (cmp_res > 0) return false; \
+    }
+
 namespace smt::noodler::ca {
 
     /**
@@ -57,6 +64,10 @@ namespace smt::noodler::ca {
             this->alph_mata_symb[mata_symb] = symb;
         }
 
+        bool has_mata_symbol_for(const T& symbol) const {
+            return (this->alph_symb_mata.find(symbol) != this->alph_symb_mata.end());
+        }
+
         mata::Symbol get_mata_symbol(const T& symb) const {
             return this->alph_symb_mata.at(symb);
         }
@@ -72,7 +83,6 @@ namespace smt::noodler::ca {
             }
             return ret;
         }
-
     };
 
     /**
@@ -82,76 +92,120 @@ namespace smt::noodler::ca {
      * <R,x,i,symb> captures i-th mismatch symbol (i=label)
      */
     struct AtomicSymbol {
+
         enum class TagType : uint8_t {
             LENGTH         = 0, // <L, x>
             MISMATCH_POS   = 1, // <P, var, mismatch_idx>
-            REGISTER_STORE = 2, // <R, var, mismatch_idx, alphabet_symbol>
-            COPY_PREVIOUS  = 3, // <C, var, mismatch_idx>
+            REGISTER_STORE = 2, // <R, disequation, side, mismatch_idx, alphabet_symbol>
+            COPY_PREVIOUS  = 3, // <C, var, disequation, side, mismatch_idx>
         };
 
+        enum class PredicateSide : uint8_t {
+            LEFT  = 0,
+            RIGHT = 1,
+        };
 
-        TagType      type;
-        BasicTerm    var;    // variable from string constraint
-        char         label;  // 0 = missing value
-        mata::Symbol symbol; // symbol (used for the R-case)
+        TagType       type;
+        BasicTerm     var;       // variable from string constraint
+        int           predicate_idx; // Negative values mean that we only deal with one predicate
+        PredicateSide predicate_side;
+        size_t        copy_idx;  // What level of the tag automaton is this tag located
+        mata::Symbol  symbol;    // Symbol stored during sampling transition (tag with type REGISTER_STORE)
 
+        // Lexicographical order on (type, copy_idx, disequation_idx, predicate_side, symbol, var)
         bool operator<(const AtomicSymbol& other_symbol) const {
-            auto cmp = type <=> other_symbol.type ;
-            if (cmp < 0) {
-                return true;
-            } else if (cmp > 0) {
-                return false;
-            } else {
-                cmp = label <=> other_symbol.label;
-                if (cmp < 0) {
-                    return true;
-                } else if (cmp > 0) {
-                    return false;
-                } else {
-                    cmp = symbol <=> other_symbol.symbol;
-                    if (cmp < 0) {
-                        return true;
-                    } else if (cmp > 0) {
-                        return false;
-                    } else {
-                        return var < other_symbol.var;
-                    }
-                }
-            }
+            INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(type           <=> other_symbol.type);
+            INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(copy_idx       <=> other_symbol.copy_idx);
+            INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(predicate_idx  <=> other_symbol.predicate_idx);
+            INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(predicate_side <=> other_symbol.predicate_side);
+            INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(symbol         <=> other_symbol.symbol);
+            return var < other_symbol.var;
         }
         bool operator==(const AtomicSymbol&) const = default;
 
         std::string to_string() const {
-            std::string ret;
-            std::string marks[3] = {"L", "P", "R"};
             std::string var_escape = var.is_literal() ? "\\\"" + var.get_name().encode() + "\\\"" : var.to_string();
 
-            std::string label_str = label == 0 ? "" : "," + std::to_string(int(label));
-            std::string symbol_str = type == TagType::REGISTER_STORE ? "," + std::to_string(symbol) : "";
-            std::string var_str = type <= TagType::REGISTER_STORE ? "," + var_escape : "";
-
-            ret = "<" + marks[size_t(type)] + var_str + label_str + symbol_str + ">";
-            return ret;
+            switch (this->type) {
+                case TagType::LENGTH: {
+                    return "<L, " + var_escape + ">";
+                }
+                case TagType::MISMATCH_POS: { // <P, var, copy_idx>
+                    return "<P, " + var_escape + ", " + std::to_string(this->copy_idx) + ">";
+                }
+                case TagType::REGISTER_STORE: { // <R, var, disequation, side, mismatch_idx, alphabet_symbol>
+                    std::stringstream string_builder;
+                    string_builder << "<R, ";
+                                   // << var_escape + ", ";
+                    if (this->predicate_idx > 0) {
+                        string_builder << this->predicate_idx << "-"
+                                       << (this->predicate_side == PredicateSide::LEFT ? "L" : "R")
+                                       << ", ";
+                    }
+                    string_builder << copy_idx << ", " << this->symbol << ">";
+                    return string_builder.str();
+                }
+                case TagType::COPY_PREVIOUS: { // <C, var, disequation, side, mismatch_idx>
+                    std::stringstream string_builder;
+                    string_builder << "<C, " << var_escape << ", "
+                                   << "Pred" << this->predicate_idx << "-"
+                                   << (this->predicate_side == PredicateSide::LEFT ? "L" : "R")
+                                   << ", " << this->copy_idx << ">";
+                    return string_builder.str();
+                }
+                default: {
+                    assert(false);
+                    return "??";
+                }
+            }
         }
 
         static AtomicSymbol create_l_symbol(const BasicTerm& var) {
-            return AtomicSymbol{TagType::LENGTH, var, 0, 0};
+            return AtomicSymbol{TagType::LENGTH, var, 0, PredicateSide::LEFT, 0,  0};
         }
 
-        static AtomicSymbol create_p_symbol(const BasicTerm& var, char label) {
-            return AtomicSymbol{TagType::MISMATCH_POS, var, label, 0};
+        static AtomicSymbol create_p_symbol(const BasicTerm& var, size_t copy_idx) {
+            return AtomicSymbol{TagType::MISMATCH_POS, var, 0, PredicateSide::LEFT, copy_idx, 0};
         }
 
-        static AtomicSymbol create_r_symbol(const BasicTerm& var, char label, mata::Symbol symbol) {
-            return AtomicSymbol{TagType::REGISTER_STORE, var, label, symbol};
+        /**
+         * Create mismatch-sampling symbol for a single disequation. When deciding multiple disequations, use
+         * create_r_symbol_with_predicate_info.
+         */
+        static AtomicSymbol create_r_symbol(const BasicTerm& var, size_t copy_idx, mata::Symbol symbol) {
+            return AtomicSymbol{TagType::REGISTER_STORE, var, 0, PredicateSide::LEFT, copy_idx, symbol};
+        }
+
+        static AtomicSymbol create_r_symbol_with_predicate_info(size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symbol) {
+            AtomicSymbol tag(
+                TagType::REGISTER_STORE,
+                predicate_idx,
+                side,
+                copy_idx,
+                symbol
+            );
+
+            return tag;
+        }
+
+        static AtomicSymbol create_c_symbol(const BasicTerm& var, size_t predicate_idx, PredicateSide side, size_t copy_idx) {
+            // Craete a Copy tag of the form: <C, x, h, k, i -> i+1> with the following semantics
+            // the mismatch letter for _h_-th disequation and its _k_-th side is in variable _x_
+            // and it is seen when transitioning from i-th copy. The symbol is the same as the one
+            // sampled in previous sampling transition.
+            return AtomicSymbol{TagType::COPY_PREVIOUS, var, predicate_idx, side, copy_idx, 0};
         }
 
     private:
         // private constructor; the AtomicSymbol should be constructed using functions create*
-        AtomicSymbol(TagType mrk, const BasicTerm& vr, char lbl, mata::Symbol symb ) : type(mrk), var(vr), label(lbl), symbol(symb) {}
+        AtomicSymbol(TagType tag_type, const BasicTerm& var, size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
+            : type(tag_type), var(var), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
+        AtomicSymbol(TagType tag_type, size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
+            : type(tag_type), var(BasicTermType::Variable, "dummy"), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
     };
 
-    using CounterAlphabet = StructAlphabet<std::set<AtomicSymbol>>;
+    using TagSet = std::set<AtomicSymbol>;
+    using CounterAlphabet = StructAlphabet<TagSet>;
 
     /**
      * Metadata about states of a tag automaton, allowing better debugging enabling testing.

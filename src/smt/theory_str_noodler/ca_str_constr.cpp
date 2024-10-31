@@ -9,25 +9,32 @@
 
 namespace smt::noodler::ca {
 
-    void DiseqAutMatrix::create_aut_matrix(const Predicate& diseq, const AutAssignment& aut_ass) {
+    void DiseqAutMatrix::create_aut_matrix(const std::vector<Predicate>& disequations, const AutAssignment& aut_ass) {
         // we want to include both variables and literals
-        std::set<BasicTerm> var_set = diseq.get_set();
+        std::set<BasicTerm> var_set;
+        for (const Predicate& predicate : disequations) {
+            for (const BasicTerm& var : predicate.get_vars()) {
+                var_set.insert(var);
+            }
+        }
 
         // create fixed linear order of variables
-        for(const BasicTerm& bt : var_set) {
-            this->var_order.push_back(bt);
+        for (const BasicTerm& var : var_set) {
+            this->var_order.push_back(var);
         }
+
+        const size_t copy_cnt = 2*disequations.size() + 1;
 
         // set offset size
         // #Note(mhecko): What is this `+ 1` here?
-        this->var_aut_init_states_in_copy.resize(3*var_set.size() + 1);
+        this->var_aut_init_states_in_copy.resize(copy_cnt*var_set.size() + 1);
 
-        // three copies
-        this->aut_matrix.resize(3);
-        for(size_t copy = 0; copy < 3; copy++) {
-            this->aut_matrix[copy] = std::vector<mata::nfa::Nfa>(var_set.size());
-            for(size_t var = 0; var < this->var_order.size(); var++) {
-                this->aut_matrix[copy][var] = *aut_ass.at(this->var_order[var]);
+        this->aut_matrix.resize(copy_cnt);
+        for (size_t copy_idx = 0; copy_idx < copy_cnt; copy_idx++) {
+            this->aut_matrix[copy_idx] = std::vector<mata::nfa::Nfa>(var_set.size());
+            for (size_t var_idx = 0; var_idx < this->var_order.size(); var_idx++) {
+                // @Optimize: we can avoid creating extra NFA copy here - we replace it with one symbol automaton.
+                this->aut_matrix[copy_idx][var_idx] = *aut_ass.at(this->var_order[var_idx]);
             }
         }
 
@@ -42,7 +49,8 @@ namespace smt::noodler::ca {
 
     void DiseqAutMatrix::recompute_var_aut_init_state_positions() {
         this->var_aut_init_states_in_copy[0] = 0;
-        for(size_t copy = 0; copy < 3; copy++) {
+
+        for(size_t copy = 0; copy < this->get_copy_cnt(); copy++) {
             for(size_t var = 0; var < this->var_order.size(); var++) {
                 size_t index = copy*this->var_order.size() + var;
                 this->var_aut_init_states_in_copy[index + 1] = this->var_aut_init_states_in_copy[index] + this->aut_matrix[copy][var].num_of_states();
@@ -50,11 +58,38 @@ namespace smt::noodler::ca {
         }
     }
 
+    mata::nfa::Nfa eps_concatenate_matrix_row(const AutMatrix& matrix, size_t row_idx, std::vector<size_t>& state_var_info) {
+        const std::vector<mata::nfa::Nfa>& row_elements = matrix[row_idx];
+        auto elements_it = row_elements.begin();
+
+        mata::nfa::Nfa result = *elements_it;
+        elements_it++;
+
+        for (size_t state = 0; state < result.num_of_states(); state++) {
+            state_var_info[state] = 0;
+        }
+
+
+        size_t var_idx = 1;
+        for (; elements_it != row_elements.end(); elements_it++) {
+            size_t old_size = result.num_of_states();
+            result = mata::nfa::concatenate(result, *elements_it, true);
+
+            for (size_t state = old_size; state < result.num_of_states(); state++) {
+                state_var_info[state] = var_idx;
+            }
+
+            var_idx += 1;
+        }
+
+        return result;
+    }
+
     AutMatrixUnionResult DiseqAutMatrix::union_matrix() const {
-        const size_t copy_count = 3;
+        const size_t copy_count = this->get_copy_cnt();
 
         // #Note(mhecko): Relying on unite_nondet_with is problematic - the procedure can do all kinds of
-        //                optilizations, yet we have very clear perception of how the result should look like.
+        //                optimalizations, yet we have very clear perception of how the result should look like.
         const size_t copy_to_use_as_a_template = 0;
 
         size_t copy_states_cnt = 0;
@@ -62,31 +97,16 @@ namespace smt::noodler::ca {
             copy_states_cnt += this->aut_matrix[copy_to_use_as_a_template][var_id].num_of_states();
         }
 
-        mata::nfa::Nfa row_template = this->aut_matrix[copy_to_use_as_a_template][0]; // First row of the matrix
-
         std::vector<size_t> state_var_info;
         state_var_info.resize(copy_states_cnt*copy_count);
-        size_t template_states_processed = 0;
-        { // Populate var origin for the first automaton in a template
-            for (mata::nfa::State state = 0; state < this->aut_matrix[copy_to_use_as_a_template][0].num_of_states(); state++) {
-                state_var_info[state] = 0;
-            }
-            template_states_processed += this->aut_matrix[copy_to_use_as_a_template][0].num_of_states();
+
+        mata::nfa::Nfa result_nfa = eps_concatenate_matrix_row(this->aut_matrix, 0, state_var_info);
+        mata::nfa::Nfa latest_constructed_row_nfa;
+
+        for (size_t copy_idx = 1; copy_idx < copy_count; copy_idx++) {
+            latest_constructed_row_nfa = eps_concatenate_matrix_row(this->aut_matrix, copy_idx, state_var_info);
+            result_nfa = mata::nfa::union_nondet(result_nfa, latest_constructed_row_nfa);
         }
-
-        for (size_t var = 1; var < this->var_order.size(); var++) {
-            row_template = mata::nfa::concatenate(row_template, this->aut_matrix[copy_to_use_as_a_template][var], true);
-
-            for (mata::nfa::State state = template_states_processed; state < row_template.num_of_states(); state++) {
-                state_var_info[state] = var;
-            }
-
-            template_states_processed = row_template.num_of_states();
-        }
-
-        mata::nfa::Nfa result_nfa = row_template;
-
-        result_nfa.delta.allocate(copy_states_cnt*copy_count);
 
         // State origin info for the first copy/row is ready. Propagate the origin info to the remaining copies.
         for (size_t copy_idx = 1; copy_idx < copy_count; copy_idx++) {
@@ -95,27 +115,11 @@ namespace smt::noodler::ca {
             }
         }
 
-        // Use the template to add links into the union
-        for (size_t copy = 0; copy < copy_count; copy++) {
-            size_t copy_state_offset = copy*copy_states_cnt;
-
-            for (mata::nfa::State template_source_state = 0; template_source_state < copy_states_cnt; template_source_state++) {
-                mata::nfa::State copy_source_state = template_source_state + copy_state_offset;
-
-                for (const mata::nfa::SymbolPost& symbol_post : row_template.delta.state_post(template_source_state)) {
-                    for (auto it = symbol_post.cbegin(); it != symbol_post.cend(); it++) {
-                        mata::nfa::State copy_target_state = (*it) + copy_state_offset;
-                        result_nfa.delta.add(copy_source_state, symbol_post.symbol, copy_target_state);
-                    }
-                }
-            }
-        }
-
-        result_nfa.initial = row_template.initial; // The offset of 0th copy is 0, no need to add offset
+        result_nfa.initial = this->aut_matrix[0][0].initial;
 
         result_nfa.final.clear();
         size_t last_row_offset = (copy_count - 1) * copy_states_cnt;
-        for (mata::nfa::State final_state : row_template.final) {
+        for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
             mata::nfa::State result_final_state = last_row_offset + final_state;
             result_nfa.final.insert(result_final_state);
         }
@@ -124,7 +128,7 @@ namespace smt::noodler::ca {
         std::vector<size_t> where_is_state_copied_from(result_nfa.num_of_states());
         std::vector<size_t> state_levels(result_nfa.num_of_states());
         for (size_t copy_idx = 0; copy_idx < copy_count; copy_idx++) {
-            const size_t template_state_cnt = row_template.num_of_states();
+            const size_t template_state_cnt = latest_constructed_row_nfa.num_of_states();
             for (mata::nfa::State template_state = 0; template_state < template_state_cnt; template_state++) {
                 mata::nfa::State union_state = template_state + copy_idx*template_state_cnt;
                 where_is_state_copied_from[union_state] = template_state;
@@ -148,44 +152,36 @@ namespace smt::noodler::ca {
 
     //-----------------------------------------------------------------------------------------------
 
-    void TagDiseqGen::replace_symbols(char copy, size_t var) {
+    void TagDiseqGen::replace_symbols(char copy_idx, size_t var) {
         BasicTerm bt = this->aut_matrix.get_var_order()[var];
 
         // <L,x>
-        std::set<ca::AtomicSymbol> ats({ ca::AtomicSymbol::create_l_symbol(bt)});
-        if (copy != 2) {
+        TagSet nonsampling_transition ({ ca::AtomicSymbol::create_l_symbol(bt)});
+        size_t last_copy_idx = this->get_copy_cnt() - 1;
+        if (copy_idx != last_copy_idx) {
             // <P,x,copy+1>
-            ats.insert(ca::AtomicSymbol::create_p_symbol(bt, char(copy+1)));
+            size_t copy_idx_labeling_tag = this->get_copy_idx_labeling_transition(copy_idx, copy_idx+1);
+            nonsampling_transition.insert(ca::AtomicSymbol::create_p_symbol(bt, copy_idx_labeling_tag));
         }
 
-        mata::Symbol new_symbol = this->alph.add_symbol(ats);
-        mata::nfa::Nfa aut = this->aut_matrix.get_aut(copy, var);
+        mata::Symbol new_symbol = this->alph.add_symbol(nonsampling_transition);
+        mata::nfa::Nfa aut = this->aut_matrix.get_aut(copy_idx, var);
         mata::nfa::Nfa res = aut.get_one_letter_aut(new_symbol);
-        this->aut_matrix.set_aut(copy, var, res, false);
+        this->aut_matrix.set_aut(copy_idx, var, res, false);
     }
 
-
-    void TagDiseqGen::add_connection(char copy_start, size_t var_idx, mata::nfa::Nfa& aut_union) {
-
-        // mapping between original symbols and new counter symbols from this->alph ensuring that the created
+    void TagDiseqGen::add_connection_single_predicate(char copy_start, size_t var_idx, mata::nfa::Nfa& aut_union) {
+        // Mapping between original symbols and new counter symbols from this->alph ensuring that the created
         // symbols are named consistently by the same mata state.
         std::map<mata::Symbol, mata::Symbol> original_to_tag_symbols;
 
-        // basic term corresponding to the positional var
-        BasicTerm bt = this->aut_matrix.get_var_order()[var_idx];
-
-        // lambda for a particular symbol construction
-        auto const_symbol = [](char copy_idx, const BasicTerm& bt, mata::Symbol sym) -> std::set<ca::AtomicSymbol> {
-            // <L,x>, <P,x,copy_idx>, <R,x,copy_idx,a>
-            std::set<ca::AtomicSymbol> atomic_symbol({ ca::AtomicSymbol::create_l_symbol(bt),
-                                                       ca::AtomicSymbol::create_p_symbol(bt, copy_idx),
-                                                       ca::AtomicSymbol::create_r_symbol(bt, copy_idx, sym) });
-            return atomic_symbol;
-        };
+        BasicTerm var = this->aut_matrix.get_var_order()[var_idx];
 
         // We use the original automaton from this->aut_ass because the actual alphabet symbols
         // might not be present in this->aut_matrix because they were replaced earlier by tags (<L, x>, etc.).
-        mata::nfa::Nfa& original_automaton = *this->aut_ass.at(bt);
+        mata::nfa::Nfa& original_automaton = *this->aut_ass.at(var);
+
+        const size_t copy_idx_to_label_symbols_with = copy_start + 1;  // 0 is reserved for special purposes )
 
         for (mata::nfa::State source_state = 0; source_state < original_automaton.num_of_states(); source_state++) {
             for (const mata::nfa::SymbolPost& symbol_post : original_automaton.delta[source_state]) {
@@ -196,26 +192,90 @@ namespace smt::noodler::ca {
                 if (original_sym_mapping_bucket != original_to_tag_symbols.end()) {
                     new_symbol = original_sym_mapping_bucket->second;
                 } else {
-                    new_symbol = this->alph.add_symbol(const_symbol(copy_start + 1, bt, symbol_post.symbol));
+                    TagSet new_tag_set({ca::AtomicSymbol::create_l_symbol(var),
+                                        ca::AtomicSymbol::create_p_symbol(var, copy_idx_to_label_symbols_with),
+                                        ca::AtomicSymbol::create_r_symbol(var, copy_idx_to_label_symbols_with, symbol_post.symbol)});
+                    new_symbol = this->alph.add_symbol(new_tag_set);
                     original_to_tag_symbols[symbol_post.symbol] = new_symbol;
                 }
 
                 for (const mata::nfa::State& target : symbol_post.targets) {
-                    aut_union.delta.add(
-                        this->aut_matrix.get_union_state(copy_start, var_idx, source_state),
-                        new_symbol,
-                        this->aut_matrix.get_union_state(copy_start+1, var_idx, target)
-                    );
+                    mata::nfa::State source_in_tag_aut = this->aut_matrix.get_union_state(copy_start, var_idx, source_state);
+                    mata::nfa::State target_in_tag_aut = this->aut_matrix.get_union_state(copy_start+1, var_idx, target);
+
+                    aut_union.delta.add(source_in_tag_aut, new_symbol, target_in_tag_aut);
                 }
             }
         }
     }
 
-    ca::TagAut TagDiseqGen::construct_tag_aut() {
+    void TagDiseqGen::add_connection_for_multiple_predicates(char copy_start, size_t var_idx, mata::nfa::Nfa& aut_union) {
+        BasicTerm var = this->aut_matrix.get_var_order()[var_idx];
 
-        std::vector<BasicTerm> var_order = this->aut_matrix.get_var_order();
+        // We use the original automaton from this->aut_ass because the actual alphabet symbols
+        // might not be present in this->aut_matrix because they were replaced earlier by tags (<L, x>, etc.).
+        mata::nfa::Nfa& original_automaton = *this->aut_ass.at(var);
+
+        const size_t copy_idx_to_label_symbols_with = this->get_copy_idx_labeling_transition(copy_start, copy_start+1);
+
+        for (mata::nfa::State source_state = 0; source_state < original_automaton.num_of_states(); source_state++) {
+            for (const mata::nfa::SymbolPost& symbol_post : original_automaton.delta[source_state]) {
+
+                AtomicSymbol var_length   = AtomicSymbol::create_l_symbol(var);
+                AtomicSymbol mismatch_pos = AtomicSymbol::create_p_symbol(var, copy_idx_to_label_symbols_with);
+
+                for (size_t predicate_idx = 0; predicate_idx < this->predicates.size(); predicate_idx++) {
+                    AtomicSymbol register_store_lhs = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx,
+                                                                                                            AtomicSymbol::PredicateSide::LEFT,
+                                                                                                            copy_idx_to_label_symbols_with,
+                                                                                                            symbol_post.symbol);
+                    TagSet lhs_transition_tag_set ({var_length, mismatch_pos, register_store_lhs});
+                    mata::Symbol lhs_reg_store_handle = this->alph.add_symbol(lhs_transition_tag_set);
+
+                    AtomicSymbol register_store_rhs = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx,
+                                                                                                            AtomicSymbol::PredicateSide::RIGHT,
+                                                                                                            copy_idx_to_label_symbols_with,
+                                                                                                            symbol_post.symbol);
+                    TagSet rhs_transition_tag_set ({var_length, mismatch_pos, register_store_rhs});
+                    mata::Symbol rhs_reg_store_handle = this->alph.add_symbol(rhs_transition_tag_set);
+
+                    for (const mata::nfa::State& target : symbol_post.targets) {
+                        mata::nfa::State source_in_tag_aut = this->aut_matrix.get_union_state(copy_start, var_idx, source_state);
+                        mata::nfa::State target_in_tag_aut = this->aut_matrix.get_union_state(copy_start+1, var_idx, target);
+
+                        aut_union.delta.add(source_in_tag_aut, rhs_reg_store_handle, target_in_tag_aut);
+                        aut_union.delta.add(source_in_tag_aut, lhs_reg_store_handle, target_in_tag_aut);
+                    }
+                }
+            }
+        }
+
+        if (this->predicates.size() == 1) return;  // We don't add copy transitions when we are dealing with a single predicate
+
+        for (size_t predicate_idx = 0; predicate_idx < this->predicates.size(); predicate_idx++) {
+            ca::AtomicSymbol copy_for_lhs = ca::AtomicSymbol::create_c_symbol(var, predicate_idx, ca::AtomicSymbol::PredicateSide::LEFT,  copy_idx_to_label_symbols_with);
+            ca::AtomicSymbol copy_for_rhs = ca::AtomicSymbol::create_c_symbol(var, predicate_idx, ca::AtomicSymbol::PredicateSide::RIGHT, copy_idx_to_label_symbols_with);
+
+            // There is no need to cache the symbols - we know that every (var, copy_idx) will have a single unique Copy symbol
+            mata::Symbol sym_handle_for_lhs = this->alph.add_symbol({copy_for_lhs});
+            mata::Symbol sym_handle_for_rhs = this->alph.add_symbol({copy_for_rhs});
+
+            for (mata::nfa::State source_state_rel = 0; source_state_rel < original_automaton.num_of_states(); source_state_rel++) {
+                mata::nfa::State source_state_abs = this->aut_matrix.get_union_state(copy_start,   var_idx, source_state_rel);
+                mata::nfa::State dest_state_abs   = this->aut_matrix.get_union_state(copy_start+1, var_idx, source_state_rel);
+
+                aut_union.delta.add(source_state_abs, sym_handle_for_lhs, dest_state_abs);
+                aut_union.delta.add(source_state_abs, sym_handle_for_rhs, dest_state_abs);
+            }
+        }
+    }
+
+    ca::TagAut TagDiseqGen::construct_tag_aut() {
+        const std::vector<BasicTerm>& var_order = this->aut_matrix.get_var_order();
+        const size_t copy_cnt = this->get_copy_cnt();
+
         // update symbols for each inner automaton
-        for (char copy = 0; copy < 3; copy++) {
+        for (char copy = 0; copy < copy_cnt; copy++) {
             for (size_t var = 0; var < var_order.size(); var++) {
                 // replace each automaton in the matrix with the specific AtomicSymbol
                 replace_symbols(copy, var);
@@ -229,14 +289,22 @@ namespace smt::noodler::ca {
         this->alph.insert(mata::nfa::EPSILON, {});
 
         // generate connecting transitions
-        for (char copy = 0; copy < 2; copy++) {
-            for (size_t var = 0; var < var_order.size(); var++) {
-                add_connection(copy, var, nfa_with_metadata.nfa);
+        if (this->predicates.size() == 1) {
+            for (char copy_idx = 0; copy_idx < copy_cnt - 1; copy_idx++) {
+                for (size_t var_idx = 0; var_idx < var_order.size(); var_idx++) {
+                    this->add_connection_single_predicate(copy_idx, var_idx, nfa_with_metadata.nfa);
+                }
+            }
+        } else {
+            for (char copy_idx = 0; copy_idx < copy_cnt - 1; copy_idx++) {
+                for (size_t var_idx = 0; var_idx < var_order.size(); var_idx++) {
+                    this->add_connection_for_multiple_predicates(copy_idx, var_idx, nfa_with_metadata.nfa);
+                }
             }
         }
 
         // Trim the automaton
-        {
+        if (this->predicates.size() == 1) {
             size_t original_nfa_size = nfa_with_metadata.nfa.num_of_states();
 
             std::unordered_map<mata::nfa::State, mata::nfa::State> state_renaming; // Original state -> New state

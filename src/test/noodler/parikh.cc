@@ -398,3 +398,329 @@ TEST_CASE("LenFormula : variables are numbered correctly", "[noodler]") {
         assert_eq_correct(to_app(z3_right_conjunction)->get_arg(1), 0, 4); // z=4  => (0)=4
     }
 }
+
+std::optional<size_t> find_mismatch_pos_tag(std::set<AtomicSymbol>& tag_set, const BasicTerm& var) {
+    for (auto& tag : tag_set) {
+        if (tag.type == AtomicSymbol::TagType::MISMATCH_POS && tag.var == var) return tag.copy_idx;
+    }
+    return std::nullopt;
+}
+
+std::map<size_t, std::set<size_t>> get_nonsampling_transitions_labeled_with_symbol(TagAut& tag_automaton, const BasicTerm& var) {
+    std::map<size_t, std::set<size_t>> level_to_mismatch_pos_copy_indices_used;
+
+    for (mata::nfa::State source_state = 0; source_state < tag_automaton.nfa.num_of_states(); source_state++) {
+        for (const mata::nfa::SymbolPost& symbol_post : tag_automaton.nfa.delta[source_state]) {
+            std::set<AtomicSymbol> tag_set = tag_automaton.alph.get_symbol(symbol_post.symbol);
+            auto mismatch_tag = find_mismatch_pos_tag(tag_set, var);
+            if (!mismatch_tag.has_value()) continue;
+
+            for (const mata::nfa::State target_state : symbol_post.targets) {
+                size_t source_level = tag_automaton.metadata.levels[source_state];
+                size_t target_level = tag_automaton.metadata.levels[target_state];
+                if (source_level != target_level) continue;
+
+                level_to_mismatch_pos_copy_indices_used[source_level].insert(mismatch_tag.value());
+            }
+        }
+    }
+
+    return level_to_mismatch_pos_copy_indices_used;
+}
+
+TEST_CASE("NotContains::copies should differ in transition symbols", "[noodler]") {
+    // Check that transitions use different _i_ in their <P, x, _i_> symbols
+    std::vector<BasicTerm> lhs {get_var('x'), get_var('y')};
+    std::vector<BasicTerm> rhs {get_var('x')};
+    Predicate disequation(PredicateType::Equation, {lhs, rhs});
+
+    AutAssignment aut_assignment;
+    aut_assignment[get_var('x')] = regex_to_nfa("abc");
+    aut_assignment[get_var('y')] = regex_to_nfa("aa");
+
+    ca::TagDiseqGen tag_automaton_generator(disequation, aut_assignment);
+    ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
+
+    // size_t states_in_row = 7;
+    REQUIRE(tag_automaton.nfa.num_of_states() == 15);
+
+    BasicTerm var_x = get_var('x');
+    auto what_mismatch_labels_do_levels_contain = get_nonsampling_transitions_labeled_with_symbol(tag_automaton, var_x);
+
+    std::map<size_t, std::set<size_t>> expected_labels_at_levels;
+    expected_labels_at_levels[0] = {1};
+    expected_labels_at_levels[1] = {2};
+
+    bool do_match = (expected_labels_at_levels == what_mismatch_labels_do_levels_contain);
+    REQUIRE(do_match);
+}
+
+using TagSet = std::set<ca::AtomicSymbol>;
+
+std::optional<mata::nfa::State> find_state_in_trimmed_aut(const TagAut& aut, mata::nfa::State needle_state, size_t states_in_row_before_trim) {
+    size_t state_level = needle_state / states_in_row_before_trim;
+    size_t state_copy_origin = needle_state % states_in_row_before_trim;
+
+    for (mata::nfa::State candidate_state = 0; candidate_state < aut.nfa.num_of_states(); candidate_state++) {
+        size_t candidate_level  = aut.metadata.levels[candidate_state];
+        size_t candidate_origin = aut.metadata.where_is_state_copied_from[candidate_state];
+
+        if (candidate_level == state_level && candidate_origin == state_copy_origin) return candidate_state;
+    }
+
+    return std::nullopt;
+}
+
+std::string tag_set_to_string(const TagSet& tag_set) {
+    std::stringstream string_builder;
+    string_builder << "(";
+    for (auto& tag : tag_set) {
+        string_builder << tag.to_string() << ", ";
+    }
+    string_builder << ")";
+    return string_builder.str();
+}
+
+void dump_alphabet(CounterAlphabet& alphabet) {
+    std::set<TagSet> known_alphabet_symbols = alphabet.get_all_symbols();
+    for (const auto& tag_set : known_alphabet_symbols) {
+        std::cout << "  -";
+        std::cout << tag_set_to_string(tag_set) << ", ";
+        std::cout << "\n";
+    }
+    std::cout << "\n";
+}
+
+struct TagSetTransition {
+    mata::nfa::State source;
+    TagSet tag_set;
+    mata::nfa::State target;
+};
+
+namespace std {
+    std::ostream& operator<<(std::ostream& output_stream, const TagSetTransition& transition) {
+        output_stream << "{.source=" << transition.source
+                      << ", .tag_set=" << tag_set_to_string(transition.tag_set)
+                      << ", .target=" << transition.target << "}";
+        return output_stream;
+    }
+};
+
+void assert_all_transitions_present(TagAut& aut, std::vector<TagSetTransition>& transitions, size_t states_in_row) {
+    std::vector<TagSetTransition> missing_transitions;
+
+    for (auto& transition : transitions) {
+        bool found_transition = false;
+
+        auto maybe_source_state = find_state_in_trimmed_aut(aut, transition.source, states_in_row);
+        auto maybe_target_state = find_state_in_trimmed_aut(aut, transition.target, states_in_row);
+        REQUIRE(maybe_source_state.has_value());
+        REQUIRE(maybe_target_state.has_value());
+
+        if (!aut.alph.has_mata_symbol_for(transition.tag_set)) {
+            std::cout << "Unknown tag set: ";
+            std::cout << tag_set_to_string(transition.tag_set) << "\n";
+            std::cout << "Known tag sets: ";
+            dump_alphabet(aut.alph);
+            std::cout << "\n";
+        }
+
+        mata::Symbol tag_set_handle = aut.alph.get_mata_symbol(transition.tag_set);
+
+        mata::nfa::StatePost source_post = aut.nfa.delta[maybe_source_state.value()];
+
+        for (mata::nfa::SymbolPost symbol_post : source_post) {
+            if (symbol_post.symbol != tag_set_handle) continue;
+
+            for (mata::nfa::State post_state : symbol_post) {
+                if (post_state == maybe_target_state.value()) {
+                    found_transition = true;
+                    break;
+                }
+            }
+
+            break;
+        }
+
+        if (!found_transition) {
+            std::cout << "Transition missing! " << transition << "\n";
+            missing_transitions.push_back(transition);
+        }
+    }
+
+    REQUIRE(missing_transitions.empty());
+}
+
+TEST_CASE("Disequations :: tag automaton for a single disequation is correct", "[noodler]") {
+    BasicTerm var_x = get_var('x');
+    BasicTerm var_y = get_var('y');
+    BasicTerm var_z = get_var('z');
+    Predicate diseq1(PredicateType::Equation, { {var_x}, {var_y, var_z} });
+
+    AutAssignment aut_assignment;
+    aut_assignment[var_x] = regex_to_nfa("a");
+    aut_assignment[var_y] = regex_to_nfa("b");
+    aut_assignment[var_z] = regex_to_nfa("c");
+
+    ca::TagDiseqGen tag_automaton_generator(diseq1, aut_assignment);
+    ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
+
+    REQUIRE(tag_automaton.nfa.num_of_states() == 10);
+
+    ca::AtomicSymbol len_x = ca::AtomicSymbol::create_l_symbol(var_x);
+    ca::AtomicSymbol len_y = ca::AtomicSymbol::create_l_symbol(var_y);
+    ca::AtomicSymbol len_z = ca::AtomicSymbol::create_l_symbol(var_z);
+    ca::AtomicSymbol mismatch_pos_x_1 = ca::AtomicSymbol::create_p_symbol(var_x, 1);
+    ca::AtomicSymbol mismatch_pos_y_1 = ca::AtomicSymbol::create_p_symbol(var_y, 1);
+    ca::AtomicSymbol mismatch_pos_y_2 = ca::AtomicSymbol::create_p_symbol(var_y, 2);
+    ca::AtomicSymbol mismatch_pos_z_2 = ca::AtomicSymbol::create_p_symbol(var_z, 2);
+    ca::AtomicSymbol register_store_x_1 = ca::AtomicSymbol::create_r_symbol(var_x, 1, 'a');
+    ca::AtomicSymbol register_store_y_1 = ca::AtomicSymbol::create_r_symbol(var_y, 1, 'b');
+    ca::AtomicSymbol register_store_y_2 = ca::AtomicSymbol::create_r_symbol(var_y, 2, 'b');
+    ca::AtomicSymbol register_store_z_2 = ca::AtomicSymbol::create_r_symbol(var_z, 2, 'c');
+
+    size_t states_in_row_before_trimming = 6;
+
+    std::vector<TagSetTransition> expected_transitions = {
+        {.source = 0, .tag_set = {len_x, mismatch_pos_x_1}, .target = 1},
+        {.source = 0, .tag_set = {len_x, mismatch_pos_x_1, register_store_x_1}, .target = 7},
+        {.source = 2, .tag_set = {len_y, mismatch_pos_y_1, register_store_y_1}, .target = 9},
+        {.source = 8, .tag_set = {len_y, mismatch_pos_y_2}, .target = 9},
+        {.source = 8, .tag_set = {len_y, mismatch_pos_y_2, register_store_y_2}, .target = 15},
+        {.source = 8, .tag_set = {len_y, mismatch_pos_y_2, register_store_y_2}, .target = 15},
+        {.source = 16, .tag_set = {len_z}, .target = 17},
+        {.source = 10, .tag_set = {len_z, mismatch_pos_z_2, register_store_z_2}, .target = 17},
+    };
+
+    assert_all_transitions_present(tag_automaton, expected_transitions, states_in_row_before_trimming);
+}
+
+
+void add_all_possible_sampling_transitions(std::vector<TagSetTransition>& transitions, const BasicTerm& var, size_t copy_idx, size_t predicate_count, const mata::nfa::Transition& transition) {
+    ca::AtomicSymbol var_len = ca::AtomicSymbol::create_l_symbol(var);
+    ca::AtomicSymbol mismatch_pos = ca::AtomicSymbol::create_p_symbol(var, copy_idx);
+
+    for (size_t predicate_idx = 0; predicate_idx < predicate_count; predicate_idx++) {
+        ca::AtomicSymbol register_store_left = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, AtomicSymbol::PredicateSide::LEFT, copy_idx, transition.symbol);
+        TagSet left_tag_set = {var_len, mismatch_pos, register_store_left};
+        TagSetTransition transition_sampling_left = {.source = transition.source, .tag_set = left_tag_set, .target = transition.target};
+        transitions.push_back(transition_sampling_left);
+
+        ca::AtomicSymbol register_store_right = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, AtomicSymbol::PredicateSide::RIGHT, copy_idx, transition.symbol);
+        TagSet right_tag_set = {var_len, mismatch_pos, register_store_right};
+        TagSetTransition transition_sampling_right = {.source = transition.source, .tag_set = right_tag_set, .target = transition.target};
+        transitions.push_back(transition_sampling_right);
+    }
+}
+
+void add_all_possible_copy_transitions_between_states(std::vector<TagSetTransition>& transitions, const BasicTerm& var, size_t copy_idx, size_t predicate_count, const mata::nfa::Transition& transition) {
+    for (size_t predicate_idx = 0; predicate_idx < predicate_count; predicate_idx++) {
+        ca::AtomicSymbol copy_for_lhs = ca::AtomicSymbol::create_c_symbol(var, predicate_idx, AtomicSymbol::PredicateSide::LEFT, copy_idx);
+        TagSetTransition copy_transtion_for_lhs = {.source = transition.source, .tag_set = {copy_for_lhs}, .target = transition.target};
+        transitions.push_back(copy_transtion_for_lhs);
+
+        ca::AtomicSymbol copy_for_rhs = ca::AtomicSymbol::create_c_symbol(var, predicate_idx, AtomicSymbol::PredicateSide::RIGHT, copy_idx);
+        TagSetTransition copy_transition_for_rhs = {.source = transition.source, .tag_set = {copy_for_rhs}, .target = transition.target};
+        transitions.push_back(copy_transition_for_rhs);
+    }
+}
+
+void add_copy_transitions_for_variable_state_range(std::vector<TagSetTransition>& transitions, const BasicTerm& var, size_t predicate_count, size_t first_state, size_t last_state, size_t states_in_row) {
+    size_t num_of_rows = predicate_count*2 + 1;
+    for (mata::nfa::State state = first_state; state <= last_state; state++) {
+        for (size_t source_copy_idx = 0; source_copy_idx < num_of_rows - 1; source_copy_idx++) {
+            mata::nfa::State source_state = source_copy_idx*states_in_row     + state;
+            mata::nfa::State target_state = (source_copy_idx+1)*states_in_row + state;
+            mata::nfa::Transition transition(source_state, 'a', target_state);
+
+            size_t expected_copy_idx_labeling_transition = source_copy_idx + 1; // Copy tags are labeled with destination copy
+            add_all_possible_copy_transitions_between_states(transitions, var, expected_copy_idx_labeling_transition, predicate_count, transition);
+        }
+    }
+}
+
+void add_sampling_transitions_based_on_template(std::vector<TagSetTransition>& transitions, const mata::nfa::Transition& transition_template, BasicTerm& var, size_t predicate_count, size_t states_in_row) {
+    size_t num_of_rows = 2*predicate_count + 1;
+    for (size_t source_copy_idx = 0; source_copy_idx < num_of_rows - 1; source_copy_idx++) {
+        mata::nfa::Transition transition_instance (transition_template.source + source_copy_idx*states_in_row,
+                                                   transition_template.symbol,
+                                                   transition_template.target + (source_copy_idx+1)*states_in_row);
+        add_all_possible_sampling_transitions(transitions, var, source_copy_idx+1, predicate_count, transition_instance);
+    }
+}
+
+void add_nonsampling_transitions_based_on_template(std::vector<TagSetTransition>& transitions, const mata::nfa::Transition& transition_template, BasicTerm& var, size_t predicate_count, size_t states_in_row) {
+    size_t num_of_rows = 2*predicate_count + 1;
+    ca::AtomicSymbol length_tag = ca::AtomicSymbol::create_l_symbol(var);
+    for (size_t source_copy_idx = 0; source_copy_idx < num_of_rows; source_copy_idx++) {
+        size_t copy_idx_to_display = source_copy_idx + 1;
+        ca::AtomicSymbol mismatch_pos_tag_for_this_copy = ca::AtomicSymbol::create_p_symbol(var, copy_idx_to_display);
+
+        TagSet tag_set = {length_tag, mismatch_pos_tag_for_this_copy};
+        if (source_copy_idx == num_of_rows-1) {
+            tag_set = {length_tag};
+        }
+
+        TagSetTransition transition_instance (transition_template.source + source_copy_idx*states_in_row,
+                                              tag_set,
+                                              transition_template.target + source_copy_idx*states_in_row);
+        transitions.push_back(transition_instance);
+    }
+}
+
+TEST_CASE("Disequations :: automaton for more predicates is constructed correctly", "[noodler]") {
+    BasicTerm var_x = get_var('x');
+    BasicTerm var_y = get_var('y');
+    BasicTerm var_z = get_var('z');
+
+    Predicate diseq1(PredicateType::Equation, { {var_x}, {var_y} });
+    Predicate diseq2(PredicateType::Equation, { {var_y}, {var_z} });
+
+    AutAssignment aut_assignment;
+    aut_assignment[var_x] = regex_to_nfa("a");
+    aut_assignment[var_y] = regex_to_nfa("b");
+    aut_assignment[var_z] = regex_to_nfa("c");
+
+    ca::TagDiseqGen tag_automaton_generator({diseq1, diseq2}, aut_assignment);
+    ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
+
+    size_t states_in_row_before_trim = 6;
+    size_t num_of_rows = 5;
+    size_t predicate_count = 2;
+
+    REQUIRE(tag_automaton.nfa.num_of_states() == states_in_row_before_trim*num_of_rows); // 30 states, trimming should not be effective due to Copy tags
+
+    ca::AtomicSymbol len_x = ca::AtomicSymbol::create_l_symbol(var_x);
+    ca::AtomicSymbol len_y = ca::AtomicSymbol::create_l_symbol(var_y);
+    ca::AtomicSymbol len_z = ca::AtomicSymbol::create_l_symbol(var_z);
+    ca::AtomicSymbol mismatch_pos_x_1 = ca::AtomicSymbol::create_p_symbol(var_x, 1);
+    ca::AtomicSymbol mismatch_pos_y_1 = ca::AtomicSymbol::create_p_symbol(var_y, 1);
+    ca::AtomicSymbol mismatch_pos_z_1 = ca::AtomicSymbol::create_p_symbol(var_z, 1);
+
+    ca::AtomicSymbol mismatch_pos_y_2 = ca::AtomicSymbol::create_p_symbol(var_y, 2);
+    ca::AtomicSymbol mismatch_pos_z_2 = ca::AtomicSymbol::create_p_symbol(var_z, 2);
+
+    ca::AtomicSymbol register_store_x_1 = ca::AtomicSymbol::create_r_symbol_with_predicate_info(0, AtomicSymbol::PredicateSide::LEFT, 1, 'a');
+
+    ca::AtomicSymbol register_store_y_1 = ca::AtomicSymbol::create_r_symbol(var_y, 1, 'b');
+    ca::AtomicSymbol register_store_y_2 = ca::AtomicSymbol::create_r_symbol(var_y, 2, 'b');
+    ca::AtomicSymbol register_store_z_2 = ca::AtomicSymbol::create_r_symbol(var_z, 2, 'c');
+
+    std::vector<TagSetTransition> expected_transitions = {};
+
+    add_nonsampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(0, 'a', 1), var_x, predicate_count, states_in_row_before_trim);
+    add_nonsampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(2, 'b', 3), var_y, predicate_count, states_in_row_before_trim);
+    add_nonsampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(4, 'c', 5), var_z, predicate_count, states_in_row_before_trim);
+
+    // Add copy transitions
+    add_copy_transitions_for_variable_state_range(expected_transitions, var_x, /* predicate_count */ 2, /*first state*/ 0, /*last state*/ 1, states_in_row_before_trim);
+    add_copy_transitions_for_variable_state_range(expected_transitions, var_y, /* predicate_count */ 2, /*first state*/ 2, /*last state*/ 3, states_in_row_before_trim);
+    add_copy_transitions_for_variable_state_range(expected_transitions, var_z, /* predicate_count */ 2, /*first state*/ 4, /*last state*/ 5, states_in_row_before_trim);
+
+    // Check for sampling transitions
+    add_sampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(0, 'a', 1), var_x, predicate_count, states_in_row_before_trim);
+    add_sampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(2, 'b', 3), var_y, predicate_count, states_in_row_before_trim);
+    add_sampling_transitions_based_on_template(expected_transitions, mata::nfa::Transition(4, 'c', 5), var_z, predicate_count, states_in_row_before_trim);
+
+    assert_all_transitions_present(tag_automaton, expected_transitions, states_in_row_before_trim);
+}

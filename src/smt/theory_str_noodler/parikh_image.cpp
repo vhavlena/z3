@@ -387,7 +387,7 @@ namespace smt::noodler::parikh {
         for (const ca::AtomicSymbol& atomic_symbol : this->atomic_symbols) {
             bool is_register_store = (atomic_symbol.type == ca::AtomicSymbol::TagType::REGISTER_STORE);
             bool matches_var  = (atomic_symbol.var == var);
-            bool matches_side = (atomic_symbol.label == predicate_side_label);
+            bool matches_side = (atomic_symbol.copy_idx == predicate_side_label);
 
             if (is_register_store && matches_var && matches_side) {
                 const BasicTerm& symbol_count_var = this->tag_occurence_count_vars.at(atomic_symbol);
@@ -556,7 +556,7 @@ namespace smt::noodler::parikh {
                 LenNode sum(LenFormulaType::PLUS);
                 for (const LenNode& var_node : register_store_vars_writing_same_symbol) {
                     // Check whether the same alphabet symbol, e.g., 'a' can be sampled also on the other side
-                    ca::AtomicSymbol counterpart = ca::AtomicSymbol::create_r_symbol(var_node.atom_val, (ats.label == 1 ? char(2) : char(1)), ats.symbol);
+                    ca::AtomicSymbol counterpart = ca::AtomicSymbol::create_r_symbol(var_node.atom_val, (ats.copy_idx == 1 ? char(2) : char(1)), ats.symbol);
 
                     auto iter = this->tag_occurence_count_vars.find(counterpart);
                     // if there is not the counterpart, we don't have to generate the formula
