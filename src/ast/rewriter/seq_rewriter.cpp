@@ -1789,11 +1789,21 @@ br_status seq_rewriter::mk_seq_index(expr* a, expr* b, expr* c, expr_ref& result
     bool isc1 = str().is_string(a, s1);
     bool isc2 = str().is_string(b, s2);
     sort* sort_a = a->get_sort();
+    expr * c1, *c2;
 
     if (isc1 && isc2 && m_autil.is_numeral(c, r) && r.is_unsigned()) {
         int idx = s1.indexofu(s2, r.get_unsigned());
         result = m_autil.mk_int(idx);
         return BR_DONE;
+    }
+
+    // indexof(s1 + s2, b, c) -> s1.indexof(b) if the result is != -1 and s1 and b are concrete strings
+    if(str().is_concat(a, c1, c2) && isc2 && str().is_string(c1, s1) && m_autil.is_numeral(c, r) && r.is_unsigned()) {
+        int idx = s1.indexofu(s2, r.get_unsigned());
+        if(idx != -1) {
+            result = m_autil.mk_int(idx);
+            return BR_DONE;
+        }
     }
     if (m_autil.is_numeral(c, r) && r.is_neg()) {
         result = minus_one();
