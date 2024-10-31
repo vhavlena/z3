@@ -1175,6 +1175,7 @@ namespace smt::noodler {
         this->len_vars.insert(v);
         if(vars.size() > 0) {
             this->var_eqs.add(expr_ref(pred, m), xvar);
+            this->var_eqs.add(expr_ref(l, m), v); 
             this->len_vars.insert(xvar);
         } else {
             this->var_eqs.add(expr_ref(i, m), x);
@@ -1447,6 +1448,10 @@ namespace smt::noodler {
             // update length variables
             this->len_vars.insert(x);
             this->var_eqs.add(expr_ref(i, m), x);
+
+            expr_ref rest(m_util_a.mk_sub(m_util_a.mk_sub(m_util_s.str.mk_length(t), i), m_util_s.str.mk_length(s)), m);
+            m_rewrite(rest);
+            this->var_eqs.add(rest, y);
 
         } else {
             expr_ref len_t(m_util_s.str.mk_length(t), m);
@@ -1844,7 +1849,14 @@ namespace smt::noodler {
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
             return;
-        } 
+        } else if (m_util_s.str.is_string(y, str)) {
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
+                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
+                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
+            literal not_e = mk_literal(mk_not({e, m}));
+            add_axiom({not_e, mk_literal(re)});
+            return;
+        }
 
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");
