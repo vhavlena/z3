@@ -174,6 +174,11 @@ protected:
     LenNode get_diff_symbol_formula();
 
 public:
+    /**
+     * Number of predicates (size of a conjunction) for which we are building LIA formula for.
+     */
+    size_t predicate_count;
+
     ParikhImageDiseqTag(const ca::TagAut& ca, const std::set<ca::AtomicSymbol>& atomic_symbols, size_t number_of_states_in_row) :
         ParikhImage(ca.nfa),
         number_of_states_in_row(number_of_states_in_row),
@@ -195,6 +200,10 @@ public:
             sc
         });
     };
+
+    size_t get_predicate_count() const {
+        return this->predicate_count;
+    }
 
     /**
      * @brief Construct formula counting number of AtomicSymbol in each set on the transitions.
@@ -218,6 +227,8 @@ public:
     LenNode count_register_stores_for_var_and_side(BasicTerm& var, char predicate_side_label) const;
     LenNode ensure_symbol_uniqueness_using_total_sum(std::map<mata::Symbol, std::vector<LenNode>>& symbol_to_register_sample_vars) const;
     LenNode ensure_symbol_uniqueness_using_implication(std::map<mata::Symbol, std::vector<LenNode>>& symbol_to_register_sample_vars) const;
+
+    LenNode make_sure_every_disequation_has_symbols_sampled();
 
 
 };
@@ -280,6 +291,10 @@ public:
     LenNode existentially_quantify_all_parikh_vars(LenNode& formula);
 };
 
+}
+
+namespace std {
+    std::ostream& operator<<(std::ostream& out_stream, const smt::noodler::parikh::Transition& transition);
 }
 
 #endif

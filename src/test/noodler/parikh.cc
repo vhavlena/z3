@@ -724,3 +724,80 @@ TEST_CASE("Disequations :: automaton for more predicates is constructed correctl
 
     assert_all_transitions_present(tag_automaton, expected_transitions, states_in_row_before_trim);
 }
+
+TEST_CASE("Disequations :: check assert_every_disequation_has_symbols_sampled", "[noodler]") {
+    BasicTerm var_x = get_var('x');
+    BasicTerm var_y = get_var('y');
+    BasicTerm var_z = get_var('z');
+
+    Predicate diseq1(PredicateType::Equation, { {var_x}, {var_y} });
+    Predicate diseq2(PredicateType::Equation, { {var_y}, {var_z} });
+
+    AutAssignment aut_assignment;
+    aut_assignment[var_x] = regex_to_nfa("a");
+    aut_assignment[var_y] = regex_to_nfa("b");
+    aut_assignment[var_z] = regex_to_nfa("c");
+
+    ca::TagDiseqGen tag_automaton_generator({diseq1, diseq2}, aut_assignment);
+    ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
+    TagSet          available_tags = tag_automaton.gather_used_symbols();
+
+    size_t num_of_copies = 5;
+    size_t num_of_states_in_row = 6;
+    ParikhImageDiseqTag formula_generator (tag_automaton, available_tags, num_of_states_in_row);
+    formula_generator.compute_parikh_image();
+
+    std::unordered_map<BasicTerm, Transition> vars_to_transitions;
+    for (auto& [transition, var] : formula_generator.get_trans_vars()) {
+        vars_to_transitions[var] = transition;
+    }
+
+    LenNode all_diseqs_have_samples_assertion = formula_generator.make_sure_every_disequation_has_symbols_sampled();
+
+    REQUIRE(all_diseqs_have_samples_assertion.type == LenFormulaType::AND);
+    REQUIRE(all_diseqs_have_samples_assertion.succ.size() == 4); // Two disequations, each has two sides
+
+    std::set<std::pair<mata::nfa::State, mata::nfa::State>> expected_abstract_transitions;
+
+    for (mata::nfa::State state = 0; state < num_of_states_in_row; state++) {
+        for (size_t copy_idx = 0; copy_idx < num_of_copies-1; copy_idx++) {
+            mata::nfa::State source_state = state + num_of_states_in_row*copy_idx;
+            mata::nfa::State target_state = state + num_of_states_in_row*(copy_idx+1);
+            expected_abstract_transitions.insert(std::make_pair(source_state, target_state));
+        }
+    }
+
+    std::vector<std::pair<mata::nfa::State, mata::nfa::State>> register_store_transition_templates {
+        {0, 7},
+        {2, 9},
+        {4, 11},
+    };
+
+    for (auto [template_source, template_target] : register_store_transition_templates) {
+        for (size_t copy_idx = 0; copy_idx < num_of_copies-1; copy_idx++) {
+            mata::nfa::State source_state = template_source + num_of_states_in_row*copy_idx;
+            mata::nfa::State target_state = template_target + num_of_states_in_row*copy_idx;
+            expected_abstract_transitions.insert(std::make_pair(source_state, target_state));
+        }
+    }
+
+    for (const LenNode& conjunct: all_diseqs_have_samples_assertion.succ) {
+        REQUIRE(conjunct.type == LenFormulaType::EQ);
+        const LenNode& lhs = conjunct.succ[0];
+        REQUIRE(lhs.succ.size() == 36);
+
+        std::set<std::pair<mata::nfa::State, mata::nfa::State>> abstract_transitions;
+
+        for (const LenNode& var_node : lhs.succ) {
+            const BasicTerm& var = var_node.atom_val;
+            Transition var_transition = vars_to_transitions[var];
+
+            mata::nfa::State source_state = std::get<0>(var_transition);
+            mata::nfa::State target_state = std::get<2>(var_transition);
+
+            abstract_transitions.insert(std::make_pair(source_state, target_state));
+        }
+
+        REQUIRE(abstract_transitions == expected_abstract_transitions);
+    }
+}

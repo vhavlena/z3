@@ -3,6 +3,18 @@
 #include "formula.h"
 #include <cstdlib>
 
+using namespace smt::noodler::ca;
+
+namespace std {
+    std::ostream& operator<<(std::ostream& out_stream, const smt::noodler::parikh::Transition& transition) {
+        out_stream << "Transition{.source=" << std::to_string(std::get<0>(transition))
+                                            << ", .symbol=" << std::to_string(std::get<1>(transition))
+                                            << ", .target=" << std::to_string(std::get<2>(transition))
+                                            << "}";
+        return out_stream;
+    }
+}
+
 namespace smt::noodler::parikh {
 
     /**
@@ -615,6 +627,59 @@ namespace smt::noodler::parikh {
         std::map<mata::Symbol, std::vector<LenNode>> sampling_transition_vars_by_symbol = this->group_sampling_transition_vars_by_symbol();
         LenNode resulting_formula = ensure_symbol_uniqueness_using_total_sum(sampling_transition_vars_by_symbol);
         return resulting_formula;
+    }
+
+    LenNode ParikhImageDiseqTag::make_sure_every_disequation_has_symbols_sampled() {
+        // We have two kinds of "sampling" transitions:
+        // <C, var, disequation, side, copy_idx>
+        // <R, disequation, side, mismatch_idx, alphabet_symbol>
+        // Therefore, for any disequation D and its side S we need to have:
+        //    #<C, var, D, S, copy_idx> + #<R, disequation, side, mismatch_idx, alphabet_symbol> = 1
+        std::unordered_map<std::pair<size_t, ca::AtomicSymbol::PredicateSide>, std::vector<LenNode>> sampling_transitions_per_diseq_side;
+
+        std::cout << "Oi!\n";
+        // Collect variables that need to add to one for every (predicate, side)
+        for (const auto& [transition, transition_var] : this->get_trans_vars()) {
+            mata::nfa::State source_state  = std::get<0>(transition);
+            mata::Symbol     symbol_handle = std::get<1>(transition);
+            mata::nfa::State target_state  = std::get<2>(transition);
+
+            // @Note: We probably could use state metadata to accelerate this a bit more
+            size_t source_level = this->ca.metadata.levels[source_state];
+            size_t target_level = this->ca.metadata.levels[target_state];
+
+            bool is_sampling_transition = ((source_level+1) == target_level);
+            if (!is_sampling_transition) continue;
+
+            const TagSet& tag_set = ca.alph.get_symbol(symbol_handle);
+
+            std::pair<size_t, AtomicSymbol::PredicateSide> disequation_side;
+            bool disequation_side_info_found = false;
+            for (const auto& tag: tag_set) {
+                if (tag.type == AtomicSymbol::TagType::COPY_PREVIOUS || tag.type == AtomicSymbol::TagType::REGISTER_STORE) {
+                    disequation_side = std::make_pair(tag.predicate_idx, tag.predicate_side);
+                    disequation_side_info_found = true;
+                }
+            }
+
+            if (!disequation_side_info_found) {
+                std::cout << "Failed to find disequation side info for transition " << transition
+                          << ". Atomic symbol on edge: " << tag_set << std::endl;
+            }
+
+            assert(disequation_side_info_found); // Transition is crossing levels - it should be either Copy or Sampling
+
+            sampling_transitions_per_diseq_side[disequation_side].push_back(transition_var);
+        }
+
+        LenNode conjunction_across_all_disequations(LenFormulaType::AND, {});
+        for (const auto& [disequation_side, vars] : sampling_transitions_per_diseq_side) {
+            LenNode sum (LenFormulaType::PLUS, vars);
+            LenNode equation_for_this_diseq_side (LenFormulaType::EQ, {sum, 1});
+            conjunction_across_all_disequations.succ.push_back(equation_for_this_diseq_side);
+        }
+
+        return conjunction_across_all_disequations;
     }
 
     LenNode ParikhImageNotContTag::get_nt_all_mismatch_formula(const Predicate& not_cont) {

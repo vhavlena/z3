@@ -137,7 +137,7 @@ namespace smt::noodler::ca {
                     std::stringstream string_builder;
                     string_builder << "<R, ";
                                    // << var_escape + ", ";
-                    if (this->predicate_idx > 0) {
+                    if (this->predicate_idx >= 0) {
                         string_builder << this->predicate_idx << "-"
                                        << (this->predicate_side == PredicateSide::LEFT ? "L" : "R")
                                        << ", ";
@@ -173,7 +173,7 @@ namespace smt::noodler::ca {
          * create_r_symbol_with_predicate_info.
          */
         static AtomicSymbol create_r_symbol(const BasicTerm& var, size_t copy_idx, mata::Symbol symbol) {
-            return AtomicSymbol{TagType::REGISTER_STORE, var, 0, PredicateSide::LEFT, copy_idx, symbol};
+            return AtomicSymbol{TagType::REGISTER_STORE, var, /* predicate_idx */-1, PredicateSide::LEFT, copy_idx, symbol};
         }
 
         static AtomicSymbol create_r_symbol_with_predicate_info(size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symbol) {
@@ -188,8 +188,8 @@ namespace smt::noodler::ca {
             return tag;
         }
 
-        static AtomicSymbol create_c_symbol(const BasicTerm& var, size_t predicate_idx, PredicateSide side, size_t copy_idx) {
-            // Craete a Copy tag of the form: <C, x, h, k, i -> i+1> with the following semantics
+        static AtomicSymbol create_c_symbol(const BasicTerm& var, int predicate_idx, PredicateSide side, size_t copy_idx) {
+            // Create a Copy tag of the form: <C, x, h, k, i -> i+1> with the following semantics
             // the mismatch letter for _h_-th disequation and its _k_-th side is in variable _x_
             // and it is seen when transitioning from i-th copy. The symbol is the same as the one
             // sampled in previous sampling transition.
@@ -198,9 +198,9 @@ namespace smt::noodler::ca {
 
     private:
         // private constructor; the AtomicSymbol should be constructed using functions create*
-        AtomicSymbol(TagType tag_type, const BasicTerm& var, size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
+        AtomicSymbol(TagType tag_type, const BasicTerm& var, int predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
             : type(tag_type), var(var), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
-        AtomicSymbol(TagType tag_type, size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
+        AtomicSymbol(TagType tag_type, int predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
             : type(tag_type), var(BasicTermType::Variable, "dummy"), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
     };
 
@@ -332,9 +332,10 @@ namespace smt::noodler::ca {
         }
 
     };
-
-
 }
 
+namespace std {
+    std::ostream& operator<<(std::ostream& out_stream, const smt::noodler::ca::TagSet& tag_set);
+}
 
 #endif
