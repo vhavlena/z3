@@ -1337,6 +1337,9 @@ namespace smt::noodler {
             prep_handler.refine_languages();
             prep_handler.refine_languages();
         }
+        // ADDED RULE
+        prep_handler.generate_equiv(len_eq_vars);
+
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
