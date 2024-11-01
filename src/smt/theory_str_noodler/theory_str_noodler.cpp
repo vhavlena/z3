@@ -1445,6 +1445,10 @@ namespace smt::noodler {
             // tightestprefix(s, x, not(contains(t, s) && s != eps))
             tightest_prefix(s, x, {~cnt, s_eq_empty});
 
+            if(expr_cases::is_indexof_at(s, t, m, m_util_s)) {
+                add_axiom({mk_literal(m_util_a.mk_ge(i, zero))});
+            }
+
             // update length variables
             this->len_vars.insert(x);
             this->var_eqs.add(expr_ref(i, m), x);
@@ -1848,13 +1852,6 @@ namespace smt::noodler {
             expr_ref in_re(m_util_s.re.mk_in_re(y, re), m);
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
-            return;
-        } else if (m_util_s.str.is_string(y, str)) {
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
-                m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(str)),
-                m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
-            literal not_e = mk_literal(mk_not({e, m}));
-            add_axiom({not_e, mk_literal(re)});
             return;
         }
 
