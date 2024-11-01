@@ -1458,6 +1458,12 @@ br_status seq_rewriter::mk_seq_contains(expr* a, expr* b, expr_ref& result) {
         return BR_REWRITE2;
     }
 
+    // contains (at ...) str where |str| > 1 --> false
+    if(str().is_at(a) && str().is_string(b, d) && d.length() > 1) {
+        result = m().mk_false();
+        return BR_DONE;
+    }
+
     for (unsigned i = 0; bs.size() + i <= as.size(); ++i) {
         unsigned j = 0;
         for (; j < bs.size() && as.get(j+i) == bs.get(j); ++j) {};
