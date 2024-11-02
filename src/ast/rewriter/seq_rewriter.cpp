@@ -1202,6 +1202,11 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
         result = str().mk_empty(a_sort);
         return BR_DONE;
     }
+
+    if(constantPos && constantLen && pos.is_zero() && len >= 1 && str().is_at(a)) {
+        result = a;
+        return BR_REWRITE1;
+    }
     
     // case 1: pos < 0 or len <= 0
     // rewrite to ""
@@ -5416,6 +5421,13 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
     if (!reduce_eq(l, r, new_eqs, changed)) {
         result = m().mk_false();
         TRACE("seq_verbose", tout << result << "\n";);
+        return BR_DONE;
+    }
+
+    // str.at ... = str where |str| > 1 --> false
+    zstring val;
+    if(str().is_at(l) && str().is_string(r, val) && val.length() > 1) {
+        result = m().mk_false(); 
         return BR_DONE;
     }
     if (!changed) {
