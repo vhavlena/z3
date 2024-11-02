@@ -361,6 +361,9 @@ namespace smt::noodler::ca {
         prep_handler.reduce_diseqalities();
 
         if(prep_handler.get_modified_formula().get_predicates().size() == 0) {
+            if(prep_handler.get_aut_assignment().is_sat()) {
+                return LenNode(LenFormulaType::TRUE);
+            }
             return LenNode(LenFormulaType::FALSE);
         }
 
