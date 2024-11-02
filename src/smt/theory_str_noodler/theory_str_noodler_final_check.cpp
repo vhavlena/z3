@@ -9,7 +9,11 @@ namespace smt::noodler {
         ast_pp_util utl(manager);
         utl.collect(formula);
         utl.display_decls(stream);
+        stream << "(assert\n";
         utl.display_expr(stream, formula);
+        stream << "\n)"
+               << "(check-sat)\n"
+               << "(get-model)";
     }
 
     /**
@@ -853,7 +857,7 @@ namespace smt::noodler {
 
         this->statistics.at("length").num_start++;
         dec_proc->init_computation();
-        
+
         lbool result = dec_proc->compute_next_solution();
 
         if (result == l_true) {
@@ -871,13 +875,13 @@ namespace smt::noodler {
                     block_curr_len(lengths);
                     this->statistics.at("length").num_finish++;
                     return l_false;
-                } 
+                }
                 else if (len_dec_proc->get_formula().get_predicates().size() > 10) {
                     ctx.get_fparams().is_underapprox = true;
                     block_curr_len(expr_ref(m.mk_false(), m));
                     this->statistics.at("length").num_finish++;
                     return l_false;
-                } 
+                }
                 else {
                     return l_undef;
                 }
@@ -961,7 +965,7 @@ namespace smt::noodler {
         dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m, m_params.m_produce_models);
         this->statistics.at("multi-memb-heur").num_start++;
         lbool result = dec_proc->compute_next_solution();
-        
+
         if(result != l_undef) this->statistics.at("multi-memb-heur").num_finish++;
         return result;
     }

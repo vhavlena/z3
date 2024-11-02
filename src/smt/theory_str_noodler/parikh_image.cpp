@@ -120,7 +120,7 @@ namespace smt::noodler::parikh {
      * spanning tree wrt a run.
      *
      * phi^1_q := sigma_q = 0 <=> gamma^I_q = 1 (the first state has distance 1)
-     * phi^2_q := sigma_q = -1 => (gamma^I_q = 0 && (conj #t = 0 for each t = (.,.,q)) ) (if a state does not occurr on the
+     * phi^2_q := sigma_q <= -1 => (gamma^I_q = 0 && (conj #t = 0 for each t = (.,.,q)) ) (if a state does not occurr on the
      *      run, #t of transitions leading to this state is zero)
      * phi^3_q := sigma_q > 0 => (disj #t > 0 && sigma_r >= 0 && sigma_q = sigma_r + 1 for each t = (r,.,q))
      *      (if a state q occurs on the run and it is not initial, there is some predecessor of this state in the run with
@@ -139,7 +139,8 @@ namespace smt::noodler::parikh {
         }
 
         for (size_t state = 0; state < this->nfa.num_of_states(); state++) {
-            LenNode cl1(LenFormulaType::AND, {
+            // State has a distance 0 in the spanning tree iff it is the initial state
+            LenNode cl1(LenFormulaType::AND, { // sigma_q = 0  <=>  gamma_init_q = 1
                 LenNode(LenFormulaType::OR, {
                     LenNode(LenFormulaType::NEQ, {this->sigma[state], 0}),
                     LenNode(LenFormulaType::EQ, {this->gamma_init[state], 1}),
@@ -150,6 +151,8 @@ namespace smt::noodler::parikh {
                 }),
             });
 
+            // Force all incoming transitions to be taken 0 times
+            // @Optimize: maybe we could emit a sum of all transitions here: \sum(..) = 0, the LIA solver might be happier
             LenNode conj_prev(LenFormulaType::AND);
             for(const Transition& tr : prev_trans[state]) {
                 conj_prev.succ.push_back(LenNode(LenFormulaType::EQ, {
@@ -157,26 +160,32 @@ namespace smt::noodler::parikh {
                     0
                 }));
             }
-            LenNode cl2(LenFormulaType::OR, {
-                LenNode(LenFormulaType::NEQ, { this->sigma[state], -1 }),
+
+            // If the state has negative sigma_q, then it is not visited at all - force all incoming transitions to be taken 0 times.
+            LenNode minus_sigma (LenFormulaType::MINUS, {this->sigma[state]});
+            LenNode cl2(LenFormulaType::OR, { // sigma_q <= -1  --> "all incoming transitions are taken 0 times"
+                LenNode(LenFormulaType::LT, { minus_sigma, 1 }),  // in implication we have (sigma <= -1), rewriting implication we get (sigma > -1) <=> (-sigma < 1)
                 LenNode(LenFormulaType::AND, {
                     LenNode(LenFormulaType::EQ, { this->gamma_init[state], 0 }),
                     conj_prev,
                 })
             });
 
+            // If the state q was visited during a run, it was reached from q' via some transition t.
+            // There must be one transition reaching q first, therefore, generate a disjunction
+            // across all incoming transitions t, such that if t is taken, then sigma_q = sigma_{q'} + 1
             LenNode disj_prev(LenFormulaType::OR);
             for(const Transition& tr : prev_trans[state]) {
-                disj_prev.succ.push_back(LenNode(LenFormulaType::AND, {
-                    LenNode(LenFormulaType::LT, {0, this->trans.at(tr)}),
-                    LenNode(LenFormulaType::LEQ, {0, this->sigma[std::get<0>(tr)]}),
-                    LenNode(LenFormulaType::EQ, {
+                disj_prev.succ.push_back(LenNode(LenFormulaType::AND, {               // AND:
+                    LenNode(LenFormulaType::LT, {0, this->trans.at(tr)}),             // - Transition was taken (0 < #t)
+                    LenNode(LenFormulaType::LEQ, {0, this->sigma[std::get<0>(tr)]}),  // - The source state of the transition is reached within this run
+                    LenNode(LenFormulaType::EQ, {                                     // - the distance of the current state is one bigger than the origin of the transition
                         this->sigma[state],
                         LenNode(LenFormulaType::PLUS, { this->sigma[std::get<0>(tr)], 1 }),
                     })
                 }));
             }
-            LenNode cl3(LenFormulaType::OR, {
+            LenNode cl3(LenFormulaType::OR, {  // (sigma_q > 0) --> "above formula forcing correct value of sigma_q"
                 LenNode(LenFormulaType::LEQ, {this->sigma[state], 0}),
                 disj_prev
             });
@@ -289,11 +298,14 @@ namespace smt::noodler::parikh {
     LenNode ParikhImageDiseqTag::get_all_mismatch_formula(const Predicate& diseq) {
         // create formula OR( mismatch(i,j) where i is position of left of diseq and j is position of right of diseq )
         LenNode mismatch(LenFormulaType::OR);
+
         for(size_t i = 0; i < diseq.get_left_side().size(); i++) {
             for (size_t j = 0; j < diseq.get_right_side().size(); j++) {
                 mismatch.succ.push_back(get_mismatch_formula(i, j, diseq));
             }
         }
+
+        mismatch.succ.push_back(get_mismatch_formula(0, 1, diseq));
         return mismatch;
     }
 
@@ -308,26 +320,28 @@ namespace smt::noodler::parikh {
             tout << std::endl;
         );
         STRACE("str-diseq", tout << "* compute_parikh_image:  " << std::endl << parikh << std::endl << std::endl;);
-        LenNode diseq_len = get_diseq_length(diseq);
-        STRACE("str-diseq", tout << "* get_diseq_length:  " << std::endl << diseq_len << std::endl << std::endl;);
+        // LenNode diseq_len = get_diseq_length(diseq);
+        // STRACE("str-diseq", tout << "* get_diseq_length:  " << std::endl << diseq_len << std::endl << std::endl;);
         LenNode mismatch = get_all_mismatch_formula(diseq);
         STRACE("str-diseq", tout << "* get_mismatch_formula:  " << std::endl << mismatch << std::endl << std::endl;);
-        LenNode len = get_var_length(diseq.get_set());
-        STRACE("str-diseq", tout << "* get_var_length:  " << std::endl << len << std::endl << std::endl;);
+        LenNode force_new_vars_expressing_str_vars_length = get_var_length(diseq.get_set());
+        STRACE("str-diseq", tout << "* get_var_length:  " << std::endl << force_new_vars_expressing_str_vars_length << std::endl << std::endl;);
         LenNode diff_symbol = get_diff_symbol_formula();
         STRACE("str-diseq", tout << "* get_diff_symbol_formula:  " << std::endl << diff_symbol << std::endl << std::endl;);
 
-        return LenNode(LenFormulaType::AND, {
+        LenNode result = LenNode(LenFormulaType::AND, {
             parikh,
-            len,
+            force_new_vars_expressing_str_vars_length,
             LenNode(LenFormulaType::OR, {
-                diseq_len,
+                // diseq_len,
                 LenNode(LenFormulaType::AND, {
                     mismatch,
                     diff_symbol
                 })
             })
         });
+
+        return result;
     }
 
     /**
@@ -410,7 +424,7 @@ namespace smt::noodler::parikh {
     }
 
 
-    std::pair<LenNode, size_t> ParikhImageDiseqTag::express_mismatch_position(const std::vector<BasicTerm>& predicate_side, size_t mismatch_pos, size_t sample_order_label, const LenNode* offset_var) const {
+    std::pair<LenNode, LenNode> ParikhImageDiseqTag::express_mismatch_position(const std::vector<BasicTerm>& predicate_side, size_t mismatch_pos, size_t sample_order_label, const LenNode* offset_var) const {
         const BasicTerm& var = predicate_side[mismatch_pos];
         LenNode mismatch_pos_formula = express_string_length_preceding_supposed_mismatch(predicate_side, mismatch_pos);
         // add symbol <P, var, label_left, 0> where var is i-th variable on left side of diseq
@@ -419,14 +433,12 @@ namespace smt::noodler::parikh {
         if (mismatch_sym_var_it == this->tag_occurence_count_vars.end()) {
             return std::make_pair(LenNode(LenFormulaType::FALSE), 0);  // The mismatch guess is not possible
         }
-        size_t mismatch_term_pos = mismatch_pos_formula.succ.size();
-        mismatch_pos_formula.succ.push_back(LenNode(mismatch_sym_var_it->second));
 
         if (offset_var != nullptr) {
             mismatch_pos_formula.succ.push_back(*offset_var);
         }
 
-        return std::make_pair(mismatch_pos_formula, mismatch_term_pos);
+        return std::make_pair(mismatch_pos_formula, LenNode(mismatch_sym_var_it->second));
     }
 
     /**
@@ -467,10 +479,10 @@ namespace smt::noodler::parikh {
             label_right = 1;
         }
 
-        auto [lhs_mismatch_pos_expr, lhs_mismatch_in_var_node_idx] = express_mismatch_position(diseq.get_left_side(), left_mismatch_pos, label_left);
+        auto [lhs_mismatch_pos_expr, lhs_position_inside_var] = express_mismatch_position(diseq.get_left_side(), left_mismatch_pos, label_left);
         if (lhs_mismatch_pos_expr.type == LenFormulaType::FALSE) return lhs_mismatch_pos_expr;
 
-        auto [rhs_mismatch_pos_expr, rhs_mismatch_in_var_node_idx] = express_mismatch_position(diseq.get_right_side(), right_mismatch_pos, label_right, &rhs_offset);
+        auto [rhs_mismatch_pos_expr, rhs_position_inside_var] = express_mismatch_position(diseq.get_right_side(), right_mismatch_pos, label_right, &rhs_offset);
         if (rhs_mismatch_pos_expr.type == LenFormulaType::FALSE) return rhs_mismatch_pos_expr;
 
         LenNode lhs_register_stores_cnt = count_register_stores_for_var_and_side(var_left, label_left);
@@ -479,37 +491,15 @@ namespace smt::noodler::parikh {
         LenNode rhs_register_stores_cnt = count_register_stores_for_var_and_side(var_right, label_right);
         LenNode rhs_has_register_store(LenFormulaType::LEQ, { 1, rhs_register_stores_cnt });
 
-        // If left_var == right_var, we don't know which sample will be seen first - create a disjunction for both branches
-        if (var_right == var_left) {
-            // Right now we have:
-            // lhs_mismatch_pos = <L, x> + ... <L, z> + <P, var, 1>
-            // rhs_mismatch_pos = <L, x> + ... <L, z> + <P, var, 2>
+        if (var_right != var_left) { // Simple case, we know whose mismatch symbol will be sampled first
+            // No need to do any magic with the position_inside_var (e.g. #<P, X, 1>) vars
+            lhs_mismatch_pos_expr.succ.push_back(lhs_position_inside_var);
+            rhs_mismatch_pos_expr.succ.push_back(rhs_position_inside_var);
 
-            LenNode mismatch_position_case_split(LenFormulaType::OR);
-
-            // (lhs < rhs) lhs sees mismatch sooner than rhs
-            {
-                LenNode rhs_sees_mismatch_later = rhs_mismatch_pos_expr;
-                rhs_sees_mismatch_later.succ.push_back(lhs_mismatch_pos_expr.succ[lhs_mismatch_in_var_node_idx]);  // <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
-
-                LenNode branch(LenFormulaType::EQ, {lhs_mismatch_pos_expr, rhs_sees_mismatch_later});
-                mismatch_position_case_split.succ.push_back(branch);
-            }
-
-            // (lhs > rhs) rhs sees mismatch sooner than lhs
-            {
-                LenNode lhs_sees_mismatch_later = lhs_mismatch_pos_expr;
-                lhs_sees_mismatch_later.succ.push_back(rhs_mismatch_pos_expr.succ[rhs_mismatch_in_var_node_idx]); // <L, x> + ... <L, z> + <P, var, 1> + <P, var, 2>
-
-                LenNode rhs_sees_mismatch_sooner = rhs_mismatch_pos_expr;
-                rhs_mismatch_pos_expr.succ[rhs_mismatch_in_var_node_idx] = lhs_mismatch_pos_expr.succ[lhs_mismatch_in_var_node_idx]; // Replace the trailing <P, var, 2> with <P, var, 1>
-
-                LenNode branch(LenFormulaType::EQ, {lhs_sees_mismatch_later, rhs_sees_mismatch_sooner});
-                mismatch_position_case_split.succ.push_back(branch);
-            }
+            LenNode mismatch_position_is_same(LenFormulaType::EQ, { lhs_mismatch_pos_expr, rhs_mismatch_pos_expr});
 
             return LenNode(LenFormulaType::AND, {
-                mismatch_position_case_split,
+                mismatch_position_is_same,
                 lhs_has_register_store,
                 rhs_has_register_store
             });
@@ -521,14 +511,42 @@ namespace smt::noodler::parikh {
         // LenNode some_lhs_mismatch_seen(LenFormulaType::LEQ, { 1, LenNode(first_mismatch_sym_var_it->second) });
         // LenNode some_rhs_mismatch_seen(LenFormulaType::LEQ, { 1, LenNode(second_mismatch_sym_var_it->second) });
 
-        LenNode mismatch_position_is_same(LenFormulaType::EQ, { lhs_mismatch_pos_expr, rhs_mismatch_pos_expr});
+        // If left_var == right_var, we don't know which sample will be seen first - create a disjunction for both branches
+        LenNode mismatch_position_case_split(LenFormulaType::OR);
+
+        // (lhs < rhs) lhs sees mismatch sooner than rhs
+        {
+            LenNode lhs_sees_mismatch_sooner = lhs_mismatch_pos_expr;
+            lhs_sees_mismatch_sooner.succ.push_back(lhs_position_inside_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
+
+            LenNode rhs_sees_mismatch_later = rhs_mismatch_pos_expr;
+            rhs_sees_mismatch_later.succ.push_back(lhs_position_inside_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
+            rhs_sees_mismatch_later.succ.push_back(rhs_position_inside_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1> + <P, var, 2>
+
+            LenNode branch(LenFormulaType::EQ, {lhs_sees_mismatch_sooner, rhs_sees_mismatch_later});
+            mismatch_position_case_split.succ.push_back(branch);
+        }
+
+        // (lhs > rhs) rhs sees mismatch sooner than lhs
+        {
+            // When building the sum for both sides, we pass in which of the variables should be seen first to generate correct <P, var, ORD> var to add
+            // In the case when (var_right == var_left) we always pass ORD=1 for var_left, and ORD=2 for var_right, so we know that rhs_position_inside_var = <P, X, 2>
+            LenNode lhs_sees_mismatch_later = lhs_mismatch_pos_expr;
+            lhs_sees_mismatch_later.succ.push_back(lhs_position_inside_var); // Result: <L, x> + ... <L, z> + <P, var, 1>
+            lhs_sees_mismatch_later.succ.push_back(rhs_position_inside_var); // Result: <L, x> + ... <L, z> + <P, var, 1> + <P, var, 2>
+
+            LenNode rhs_sees_mismatch_sooner = rhs_mismatch_pos_expr;
+            rhs_sees_mismatch_sooner.succ.push_back(lhs_position_inside_var); // <L, x> + ... <L, z> + <P, var, 1>
+
+            LenNode branch(LenFormulaType::EQ, {lhs_sees_mismatch_later, rhs_sees_mismatch_sooner});
+            mismatch_position_case_split.succ.push_back(branch);
+        }
 
         return LenNode(LenFormulaType::AND, {
-            mismatch_position_is_same,
+            mismatch_position_case_split,
             lhs_has_register_store,
             rhs_has_register_store
         });
-
     }
 
     LenNode ParikhImageDiseqTag::ensure_symbol_uniqueness_using_total_sum(std::map<mata::Symbol, std::vector<LenNode>>& symbol_to_register_sample_vars) const {
