@@ -637,7 +637,6 @@ namespace smt::noodler::parikh {
         //    #<C, var, D, S, copy_idx> + #<R, disequation, side, mismatch_idx, alphabet_symbol> = 1
         std::unordered_map<std::pair<size_t, ca::AtomicSymbol::PredicateSide>, std::vector<LenNode>> sampling_transitions_per_diseq_side;
 
-        std::cout << "Oi!\n";
         // Collect variables that need to add to one for every (predicate, side)
         for (const auto& [transition, transition_var] : this->get_trans_vars()) {
             mata::nfa::State source_state  = std::get<0>(transition);
@@ -680,6 +679,135 @@ namespace smt::noodler::parikh {
         }
 
         return conjunction_across_all_disequations;
+    }
+
+    LenNode ParikhImageDiseqTag::assert_register_values() {
+        int predicate_count   = static_cast<int>(this->get_predicate_count());
+        int register_count = 2*predicate_count; // Every predicate has 2 sides
+        int max_mismatch_sample = 2*predicate_count+1; // Every predicate has 2 sides
+
+        this->registers_in_sampling_order.clear();
+        this->registers_in_sampling_order.reserve(register_count);
+
+        // Populate registers in sampling order
+        for (size_t register_idx = 0; register_idx < register_count; register_idx++) {
+            std::string var_name = "reg_ord" + std::to_string(register_idx);
+            BasicTerm var = BasicTerm(BasicTermType::Variable, var_name);
+            LenNode var_node (var);
+            this->registers_in_sampling_order.push_back(var_node);
+        }
+
+        this->registers_per_disequation_side.clear(); // Technically, this should not be needed
+
+        for (int predicate_idx = 0; predicate_idx < predicate_count; predicate_idx++) {
+            DiseqSide lhs = {predicate_idx, AtomicSymbol::PredicateSide::LEFT};
+            DiseqSide rhs = {predicate_idx, AtomicSymbol::PredicateSide::RIGHT};
+
+            std::string lhs_var_name = "reg_diseq" + std::to_string(predicate_idx) + "_left";
+            std::string rhs_var_name = "reg_diseq" + std::to_string(predicate_idx) + "_right";
+
+            BasicTerm lhs_var = BasicTerm(BasicTermType::Variable, lhs_var_name);
+            BasicTerm rhs_var = BasicTerm(BasicTermType::Variable, rhs_var_name);
+
+            this->registers_per_disequation_side.emplace(lhs, lhs_var);
+            this->registers_per_disequation_side.emplace(rhs, rhs_var);
+        }
+
+        LenNode all_registers_have_value_conjunction (LenFormulaType::AND, {});
+        all_registers_have_value_conjunction.succ.reserve(register_count);
+
+        // Prepare disjunctions for every automaton level forcing value of the corresponding reg_ord<i>
+        for (int register_idx = 0; register_idx < register_count; register_idx++) {
+            all_registers_have_value_conjunction.succ.push_back(LenNode(LenFormulaType::AND, {}));
+        }
+
+        for (const auto& [transition, var] : this->get_trans_vars()) {
+            mata::nfa::State source_state  = std::get<0>(transition);
+            mata::Symbol     symbol_handle = std::get<1>(transition);
+            mata::nfa::State target_state  = std::get<2>(transition);
+
+            size_t source_level = ca.metadata.levels[source_state];
+            size_t target_level = ca.metadata.levels[target_state];
+
+            if (source_level == target_level) continue; // This transition is not Copy nor Register_Store
+
+            const TagSet& tag_set = ca.alph.get_symbol(symbol_handle);
+
+            AtomicSymbol::TagType transition_type;
+            DiseqSide diseq_side;
+            int mismatch_level = -1;
+            mata::Symbol sampled_symbol;
+
+            // Look at the tags and determine what disequation and side are we sampling
+            for (const AtomicSymbol& tag : tag_set) {
+                if (tag.type == AtomicSymbol::TagType::REGISTER_STORE) {
+                    mismatch_level = static_cast<int>(tag.copy_idx);
+                    diseq_side = {.predicate_idx = tag.predicate_idx, .side = tag.predicate_side};
+                    transition_type = tag.type;
+                    sampled_symbol = tag.symbol;
+                }
+
+                if (tag.type == AtomicSymbol::TagType::COPY_PREVIOUS) {
+                    mismatch_level = static_cast<int>(tag.copy_idx);
+                    diseq_side = {.predicate_idx = tag.predicate_idx, .side = tag.predicate_side};
+                    transition_type = tag.type;
+                }
+            }
+
+            assert(mismatch_level >= 0);
+
+            int mismatch_idx = mismatch_level - 1;
+
+            LenNode& conjunction_for_this_mismatch_idx = all_registers_have_value_conjunction.succ[mismatch_idx];
+
+            if (transition_type == AtomicSymbol::TagType::COPY_PREVIOUS) {
+                if (mismatch_idx == 0) {
+                    std::cout << "Cannot have copy transitions from the first level - there is no register value to copy!\n";
+                    assert (mismatch_idx != 0);  // Fail
+                }
+                // Add an implicication:
+                //  (#<C, Var, disequation_idx, side, mismatch_level>  > 0) -> reg_ord{mismatch_level} = reg_ord{mismatch_level-1}
+                //  (#<C, Var, disequation_idx, side, mismatch_level> <= 0) OR reg_ord{mismatch_level} = reg_ord{mismatch_level-1}
+                LenNode implication_lhs (LenFormulaType::LEQ, {var, 0});
+
+                const LenNode& ith_register_var      = this->registers_in_sampling_order[mismatch_idx];
+                const LenNode& previous_register_var = this->registers_in_sampling_order[mismatch_idx-1];
+
+                const LenNode& diseq_side_register = this->registers_per_disequation_side.at(diseq_side);
+
+                LenNode set_ith_register        (LenFormulaType::EQ, {ith_register_var,    previous_register_var});
+                LenNode set_diseq_side_register (LenFormulaType::EQ, {diseq_side_register, previous_register_var});
+
+                LenNode implication_rhs (LenFormulaType::AND, {set_ith_register, set_diseq_side_register});
+                LenNode disjunction_equiv_to_implication (LenFormulaType::OR, {implication_lhs, implication_rhs});
+
+                conjunction_for_this_mismatch_idx.succ.push_back(disjunction_equiv_to_implication);
+                continue;
+            }
+
+            if (transition_type == AtomicSymbol::TagType::REGISTER_STORE) {
+                // Add an implicication:
+                //  (#<R, Var, disequation_idx, side, mismatch_level, A>  > 0) -> reg_ord{mismatch_level} = A
+                //  (#<R, Var, disequation_idx, side, mismatch_level, A> <= 0) OR reg_ord{mismatch_level} = A
+                LenNode implication_lhs (LenFormulaType::LEQ, {var, 0});
+
+                const LenNode& ith_register_var    = this->registers_in_sampling_order[mismatch_idx];
+                const LenNode& diseq_side_register = this->registers_per_disequation_side.at(diseq_side);
+
+                LenNode sampled_symbol_node (sampled_symbol);
+
+                LenNode set_ith_register        (LenFormulaType::EQ, {ith_register_var,    sampled_symbol_node});
+                LenNode set_diseq_side_register (LenFormulaType::EQ, {diseq_side_register, sampled_symbol_node});
+
+                LenNode implication_rhs (LenFormulaType::AND, {set_ith_register, set_diseq_side_register});
+                LenNode disjunction_equiv_to_implication (LenFormulaType::OR, {implication_lhs, implication_rhs});
+
+                conjunction_for_this_mismatch_idx.succ.push_back(disjunction_equiv_to_implication);
+                continue;
+            }
+        }
+
+        return all_registers_have_value_conjunction;
     }
 
     LenNode ParikhImageNotContTag::get_nt_all_mismatch_formula(const Predicate& not_cont) {

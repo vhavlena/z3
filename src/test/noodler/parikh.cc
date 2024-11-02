@@ -628,7 +628,7 @@ void add_all_possible_copy_transitions_between_states(std::vector<TagSetTransiti
 void add_copy_transitions_for_variable_state_range(std::vector<TagSetTransition>& transitions, const BasicTerm& var, size_t predicate_count, size_t first_state, size_t last_state, size_t states_in_row) {
     size_t num_of_rows = predicate_count*2 + 1;
     for (mata::nfa::State state = first_state; state <= last_state; state++) {
-        for (size_t source_copy_idx = 0; source_copy_idx < num_of_rows - 1; source_copy_idx++) {
+        for (size_t source_copy_idx = 1; source_copy_idx < num_of_rows - 1; source_copy_idx++) {
             mata::nfa::State source_state = source_copy_idx*states_in_row     + state;
             mata::nfa::State target_state = (source_copy_idx+1)*states_in_row + state;
             mata::nfa::Transition transition(source_state, 'a', target_state);
@@ -760,7 +760,7 @@ TEST_CASE("Disequations :: check assert_every_disequation_has_symbols_sampled", 
     std::set<std::pair<mata::nfa::State, mata::nfa::State>> expected_abstract_transitions;
 
     for (mata::nfa::State state = 0; state < num_of_states_in_row; state++) {
-        for (size_t copy_idx = 0; copy_idx < num_of_copies-1; copy_idx++) {
+        for (size_t copy_idx = 1; copy_idx < num_of_copies-1; copy_idx++) {
             mata::nfa::State source_state = state + num_of_states_in_row*copy_idx;
             mata::nfa::State target_state = state + num_of_states_in_row*(copy_idx+1);
             expected_abstract_transitions.insert(std::make_pair(source_state, target_state));
@@ -784,7 +784,7 @@ TEST_CASE("Disequations :: check assert_every_disequation_has_symbols_sampled", 
     for (const LenNode& conjunct: all_diseqs_have_samples_assertion.succ) {
         REQUIRE(conjunct.type == LenFormulaType::EQ);
         const LenNode& lhs = conjunct.succ[0];
-        REQUIRE(lhs.succ.size() == 36);
+        REQUIRE(lhs.succ.size() == 30); // Would be 36, but there are no sampling transitions between frist and second rows
 
         std::set<std::pair<mata::nfa::State, mata::nfa::State>> abstract_transitions;
 
@@ -800,4 +800,144 @@ TEST_CASE("Disequations :: check assert_every_disequation_has_symbols_sampled", 
 
         REQUIRE(abstract_transitions == expected_abstract_transitions);
     }
+}
+
+struct RegisterValueImplicationVars {
+    BasicTerm control_var;
+    BasicTerm ordered_register;
+    BasicTerm diseq_register;
+
+    bool operator<(const RegisterValueImplicationVars& other_vars) const {
+        if (control_var < other_vars.control_var) return true;
+        if (control_var > other_vars.control_var) return false;
+
+        if (ordered_register < other_vars.ordered_register) return true;
+        if (ordered_register > other_vars.ordered_register) return false;
+
+        return diseq_register < other_vars.diseq_register;
+    }
+
+    bool operator==(const RegisterValueImplicationVars& other) const = default;
+};
+
+/**
+ * Assert that the implication has the form:
+ *   (<Something> <= 0) OR (<equation1> AND <equation2>)
+ */
+void assert_register_store_implication_structure(const LenNode& implication, std::map<RegisterValueImplicationVars, int>& probes) {
+    REQUIRE(implication.type == LenFormulaType::OR);
+    REQUIRE(implication.succ.size() == 2);
+
+    const LenNode& antecedent = implication.succ[0];
+    REQUIRE(antecedent.type == LenFormulaType::LEQ);
+
+    const BasicTerm& control_var = antecedent.succ[0].atom_val;
+
+    LenNode zero (0);
+    REQUIRE(antecedent.succ[1].atom_val == zero.atom_val);
+
+    const LenNode& rhs = implication.succ[1];
+    REQUIRE(rhs.type == LenFormulaType::AND);
+    REQUIRE(rhs.succ.size() == 2);
+
+    LenNode eq0 = rhs.succ[0];
+    REQUIRE(eq0.type == LenFormulaType::EQ);
+    REQUIRE(eq0.succ[0].type == LenFormulaType::LEAF);
+
+    const BasicTerm& modified_reg_ord = eq0.succ[0].atom_val;
+
+    LenNode eq1 = rhs.succ[1];
+    REQUIRE(eq1.type == LenFormulaType::EQ);
+    REQUIRE(eq1.succ[0].type == LenFormulaType::LEAF);
+
+    const BasicTerm& modified_reg_diseq = eq1.succ[0].atom_val;
+
+    RegisterValueImplicationVars seen_template = {.control_var = control_var,
+                                                  .ordered_register = modified_reg_ord,
+                                                  .diseq_register = modified_reg_diseq};
+
+    if (!probes.contains(seen_template)) {
+        std::cout << "Missing the following template: "
+                  << "{.control_var=" << seen_template.control_var.to_string()
+                  << ",.diseq_register=" << seen_template.diseq_register.to_string()
+                  << ",.ord_register=" << seen_template.ordered_register.to_string()
+                  << "}\n";
+    }
+    REQUIRE(probes.contains(seen_template));
+
+    probes[seen_template] += 1;
+}
+
+void check_register_stores_for_level(int level, const TagAut& tag_automaton, const ParikhImageDiseqTag& formula_generator, const LenNode& implications_conjunction) {
+    std::map<RegisterValueImplicationVars, int> seen_register_implications;
+
+    const BasicTerm& reg_ord = formula_generator.registers_in_sampling_order[level].atom_val;
+    std::cout << "Using ORD register: " << reg_ord << "\n";
+    for (const auto& [transition, var] : formula_generator.get_trans_vars()) {
+        mata::nfa::State source_state  = std::get<0>(transition);
+        mata::Symbol     symbol_handle = std::get<1>(transition);
+        mata::nfa::State target_state  = std::get<2>(transition);
+
+        if (tag_automaton.metadata.levels[source_state] != level || tag_automaton.metadata.levels[target_state] != (level+1)) {
+            continue;
+        }
+
+        const TagSet& tag_set = tag_automaton.alph.get_symbol(symbol_handle);
+        for (const auto& tag : tag_set) {
+            if (tag.type == AtomicSymbol::TagType::REGISTER_STORE || tag.type == AtomicSymbol::TagType::COPY_PREVIOUS) {
+                DiseqSide side = {.predicate_idx = tag.predicate_idx, .side = tag.predicate_side};
+                const BasicTerm& diseq_register = formula_generator.registers_per_disequation_side.at(side).atom_val;
+
+                RegisterValueImplicationVars implication_template = {.control_var = var, .ordered_register = reg_ord, .diseq_register = diseq_register};
+                seen_register_implications.emplace(implication_template, 0);
+            }
+        }
+    }
+
+    std::cout << "----\n";
+    for (const LenNode& implication : implications_conjunction.succ) {
+        std::cout << implication << "\n";
+        assert_register_store_implication_structure(implication, seen_register_implications);
+    }
+
+    for (const auto& [implication_template, seen_count] : seen_register_implications) {
+        REQUIRE(seen_count == 1);
+    }
+}
+
+
+TEST_CASE("Disequations :: check assert_register_values", "[noodler]") {
+    BasicTerm var_x = get_var('x');
+    BasicTerm var_y = get_var('y');
+    BasicTerm var_z = get_var('z');
+
+    Predicate diseq1(PredicateType::Equation, { {var_x}, {var_y} });
+    Predicate diseq2(PredicateType::Equation, { {var_y}, {var_z} });
+
+    AutAssignment aut_assignment;
+    aut_assignment[var_x] = regex_to_nfa("a");
+    aut_assignment[var_y] = regex_to_nfa("b");
+    aut_assignment[var_z] = regex_to_nfa("c");
+
+    ca::TagDiseqGen tag_automaton_generator({diseq1, diseq2}, aut_assignment);
+    ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
+    TagSet          available_tags = tag_automaton.gather_used_symbols();
+
+    size_t num_of_copies = 5;
+    size_t num_of_states_in_row = 6;
+    ParikhImageDiseqTag formula_generator (tag_automaton, available_tags, num_of_states_in_row);
+    formula_generator.predicate_count = 2;
+
+    formula_generator.compute_parikh_image();
+
+    LenNode register_values_formula = formula_generator.assert_register_values();
+
+    REQUIRE(register_values_formula.succ[0].succ.size() == 12);
+    check_register_stores_for_level(0, tag_automaton, formula_generator, register_values_formula.succ[0]);
+    REQUIRE(register_values_formula.succ[1].succ.size() == 36);
+    check_register_stores_for_level(1, tag_automaton, formula_generator, register_values_formula.succ[1]);
+    REQUIRE(register_values_formula.succ[2].succ.size() == 36);
+    check_register_stores_for_level(2, tag_automaton, formula_generator, register_values_formula.succ[2]);
+    REQUIRE(register_values_formula.succ[3].succ.size() == 36);
+    check_register_stores_for_level(3, tag_automaton, formula_generator, register_values_formula.succ[3]);
 }

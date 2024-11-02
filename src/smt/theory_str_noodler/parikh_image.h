@@ -20,6 +20,18 @@
 
 namespace smt::noodler::parikh {
 
+struct DiseqSide {
+    int predicate_idx;
+    ca::AtomicSymbol::PredicateSide side;
+    bool operator<(const DiseqSide& other) const {
+        if (predicate_idx < other.predicate_idx) return true;
+        if (predicate_idx > other.predicate_idx) return false;
+        return side < other.side;
+    }
+
+    bool operator==(const DiseqSide& other) const = default;
+};
+
 using Transition = std::tuple<mata::nfa::State, mata::Symbol, mata::nfa::State>;
 // Structure storing for each state a vector of transitions adjacent to this state.
 // In particular TransitionStateVector[state] is a vector of transitions with source state being state
@@ -179,6 +191,16 @@ public:
      */
     size_t predicate_count;
 
+    /**
+     * Register variables allowing to refer to the values of previous registers.
+     */
+    std::vector<LenNode> registers_in_sampling_order;
+
+    /**
+     * Register variables per disequation sides. Allow to refer to mismatch symbols for every disequation.
+     */
+    std::map<DiseqSide, LenNode> registers_per_disequation_side;
+
     ParikhImageDiseqTag(const ca::TagAut& ca, const std::set<ca::AtomicSymbol>& atomic_symbols, size_t number_of_states_in_row) :
         ParikhImage(ca.nfa),
         number_of_states_in_row(number_of_states_in_row),
@@ -229,8 +251,7 @@ public:
     LenNode ensure_symbol_uniqueness_using_implication(std::map<mata::Symbol, std::vector<LenNode>>& symbol_to_register_sample_vars) const;
 
     LenNode make_sure_every_disequation_has_symbols_sampled();
-
-
+    LenNode assert_register_values();
 };
 
 typedef std::pair<mata::nfa::State, mata::nfa::State> StatePair;

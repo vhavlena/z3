@@ -251,6 +251,7 @@ namespace smt::noodler::ca {
         }
 
         if (this->predicates.size() == 1) return;  // We don't add copy transitions when we are dealing with a single predicate
+        if (copy_start == 0) return;
 
         for (size_t predicate_idx = 0; predicate_idx < this->predicates.size(); predicate_idx++) {
             ca::AtomicSymbol copy_for_lhs = ca::AtomicSymbol::create_c_symbol(var, predicate_idx, ca::AtomicSymbol::PredicateSide::LEFT,  copy_idx_to_label_symbols_with);
