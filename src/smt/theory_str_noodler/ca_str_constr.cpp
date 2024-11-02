@@ -456,7 +456,7 @@ namespace smt::noodler::ca {
         }
 
         if (!can_construct_lia) {
-            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
+            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
         }
 
         AutAssignment actual_var_assignment = prep_handler.get_aut_assignment();
