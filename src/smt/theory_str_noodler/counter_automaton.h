@@ -123,6 +123,10 @@ namespace smt::noodler::ca {
         }
         bool operator==(const AtomicSymbol&) const = default;
 
+        bool is_mutating_registers() const {
+            return (this->type == TagType::REGISTER_STORE || this->type == TagType::COPY_PREVIOUS);
+        }
+
         std::string to_string() const {
             std::string var_escape = var.is_literal() ? "\\\"" + var.get_name().encode() + "\\\"" : var.to_string();
 

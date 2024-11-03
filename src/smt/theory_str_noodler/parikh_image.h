@@ -32,6 +32,18 @@ struct DiseqSide {
     bool operator==(const DiseqSide& other) const = default;
 };
 
+struct DiseqSideWithLevelInfo {
+    DiseqSide side;
+    size_t    level;
+    bool operator<(const DiseqSideWithLevelInfo& other) const {
+        if (level < other.level) return true;
+        if (level > other.level) return false;
+        return this->side < other.side;
+    }
+
+    bool operator==(const DiseqSideWithLevelInfo& other) const = default;
+};
+
 using Transition = std::tuple<mata::nfa::State, mata::Symbol, mata::nfa::State>;
 // Structure storing for each state a vector of transitions adjacent to this state.
 // In particular TransitionStateVector[state] is a vector of transitions with source state being state
@@ -191,6 +203,8 @@ public:
      */
     size_t predicate_count;
 
+    std::vector<Predicate> predicates;
+
     /**
      * Register variables allowing to refer to the values of previous registers.
      */
@@ -200,6 +214,8 @@ public:
      * Register variables per disequation sides. Allow to refer to mismatch symbols for every disequation.
      */
     std::map<DiseqSide, LenNode> registers_per_disequation_side;
+
+    std::map<size_t, std::pair<BasicTerm, BasicTerm>> mismatch_pos_inside_vars_per_diseq;
 
     ParikhImageDiseqTag(const ca::TagAut& ca, const std::set<ca::AtomicSymbol>& atomic_symbols, size_t number_of_states_in_row) :
         ParikhImage(ca.nfa),
@@ -254,8 +270,19 @@ public:
 
     LenNode ensure_symbol_uniqueness_using_implication(std::map<mata::Symbol, std::vector<LenNode>>& symbol_to_register_sample_vars) const;
 
-    LenNode make_sure_every_disequation_has_symbols_sampled();
+    LenNode make_sure_every_disequation_has_symbols_sampled() const;
+
     LenNode assert_register_values();
+
+    LenNode establish_positions_inside_vars_based_on_sampling_order();
+
+    LenNode make_mismatch_pos_vars_assertion(int predicate_idx, const BasicTerm& left_var, const BasicTerm& right_var) const;
+
+    LenNode make_formula_binding_mismatch_pos_with_implications(const LenNode& var_to_restrict, const std::vector<std::vector<LenNode>>& control_vars_per_level, const BasicTerm& var_containing_mismatch) const;
+
+    LenNode make_mismatch_existence_assertion_for_diseq(size_t predicate_idx) const;
+
+    void init_mismatch_pos_inside_vars_per_diseq();
 };
 
 typedef std::pair<mata::nfa::State, mata::nfa::State> StatePair;
