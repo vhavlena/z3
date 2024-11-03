@@ -629,11 +629,7 @@ namespace smt::noodler::ca {
 
         if (can_construct_lia) {
             for (const BasicTerm& var : vars) {
-                std::cout << "Var: " << var.to_string() << std::endl;
-
                 if (var.get_type() == BasicTermType::Literal) {
-                    std::cout << " - is literal :(\n";
-
                     // var is a literal - right now we do not support that.
                     STRACE("str-not-contains", tout << "* not-contains has a literal - we do not support literals yet\n"; );
                     can_construct_lia = false;
