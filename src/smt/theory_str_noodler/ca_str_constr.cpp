@@ -415,8 +415,192 @@ namespace smt::noodler::ca {
         return pi_formula;
     }
 
-    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment) {
+    struct WordChoice {
+        const BasicTerm& var;   // Mostly for debug
+        const std::set<mata::Word>& language;
+        std::set<mata::Word>::const_iterator current_word;
+    };
 
+    struct WordChoicesForFiniteLanguages {
+        std::vector<WordChoice> slots;
+        bool exhausted = false;
+    };
+
+    bool are_choices_exhausted(const WordChoicesForFiniteLanguages& choices) {
+        return choices.exhausted;
+    }
+
+    void try_next_word_choice(WordChoicesForFiniteLanguages& choices) {
+        bool previous_choices_were_reset = false;
+        int num_of_slot_overflows = 0;
+        for (auto current_slot = choices.slots.begin(); current_slot != choices.slots.end(); current_slot++) {
+            WordChoice& current_choice = *current_slot;
+
+            current_choice.current_word++;
+            if (current_choice.current_word == current_choice.language.end()) {
+                current_choice.current_word = current_choice.language.begin();
+                previous_choices_were_reset = true;
+                num_of_slot_overflows += 1;
+            }
+
+            if (!previous_choices_were_reset) {
+                break;
+            }
+        }
+
+        if (num_of_slot_overflows == choices.slots.size()) {
+            choices.exhausted = true;
+        }
+    }
+
+    void write_word_choices(const WordChoicesForFiniteLanguages& choices, std::ostream& out_stream) {
+        for (auto& choice : choices.slots) {
+            out_stream << choice.var << "=";
+            for (const mata::Symbol& word_symbol : *choice.current_word) {
+                out_stream << std::to_string(word_symbol);
+            }
+            out_stream << ", ";
+        }
+    }
+
+    struct SharedPredicates {
+        std::vector<const Predicate*> predicates;
+        std::set<BasicTerm> all_lhs_variables;
+    };
+
+    mata::nfa::Nfa prune_subword_from_automaton(const mata::nfa::Nfa& automaton, const mata::Word& word) {
+        assert(word.size() == 1);
+
+        mata::Symbol symbol_to_remove = word.at(0);
+
+        if (smt::noodler::util::is_dummy_symbol(symbol_to_remove)) {
+            // This is not a symbol, but a symbolic representation of an entire set of symbols
+            // Out of this set, we can pick a single symbol such that it is different from any of the symbols
+            // in automaton transition. The only exception would be that all alphabet symbols are written
+            // somewhere in the NFA... unlikely.
+            return automaton;
+        }
+
+        mata::nfa::Nfa new_automaton;
+        new_automaton.delta.allocate(automaton.num_of_states());
+
+        // We are dealing with a concrete symbol, e.g., 'a'
+        for (mata::nfa::State source_state = 0; source_state < automaton.num_of_states(); source_state++) {
+            for (const auto& symbol_post : automaton.delta[source_state]) {
+                if (symbol_post.symbol == symbol_to_remove) continue;
+
+                for (mata::nfa::State target_state : symbol_post.targets) {
+                    new_automaton.delta.add(source_state, symbol_post.symbol, target_state);
+                }
+            }
+        }
+
+        return new_automaton;
+    }
+
+    std::optional<LenNode> try_solving_notcontains_with_finite_rhs(const std::vector<Predicate>& not_contains_predicates, const AutAssignment& aut_assignment) {
+        // Check that every not-contains has a finite RHS
+        // @Note we currently do not support finite languages where RHS contains more than one variable
+        bool can_apply_heuristic = true;
+
+        std::map<BasicTerm, std::set<mata::Word>> rhs_var_words;
+        for (const Predicate& not_contains : not_contains_predicates) {
+            if (not_contains.get_right_side().size() > 1) {
+                STRACE("str-not-contains", tout << "* Cannot apply heuristics for finite side not-contains - we do not support more than 1 variable on RHS. Problematic predicate: \n  - " << not_contains << std::endl; );
+                can_apply_heuristic = false;
+                break;
+            }
+
+            const BasicTerm& rhs_var = not_contains.get_right_side().at(0);
+            std::shared_ptr<mata::nfa::Nfa> rhs_var_automaton = aut_assignment.at(rhs_var);
+
+            bool is_finite = rhs_var_automaton->is_acyclic();
+            if (!is_finite) {
+                STRACE("str-not-contains", tout << "* Cannot apply heuristics for finite side not-contains - RHS var has infinite language. Problematic predicate: \n  - " << not_contains << std::endl; );
+                can_apply_heuristic = false;
+                break;
+            }
+
+            std::set<mata::Word> words = rhs_var_automaton->get_words(rhs_var_automaton->num_of_states());
+
+            bool are_all_words_have_length_one = true;  // In principle, nothing prevents us from dealing with the general case, but the implementation would have to be much more complex
+            for (const mata::Word& word : words) {
+                if (word.size() > 1) {
+                    are_all_words_have_length_one = false;
+                    break;
+                }
+            }
+
+            rhs_var_words.emplace(rhs_var, std::move(words));
+
+            if (!are_all_words_have_length_one) {
+                STRACE("str-not-contains", tout << "* Cannot apply heuristics for finite side not-contains - RHS var has finite language with words longer than 1. Problematic predicate: \n  - " << not_contains << std::endl; );
+                can_apply_heuristic = false;
+                break;
+            }
+        }
+
+        if (!can_apply_heuristic) return std::nullopt;
+
+        std::map<BasicTerm, SharedPredicates> predicates_sharing_rhs_var;
+        for (const auto& not_contains : not_contains_predicates) {
+            const BasicTerm& rhs_var = not_contains.get_right_side().at(0);
+            SharedPredicates& shared_predicates_info = predicates_sharing_rhs_var[rhs_var];
+            shared_predicates_info.predicates.push_back(&not_contains);
+            for (const BasicTerm& lhs_var : not_contains.get_left_side()) {
+                shared_predicates_info.all_lhs_variables.insert(lhs_var);
+            }
+        }
+
+        WordChoicesForFiniteLanguages word_choices;
+        for (const auto& [var, var_words] : rhs_var_words) {
+            WordChoice initial_choice = {.var = var, .language = var_words, .current_word = var_words.begin() };
+            word_choices.slots.emplace_back(initial_choice);
+        }
+
+        LenNode lengths_of_all_solutions (LenFormulaType::OR, {});
+
+        for (; !word_choices.exhausted; try_next_word_choice(word_choices)) {
+            AutAssignment assignment_for_this_word_choice = aut_assignment; // Make a local copy of the assignment
+
+            int var_idx = 0;
+            for (const auto& [rhs_var, var_predicates] : predicates_sharing_rhs_var) {
+                const WordChoice& word_choice_for_var = word_choices.slots[var_idx];
+
+                for (const BasicTerm& lhs_var : var_predicates.all_lhs_variables) {
+                    assignment_for_this_word_choice[lhs_var] = std::make_shared<mata::nfa::Nfa>(prune_subword_from_automaton(*assignment_for_this_word_choice[lhs_var], *word_choice_for_var.current_word));
+                }
+
+                var_idx += 1;
+            }
+
+            // We have automata ready, lets compute the lengths of solutions
+            LenNode lengths_of_solutions (LenFormulaType::AND, {});
+            for (const auto& [var, var_language] : assignment_for_this_word_choice) {
+                parikh::ParikhImage parikh_image_generator (*var_language);
+                LenNode parikh_image = parikh_image_generator.compute_parikh_image();
+
+                LenNode word_length_expr = LenNode(LenFormulaType::PLUS, {});
+                for (const auto& [transition, transition_var] : parikh_image_generator.get_trans_vars()) {
+                    mata::Symbol transition_symbol = std::get<1>(transition);
+                    if (transition_symbol == mata::nfa::EPSILON) continue;
+
+                    word_length_expr.succ.push_back(transition_var);
+                }
+
+                LenNode lengths_of_var_words = LenNode(LenFormulaType::EQ, {var, word_length_expr});
+
+                lengths_of_solutions.succ.push_back(parikh_image);
+                lengths_of_solutions.succ.push_back(lengths_of_var_words);
+            }
+
+            lengths_of_all_solutions.succ.push_back(lengths_of_solutions);
+        }
+
+        return std::make_optional(lengths_of_all_solutions);
+    }
+
+    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment) {
         if (formula.get_predicates().empty()) {
             return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
         }
@@ -431,31 +615,46 @@ namespace smt::noodler::ca {
             return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
         }
 
-        if (formula.get_predicates().size() > 1) {
-            // We have more than 1 notContains, for now we pretent we don't know what to do with it
-            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
-        }
-
         const Predicate& not_contains = formula.get_predicates().at(0);
 
         // #Optimize(mhecko): Add a Iterator<const BasicTerm> to Predicate - it is pointless to create a set
         std::set<BasicTerm> vars = not_contains.get_set();
 
         bool can_construct_lia = true;
-        for (const BasicTerm& var : vars) {
-            if (var.get_type() == BasicTermType::Literal) {
-                // var is a literal - right now we do not support that.
-                STRACE("str-not-contains", tout << "* not-contains has a literal - we do not support literals yet\n"; );
-                can_construct_lia = false;
-                break;
+
+        if (formula.get_predicates().size() > 1) {
+            // We have more than 1 notContains, for now we pretent we don't know what to do with it
+            can_construct_lia = false;
+        }
+
+        if (can_construct_lia) {
+            for (const BasicTerm& var : vars) {
+                std::cout << "Var: " << var.to_string() << std::endl;
+
+                if (var.get_type() == BasicTermType::Literal) {
+                    std::cout << " - is literal :(\n";
+
+                    // var is a literal - right now we do not support that.
+                    STRACE("str-not-contains", tout << "* not-contains has a literal - we do not support literals yet\n"; );
+                    can_construct_lia = false;
+                    break;
+                }
+
+                if (!var_assignment.is_flat(var)) {
+                    STRACE("str-not-contains", tout << "* cannot reduce to LIA - one of the input vars does not have a flat langauge\n"; );
+                    can_construct_lia = false;
+                    break;
+                };
             }
+        }
 
-            if (!var_assignment.is_flat(var)) {
-                STRACE("str-not-contains", tout << "* cannot reduce to LIA - one of the input vars does not have a flat langauge\n"; );
-                can_construct_lia = false;
-                break;
+        if (!can_construct_lia) {
+            // We cannot use the big LIA hammer, maybe we can apply some of the smaller hammers
+            std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains}, var_assignment);
 
-            };
+            if (heuristic_solution.has_value()) {
+                return { heuristic_solution.value(), LenNodePrecision::PRECISE };
+            }
         }
 
         if (!can_construct_lia) {
