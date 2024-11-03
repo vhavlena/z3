@@ -58,7 +58,7 @@ namespace smt::noodler {
         while (!inclusions_to_process.empty()) {
             Predicate substituted_inclusion = substitute_inclusion(inclusions_to_process.front());
             inclusions_to_process.pop_front();
-            
+
             if (!inclusion_has_same_sides(substituted_inclusion) // we do not want to add inclusion that is already in inclusions_to_process
                 && substituted_inclusions_to_process.count(substituted_inclusion) == 0) {
                 new_inclusions_to_process.push_back(substituted_inclusion);
@@ -195,7 +195,7 @@ namespace smt::noodler {
             // check that the non-empty side actually contains empty string and replace the vars on that side by epsilon.
             if (right_side_vars.empty() || left_side_vars.empty()) {
                 std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
-                auto const non_empty_side_vars = right_side_vars.empty() ? 
+                auto const non_empty_side_vars = right_side_vars.empty() ?
                                                         inclusion_to_process.get_left_set()
                                                       : inclusion_to_process.get_right_set();
                 bool non_empty_side_contains_empty_word = true;
@@ -397,7 +397,7 @@ namespace smt::noodler {
              * and process them if z3 realizes that the result is actually not sat (because of lengths)
              */
 
-            
+
 
             /********************************************************************************************************/
             /******************************************* Noodlification *********************************************/
@@ -409,9 +409,9 @@ namespace smt::noodler {
              * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
              * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
              **/
-            auto noodles = mata::strings::seg_nfa::noodlify_for_equation(left_side_automata, 
+            auto noodles = mata::strings::seg_nfa::noodlify_for_equation(left_side_automata,
                                                                         right_side_automata,
-                                                                        false, 
+                                                                        false,
                                                                         {{"reduce", "forward"}});
 
             for (const auto &noodle : noodles) {
@@ -443,7 +443,7 @@ namespace smt::noodler {
                     STRACE("str-nfa", tout << new_var << std::endl << *noodle[i].first;);
                 }
 
-                // Each variable that occurs in the left side or is length-aware needs to be substituted, we use this map for that 
+                // Each variable that occurs in the left side or is length-aware needs to be substituted, we use this map for that
                 std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map;
 
                 /* Following the example from before, the following loop will create these inclusions from the right side divisions:
@@ -587,7 +587,7 @@ namespace smt::noodler {
                 conjuncts.push_back(init_aut_ass.get_lengths(var));
             }
         }
-        
+
 
         return LenNode(LenFormulaType::AND, conjuncts);
     }
@@ -624,7 +624,12 @@ namespace smt::noodler {
         auto not_cont_prec = get_formula_for_not_contains();
 
         if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
+            // Formula for not-contains is at least as precise as is the current precision
             conjuncts.push_back(not_cont_prec.first);
+        } else if (this->disequations.get_predicates().empty()) {
+            // We do not have any disequations at all, so we can just overwrite the precision with whatever came out of not-contains
+            conjuncts.push_back(not_cont_prec.first);
+            precision = not_cont_prec.second;
         } else {
             // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
             conjuncts.push_back(LenNode(LenFormulaType::FALSE));
@@ -698,7 +703,7 @@ namespace smt::noodler {
                 char_case.succ.emplace_back(LenFormulaType::OR, equal_to_one_of_symbols);
             } else {
                 // if there is dummy symbol, then code_version_of(c) can be code point of any char, except those in the alphabet but not in real_symbols_of_code_var
-                
+
                 // code_version_of(c) is valid code_point: (0 <= code_version_of(c) <= max_char)
                 char_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{0, code_version_of(c)});
                 char_case.succ.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{code_version_of(c), zstring::max_char()});
@@ -710,7 +715,7 @@ namespace smt::noodler {
                     }
                 }
             }
-            
+
             result.succ.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
                 non_char_case,
                 char_case
@@ -761,7 +766,7 @@ namespace smt::noodler {
                     interval_cases[0].first += interval_start*place_value;
                     interval_cases[0].second += interval_end*place_value;
                     if (interval_start != 0 || interval_end != 9) {
-                        // If the currently processed interval is not of the form [0-9], we will have to add all cases for 
+                        // If the currently processed interval is not of the form [0-9], we will have to add all cases for
                         need_to_split = true;
                     }
                 } else {
@@ -912,7 +917,7 @@ namespace smt::noodler {
                     LenNode(LenFormulaType::EQ, { int_subst_var, l }),
                     encode_interval_words(int_version_of(int_subst_var), AutAssignment::get_interval_words(aut_valid_of_length))
                 });
-                
+
                 if (code_subst_vars.contains(int_subst_var) && l == 1) {
                     // int_subst_var is used in some to_code/from_code AND we are handling the case of l==1 (for other lengths, the formula from get_formula_for_code_subst_vars should force that code_version_of(int_subst_var) is -1)
                     // => we need to connect code_version_of(int_subst_var) and int_version_of(int_subst_var)
@@ -966,7 +971,7 @@ namespace smt::noodler {
             equal_to_one_subst_var.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{c, code_version_of(subst_var)});
         }
         valid_case.succ.push_back(equal_to_one_subst_var);
-        
+
         return LenNode(LenFormulaType::OR, std::vector<LenNode>{
             invalid_case,
             valid_case
@@ -984,7 +989,7 @@ namespace smt::noodler {
 
         // first handle non-valid cases
         if (conv.type == ConversionType::TO_INT) {
-            // for TO_INT empty string or anything that contains non-digit 
+            // for TO_INT empty string or anything that contains non-digit
             LenNode empty_or_one_subst_contains_non_digit(LenFormulaType::OR, {LenNode(LenFormulaType::EQ, {s, 0})}); // start with empty string: |s| = 0
             for (const BasicTerm& subst_var : subst_vars) {
                 // subst_var contain non-digit if one of s_i == -1 (see get_formula_for_int_subst_vars)
@@ -1042,11 +1047,11 @@ namespace smt::noodler {
             //      i == 15*10000 + 364*10 + 6 = 150000 + 3640 + 6 = 153646
 
             // We are then creating formula
-            //      ((|s_1| == |l_1| && int_version_of(s_1) != -1) ... && (|s_n| == |l_n| && int_version_of(s_n) != -1)) && ... 
+            //      ((|s_1| == |l_1| && int_version_of(s_1) != -1) ... && (|s_n| == |l_n| && int_version_of(s_n) != -1)) && ...
             LenNode formula_for_case(LenFormulaType::AND);
             //      ... && i = int_version_of(s_1)*10^(l_2+...+l_n) + int_version_of(s_2)*10^(l_3+...+l_n) + ... + int_version_of(s_2)*10^(l_n) + int_version_of(s_n)
             LenNode formula_for_sum(LenFormulaType::PLUS);
-            
+
             // However, for case that l_1 = l_2 = ... = l_n = 0, we get an invalid case, so this should be ignored => is_empty will take care of it
             bool is_empty = true;
 
@@ -1062,7 +1067,7 @@ namespace smt::noodler {
                 // int_version_of(s_i) != -1
                 formula_for_case.succ.emplace_back(LenFormulaType::NEQ, std::vector<LenNode>{int_version_of(subst_var), -1});
                 STRACE("str-conversion-int", tout << "part of valid part for int conversion: " << formula_for_case << std::endl;);
-                
+
                 if (length_of_subst_var > 0) {
                     is_empty = false; // l_i != 0 => we cannot get the case where all l_1,...,l_n are 0
 
@@ -1096,7 +1101,7 @@ namespace smt::noodler {
      *      - will be used in conjunction with the result of solution.get_lengths,
      *      - the resulting string variable of from_code/from_int is restricted to only valid results of from_code/from_int (should be done in theory_str_noodler::handle_conversion),
      *      - if to_int/from_int will be processed, code points of all digits (symbols 48,..,57) should be in the alphabet (should be done in theory_str_noodler::final_check_eh).
-     * 
+     *
      * We have following types of conversions:
      *      c = to_code(s)
      *      s = from_code(s)
@@ -1108,13 +1113,13 @@ namespace smt::noodler {
      * We therefore collect all vars s_i and put them into two sets:
      *      code_subst_vars - all vars that substitute some s in to_code/from_code
      *      int_subst_vars - all vars that substitute some s in to_int/from_int
-     * 
+     *
      * We will then use functions get_formula_for_code_subst_vars and get_formula_for_int_subst_vars to encode
      *      - for each s \in code_subst_vars a formula compactly saying that
      *          - code_version_of(s) is equal to some to_code(w_s) for any w_s \in solution.aut_ass.at(w_s) with the condition that |s| == |w_s|
      *      - for each s \in code_subst_vars a formula compactly saying that
      *          - int_version_of(s) is equal to some to_int(w_s) for any w_s \in solution.aut_ass.at(w_s) with the condition that |s| == |w_s| AND if s also belongs to code_subst_vars, there is a correspondence between int_version_of(s) and code_version_of(s)
-     * 
+     *
      * After that, we use get_formula_for_code_conversion to handle code conversions - both to_code and from_code are handled similarly for valid strings (i.e. strings of length 1), invalid cases must be handled differently.
      * Similarly, we use get_formula_for_int_conversion to handle int_conversions.
      */
@@ -1123,7 +1128,7 @@ namespace smt::noodler {
             tout << "Creating formula for conversions" << std::endl;
         );
 
-        // the resulting formula 
+        // the resulting formula
         LenNode result(LenFormulaType::AND);
         LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
@@ -1200,8 +1205,8 @@ namespace smt::noodler {
             return ret;
         };
 
-        // take the original disequations (taken from input) and 
-        // propagate substitutions involved by the current substitution map of 
+        // take the original disequations (taken from input) and
+        // propagate substitutions involved by the current substitution map of
         // a stable solution
         for(const Predicate& dis : this->disequations.get_predicates()) {
             proj_diseqs.add_predicate(Predicate(PredicateType::Inequation, {
@@ -1227,8 +1232,8 @@ namespace smt::noodler {
             return ret;
         };
 
-        // take the original disequations (taken from input) and 
-        // propagate substitutions involved by the current substitution map of 
+        // take the original disequations (taken from input) and
+        // propagate substitutions involved by the current substitution map of
         // a stable solution
         for(const Predicate& dis : this->not_contains.get_predicates()) {
             proj_not_cont.add_predicate(Predicate(PredicateType::NotContains, {
@@ -1336,12 +1341,12 @@ namespace smt::noodler {
             prep_handler.underapprox_languages();
         }
         prep_handler.propagate_eps();
-        // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of 
-        // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of 
+        // Refinement of languages is beneficial only for instances containing not(contains) or disequalities (it is used to reduce the number of
+        // disequations/not(contains). For a strong reduction you need to have languages as precise as possible). In the case of
         // pure equalitities it could create bigger automata, which may be problem later during the noodlification.
         if(this->formula.contains_pred_type(PredicateType::Inequation) || this->formula.contains_pred_type(PredicateType::NotContains)) {
-            // Refine languages is applied in the order given by the predicates. Single iteration 
-            // might not update crucial variables that could contradict the formula. 
+            // Refine languages is applied in the order given by the predicates. Single iteration
+            // might not update crucial variables that could contradict the formula.
             // Two iterations seem to be a good trade-off since the automata could explode in the fixpoint.
             prep_handler.refine_languages();
             prep_handler.refine_languages();
@@ -1353,7 +1358,7 @@ namespace smt::noodler {
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
         prep_handler.remove_regular();
-        // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables 
+        // Skip_len_sat is not compatible with not(contains) and conversions as the preprocessing may skip equations with variables
         // inside not(contains)/conversion.
         if(this->not_contains.get_predicates().empty() && this->conversions.empty()) {
             prep_handler.skip_len_sat();
@@ -1375,7 +1380,7 @@ namespace smt::noodler {
                     tout << s.to_string() << " ";
                 }
                 tout << std::endl;
-            }   
+            }
         );
         prep_handler.generate_equiv(len_eq_vars);
         prep_handler.common_prefix_propagation();
@@ -1562,7 +1567,7 @@ namespace smt::noodler {
         //     model of vars on the right side from the left side)
         for (const Predicate& incl : inclusions_from_preprocessing) {
             solution.inclusions.insert(incl);
-            solution.inclusions_not_on_cycle.insert(incl); 
+            solution.inclusions_not_on_cycle.insert(incl);
         }
         inclusions_from_preprocessing.clear();
 
@@ -1611,7 +1616,7 @@ namespace smt::noodler {
 
         // we remove dummy symbol from automata, so we do not have to work with it
         solution.aut_ass.replace_dummy_with_new_symbol();
-        
+
         is_model_initialized = true;
 
         STRACE("str-model",

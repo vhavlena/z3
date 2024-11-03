@@ -600,6 +600,69 @@ namespace smt::noodler::ca {
         return std::make_optional(lengths_of_all_solutions);
     }
 
+    LenNode convert_loop_representation_of_var_word_lengths_into_formula(const std::set<std::pair<int, int>>& loop_repr, const BasicTerm& var) {
+        LenNode disjunction_across_all_loops (LenFormulaType::OR, {});
+        BasicTerm loop_rep_var = noodler::util::mk_noodler_var_fresh(var.get_name().encode() + "_loop_rep");
+
+        for (const auto& [stem_size, loop_size] : loop_repr) {
+            LenNode repeated_loop_length (LenFormulaType::TIMES, {loop_size, loop_rep_var});
+            LenNode word_length (LenFormulaType::PLUS, {repeated_loop_length, stem_size});
+            LenNode length (LenFormulaType::EQ, {word_length, var});
+
+            if (loop_repr.size() == 1) {
+                return length;
+            }
+
+            disjunction_across_all_loops.succ.push_back(length);
+        }
+
+        return disjunction_across_all_loops;
+    }
+
+    LenNode try_making_rhs_longer_than_lhs(const std::vector<Predicate>& not_contains_predicates, const AutAssignment& aut_assignment) {
+        std::set<BasicTerm> used_variables;
+
+        for (const Predicate& not_contains : not_contains_predicates) {
+            // We could just get a set of all variables in the predicate, but I guess that are needless extra allocations
+            used_variables.insert(not_contains.get_left_side().begin(), not_contains.get_left_side().end());
+            used_variables.insert(not_contains.get_right_side().begin(), not_contains.get_right_side().end());
+        }
+
+        LenNode variable_lengths_are_correct (LenFormulaType::TRUE, {});
+        if (0) { // @Temporary: This should be removed, other parts should make sure that the model is correct wrt. lengths implied by automata
+            variable_lengths_are_correct.type = LenFormulaType::AND;
+
+            for (const BasicTerm& used_var : used_variables) {
+                std::shared_ptr<mata::nfa::Nfa> var_automaton = aut_assignment.at(used_var);
+
+                std::set<std::pair<int, int>> lengths_of_words_in_var_lang = mata::strings::get_word_lengths(*var_automaton);
+                LenNode formula_describing_word_lengths = convert_loop_representation_of_var_word_lengths_into_formula(lengths_of_words_in_var_lang, used_var);
+                variable_lengths_are_correct.succ.push_back(formula_describing_word_lengths);
+            }
+        }
+
+        LenNode all_predicates_have_rhs_longer_than_lhs (LenFormulaType::AND, {});
+        for (const Predicate& not_contains : not_contains_predicates) {
+            LenNode rhs_minus_lhs_lengths (LenFormulaType::PLUS, {});
+
+            for (const BasicTerm& rhs_var : not_contains.get_right_side()) {
+                rhs_minus_lhs_lengths.succ.push_back(rhs_var);
+            }
+
+            for (const BasicTerm& lhs_var : not_contains.get_left_side()) {
+                LenNode minus_lhs_var (LenFormulaType::MINUS, {lhs_var});
+                rhs_minus_lhs_lengths.succ.push_back(minus_lhs_var);
+            }
+
+            // not-contains is satisfied if |lhs| < |rhs|  <=> 0 < |rhs| - |lhs|
+            LenNode rhs_is_longer_than_lhs (LenFormulaType::LT, {0, rhs_minus_lhs_lengths});
+            all_predicates_have_rhs_longer_than_lhs.succ.push_back(rhs_is_longer_than_lhs);
+        }
+
+        LenNode result (LenFormulaType::AND, {variable_lengths_are_correct, all_predicates_have_rhs_longer_than_lhs});
+        return result;
+    }
+
     std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment) {
         if (formula.get_predicates().empty()) {
             return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
@@ -647,14 +710,12 @@ namespace smt::noodler::ca {
         if (!can_construct_lia) {
             // We cannot use the big LIA hammer, maybe we can apply some of the smaller hammers
             std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains}, var_assignment);
-
             if (heuristic_solution.has_value()) {
                 return { heuristic_solution.value(), LenNodePrecision::PRECISE };
             }
-        }
 
-        if (!can_construct_lia) {
-            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
+            LenNode rhs_is_longer_than_lhs = try_making_rhs_longer_than_lhs({not_contains}, var_assignment);
+            return { rhs_is_longer_than_lhs, LenNodePrecision::UNDERAPPROX }; // Return here, there is nothing better we can do as we cannot construct a precise LIA
         }
 
         AutAssignment actual_var_assignment = prep_handler.get_aut_assignment();
