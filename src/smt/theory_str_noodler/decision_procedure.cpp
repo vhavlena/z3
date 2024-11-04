@@ -1188,7 +1188,7 @@ namespace smt::noodler {
     void DecisionProcedure::init_ca_diseq(const Predicate& diseq) {
         this->disequations.add_predicate(diseq);
         // include variables occurring in the diseqations into init_length_sensitive_vars
-        for(const BasicTerm& var : diseq.get_vars()) {
+        for (const BasicTerm& var : diseq.get_vars()) {
             this->init_length_sensitive_vars.insert(var);
         }
     }
@@ -1259,8 +1259,8 @@ namespace smt::noodler {
             if (dis_or_eq.is_equation()) {
                 equations.add_predicate(dis_or_eq);
             } else if (dis_or_eq.is_inequation()) {
-                // if we solve diesquations using CA --> we store the disequations to be solved later on
-                if(!some_diseq_handled_by_ca && this->m_params.m_ca_constr) {
+                // If we solve diesquations using CA --> we store the disequations to be solved later on
+                if (this->m_params.m_ca_constr) {
                     init_ca_diseq(dis_or_eq);
                     some_diseq_handled_by_ca = true;
                 } else {

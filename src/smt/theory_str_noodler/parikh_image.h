@@ -198,10 +198,6 @@ protected:
     LenNode get_diff_symbol_formula();
 
 public:
-    /**
-     * Number of predicates (size of a conjunction) for which we are building LIA formula for.
-     */
-    size_t predicate_count;
 
     std::vector<Predicate> predicates;
 
@@ -240,7 +236,7 @@ public:
     };
 
     size_t get_predicate_count() const {
-        return this->predicate_count;
+        return this->predicates.size();
     }
 
     /**
@@ -283,6 +279,10 @@ public:
     LenNode make_mismatch_existence_assertion_for_diseq(size_t predicate_idx) const;
 
     void init_mismatch_pos_inside_vars_per_diseq();
+
+    std::vector<std::vector<LenNode>> collect_sampling_transisions_for_diseq_and_var(const BasicTerm& var, int diseq_idx, ca::AtomicSymbol::PredicateSide side) const;
+
+    LenNode get_formula_for_multiple_diseqs(const std::vector<Predicate>& disequations);
 };
 
 typedef std::pair<mata::nfa::State, mata::nfa::State> StatePair;

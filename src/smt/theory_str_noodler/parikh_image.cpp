@@ -325,8 +325,10 @@ namespace smt::noodler::parikh {
 
         LenNode mismatch = get_all_mismatch_formula(diseq);
         STRACE("str-diseq", tout << "* get_mismatch_formula:  " << std::endl << mismatch << std::endl << std::endl;);
+
         LenNode force_new_vars_expressing_str_vars_length = get_var_length(diseq.get_set());
         STRACE("str-diseq", tout << "* get_var_length:  " << std::endl << force_new_vars_expressing_str_vars_length << std::endl << std::endl;);
+
         LenNode diff_symbol = get_diff_symbol_formula();
         STRACE("str-diseq", tout << "* get_diff_symbol_formula:  " << std::endl << diff_symbol << std::endl << std::endl;);
 
@@ -343,6 +345,56 @@ namespace smt::noodler::parikh {
         });
 
         return result;
+    }
+
+    LenNode ParikhImageDiseqTag::get_formula_for_multiple_diseqs(const std::vector<Predicate>& disequations) {
+        std::cout << "Hello\n";
+
+        this->predicates = disequations;
+        init_mismatch_pos_inside_vars_per_diseq();
+
+        LenNode parikh_image_formula = compute_parikh_image();
+
+        STRACE("str-diseq", tout << "* (multiple-disequations) Parikh image symbols:  " << std::endl;
+            for(const auto& [sym, bt] : this->tag_occurence_count_vars) {
+                tout << bt.to_string() << " : " << sym.to_string() << std::endl;
+            }
+            tout << std::endl;
+        );
+        STRACE("str-diseq", tout << "* (multiple-disequations) compute_parikh_image:  " << std::endl << parikh_image_formula << std::endl << std::endl;);
+
+        LenNode all_disequations_have_samples = make_sure_every_disequation_has_symbols_sampled();
+        STRACE("str-diseq", tout << "* every disequation should have a symbol sampled:  " << std::endl << all_disequations_have_samples << std::endl << std::endl;);
+
+        LenNode all_register_variables_have_values = assert_register_values();
+        STRACE("str-diseq", tout << "* all registers hold correct values wrt. run:  " << std::endl << all_register_variables_have_values << std::endl << std::endl;);
+
+        std::set<BasicTerm> all_vars;  // @Todo(mhecko): We are doing something similar elsewhere in the codebase, refactor.
+        for (auto& disequation : disequations) {
+            all_vars.insert(disequation.get_left_side().begin(), disequation.get_left_side().end());
+            all_vars.insert(disequation.get_right_side().begin(), disequation.get_right_side().end());
+        }
+
+        LenNode force_new_vars_expressing_str_vars_length = get_var_length(all_vars);
+        STRACE("str-diseq", tout << "* binding variable lengths to <L, var> occurrences:  " << std::endl << force_new_vars_expressing_str_vars_length << std::endl << std::endl;);
+
+        LenNode all_disequations_are_satisfied (LenFormulaType::AND, {});
+        for (int disequation_idx = 0; disequation_idx < static_cast<int>(disequations.size()); disequation_idx++) {
+            LenNode disequation_contains_a_conflict = make_mismatch_existence_assertion_for_diseq(disequation_idx);
+            LenNode disequation_sides_have_different_length = get_diseq_length(disequations.at(disequation_idx));
+
+            LenNode either_different_lengths_or_conflict (LenFormulaType::OR, {disequation_contains_a_conflict, disequation_sides_have_different_length});
+            all_disequations_are_satisfied.succ.push_back(either_different_lengths_or_conflict);
+        }
+
+        LenNode resulting_formula (LenFormulaType::AND, {
+            parikh_image_formula,
+            all_disequations_have_samples,
+            all_register_variables_have_values,
+            all_disequations_are_satisfied
+        });
+
+        return resulting_formula;
     }
 
     /**
@@ -914,6 +966,32 @@ namespace smt::noodler::parikh {
         return result;
     }
 
+    std::vector<std::vector<LenNode>> ParikhImageDiseqTag::collect_sampling_transisions_for_diseq_and_var(const BasicTerm& var, int diseq_idx, AtomicSymbol::PredicateSide side) const {
+        std::vector<std::vector<LenNode>> sampling_transitions_per_automaton_level;
+        sampling_transitions_per_automaton_level.resize(2*this->get_predicate_count());
+
+        for (const auto& [tag, tag_var] : this->tag_occurence_count_vars) {
+            if (!tag.is_mutating_registers()) continue;
+            if (tag.var != var || tag.predicate_idx != diseq_idx || tag.predicate_side != side) continue;
+
+            sampling_transitions_per_automaton_level[tag.copy_idx - 1].push_back(tag_var);
+        }
+
+        return sampling_transitions_per_automaton_level;
+    }
+
+    LenNode make_register_contents_differ_formula(const std::map<DiseqSide, LenNode>& register_contents_vars, int predicate_idx) {
+        DiseqSide lhs = {.predicate_idx = static_cast<int>(predicate_idx), .side = AtomicSymbol::PredicateSide::LEFT};
+        const LenNode& lhs_symbol = register_contents_vars.at(lhs);
+
+        DiseqSide rhs = {.predicate_idx = static_cast<int>(predicate_idx), .side = AtomicSymbol::PredicateSide::RIGHT};
+        const LenNode& rhs_symbol = register_contents_vars.at(rhs);
+
+        // @Todo: reflect the possibility of a dummy symbol
+        LenNode symbols_differ (LenFormulaType::NEQ, {lhs_symbol, rhs_symbol});
+        return symbols_differ;
+    }
+
     LenNode ParikhImageDiseqTag::make_mismatch_existence_assertion_for_diseq(size_t predicate_idx) const {
         const Predicate& disequation = this->predicates[predicate_idx];
 
@@ -922,7 +1000,6 @@ namespace smt::noodler::parikh {
         std::map<BasicTerm, std::vector<LenNode>> sampling_transitions_per_string_var;
         for (const auto& [tag, tag_var] : this->tag_occurence_count_vars) {
             if (!tag.is_mutating_registers()) continue;
-
             sampling_transitions_per_string_var[tag.var].push_back(tag_var);
         }
 
@@ -937,17 +1014,15 @@ namespace smt::noodler::parikh {
 
                 LenNode mismatch_pos_value_correct = make_mismatch_pos_vars_assertion(predicate_idx, left_var, right_var);
 
-                const auto& mismatch_pos_vars = this->mismatch_pos_inside_vars_per_diseq.at(predicate_idx);
-                const BasicTerm& left_mismatch_pos_var  = mismatch_pos_vars.first;
-                const BasicTerm& right_mismatch_pos_var = mismatch_pos_vars.second;
+                const auto& [left_mismatch_pos_var, right_mismatch_pos_var] = this->mismatch_pos_inside_vars_per_diseq.at(predicate_idx);
 
-                DiseqSide lhs = {.predicate_idx = static_cast<int>(predicate_idx), .side = AtomicSymbol::PredicateSide::LEFT};
-                const LenNode& lhs_symbol = this->registers_per_disequation_side.at(lhs);
+                auto sampling_transitions_for_left_var = collect_sampling_transisions_for_diseq_and_var(left_mismatch_pos_var, predicate_idx, AtomicSymbol::PredicateSide::LEFT);
+                LenNode left_mismatch_pos_is_correct = make_formula_binding_mismatch_pos_with_implications(left_mismatch_pos_var, sampling_transitions_for_left_var, left_var);
 
-                DiseqSide rhs = {.predicate_idx = static_cast<int>(predicate_idx), .side = AtomicSymbol::PredicateSide::RIGHT};
-                const LenNode& rhs_symbol = this->registers_per_disequation_side.at(rhs);
+                auto sampling_transitions_for_right_var = collect_sampling_transisions_for_diseq_and_var(right_mismatch_pos_var, predicate_idx, AtomicSymbol::PredicateSide::RIGHT);
+                LenNode right_mismatch_pos_is_correct = make_formula_binding_mismatch_pos_with_implications(right_mismatch_pos_var, sampling_transitions_for_right_var, right_var);
 
-                LenNode symbols_differ (LenFormulaType::NEQ, {lhs_symbol, rhs_symbol});
+                LenNode symbols_differ = make_register_contents_differ_formula(this->registers_per_disequation_side, static_cast<int>(predicate_idx));
 
                 // We have to take at least one of these transitions to see mismatch in left_var
                 std::vector<LenNode> lhs_mismatch_sampling_vars = sampling_transitions_per_string_var[left_var];
@@ -957,23 +1032,32 @@ namespace smt::noodler::parikh {
                 std::vector<LenNode> rhs_mismatch_sampling_vars = sampling_transitions_per_string_var[right_var];
                 LenNode mismatch_seen_in_rhs_var (LenFormulaType::LT, { 0, LenNode(LenFormulaType::PLUS, rhs_mismatch_sampling_vars) });
 
+                LenNode mismatch_pos_equal_and_registers_differ (LenFormulaType::AND, {
+                    symbols_differ,           // Register contents differ
+                    mismatch_seen_in_lhs_var, // One mismatch has been seen in the guessed left variable
+                    mismatch_seen_in_rhs_var, // Other mismatch has been seen in the guessed right variable
+                    left_mismatch_pos_is_correct, // The position inside left variable is correct wrt. where we have seen the conflict
+                    right_mismatch_pos_is_correct // The position inside right variable is correct wrt. where we have seen the conflict
+                });
+
                 if (left_var != right_var) {
                     // No special magic needed, just add the mismatch positions
                     lhs_mismatch_pos_sum.succ.push_back(left_mismatch_pos_var);
                     rhs_mismatch_pos_sum.succ.push_back(right_mismatch_pos_var);
 
                     LenNode mismatch_positions_equal (LenFormulaType::EQ, {lhs_mismatch_pos_sum, rhs_mismatch_pos_sum});
-                    LenNode mismatch_pos_eq_and_symbols_differ (LenFormulaType::AND,
-                                                                {mismatch_positions_equal, symbols_differ, mismatch_seen_in_lhs_var, mismatch_seen_in_rhs_var});
+                    mismatch_pos_equal_and_registers_differ.succ.push_back(mismatch_positions_equal);
 
-                    disjunction_across_all_var_pairs.succ.push_back(mismatch_pos_eq_and_symbols_differ);
-                    continue;
+                    disjunction_across_all_var_pairs.succ.push_back(mismatch_pos_equal_and_registers_differ);
+                } else {
+                    // We are dealing with the same variables - guess whether lhs sees mismatch first
+                    LenNode mismatch_guess = make_guess_what_side_sees_mismatch_first(lhs_mismatch_pos_sum, left_mismatch_pos_var,
+                                                                                      rhs_mismatch_pos_sum, right_mismatch_pos_var);
+
+                    mismatch_pos_equal_and_registers_differ.succ.push_back(mismatch_guess);
+                    disjunction_across_all_var_pairs.succ.push_back(mismatch_pos_equal_and_registers_differ);
                 }
 
-                // We are dealing with the same variables
-                LenNode mismatch_guess = make_guess_what_side_sees_mismatch_first(lhs_mismatch_pos_sum, left_mismatch_pos_var,
-                                                                                  rhs_mismatch_pos_sum, right_mismatch_pos_var);
-                LenNode result (LenFormulaType::AND, {mismatch_guess, symbols_differ, mismatch_seen_in_lhs_var, mismatch_seen_in_rhs_var});
             }
         }
 

@@ -351,7 +351,8 @@ namespace smt::noodler::ca {
     //-----------------------------------------------------------------------------------------------
 
     LenNode get_lia_for_disequations(const Formula& diseqs, const AutAssignment& autass) {
-        if(diseqs.get_predicates().size() == 0) {
+
+        if (diseqs.get_predicates().size() == 0) {
             return LenNode(LenFormulaType::TRUE);
         }
 
@@ -360,8 +361,8 @@ namespace smt::noodler::ca {
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
 
-        if(prep_handler.get_modified_formula().get_predicates().size() == 0) {
-            if(prep_handler.get_aut_assignment().is_sat()) {
+        if (prep_handler.get_modified_formula().get_predicates().size() == 0) {
+            if (prep_handler.get_aut_assignment().is_sat()) {
                 return LenNode(LenFormulaType::TRUE);
             }
             return LenNode(LenFormulaType::FALSE);
@@ -372,27 +373,32 @@ namespace smt::noodler::ca {
             assert(!autass.empty());
         }
 
-        Predicate diseq = prep_handler.get_modified_formula().get_predicates()[0];
-        TagDiseqGen gen(diseq, prep_handler.get_aut_assignment());
-        ca::TagAut tag_aut = gen.construct_tag_aut();
-        tag_aut.nfa.trim();
+        std::vector<Predicate> disequations = prep_handler.get_modified_formula().get_predicates();
         STRACE("str-diseq",
-            tout << "* Disequation: " << diseq << std::endl;
+            tout << "* Conjunction of disequations: \n";
+            for (const auto& diseq: disequations) {
+                tout << "   - " << diseq << "\n";
+            }
         );
+
+        TagDiseqGen tag_automaton_generator(disequations, prep_handler.get_aut_assignment());
+        ca::TagAut tag_aut = tag_automaton_generator.construct_tag_aut();
 
         STRACE("str-diseq",
             tout << "* Variable ordering: " << std::endl;
-            tout << concat_to_string(gen.get_aut_matrix().get_var_order()) << std::endl << std::endl;
+            tout << concat_to_string(tag_automaton_generator.get_aut_matrix().get_var_order()) << std::endl << std::endl;
         );
 
+        const std::vector<BasicTerm>& all_vars = tag_automaton_generator.get_aut_matrix().get_var_order();
         STRACE("str-diseq",
             tout << "* NFAs for variables: " << std::endl;
-            for(const BasicTerm& bt : diseq.get_set()) {
+            for (const BasicTerm& bt : all_vars) {
                 tout << bt.to_string() << ":" << std::endl;
                 autass.at(bt)->print_to_dot(tout);
             }
             tout << std::endl;
         );
+
         STRACE("str-diseq",
             tout << "* Tag Automaton for diseq: " << diseqs.to_string() << std::endl;
             tag_aut.print_to_dot(tout);
@@ -401,14 +407,24 @@ namespace smt::noodler::ca {
         STRACE("str", tout << "TagAut LIA: finished" << std::endl; );
 
         // we include only those symbols occurring in the reduced tag automaton
-        std::set<AtomicSymbol> ats;
+        TagSet all_used_tags;
         for (const auto& trans : tag_aut.nfa.delta.transitions()) {
-            std::set<AtomicSymbol> sms = tag_aut.alph.get_symbol(trans.symbol);
-            ats.insert(sms.begin(), sms.end());
+            const TagSet& tag_set = tag_aut.alph.get_symbol(trans.symbol);
+            all_used_tags.insert(tag_set.begin(), tag_set.end());
         }
 
-        parikh::ParikhImageDiseqTag pi(tag_aut, ats, 0);
-        LenNode pi_formula = pi.get_diseq_formula(diseq);
+        parikh::ParikhImageDiseqTag diseq_lia_formula_generator(tag_aut, all_used_tags, 0);
+
+        LenNode pi_formula (LenFormulaType::FALSE, {});
+        if (disequations.size() == 1) { // Use a simpler construction without Copy tags
+            STRACE("str-diseq", tout << "* Generating formulae for a single disequation\n"; );
+
+            Predicate diseq = disequations[0];
+            pi_formula = diseq_lia_formula_generator.get_diseq_formula(diseq);
+        } else {
+            STRACE("str-diseq", tout << "* Generating formulae for multiple disequations\n"; );
+            pi_formula = diseq_lia_formula_generator.get_formula_for_multiple_diseqs(disequations);
+        }
 
         STRACE("str-diseq", tout << "* Resulting formula: " << std::endl << pi_formula << std::endl << std::endl; );
 
