@@ -294,8 +294,8 @@ namespace smt::noodler {
 
                 if (0) {
                     std::ofstream out_file("./not-contains-lia.smt2");
-                    // write_z3_expr_into_stream(this->m, out_file, lengths);
-                    write_len_formula_as_smt2(noodler_lengths, out_file);
+                    write_z3_expr_into_stream(this->m, out_file, lengths);
+                    // write_len_formula_as_smt2(noodler_lengths, out_file);
                     out_file.close();
                 }
 
@@ -318,6 +318,8 @@ namespace smt::noodler {
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;
                     }
+                } else {
+                    ctx.get_fparams().is_underapprox = true;
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
@@ -699,7 +701,9 @@ namespace smt::noodler {
             m_rewrite(len_formula);
             quant_lia_solver m_quant_int_solver(get_manager());
             m_quant_int_solver.initialize(get_context());
-            return m_quant_int_solver.check_sat(len_formula);
+
+            lbool is_sat = m_quant_int_solver.check_sat(len_formula);
+            return is_sat;
         }
 
         int_expr_solver m_int_solver(get_manager(), get_fparams());

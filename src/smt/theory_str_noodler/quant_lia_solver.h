@@ -67,7 +67,6 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < ctx.get_num_asserted_formulas(); ++i) {
                     STRACE("str-lia", tout<< "check_sat context from asserted: " << mk_pp(ctx.get_asserted_formula(i),m) << std::endl);
                     assert_expr(ctx.get_asserted_formula(i));
-
                 }
                 if (include_ass) {
                     for (auto & e : Assigns){
