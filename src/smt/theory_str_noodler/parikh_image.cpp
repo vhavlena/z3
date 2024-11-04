@@ -319,8 +319,10 @@ namespace smt::noodler::parikh {
             tout << std::endl;
         );
         STRACE("str-diseq", tout << "* compute_parikh_image:  " << std::endl << parikh << std::endl << std::endl;);
-        // LenNode diseq_len = get_diseq_length(diseq);
-        // STRACE("str-diseq", tout << "* get_diseq_length:  " << std::endl << diseq_len << std::endl << std::endl;);
+
+        LenNode diseq_len = get_diseq_length(diseq);
+        STRACE("str-diseq", tout << "* get_diseq_length:  " << std::endl << diseq_len << std::endl << std::endl;);
+
         LenNode mismatch = get_all_mismatch_formula(diseq);
         STRACE("str-diseq", tout << "* get_mismatch_formula:  " << std::endl << mismatch << std::endl << std::endl;);
         LenNode force_new_vars_expressing_str_vars_length = get_var_length(diseq.get_set());
@@ -332,7 +334,7 @@ namespace smt::noodler::parikh {
             parikh,
             force_new_vars_expressing_str_vars_length,
             LenNode(LenFormulaType::OR, {
-                // diseq_len,
+                diseq_len,
                 LenNode(LenFormulaType::AND, {
                     mismatch,
                     diff_symbol
@@ -1085,6 +1087,11 @@ namespace smt::noodler::parikh {
                               {var, formula});
         }
 
+        for (auto& [tag, tag_var] : this->tag_occurence_count_vars) {
+            formula = LenNode(LenFormulaType::EXISTS,
+                              {tag_var, formula});
+        }
+
         return formula;
     }
 
@@ -1129,7 +1136,6 @@ namespace smt::noodler::parikh {
             })}
         );
 
-        LenNode log_true(LenFormulaType::TRUE, {});
         LenNode exist_alternative_parikh_with_conflict(
             LenFormulaType::AND, {
                 second_level_parikh,

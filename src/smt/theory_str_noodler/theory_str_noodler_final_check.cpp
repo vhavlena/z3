@@ -294,7 +294,8 @@ namespace smt::noodler {
 
                 if (0) {
                     std::ofstream out_file("./not-contains-lia.smt2");
-                    write_z3_expr_into_stream(this->m, out_file, lengths);
+                    // write_z3_expr_into_stream(this->m, out_file, lengths);
+                    write_len_formula_as_smt2(noodler_lengths, out_file);
                     out_file.close();
                 }
 
