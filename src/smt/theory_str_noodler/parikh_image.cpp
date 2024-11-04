@@ -305,7 +305,6 @@ namespace smt::noodler::parikh {
             }
         }
 
-        mismatch.succ.push_back(get_mismatch_formula(0, 1, diseq));
         return mismatch;
     }
 
