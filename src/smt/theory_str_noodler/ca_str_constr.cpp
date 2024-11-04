@@ -701,6 +701,13 @@ namespace smt::noodler::ca {
 
         bool can_construct_lia = true;
 
+        { // Priority - apply fast heuristics before attempting to use the great LIA hammer
+            std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains}, var_assignment);
+            if (heuristic_solution.has_value()) {
+                return { heuristic_solution.value(), LenNodePrecision::PRECISE };
+            }
+        }
+
         if (formula.get_predicates().size() > 1) {
             // We have more than 1 notContains, for now we pretent we don't know what to do with it
             can_construct_lia = false;
@@ -725,11 +732,6 @@ namespace smt::noodler::ca {
 
         if (!can_construct_lia) {
             // We cannot use the big LIA hammer, maybe we can apply some of the smaller hammers
-            std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains}, var_assignment);
-            if (heuristic_solution.has_value()) {
-                return { heuristic_solution.value(), LenNodePrecision::PRECISE };
-            }
-
             LenNode rhs_is_longer_than_lhs = try_making_rhs_longer_than_lhs({not_contains}, var_assignment);
             return { rhs_is_longer_than_lhs, LenNodePrecision::UNDERAPPROX }; // Return here, there is nothing better we can do as we cannot construct a precise LIA
         }
