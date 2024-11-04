@@ -348,8 +348,6 @@ namespace smt::noodler::parikh {
     }
 
     LenNode ParikhImageDiseqTag::get_formula_for_multiple_diseqs(const std::vector<Predicate>& disequations) {
-        std::cout << "Hello\n";
-
         this->predicates = disequations;
         init_mismatch_pos_inside_vars_per_diseq();
 
