@@ -376,6 +376,9 @@ namespace smt::noodler::parikh {
         LenNode force_new_vars_expressing_str_vars_length = get_var_length(all_vars);
         STRACE("str-diseq", tout << "* binding variable lengths to <L, var> occurrences:  " << std::endl << force_new_vars_expressing_str_vars_length << std::endl << std::endl;);
 
+        LenNode all_copies_are_correct = assert_copy_transition_correctness();
+        STRACE("str-diseq", tout << "* making <C, X..> transitions can be taken if there is some <R, X..> transition taken before:  " << std::endl << all_copies_are_correct << std::endl << std::endl;);
+
         LenNode all_disequations_are_satisfied (LenFormulaType::AND, {});
         for (int disequation_idx = 0; disequation_idx < static_cast<int>(disequations.size()); disequation_idx++) {
             LenNode disequation_contains_a_conflict = make_mismatch_existence_assertion_for_diseq(disequation_idx);
@@ -387,6 +390,7 @@ namespace smt::noodler::parikh {
 
         LenNode resulting_formula (LenFormulaType::AND, {
             parikh_image_formula,
+            all_copies_are_correct,
             all_disequations_have_samples,
             all_register_variables_have_values,
             all_disequations_are_satisfied
@@ -492,14 +496,17 @@ namespace smt::noodler::parikh {
         return std::make_pair(mismatch_pos_formula, LenNode(mismatch_sym_var_it->second));
     }
 
-    LenNode make_guess_what_side_sees_mismatch_first(const LenNode& lhs_sum, const LenNode& lhs_mismatch_in_var, const LenNode& rhs_sum, const LenNode& rhs_mismatch_in_var) {
+    LenNode make_guess_what_side_sees_mismatch_first(const LenNode& lhs_sum, const LenNode& lhs_mismatch_in_var, const LenNode& rhs_sum, const LenNode& rhs_mismatch_in_var, bool mismatch_pos_subsume_each_other = false) {
         LenNode mismatch_position_case_split (LenFormulaType::OR, {});
+
         {
             LenNode lhs_sees_mismatch_sooner = lhs_sum;
             lhs_sees_mismatch_sooner.succ.push_back(lhs_mismatch_in_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
 
             LenNode rhs_sees_mismatch_later = rhs_sum;
-            rhs_sees_mismatch_later.succ.push_back(lhs_mismatch_in_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
+            if (!mismatch_pos_subsume_each_other) {
+                rhs_sees_mismatch_later.succ.push_back(lhs_mismatch_in_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1>
+            }
             rhs_sees_mismatch_later.succ.push_back(rhs_mismatch_in_var);  // Result: <L, x> + ... <L, z> + <P, var, 2> + <P, var, 1> + <P, var, 2>
 
             LenNode branch(LenFormulaType::EQ, {lhs_sees_mismatch_sooner, rhs_sees_mismatch_later});
@@ -511,7 +518,9 @@ namespace smt::noodler::parikh {
             // When building the sum for both sides, we pass in which of the variables should be seen first to generate correct <P, var, ORD> var to add
             // In the case when (var_right == var_left) we always pass ORD=1 for var_left, and ORD=2 for var_right, so we know that rhs_position_inside_var = <P, X, 2>
             LenNode lhs_sees_mismatch_later = lhs_sum;
-            lhs_sees_mismatch_later.succ.push_back(lhs_mismatch_in_var); // Result: <L, x> + ... <L, z> + <P, var, 1>
+            if (!mismatch_pos_subsume_each_other) {
+                lhs_sees_mismatch_later.succ.push_back(lhs_mismatch_in_var); // Result: <L, x> + ... <L, z> + <P, var, 1>
+            }
             lhs_sees_mismatch_later.succ.push_back(rhs_mismatch_in_var); // Result: <L, x> + ... <L, z> + <P, var, 1> + <P, var, 2>
 
             LenNode rhs_sees_mismatch_sooner = rhs_sum;
@@ -902,11 +911,11 @@ namespace smt::noodler::parikh {
             LenNode sum_of_control_vars (LenFormulaType::PLUS, control_var_for_this_level);
 
             // Positive: control_var_1 + ... + control_var_n  > 0
-            // Negated :-control_var_1 - ... - control_var_n <= 0   <=> 0 <= control_var_1 + ...
-            LenNode negated_antecedent (LenFormulaType::LEQ, {0, sum_of_control_vars});
+            // Negated : control_var_1 + ... + control_var_n <= 0
+            LenNode negated_antecedent (LenFormulaType::LEQ, {sum_of_control_vars, 0});
 
             LenNode sum_of_pos_tags (LenFormulaType::PLUS);
-            for (size_t pos_tag_level_idx = 0; pos_tag_level_idx < level_idx; pos_tag_level_idx++) {
+            for (size_t pos_tag_level_idx = 0; pos_tag_level_idx <= level_idx; pos_tag_level_idx++) {
                 const BasicTerm* pos_tag_occurrence_count = mismatch_pos_transition_vars[pos_tag_level_idx];
                 assert(pos_tag_occurrence_count != nullptr);
                 sum_of_pos_tags.succ.push_back(*pos_tag_occurrence_count);
@@ -936,6 +945,7 @@ namespace smt::noodler::parikh {
     }
 
     LenNode ParikhImageDiseqTag::make_mismatch_pos_vars_assertion(int predicate_idx, const BasicTerm& left_var, const BasicTerm& right_var) const {
+        // @Todo(mhecko): unused, refactor?
         std::vector<std::vector<LenNode>> control_vars_per_level_for_lhs, control_vars_per_level_for_rhs;
         control_vars_per_level_for_lhs.resize(2*this->get_predicate_count());
         control_vars_per_level_for_rhs.resize(2*this->get_predicate_count());
@@ -1005,21 +1015,122 @@ namespace smt::noodler::parikh {
         return LenNode(LenFormulaType::LT, {0, sum_of_all_transitions});
     }
 
+    struct SamplingTransitionLists {
+        std::vector<LenNode> register_stores;
+        std::vector<LenNode> copies;
+    };
+
+
+    LenNode ParikhImageDiseqTag::assert_copy_transition_correctness() const {
+        std::map<BasicTerm, std::vector<SamplingTransitionLists>> sampling_transitions_grouped_by_var;
+        std::map<BasicTerm, std::vector<const BasicTerm*>> var_to_mismatch_pos_tag_counts;
+
+        std::set<BasicTerm> all_vars;
+        for (auto& diseq : this->predicates) {
+            all_vars.insert(diseq.get_left_side().begin(), diseq.get_left_side().end());
+            all_vars.insert(diseq.get_right_side().begin(), diseq.get_right_side().end());
+        }
+
+        for (const BasicTerm& var : all_vars) {
+            sampling_transitions_grouped_by_var[var].resize(2*get_predicate_count());
+            var_to_mismatch_pos_tag_counts[var].resize(2*get_predicate_count());
+        }
+
+        for (const auto& [tag, tag_var] : tag_occurence_count_vars) {
+
+            if (tag.type == AtomicSymbol::TagType::MISMATCH_POS) {
+                var_to_mismatch_pos_tag_counts.at(tag.var)[tag.copy_idx-1] = &tag_var;
+                continue;
+            }
+
+            if (!tag.is_mutating_registers()) continue;
+
+            std::vector<SamplingTransitionLists>& transitions_for_this_var = sampling_transitions_grouped_by_var.at(tag.var);
+            SamplingTransitionLists& this_level_transitions = transitions_for_this_var[tag.copy_idx-1];
+
+            if (tag.type == AtomicSymbol::TagType::REGISTER_STORE) {
+                this_level_transitions.register_stores.push_back(tag_var);
+            }
+
+            if (tag.type == AtomicSymbol::TagType::COPY_PREVIOUS) {
+                this_level_transitions.copies.push_back(tag_var);
+            }
+        }
+
+        /**
+         * If we did not to the current level into a state belonging to the variable X by sampling or copying,
+         * then we cannot take a copy transition - the register does not hold value that belongs to X. Otherwise
+         * we could take a copy transition a copy register value that belongs to other variable.
+         *
+         * #<C, X, ?, ?, previous_level> + #<R, X, ?, ?, previous_level> = 0  --->  #<C, X, ?, ?, current_level> = 0
+         */
+        LenNode copies_copy_register_values_from_the_sampled_var (LenFormulaType::AND, {});  // Correctness across all variables
+        for (const auto& [var, sampling_transitions] : sampling_transitions_grouped_by_var) {
+            LenNode copies_for_this_var_are_correct (LenFormulaType::AND, {});
+
+            for (size_t transition_level = 1; transition_level < sampling_transitions.size(); transition_level++) {
+                const SamplingTransitionLists& previous_level = sampling_transitions[transition_level-1];
+                const SamplingTransitionLists& current_level  = sampling_transitions[transition_level];
+
+                LenNode sum_of_sampling_for_previous_level (LenFormulaType::PLUS, previous_level.copies);
+                for (auto& register_store : previous_level.register_stores) {
+                   sum_of_sampling_for_previous_level.succ.push_back(register_store);
+                }
+                LenNode previous_level_has_no_value_to_copy (LenFormulaType::NEQ, {sum_of_sampling_for_previous_level, 0}); // Already negated, we will write implication as (not antecendent OR consequent)
+
+                LenNode sum_of_copies_for_current_level (LenFormulaType::PLUS, current_level.copies);
+                LenNode current_level_performs_no_copies (LenFormulaType::EQ, {sum_of_copies_for_current_level, 0});
+
+                LenNode asserting_implication (LenFormulaType::OR, {previous_level_has_no_value_to_copy, current_level_performs_no_copies});
+
+                copies_for_this_var_are_correct.succ.push_back(asserting_implication);
+            }
+            copies_copy_register_values_from_the_sampled_var.succ.push_back(copies_for_this_var_are_correct);
+        }
+
+
+        /**
+         * If we are at level L and we do a copy transitions for variable X, we cannot take any normal transitions at level L.
+         * Otherwise we might compute offset inside variable that is wrong.
+         *
+         * #<C, X, ?, ?, level> > 0  --->  #<P, X, level-1> = 0
+         */
+        LenNode cannot_take_normal_transitions_before_copying (LenFormulaType::AND, {});
+        for (const auto& [var, sampling_transitions] : sampling_transitions_grouped_by_var) {
+            for (size_t level = 1; level < sampling_transitions.size(); level++) {
+                const SamplingTransitionLists& level_mutating_transitions = sampling_transitions[level];
+
+                LenNode sum_of_copies_from_this_level (LenFormulaType::PLUS, level_mutating_transitions.copies);
+                LenNode this_level_did_a_copy (LenFormulaType::LEQ, {sum_of_copies_from_this_level, 0}); // Already negated, we will write implication as (not antecendent OR consequent)
+
+                const BasicTerm* transitions_at_this_level_var = var_to_mismatch_pos_tag_counts.at(var).at(level);
+                LenNode tranistions_at_this_level_node (*transitions_at_this_level_var);
+                LenNode no_ordinary_transitions_at_this_level (LenFormulaType::EQ, {tranistions_at_this_level_node, 0});
+
+
+                LenNode asserting_implication (LenFormulaType::OR, {this_level_did_a_copy, no_ordinary_transitions_at_this_level});
+
+                cannot_take_normal_transitions_before_copying.succ.push_back(asserting_implication);
+            }
+        }
+
+        LenNode result (LenFormulaType::AND, {copies_copy_register_values_from_the_sampled_var, cannot_take_normal_transitions_before_copying});
+        return result;
+    }
+
     LenNode ParikhImageDiseqTag::make_mismatch_existence_assertion_for_diseq(size_t predicate_idx) const {
         const Predicate& disequation = this->predicates[predicate_idx];
 
-        LenNode disjunction_across_all_var_pairs(LenFormulaType::OR);
+        LenNode disjunction_across_all_var_pairs(LenFormulaType::OR, {});
 
         for (size_t left_var_idx = 0; left_var_idx < disequation.get_left_side().size(); left_var_idx++) {
             for (size_t right_var_idx = 0; right_var_idx < disequation.get_right_side().size(); right_var_idx++) {
                 // Sum up all <L, x> that preceed the left_var_idx and right_var_idx
                 LenNode lhs_mismatch_pos_sum = express_string_length_preceding_supposed_mismatch(disequation.get_left_side(), left_var_idx);
-                LenNode rhs_mismatch_pos_sum = express_string_length_preceding_supposed_mismatch(disequation.get_left_side(), right_var_idx);
+                LenNode rhs_mismatch_pos_sum = express_string_length_preceding_supposed_mismatch(disequation.get_right_side(), right_var_idx);
 
                 const BasicTerm& left_var  = disequation.get_left_side().at(left_var_idx);
                 const BasicTerm& right_var = disequation.get_right_side().at(right_var_idx);
-
-                LenNode mismatch_pos_value_correct = make_mismatch_pos_vars_assertion(predicate_idx, left_var, right_var);
 
                 const auto& [left_mismatch_pos_var, right_mismatch_pos_var] = this->mismatch_pos_inside_vars_per_diseq.at(predicate_idx);
 
@@ -1036,7 +1147,6 @@ namespace smt::noodler::parikh {
                 LenNode mismatch_seen_in_rhs_var = assert_one_of_the_transitions_taken(sampling_transitions_for_right_var);
 
                 LenNode mismatch_pos_equal_and_registers_differ (LenFormulaType::AND, {
-                    mismatch_pos_value_correct,
                     symbols_differ,           // Register contents differ
                     mismatch_seen_in_lhs_var, // One mismatch has been seen in the guessed left variable
                     mismatch_seen_in_rhs_var, // Other mismatch has been seen in the guessed right variable
@@ -1050,13 +1160,14 @@ namespace smt::noodler::parikh {
                     rhs_mismatch_pos_sum.succ.push_back(right_mismatch_pos_var);
 
                     LenNode mismatch_positions_equal (LenFormulaType::EQ, {lhs_mismatch_pos_sum, rhs_mismatch_pos_sum});
-                    mismatch_pos_equal_and_registers_differ.succ.push_back(mismatch_positions_equal);
 
+                    mismatch_pos_equal_and_registers_differ.succ.push_back(mismatch_positions_equal);
                     disjunction_across_all_var_pairs.succ.push_back(mismatch_pos_equal_and_registers_differ);
                 } else {
                     // We are dealing with the same variables - guess whether lhs sees mismatch first
                     LenNode mismatch_guess = make_guess_what_side_sees_mismatch_first(lhs_mismatch_pos_sum, left_mismatch_pos_var,
-                                                                                      rhs_mismatch_pos_sum, right_mismatch_pos_var);
+                                                                                      rhs_mismatch_pos_sum, right_mismatch_pos_var,
+                                                                                      true);
 
                     mismatch_pos_equal_and_registers_differ.succ.push_back(mismatch_guess);
                     disjunction_across_all_var_pairs.succ.push_back(mismatch_pos_equal_and_registers_differ);

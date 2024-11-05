@@ -139,8 +139,8 @@ namespace smt::noodler::ca {
                 }
                 case TagType::REGISTER_STORE: { // <R, var, disequation, side, mismatch_idx, alphabet_symbol>
                     std::stringstream string_builder;
-                    string_builder << "<R, ";
-                                   // << var_escape + ", ";
+                    string_builder << "<R, "
+                                   << var_escape + ", ";
                     if (this->predicate_idx >= 0) {
                         string_builder << this->predicate_idx << "-"
                                        << (this->predicate_side == PredicateSide::LEFT ? "L" : "R")

@@ -23,10 +23,17 @@ namespace smt::noodler::parikh {
 struct DiseqSide {
     int predicate_idx;
     ca::AtomicSymbol::PredicateSide side;
+
     bool operator<(const DiseqSide& other) const {
         if (predicate_idx < other.predicate_idx) return true;
         if (predicate_idx > other.predicate_idx) return false;
         return side < other.side;
+    }
+
+    bool operator>(const DiseqSide& other) const {
+        if (predicate_idx > other.predicate_idx) return true;
+        if (predicate_idx < other.predicate_idx) return false;
+        return side > other.side;
     }
 
     bool operator==(const DiseqSide& other) const = default;
@@ -283,6 +290,9 @@ public:
     std::vector<std::vector<LenNode>> collect_sampling_transisions_for_diseq_and_var(const BasicTerm& var, int diseq_idx, ca::AtomicSymbol::PredicateSide side) const;
 
     LenNode get_formula_for_multiple_diseqs(const std::vector<Predicate>& disequations);
+
+
+    LenNode assert_copy_transition_correctness() const;
 };
 
 typedef std::pair<mata::nfa::State, mata::nfa::State> StatePair;
