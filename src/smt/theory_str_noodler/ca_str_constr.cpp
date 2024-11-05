@@ -226,6 +226,7 @@ namespace smt::noodler::ca {
 
                 for (size_t predicate_idx = 0; predicate_idx < this->predicates.size(); predicate_idx++) {
                     AtomicSymbol register_store_lhs = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx,
+                                                                                                            var,
                                                                                                             AtomicSymbol::PredicateSide::LEFT,
                                                                                                             copy_idx_to_label_symbols_with,
                                                                                                             symbol_post.symbol);
@@ -233,6 +234,7 @@ namespace smt::noodler::ca {
                     mata::Symbol lhs_reg_store_handle = this->alph.add_symbol(lhs_transition_tag_set);
 
                     AtomicSymbol register_store_rhs = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx,
+                                                                                                            var,
                                                                                                             AtomicSymbol::PredicateSide::RIGHT,
                                                                                                             copy_idx_to_label_symbols_with,
                                                                                                             symbol_post.symbol);

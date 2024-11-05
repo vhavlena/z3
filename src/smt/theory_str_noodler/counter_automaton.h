@@ -180,9 +180,10 @@ namespace smt::noodler::ca {
             return AtomicSymbol{TagType::REGISTER_STORE, var, /* predicate_idx */-1, PredicateSide::LEFT, copy_idx, symbol};
         }
 
-        static AtomicSymbol create_r_symbol_with_predicate_info(size_t predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symbol) {
+        static AtomicSymbol create_r_symbol_with_predicate_info(size_t predicate_idx, const BasicTerm& var, PredicateSide side, size_t copy_idx, mata::Symbol symbol) {
             AtomicSymbol tag(
                 TagType::REGISTER_STORE,
+                var,
                 predicate_idx,
                 side,
                 copy_idx,
