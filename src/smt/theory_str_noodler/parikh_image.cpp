@@ -449,7 +449,7 @@ namespace smt::noodler::parikh {
         LenNode sum_len(LenFormulaType::PLUS);
 
         size_t last_term_pos_to_include = supposed_mismatch_pos - 1;
-        int current_term_idx = 0;
+        size_t current_term_idx = 0;
         for (const BasicTerm& side_term : predicate_side) {
             if (current_term_idx > last_term_pos_to_include) {
                 break;
@@ -463,7 +463,7 @@ namespace smt::noodler::parikh {
         return sum_len;
     }
 
-    LenNode ParikhImageDiseqTag::count_register_stores_for_var_and_side(BasicTerm& var, char predicate_side_label) const {
+    LenNode ParikhImageDiseqTag::count_register_stores_for_var_and_side(BasicTerm& var, int predicate_side_label) const {
         LenNode register_store_count (LenFormulaType::PLUS);
         for (const ca::AtomicSymbol& atomic_symbol : this->atomic_symbols) {
             bool is_register_store = (atomic_symbol.type == ca::AtomicSymbol::TagType::REGISTER_STORE);
@@ -557,7 +557,7 @@ namespace smt::noodler::parikh {
      */
     LenNode ParikhImageDiseqTag::get_mismatch_formula(size_t left_mismatch_pos, size_t right_mismatch_pos, const Predicate& diseq, const LenNode& rhs_offset) {
         // labels of the <P> symbols
-        char label_left = 1, label_right = 2;
+        int label_left = 1, label_right = 2;
         BasicTerm var_left  = diseq.get_left_side()[left_mismatch_pos];
         BasicTerm var_right = diseq.get_right_side()[right_mismatch_pos];
 
@@ -774,7 +774,7 @@ namespace smt::noodler::parikh {
         this->registers_in_sampling_order.reserve(register_count);
 
         // Populate registers in sampling order
-        for (size_t register_idx = 0; register_idx < register_count; register_idx++) {
+        for (int register_idx = 0; register_idx < register_count; register_idx++) {
             std::string var_name = "reg_ord" + std::to_string(register_idx);
             BasicTerm var = BasicTerm(BasicTermType::Variable, var_name);
             LenNode var_node (var);
@@ -998,9 +998,19 @@ namespace smt::noodler::parikh {
         DiseqSide rhs = {.predicate_idx = static_cast<int>(predicate_idx), .side = AtomicSymbol::PredicateSide::RIGHT};
         const LenNode& rhs_symbol = register_contents_vars.at(rhs);
 
-        // @Todo: reflect the possibility of a dummy symbol
+        mata::Symbol dummy_symbol = noodler::util::get_dummy_symbol();
+        LenNode lhs_symbol_is_dummy (LenFormulaType::EQ, {lhs_symbol, static_cast<int>(dummy_symbol)});
+        LenNode rhs_symbol_is_dummy (LenFormulaType::EQ, {rhs_symbol, static_cast<int>(dummy_symbol)});
+
         LenNode symbols_differ (LenFormulaType::NEQ, {lhs_symbol, rhs_symbol});
-        return symbols_differ;
+
+        LenNode symbols_must_differ_if_not_dummy (LenFormulaType::OR, {
+            lhs_symbol_is_dummy,
+            rhs_symbol_is_dummy,
+            symbols_differ
+        });
+
+        return symbols_must_differ_if_not_dummy;
     }
 
     LenNode assert_one_of_the_transitions_taken(const std::vector<std::vector<LenNode>>& transitions) {

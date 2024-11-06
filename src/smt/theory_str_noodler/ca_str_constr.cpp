@@ -293,13 +293,13 @@ namespace smt::noodler::ca {
 
         // generate connecting transitions
         if (this->predicates.size() == 1) {
-            for (char copy_idx = 0; copy_idx < copy_cnt - 1; copy_idx++) {
+            for (char copy_idx = 0; static_cast<size_t>(copy_idx) < copy_cnt - 1; copy_idx++) {
                 for (size_t var_idx = 0; var_idx < var_order.size(); var_idx++) {
                     this->add_connection_single_predicate(copy_idx, var_idx, nfa_with_metadata.nfa);
                 }
             }
         } else {
-            for (char copy_idx = 0; copy_idx < copy_cnt - 1; copy_idx++) {
+            for (char copy_idx = 0; static_cast<size_t>(copy_idx) < copy_cnt - 1; copy_idx++) {
                 for (size_t var_idx = 0; var_idx < var_order.size(); var_idx++) {
                     this->add_connection_for_multiple_predicates(copy_idx, var_idx, nfa_with_metadata.nfa);
                 }
@@ -450,7 +450,7 @@ namespace smt::noodler::ca {
 
     void try_next_word_choice(WordChoicesForFiniteLanguages& choices) {
         bool previous_choices_were_reset = false;
-        int num_of_slot_overflows = 0;
+        size_t num_of_slot_overflows = 0;
         for (auto current_slot = choices.slots.begin(); current_slot != choices.slots.end(); current_slot++) {
             WordChoice& current_choice = *current_slot;
 
