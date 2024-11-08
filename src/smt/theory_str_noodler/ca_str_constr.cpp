@@ -115,9 +115,16 @@ namespace smt::noodler::ca {
             }
         }
 
-        result_nfa.initial = this->aut_matrix[0][0].initial;
+        result_nfa.initial = this->aut_matrix[0][0].initial;  // Initial states of the very first automaton
 
         result_nfa.final.clear();
+
+        // Make states of the first copy accepting if they were accepting in the eps-concatenation stored in latest_constructed_row_nfa
+        for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
+            result_nfa.final.insert(final_state);
+        }
+
+        // Add final states from the very last row
         size_t last_row_offset = (copy_count - 1) * copy_states_cnt;
         for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
             mata::nfa::State result_final_state = last_row_offset + final_state;
