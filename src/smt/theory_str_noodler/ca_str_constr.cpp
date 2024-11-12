@@ -119,17 +119,28 @@ namespace smt::noodler::ca {
 
         result_nfa.final.clear();
 
-        // Make states of the first copy accepting if they were accepting in the eps-concatenation stored in latest_constructed_row_nfa
-        for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
-            result_nfa.final.insert(final_state);
+        if (copy_count == 3) { // We are dealing with only 1 predicate, mark final states accordingly
+            // Make states of the first copy accepting if they were accepting in the eps-concatenation stored in latest_constructed_row_nfa
+            for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
+                result_nfa.final.insert(final_state);
+            }
+
+            // Add final states from the very last row
+            size_t last_row_offset = (copy_count - 1) * copy_states_cnt;
+            for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
+                mata::nfa::State result_final_state = last_row_offset + final_state;
+                result_nfa.final.insert(result_final_state);
+            }
+        } else { // Dealing with >1 predicates, make accepting states of every copy accepting if they are accepting in the eps-concatenation
+            std::cout << "Hello: " << copy_count << std::endl;
+            for (size_t copy_idx = 0; copy_idx < copy_count; copy_idx++) {
+                for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
+                    mata::nfa::State final_state_for_this_copy = (copy_idx * copy_states_cnt) + final_state;
+                    result_nfa.final.insert(final_state_for_this_copy);
+                }
+            }
         }
 
-        // Add final states from the very last row
-        size_t last_row_offset = (copy_count - 1) * copy_states_cnt;
-        for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
-            mata::nfa::State result_final_state = last_row_offset + final_state;
-            result_nfa.final.insert(result_final_state);
-        }
 
         // Construct info about where was a state copied from, so we can group "isomorphic" transitions later
         std::vector<size_t> where_is_state_copied_from(result_nfa.num_of_states());
