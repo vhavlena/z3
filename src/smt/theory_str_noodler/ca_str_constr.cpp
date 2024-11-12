@@ -132,7 +132,6 @@ namespace smt::noodler::ca {
                 result_nfa.final.insert(result_final_state);
             }
         } else { // Dealing with >1 predicates, make accepting states of every copy accepting if they are accepting in the eps-concatenation
-            std::cout << "Hello: " << copy_count << std::endl;
             for (size_t copy_idx = 0; copy_idx < copy_count; copy_idx++) {
                 for (mata::nfa::State final_state : latest_constructed_row_nfa.final) {
                     mata::nfa::State final_state_for_this_copy = (copy_idx * copy_states_cnt) + final_state;
