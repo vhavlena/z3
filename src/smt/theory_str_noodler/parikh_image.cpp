@@ -69,14 +69,23 @@ namespace smt::noodler::parikh {
             if(this->nfa.final.contains(state)) {
                 // 0 <= gamma_fin[state] <= 1
                 phi_fin.succ.emplace_back( LenNode(LenFormulaType::AND, {
-                    LenNode(LenFormulaType::LEQ, {0, this->gamma_init[state]}),
-                    LenNode(LenFormulaType::LEQ, {this->gamma_init[state], 1})
+                    LenNode(LenFormulaType::LEQ, {0, this->gamma_fin[state]}),
+                    LenNode(LenFormulaType::LEQ, {this->gamma_fin[state], 1})
                 }) );
             } else {
                 // gamma_fin[state] == 0
                 phi_fin.succ.emplace_back( LenNode(LenFormulaType::EQ, {0, this->gamma_fin[state]}) );
             }
         }
+
+        // There should be only 1 state that is final
+        LenNode sum_of_gamma_fin (LenFormulaType::PLUS, {});
+        for (BasicTerm& gamma_fin : this->gamma_fin) {
+            sum_of_gamma_fin.succ.push_back(gamma_fin);
+        }
+        LenNode max_one_final_state (LenFormulaType::EQ, {sum_of_gamma_fin, 1});
+        phi_fin.succ.push_back(max_one_final_state);
+
         return phi_fin;
     }
 
