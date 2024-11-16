@@ -1668,8 +1668,8 @@ namespace smt::noodler {
         if(m_util_s.str.is_at(y)) {
             literal lit_e = mk_literal(e);
             expr_ref eps(m_util_s.str.mk_string(""), m);
-            add_axiom({ lit_e, ~mk_eq(x,y,false) });
-            add_axiom({ lit_e, ~mk_eq(x,eps,false) });
+            add_axiom({ lit_e, mk_literal(m.mk_not(m.mk_eq(x,y))) });
+            add_axiom({ lit_e, mk_literal(m.mk_not(m.mk_eq(x,eps))) });
             return;
         }
 
