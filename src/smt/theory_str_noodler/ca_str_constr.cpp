@@ -394,12 +394,17 @@ namespace smt::noodler::ca {
         return new_concat;
     }
 
+    Predicate replace_literals_in_predicate(const Predicate& predicate, std::map<BasicTerm, BasicTerm>& literal_table, AutAssignment& aut_assignment) {
+        std::vector<BasicTerm> new_lhs = replace_literals_in_concat(predicate.get_left_side(), literal_table, aut_assignment);
+        std::vector<BasicTerm> new_rhs = replace_literals_in_concat(predicate.get_right_side(), literal_table, aut_assignment);
+        Predicate new_predicate(predicate.get_type(), {new_lhs, new_rhs});
+        return new_predicate;
+    }
+
     std::vector<Predicate> replace_literals_with_fresh_vars(const std::vector<Predicate>& predicates, std::map<BasicTerm, BasicTerm>& literal_table, AutAssignment& aut_assignment) {
         std::vector<Predicate> new_predicates;
         for (const Predicate& predicate : predicates) {
-            std::vector<BasicTerm> new_lhs = replace_literals_in_concat(predicate.get_left_side(), literal_table, aut_assignment);
-            std::vector<BasicTerm> new_rhs = replace_literals_in_concat(predicate.get_right_side(), literal_table, aut_assignment);
-            Predicate new_predicate(predicate.get_type(), {new_lhs, new_rhs});
+            Predicate new_predicate = replace_literals_in_predicate(predicate, literal_table, aut_assignment);
             new_predicates.push_back(new_predicate);
         }
         return new_predicates;
@@ -764,15 +769,13 @@ namespace smt::noodler::ca {
             return { LenNode(LenFormulaType::FALSE), LenNodePrecision::PRECISE };
         }
 
-        const Predicate& not_contains = formula.get_predicates().at(0);
-
-        // #Optimize(mhecko): Add a Iterator<const BasicTerm> to Predicate - it is pointless to create a set
-        std::set<BasicTerm> vars = not_contains.get_set();
+        AutAssignment actual_var_assignment = prep_handler.get_aut_assignment();
+        const Predicate& not_contains_with_literals = formula.get_predicates().at(0);
 
         bool can_construct_lia = true;
 
         { // Priority - apply fast heuristics before attempting to use the great LIA hammer
-            std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains}, var_assignment);
+            std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains_with_literals}, actual_var_assignment);
             if (heuristic_solution.has_value()) {
                 return { heuristic_solution.value(), LenNodePrecision::PRECISE };
             }
@@ -783,16 +786,24 @@ namespace smt::noodler::ca {
             can_construct_lia = false;
         }
 
+        std::map<BasicTerm, BasicTerm> literal_table;
+        AutAssignment workspace_aut_assignment = actual_var_assignment;
+        Predicate not_contains = replace_literals_in_predicate(not_contains_with_literals, literal_table, workspace_aut_assignment);
+
+        STRACE("str-not-contains", {
+            tout << "* Replaced literals with variables: " << not_contains << "\n";
+            tout << "* Literal table:\n";
+            for (const auto& [literal, literal_handle] : literal_table) {
+                tout << "  - " << literal_handle << " stands for: " << literal << "\n";
+            }
+        });
+
+
+        // #Optimize(mhecko): Add a Iterator<const BasicTerm> to Predicate - it is pointless to create a set
+        const std::set<BasicTerm> vars = not_contains.get_set();
         if (can_construct_lia) {
             for (const BasicTerm& var : vars) {
-                if (var.get_type() == BasicTermType::Literal) {
-                    // var is a literal - right now we do not support that.
-                    STRACE("str-not-contains", tout << "* not-contains has a literal - we do not support literals yet\n"; );
-                    can_construct_lia = false;
-                    break;
-                }
-
-                if (!var_assignment.is_flat(var)) {
+                if (!workspace_aut_assignment.is_flat(var)) {
                     STRACE("str-not-contains", tout << "* cannot reduce to LIA - one of the input vars does not have a flat langauge\n"; );
                     can_construct_lia = false;
                     break;
@@ -802,14 +813,12 @@ namespace smt::noodler::ca {
 
         if (!can_construct_lia) {
             // We cannot use the big LIA hammer, maybe we can apply some of the smaller hammers
-            LenNode rhs_is_longer_than_lhs = try_making_rhs_longer_than_lhs({not_contains}, var_assignment);
+            LenNode rhs_is_longer_than_lhs = try_making_rhs_longer_than_lhs({not_contains}, workspace_aut_assignment);
             return { rhs_is_longer_than_lhs, LenNodePrecision::UNDERAPPROX }; // Return here, there is nothing better we can do as we cannot construct a precise LIA
         }
 
-        AutAssignment actual_var_assignment = prep_handler.get_aut_assignment();
-
         // Preprocess the assignment: reduce the automata and make them deterministic
-        for (auto it = actual_var_assignment.begin(); it != actual_var_assignment.end(); it++) {
+        for (auto it = workspace_aut_assignment.begin(); it != workspace_aut_assignment.end(); it++) {
             mata::nfa::Nfa reduced_nfa = mata::nfa::reduce(*it->second);
             mata::nfa::Nfa reduced_dfa = mata::nfa::determinize(reduced_nfa);
             it->second = std::make_shared<mata::nfa::Nfa>(reduced_dfa);
@@ -819,7 +828,7 @@ namespace smt::noodler::ca {
             });
         }
 
-        ca::TagDiseqGen tag_automaton_generator(not_contains, actual_var_assignment);
+        ca::TagDiseqGen tag_automaton_generator(not_contains, workspace_aut_assignment);
 
         ca::TagAut tag_automaton = tag_automaton_generator.construct_tag_aut();
         std::set<AtomicSymbol> atomic_symbols = tag_automaton.gather_used_symbols();
