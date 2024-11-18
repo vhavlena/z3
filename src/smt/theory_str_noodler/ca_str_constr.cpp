@@ -6,6 +6,7 @@
 #include <mata/nfa/nfa.hh>
 #include <mata/nfa/strings.hh>
 #include <unordered_map>
+#include <mata/parser/re2parser.hh>
 
 namespace smt::noodler::ca {
 
@@ -369,6 +370,41 @@ namespace smt::noodler::ca {
 
     //-----------------------------------------------------------------------------------------------
 
+    std::vector<BasicTerm> replace_literals_in_concat(const std::vector<BasicTerm>& concat, std::map<BasicTerm, BasicTerm>& literal_table, AutAssignment& assignment) {
+        std::vector<BasicTerm> new_concat;
+        for (const BasicTerm& concat_term : concat) {
+            if (concat_term.is_literal()) {
+                // @Note: Reusing variables for literals can seem unsound as it induces some sort of synchronization, but it is actually OK.
+                auto literal_handle_it = literal_table.find(concat_term);
+                if (literal_handle_it == literal_table.end()) {
+                    BasicTerm literal_handle = util::mk_noodler_var_fresh("literal");  // Unique suffix is added, no need to add anything to "literal"
+                    literal_table.emplace(concat_term, literal_handle);
+                    new_concat.push_back(literal_handle);
+
+                    // @Optimize: Maybe we could construct the automaton faster by a specialized construction since
+                    //            we know it is just a literal (no Kleene stars etc.)
+                    mata::nfa::Nfa aut;
+                    mata::parser::create_nfa(&aut, concat_term.get_name().encode());
+                    assignment[literal_handle] = std::make_shared<mata::nfa::Nfa>(aut);
+                }
+            } else {
+                new_concat.push_back(concat_term);
+            }
+        }
+        return new_concat;
+    }
+
+    std::vector<Predicate> replace_literals_with_fresh_vars(const std::vector<Predicate>& predicates, std::map<BasicTerm, BasicTerm>& literal_table, AutAssignment& aut_assignment) {
+        std::vector<Predicate> new_predicates;
+        for (const Predicate& predicate : predicates) {
+            std::vector<BasicTerm> new_lhs = replace_literals_in_concat(predicate.get_left_side(), literal_table, aut_assignment);
+            std::vector<BasicTerm> new_rhs = replace_literals_in_concat(predicate.get_right_side(), literal_table, aut_assignment);
+            Predicate new_predicate(predicate.get_type(), {new_lhs, new_rhs});
+            new_predicates.push_back(new_predicate);
+        }
+        return new_predicates;
+    }
+
     LenNode get_lia_for_disequations(const Formula& diseqs, const AutAssignment& autass) {
 
         if (diseqs.get_predicates().size() == 0) {
@@ -392,15 +428,30 @@ namespace smt::noodler::ca {
             assert(!autass.empty());
         }
 
-        std::vector<Predicate> disequations = prep_handler.get_modified_formula().get_predicates();
+        std::vector<Predicate> disequations_with_literals = prep_handler.get_modified_formula().get_predicates();
         STRACE("str-diseq",
             tout << "* Conjunction of disequations: \n";
-            for (const auto& diseq: disequations) {
+            for (const auto& diseq: disequations_with_literals) {
                 tout << "   - " << diseq << "\n";
             }
         );
 
-        TagDiseqGen tag_automaton_generator(disequations, prep_handler.get_aut_assignment());
+        std::map<BasicTerm, BasicTerm> literal_table;
+        AutAssignment workspace_aut_assignment = prep_handler.get_aut_assignment(); // Make a local copy that we will modify; do not pollute autass
+        std::vector<Predicate> disequations = replace_literals_with_fresh_vars(disequations_with_literals, literal_table, workspace_aut_assignment);
+
+        STRACE("str-diseq",
+            tout << "* After replacing literals with fresh variables: \n";
+            for (const auto& diseq: disequations) {
+                tout << "   - " << diseq << "\n";
+            }
+            tout << "* Literal table: \n";
+            for (const auto& [literal_term, literal_handle]: literal_table) {
+                tout << "   - " << literal_handle << " stands for " << literal_term << "\n";
+            }
+        );
+
+        TagDiseqGen tag_automaton_generator(disequations, workspace_aut_assignment);
         ca::TagAut tag_aut = tag_automaton_generator.construct_tag_aut();
 
         STRACE("str-diseq",
@@ -413,7 +464,7 @@ namespace smt::noodler::ca {
             tout << "* NFAs for variables: " << std::endl;
             for (const BasicTerm& bt : all_vars) {
                 tout << bt.to_string() << ":" << std::endl;
-                autass.at(bt)->print_to_dot(tout);
+                workspace_aut_assignment.at(bt)->print_to_dot(tout);
             }
             tout << std::endl;
         );
