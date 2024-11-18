@@ -180,6 +180,7 @@ namespace smt::noodler {
         void propagate() override;
         void push_scope_eh() override;
         void pop_scope_eh(unsigned num_scopes) override;
+        void restart_eh() override;
         void reset_eh() override;
         final_check_status final_check_eh() override;
         model_value_proc *mk_value(enode *n, model_generator& mg) override;
