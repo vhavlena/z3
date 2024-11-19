@@ -647,7 +647,9 @@ namespace smt::noodler {
         m_conversion_todo.pop_scope(num_scopes);
         m_rewrite.reset();
         // for incremental solving, we assume (TODO: should be done differently?) that if we added another assert, then pop must have been called and the satisfiability of the last run does not matter
-        last_run_was_sat = false;
+        if (m_scope_level < scope_with_last_run_was_sat) {
+            last_run_was_sat = false;
+        }
         STRACE("str",
             tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
     }
