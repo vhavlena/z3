@@ -1175,6 +1175,7 @@ namespace smt::noodler {
         this->len_vars.insert(v);
         if(vars.size() > 0) {
             this->var_eqs.add(expr_ref(pred, m), xvar);
+            this->var_eqs.add(expr_ref(l, m), v); 
             this->len_vars.insert(xvar);
         } else {
             this->var_eqs.add(expr_ref(i, m), x);
@@ -1444,9 +1445,17 @@ namespace smt::noodler {
             // tightestprefix(s, x, not(contains(t, s) && s != eps))
             tightest_prefix(s, x, {~cnt, s_eq_empty});
 
+            if(expr_cases::is_indexof_at(s, t, m, m_util_s)) {
+                add_axiom({mk_literal(m_util_a.mk_ge(i, zero))});
+            }
+
             // update length variables
             this->len_vars.insert(x);
             this->var_eqs.add(expr_ref(i, m), x);
+
+            expr_ref rest(m_util_a.mk_sub(m_util_a.mk_sub(m_util_s.str.mk_length(t), i), m_util_s.str.mk_length(s)), m);
+            m_rewrite(rest);
+            this->var_eqs.add(rest, y);
 
         } else {
             expr_ref len_t(m_util_s.str.mk_length(t), m);
@@ -1844,7 +1853,7 @@ namespace smt::noodler {
             literal not_e = mk_literal(mk_not({e, m}));
             add_axiom({not_e, mk_literal(in_re)});
             return;
-        } 
+        }
 
         expr_ref p = mk_str_var_fresh("contains_left");
         expr_ref s = mk_str_var_fresh("contains_right");

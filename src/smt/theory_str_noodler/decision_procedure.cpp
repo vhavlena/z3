@@ -1337,6 +1337,9 @@ namespace smt::noodler {
             prep_handler.refine_languages();
             prep_handler.refine_languages();
         }
+        // ADDED RULE
+        prep_handler.generate_equiv(len_eq_vars);
+
         prep_handler.propagate_variables();
         prep_handler.propagate_eps();
         prep_handler.infer_alignment();
@@ -1381,6 +1384,8 @@ namespace smt::noodler {
             prep_handler.skip_len_sat(); // if opt == PreprocessType::UNDERAPPROX, there is no not(contains) nor conversion
         }
         prep_handler.reduce_regular_sequence(1);
+        prep_handler.generate_identities();
+        prep_handler.propagate_variables();
         prep_handler.remove_regular();
 
         prep_handler.conversions_validity(conversions);

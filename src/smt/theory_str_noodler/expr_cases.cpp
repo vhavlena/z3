@@ -108,4 +108,12 @@ bool is_len_num_leq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_u
     return false;
 }
 
+bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s) {
+    expr *at_str, *at_pos;
+    if(m_util_s.str.is_at(index_param, at_str, at_pos) && index_str->hash() == at_str->hash()) {
+        return true;
+    }
+    return false;
+}
+
 }

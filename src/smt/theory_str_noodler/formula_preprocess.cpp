@@ -1761,7 +1761,7 @@ namespace smt::noodler {
             if(!pred.is_not_cont()) continue;
             Concat left = pred.get_params()[0];
             Concat right = pred.get_params()[1];
-            if(left.size() == 1 && right.size() == 1) {
+            if(left.size() == 1 && right.size() == 1 && this->aut_ass.at(left[0])->delta.get_used_symbols() != mata::utils::OrdVector<mata::Symbol>({util::get_dummy_symbol()})) {
                 if(this->aut_ass.is_singleton(left[0]) && this->aut_ass.is_singleton(right[0])) {
                     if(mata::nfa::are_equivalent(*this->aut_ass.at(left[0]), *this->aut_ass.at(right[0]))) {
                         return false;

@@ -1202,6 +1202,11 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
         result = str().mk_empty(a_sort);
         return BR_DONE;
     }
+
+    if(constantPos && constantLen && pos.is_zero() && len >= 1 && str().is_at(a)) {
+        result = a;
+        return BR_REWRITE1;
+    }
     
     // case 1: pos < 0 or len <= 0
     // rewrite to ""
@@ -1456,6 +1461,12 @@ br_status seq_rewriter::mk_seq_contains(expr* a, expr* b, expr_ref& result) {
     if (as.empty()) {
         result = str().mk_is_empty(b);
         return BR_REWRITE2;
+    }
+
+    // contains (at ...) str where |str| > 1 --> false
+    if(str().is_at(a) && str().is_string(b, d) && d.length() > 1) {
+        result = m().mk_false();
+        return BR_DONE;
     }
 
     for (unsigned i = 0; bs.size() + i <= as.size(); ++i) {
@@ -1789,11 +1800,21 @@ br_status seq_rewriter::mk_seq_index(expr* a, expr* b, expr* c, expr_ref& result
     bool isc1 = str().is_string(a, s1);
     bool isc2 = str().is_string(b, s2);
     sort* sort_a = a->get_sort();
+    expr * c1, *c2;
 
     if (isc1 && isc2 && m_autil.is_numeral(c, r) && r.is_unsigned()) {
         int idx = s1.indexofu(s2, r.get_unsigned());
         result = m_autil.mk_int(idx);
         return BR_DONE;
+    }
+
+    // indexof(s1 + s2, b, c) -> s1.indexof(b) if the result is != -1 and s1 and b are concrete strings
+    if(str().is_concat(a, c1, c2) && isc2 && str().is_string(c1, s1) && m_autil.is_numeral(c, r) && r.is_unsigned()) {
+        int idx = s1.indexofu(s2, r.get_unsigned());
+        if(idx != -1) {
+            result = m_autil.mk_int(idx);
+            return BR_DONE;
+        }
     }
     if (m_autil.is_numeral(c, r) && r.is_neg()) {
         result = minus_one();
@@ -5400,6 +5421,13 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
     if (!reduce_eq(l, r, new_eqs, changed)) {
         result = m().mk_false();
         TRACE("seq_verbose", tout << result << "\n";);
+        return BR_DONE;
+    }
+
+    // str.at ... = str where |str| > 1 --> false
+    zstring val;
+    if(str().is_at(l) && str().is_string(r, val) && val.length() > 1) {
+        result = m().mk_false(); 
         return BR_DONE;
     }
     if (!changed) {
