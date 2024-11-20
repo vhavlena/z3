@@ -208,7 +208,10 @@ namespace smt::noodler {
     }
 
     void AutAssignment::replace_dummy_with_new_symbol() {
-        mata::Symbol new_symbol = alphabet.size() == 0 ? 92 : regex::Alphabet(alphabet).get_unused_symbol();
+        if(alphabet.size() == 0) {
+            return;
+        }
+        mata::Symbol new_symbol = regex::Alphabet(alphabet).get_unused_symbol();
         bool is_there_some_dummy = false;
         for (auto& [var, nfa] : *this) {
             for (mata::nfa::State state = 0; state < nfa->num_of_states(); ++state) {
