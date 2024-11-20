@@ -126,10 +126,13 @@ namespace smt::noodler {
         vector<expr_pair_flag> m_membership_todo_rel; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
         // we cannot decide relevancy of to_code, from_code, to_int and from_int, so we assume everything in m_conversion_todo is relevant => no _todo_rel version
 
+        // TODO: the following three things should probably be done differently
         // true if last run of final_check_eh was sat (if it is true, then final_check_eh always return sat)
         bool last_run_was_sat = false;
         // the length formula from the last run that was sat
         expr_ref sat_length_formula;
+        // the scope at which the last run was sat (so if we pop behind this scope, we have to forget that the last run was sat)
+        int scope_with_last_run_was_sat = -1;
 
         unsigned num_of_solving_final_checks = 0; // number of final checks that lead to solving string formula (i.e. not solved by loop protection nor by language (dis)equalities)
         std::map<std::string, DecProcStats> statistics {
@@ -180,6 +183,7 @@ namespace smt::noodler {
         void propagate() override;
         void push_scope_eh() override;
         void pop_scope_eh(unsigned num_scopes) override;
+        void restart_eh() override;
         void reset_eh() override;
         final_check_status final_check_eh() override;
         model_value_proc *mk_value(enode *n, model_generator& mg) override;

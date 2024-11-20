@@ -34,6 +34,7 @@ namespace smt::noodler {
         dec_proc = nullptr;
         relevant_vars.clear();
         sat_length_formula = expr_ref(m);
+        scope_with_last_run_was_sat = -1;
 
         remove_irrelevant_constr();
         STRACE("str",
