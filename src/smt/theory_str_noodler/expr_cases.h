@@ -74,12 +74,6 @@ bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s
 /**
  * @brief Check if the constraint is of the form (indexof ( @p index_param ) ( @p index_str )). 
  * 
- * @param index_param 
- * @param index_str 
- * @param m 
- * @param m_util_s 
- * @return true 
- * @return false 
  */
 bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s);
 
