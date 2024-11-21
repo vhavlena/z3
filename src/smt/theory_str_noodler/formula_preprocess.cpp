@@ -1548,6 +1548,36 @@ namespace smt::noodler {
                 ret.push_back(bt);
             }
         }
+
+        if (ret.empty()) return ret;
+
+        int conseq_literals = 0;
+        bool should_compress = false;
+        for (const BasicTerm& term : ret) {
+            if (term.is_literal()) conseq_literals += 1;
+            if (conseq_literals >= 2) should_compress = true;
+        }
+
+        if (should_compress) {
+            Concat new_concat;
+            auto ret_iterator = ret.begin();
+            new_concat.push_back(*ret_iterator);
+            ret_iterator++;
+
+            for (; ret_iterator != ret.end(); ret_iterator++) {
+                int last_idx_in_new_concat = new_concat.size() - 1;
+                const BasicTerm& current_item = *ret_iterator;
+                if (new_concat.at(last_idx_in_new_concat).is_literal() && current_item.is_literal()) {
+                    // @Optimize(mhecko): If we compute the buffer size beforehand, we might get away with doing less
+                    //                    allocations -- should be faster.
+                    zstring new_literal = new_concat[last_idx_in_new_concat].get_name() + current_item.get_name();
+                    new_concat[last_idx_in_new_concat] = BasicTerm(BasicTermType::Literal, new_literal);
+                }
+            }
+
+            return new_concat;
+        }
+
         return ret;
     }
 
@@ -1667,10 +1697,10 @@ namespace smt::noodler {
             return c1 == c2;
         };
         for(const auto& pr : this->formula.get_predicates()) {            
-            if(pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side(), check)) {
+            if (pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side(), check)) {
                 return true;
             }
-            if(pr.second.is_equation() && pr.second.is_str_const()) {
+            if (pr.second.is_equation() && pr.second.is_str_const()) {
                 zstring left{};
                 zstring right{};
                 for(const BasicTerm& t : pr.second.get_left_side()) {
