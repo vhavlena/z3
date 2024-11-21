@@ -595,9 +595,14 @@ namespace smt::noodler {
     std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
-        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().size() == 0 && !this->m_params.m_ca_constr) {
-            // There is not notcontains predicate to be solved and there are no length vars (which also means no disequations nor conversions), it is not needed to create the lengths formula.
-            // for the option m_ca_constr we completely skip this heuristic as there may remain also diseqations
+        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty()) {
+            // There is not notcontains predicate to be solved and there are no length vars (which also means no
+            // disequations nor conversions), it is not needed to create the lengths formula.
+            return {LenNode(LenFormulaType::TRUE), precision};
+        }
+
+        if (!this->m_params.m_ca_constr) {
+            // If the CA construction is disabled, then we should not produce any LIA based on constructing counter/tag automata
             return {LenNode(LenFormulaType::TRUE), precision};
         }
 
