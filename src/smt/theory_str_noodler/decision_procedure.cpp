@@ -595,10 +595,10 @@ namespace smt::noodler {
     std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
-        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty() && !this->m_params.m_ca_constr) {
+        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty()) {
             // There is not notcontains predicate to be solved and there are no length vars (which also means no
             // disequations nor conversions), it is not needed to create the lengths formula.
-            return {preprocessing_len_formula, precision};
+            return {LenNode(LenFormulaType::TRUE), precision};
         }
 
         // start with formula for disequations
