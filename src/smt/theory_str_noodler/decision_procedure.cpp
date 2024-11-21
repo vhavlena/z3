@@ -595,19 +595,15 @@ namespace smt::noodler {
     std::pair<LenNode, LenNodePrecision> DecisionProcedure::get_lengths() {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
-        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty()) {
+        if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty() && !this->m_params.m_ca_constr) {
             // There is not notcontains predicate to be solved and there are no length vars (which also means no
             // disequations nor conversions), it is not needed to create the lengths formula.
-            return {LenNode(LenFormulaType::TRUE), precision};
-        }
-
-        if (!this->m_params.m_ca_constr) {
-            // If the CA construction is disabled, then we should not produce any LIA based on constructing counter/tag automata
-            return {LenNode(LenFormulaType::TRUE), precision};
+            return {preprocessing_len_formula, precision};
         }
 
         // start with formula for disequations
         std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
+
         // add length formula from preprocessing
         conjuncts.push_back(preprocessing_len_formula);
 
@@ -623,6 +619,11 @@ namespace smt::noodler {
         auto conv_form_with_precision = get_formula_for_conversions();
         conjuncts.push_back(conv_form_with_precision.first);
         precision = conv_form_with_precision.second;
+
+        bool has_lia_reducible_predicates = (!solution.length_sensitive_vars.empty() || !this->not_contains.get_predicates().empty());
+        if (!has_lia_reducible_predicates) {
+            return {LenNode(LenFormulaType::AND, conjuncts), precision};
+        }
 
         // get the LIA formula describing solutions for special predicates
         conjuncts.push_back(get_formula_for_ca_diseqs());
