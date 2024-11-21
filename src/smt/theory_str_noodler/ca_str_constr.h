@@ -139,13 +139,6 @@ namespace smt::noodler::ca {
         std::vector<Predicate>  predicates;
         ca::CounterAlphabet     alph {};
 
-    public:
-        TagDiseqGen(const Predicate& diseq, const AutAssignment& aut_ass) : aut_matrix(diseq, aut_ass),
-            aut_ass(aut_ass), predicates({diseq}), alph() { }
-
-        TagDiseqGen(const std::vector<Predicate>& disequations, const AutAssignment& aut_ass) : aut_matrix(disequations, aut_ass),
-            aut_ass(aut_ass), predicates(disequations), alph() { }
-
     protected:
         /**
          * @brief Replace symbols in the variable automaton in the matrix cell given by @p copy
@@ -191,6 +184,13 @@ namespace smt::noodler::ca {
         const size_t get_copy_cnt() const {
             return 2*this->predicates.size() + 1;
         }
+
+        TagDiseqGen(const Predicate& diseq, const AutAssignment& aut_ass) : aut_matrix(diseq, aut_ass),
+            aut_ass(aut_ass), predicates({diseq}), alph() { }
+
+        TagDiseqGen(const std::vector<Predicate>& disequations, const AutAssignment& aut_ass) : aut_matrix(disequations, aut_ass),
+            aut_ass(aut_ass), predicates(disequations), alph() { }
+
 
     };
 
