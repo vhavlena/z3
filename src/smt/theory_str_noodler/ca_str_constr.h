@@ -221,9 +221,10 @@ namespace smt::noodler::ca {
      *
      * @param not_conts Not contains
      * @param autass Automata assignmnent after stabilization
+     * @param use_tag_proc Whether to use the tag-based procedure
      * @return std::pair<LenNode, LenNodePrecision> LIA formula describing lengths of string models together with the precision.
      */
-    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& not_conts, const AutAssignment& autass);
+    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& not_conts, const AutAssignment& autass, bool use_tag_proc);
 
 }
 

@@ -757,7 +757,7 @@ namespace smt::noodler::ca {
         return result;
     }
 
-    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment) {
+    std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment, bool use_tag_proc) {
         if (formula.get_predicates().empty()) {
             return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
         }
@@ -782,6 +782,10 @@ namespace smt::noodler::ca {
             if (heuristic_solution.has_value()) {
                 return { heuristic_solution.value(), LenNodePrecision::PRECISE };
             }
+        }
+
+        if(!use_tag_proc) {
+            return { LenNode(LenFormulaType::FALSE), LenNodePrecision::UNDERAPPROX };
         }
 
         if (formula.get_predicates().size() > 1) {

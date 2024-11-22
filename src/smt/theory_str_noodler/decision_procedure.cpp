@@ -1251,7 +1251,7 @@ namespace smt::noodler {
 
         STRACE("str", tout << "CA-DISEQS (original): " << std::endl << this->not_contains.to_string() << std::endl;);
         STRACE("str", tout << "CA-DISEQS (substituted): " << std::endl << proj_not_cont.to_string() << std::endl;);
-        return ca::get_lia_for_not_contains(proj_not_cont, this->solution.aut_ass);
+        return ca::get_lia_for_not_contains(proj_not_cont, this->solution.aut_ass, this->m_params.m_ca_constr);
     }
 
     /**
