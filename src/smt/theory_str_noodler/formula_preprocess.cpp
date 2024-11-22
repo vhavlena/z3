@@ -1549,34 +1549,34 @@ namespace smt::noodler {
             }
         }
 
-        if (ret.empty()) return ret;
+        // if (ret.empty()) return ret;
 
-        int conseq_literals = 0;
-        bool should_compress = false;
-        for (const BasicTerm& term : ret) {
-            if (term.is_literal()) conseq_literals += 1;
-            if (conseq_literals >= 2) should_compress = true;
-        }
+        // int conseq_literals = 0;
+        // bool should_compress = false;
+        // for (const BasicTerm& term : ret) {
+        //     if (term.is_literal()) conseq_literals += 1;
+        //     if (conseq_literals >= 2) should_compress = true;
+        // }
 
-        if (should_compress) {
-            Concat new_concat;
-            auto ret_iterator = ret.begin();
-            new_concat.push_back(*ret_iterator);
-            ret_iterator++;
+        // if (should_compress) {
+        //     Concat new_concat;
+        //     auto ret_iterator = ret.begin();
+        //     new_concat.push_back(*ret_iterator);
+        //     ret_iterator++;
 
-            for (; ret_iterator != ret.end(); ret_iterator++) {
-                int last_idx_in_new_concat = new_concat.size() - 1;
-                const BasicTerm& current_item = *ret_iterator;
-                if (new_concat.at(last_idx_in_new_concat).is_literal() && current_item.is_literal()) {
-                    // @Optimize(mhecko): If we compute the buffer size beforehand, we might get away with doing less
-                    //                    allocations -- should be faster.
-                    zstring new_literal = new_concat[last_idx_in_new_concat].get_name() + current_item.get_name();
-                    new_concat[last_idx_in_new_concat] = BasicTerm(BasicTermType::Literal, new_literal);
-                }
-            }
+        //     for (; ret_iterator != ret.end(); ret_iterator++) {
+        //         int last_idx_in_new_concat = new_concat.size() - 1;
+        //         const BasicTerm& current_item = *ret_iterator;
+        //         if (new_concat.at(last_idx_in_new_concat).is_literal() && current_item.is_literal()) {
+        //             // @Optimize(mhecko): If we compute the buffer size beforehand, we might get away with doing less
+        //             //                    allocations -- should be faster.
+        //             zstring new_literal = new_concat[last_idx_in_new_concat].get_name() + current_item.get_name();
+        //             new_concat[last_idx_in_new_concat] = BasicTerm(BasicTermType::Literal, new_literal);
+        //         }
+        //     }
 
-            return new_concat;
-        }
+        //     return new_concat;
+        // }
 
         return ret;
     }
@@ -1823,6 +1823,42 @@ namespace smt::noodler {
             this->formula.remove_predicate(i);
         }
         return true;
+    }
+
+    /**
+     * @brief Check whether the system contains trivially unsatisfiable (dis)equations 
+     * containing only literals.
+     * 
+     * @return true the system is unsat
+     */
+    bool FormulaPreprocessor::contains_unsat_literals() {
+
+        auto gather_lits = [&](const Concat& concat) -> std::optional<zstring> {
+            zstring lits;
+            for(const BasicTerm& bt : concat) {
+                if(bt.is_literal()) {
+                    lits = lits + bt.get_name();
+                } else {
+                    return {};
+                }
+            }
+            return lits;
+        };
+
+        for(const auto& [id, pred] : this->formula.get_predicates()) {
+            if(!pred.is_eq_or_ineq()) continue;
+            std::optional<zstring> left = gather_lits(pred.get_left_side());
+            std::optional<zstring> right = gather_lits(pred.get_right_side());
+            if(left.has_value() && right.has_value()) {
+                if(pred.is_equation() && left.value() != right.value()) {
+                    return true;
+                }
+                if(pred.is_inequation() && left.value() == right.value()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     std::string FormulaPreprocessor::print_info(bool print_nfas) {

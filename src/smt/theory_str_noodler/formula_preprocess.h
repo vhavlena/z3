@@ -396,6 +396,7 @@ namespace smt::noodler {
         void refine_languages();
         void reduce_diseqalities();
 
+        bool contains_unsat_literals();
         bool contains_unsat_eqs_or_diseqs();
         bool can_unify_contain(const Concat& left, const Concat& right) const;
          /**

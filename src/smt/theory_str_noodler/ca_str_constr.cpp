@@ -421,6 +421,9 @@ namespace smt::noodler::ca {
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
 
+        if(prep_handler.contains_unsat_literals()) {
+            return LenNode(LenFormulaType::FALSE);
+        }
         if (prep_handler.get_modified_formula().get_predicates().size() == 0) {
             if (prep_handler.get_aut_assignment().is_sat()) {
                 return LenNode(LenFormulaType::TRUE);
