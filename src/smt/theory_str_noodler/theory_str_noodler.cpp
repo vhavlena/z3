@@ -453,11 +453,15 @@ namespace smt::noodler {
             // we do not need to handle these, concatenation is handled differently (TODO: explain better?)
             // and everything else will be handled during final_check_eh
         } else {
-            std::stringstream error_msg;
-            error_msg << "Unknown predicate/function " << mk_pp(n, get_manager()) << " in relevant_eh()";
-            util::throw_error(error_msg.str());
+            // if we got here it means that we got some uninterpreted string function (i.e. probably user declared), we just replace it with a fresh string variable
+            expr* e = n;
+            if (!axiomatized_persist_terms.contains(e)) {
+                axiomatized_persist_terms.insert(e);
+                expr_ref fresh = mk_str_var_fresh("uninter");
+                predicate_replace.insert(e, fresh.get());
+                add_axiom({mk_eq(fresh, e, false)});
+            }
         }
-
     }
 
     /*
