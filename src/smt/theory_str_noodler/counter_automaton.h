@@ -17,11 +17,16 @@
 #include "formula.h"
 #include "util.h"
 
+/**
+ * Exapands to two if statements terminating the function containing the macro early.
+ *
+ * Insert two ifs that make the code containing this macro return true if (cmp_expr < 0) and false if (cmp_expr > 0)
+ * @Note: when cmp_expr == 0, the control flow goes/falls through the inserted branches.
+ */
 #define INSERT_LEXICOGRAPHIC_BRANCH_ON_CMP_RESULT(cmp_expr) \
     {                                       \
-        auto cmp_res = cmp_expr;            \
-        if (cmp_res < 0) return true;       \
-        else if (cmp_res > 0) return false; \
+        if ((cmp_expr) < 0)      return true;  \
+        else if ((cmp_expr) > 0) return false; \
     }
 
 namespace smt::noodler::ca {
