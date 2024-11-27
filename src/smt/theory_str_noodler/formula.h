@@ -139,6 +139,11 @@ namespace smt::noodler {
         OVERAPPROX,
     };
 
+    /**
+     * Return the resulting precision for a conjunction of formulae with precision p0 and p1
+     */
+    LenNodePrecision get_resulting_precision_for_conjunction(const LenNodePrecision& p0, const LenNodePrecision& p1);
+
     enum struct LenFormulaType {
         PLUS,
         MINUS,

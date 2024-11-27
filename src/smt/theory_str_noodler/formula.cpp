@@ -64,6 +64,18 @@ namespace smt::noodler {
         }
     }
 
+    LenNodePrecision get_resulting_precision_for_conjunction(const LenNodePrecision& p0, const LenNodePrecision& p1) {
+        // If one of the formulae is an underapproximation, then when we find that the resulting conjunction has no solutions,
+        // then we cannot say that for sure - we might have lost some solutions due to imprecision of one of the conjuncts.
+        if (p0 == LenNodePrecision::UNDERAPPROX || p1 == LenNodePrecision::UNDERAPPROX) return LenNodePrecision::UNDERAPPROX;
+
+        // If p0 is precise, and p1 is an overapproximation, then taking a conjunction will preserve all the precise solutions
+        if (p0 == LenNodePrecision::PRECISE || p1 == LenNodePrecision::PRECISE) return LenNodePrecision::PRECISE;
+
+        // Both are overapprox
+        return LenNodePrecision::OVERAPPROX;
+    }
+
     LenNode substitute_free_vars_for_int_values_rec(const LenNode& node, const std::map<BasicTerm, int64_t>& substitution) {
         switch (node.type) {
             case LenFormulaType::TRUE:

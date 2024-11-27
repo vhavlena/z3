@@ -631,7 +631,7 @@ namespace smt::noodler {
         } else if (this->disequations.get_predicates().empty()) {
             // We do not have any disequations at all, so we can just overwrite the precision with whatever came out of not-contains
             conjuncts.push_back(not_cont_prec.first);
-            precision = not_cont_prec.second;
+            precision = get_resulting_precision_for_conjunction(precision, not_cont_prec.second);
         } else {
             // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
             conjuncts.push_back(LenNode(LenFormulaType::FALSE));
