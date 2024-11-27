@@ -76,7 +76,7 @@ namespace smt::noodler {
         return LenNodePrecision::OVERAPPROX;
     }
 
-    LenNode substitute_free_vars_for_int_values_rec(const LenNode& node, const std::map<BasicTerm, int64_t>& substitution) {
+    LenNode substitute_free_vars_for_int_values_rec(const LenNode& node, const std::map<BasicTerm, int>& substitution) {
         switch (node.type) {
             case LenFormulaType::TRUE:
             case LenFormulaType::FALSE:
@@ -127,7 +127,7 @@ namespace smt::noodler {
         return LenNode(0);
     }
 
-    LenNode substitute_free_vars_for_concrete_values(const LenNode& formula, const std::map<BasicTerm, int64_t> substitution) {
+    LenNode substitute_free_vars_for_concrete_values(const LenNode& formula, const std::map<BasicTerm, int> substitution) {
         return substitute_free_vars_for_int_values_rec(formula, substitution);
     }
 
