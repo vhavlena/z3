@@ -264,7 +264,7 @@ namespace smt::noodler {
     std::set<BasicTerm> collect_free_vars(const LenNode& formula);
 
     /**
-     * Write the given formula as SMT2 to the given @p out_stream, including preable.
+     * Write the given formula as SMT2 to the given @p out_stream, including preamble.
      */
     void write_len_formula_as_smt2(const LenNode& formula, std::ostream& out_stream);
 
