@@ -621,11 +621,6 @@ namespace smt::noodler {
         conjuncts.push_back(conv_form_with_precision.first);
         precision = conv_form_with_precision.second;
 
-        bool has_lia_reducible_predicates = (!solution.length_sensitive_vars.empty() || !this->not_contains.get_predicates().empty() || !this->disequations.get_predicates().empty());
-        if (!has_lia_reducible_predicates) {
-            return {LenNode(LenFormulaType::AND, conjuncts), precision};
-        }
-
         // get the LIA formula describing solutions for special predicates
         conjuncts.push_back(get_formula_for_ca_diseqs());
         auto not_cont_prec = get_formula_for_not_contains();
