@@ -42,8 +42,10 @@ set_target_properties(shell PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON)
 
 # target_link_libraries(shell PRIVATE libmata)
-find_library(LIBMATA mata)
-target_link_libraries(shell PRIVATE ${LIBMATA})
+if (NOT EMSCRIPTEN)
+  find_library(LIBMATA mata)
+  target_link_libraries(shell PRIVATE ${LIBMATA})
+endif()
 
 z3_add_install_tactic_rule(${shell_deps})
 z3_add_memory_initializer_rule(${shell_deps})

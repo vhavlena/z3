@@ -193,8 +193,10 @@ elseif (WIN32)
   list(APPEND Z3_COMPONENT_CXX_DEFINES "-D_WINDOWS")
 elseif (EMSCRIPTEN)
   message(STATUS "Platform: Emscripten")
+  z3_add_cxx_flag("-pthread" REQUIRED)
   list(APPEND Z3_DEPENDENT_EXTRA_CXX_LINK_FLAGS
     "-Os"
+    "-lpthread"
     "-s ALLOW_MEMORY_GROWTH=1"
     "-s ASSERTIONS=0"
     "-s DISABLE_EXCEPTION_CATCHING=0"
