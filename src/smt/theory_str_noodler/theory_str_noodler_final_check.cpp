@@ -330,7 +330,9 @@ namespace smt::noodler {
                     block_curr_len(block_len, false, true);
                 // if there are no length vars comming from the initial formula (or from axiom saturation),
                 // we can block the string assignment only
-                } else if(init_length_sensitive_vars.size() == 0) {
+                // we also need to check whether no length variables come from the translation of disequations 
+                // and notcontains (all of them should be included in length vars of the procedure)
+                } else if(init_length_sensitive_vars.size() == 0 && main_dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
                     block_curr_len(block_len);
@@ -1067,6 +1069,9 @@ namespace smt::noodler {
         sat_length_formula = length_formula;
         // It seems thare is problem if the length_formula has quantifiers. In that case we skip adding axioms.
         if(!expr_cases::has_quantifier(length_formula, m)) {
+            // WARNING: the model generation is not supported for tag automata stuff. 
+            // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
+            // (so-far the internal solver timeouts with quntified axioms)
             add_axiom(length_formula);
         }
     }

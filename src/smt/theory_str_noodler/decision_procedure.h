@@ -509,6 +509,10 @@ namespace smt::noodler {
         std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override;
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
+        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const {
+            return this->init_length_sensitive_vars;
+        }
     };
 }
 
