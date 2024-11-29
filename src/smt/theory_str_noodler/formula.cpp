@@ -69,10 +69,10 @@ namespace smt::noodler {
         // then we cannot say that for sure - we might have lost some solutions due to imprecision of one of the conjuncts.
         if (p0 == LenNodePrecision::UNDERAPPROX || p1 == LenNodePrecision::UNDERAPPROX) return LenNodePrecision::UNDERAPPROX;
 
-        // If p0 is precise, and p1 is an overapproximation, then taking a conjunction will preserve all the precise solutions
-        if (p0 == LenNodePrecision::PRECISE || p1 == LenNodePrecision::PRECISE) return LenNodePrecision::PRECISE;
+        // If both are precise, we have a precise formula
+        if (p0 == LenNodePrecision::PRECISE && p1 == LenNodePrecision::PRECISE) return LenNodePrecision::PRECISE;
 
-        // Both are overapprox
+        // At least one of them are overapprox
         return LenNodePrecision::OVERAPPROX;
     }
 

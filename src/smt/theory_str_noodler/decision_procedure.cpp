@@ -624,14 +624,10 @@ namespace smt::noodler {
         // get the LIA formula describing solutions for special predicates
         conjuncts.push_back(get_formula_for_ca_diseqs());
         auto not_cont_prec = get_formula_for_not_contains();
+        precision = get_resulting_precision_for_conjunction(precision, not_cont_prec.second);
 
-        if (not_cont_prec.second == LenNodePrecision::PRECISE || not_cont_prec.second == precision) {
-            // Formula for not-contains is at least as precise as is the current precision
+        if (this->disequations.get_predicates().empty()) {
             conjuncts.push_back(not_cont_prec.first);
-        } else if (this->disequations.get_predicates().empty()) {
-            // We do not have any disequations at all, so we can just overwrite the precision with whatever came out of not-contains
-            conjuncts.push_back(not_cont_prec.first);
-            precision = get_resulting_precision_for_conjunction(precision, not_cont_prec.second);
         } else {
             // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
             conjuncts.push_back(LenNode(LenFormulaType::FALSE));
