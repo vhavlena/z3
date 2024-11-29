@@ -625,14 +625,7 @@ namespace smt::noodler {
         conjuncts.push_back(get_formula_for_ca_diseqs());
         auto not_cont_prec = get_formula_for_not_contains();
         precision = get_resulting_precision_for_conjunction(precision, not_cont_prec.second);
-
-        if (this->disequations.get_predicates().empty()) {
-            conjuncts.push_back(not_cont_prec.first);
-        } else {
-            // if we should overwrite the precision, we instead return FALSE and say that we have underapproximation
-            conjuncts.push_back(LenNode(LenFormulaType::FALSE));
-            precision = LenNodePrecision::UNDERAPPROX;
-        }
+        conjuncts.push_back(not_cont_prec.first);
 
         LenNode result(LenFormulaType::AND, conjuncts);
         STRACE("str", tout << "Final " << (precision == LenNodePrecision::PRECISE ? "precise" : "underapproximating") << " formula from get_lengths(): " << result << std::endl;);
