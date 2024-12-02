@@ -318,6 +318,9 @@ namespace smt::noodler {
                         ctx.get_fparams().is_underapprox = true;
                     }
                 } else {
+                    // The solver returned `l_undef`. As not-contains predicates are being reduced to quantified LIA, we are using a solver with quantified instantiation
+                    // that is incomplete and it might return `l_undef` (unknown) on some branches. We want to continue exploring other branches, hoping that some other
+                    // might get solved. Hence we set is_underapprox = true - we don't really know whether this branch has contained any solutions.
                     ctx.get_fparams().is_underapprox = true;
                 }
             } else if (result == l_false) {
