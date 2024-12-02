@@ -65,15 +65,37 @@ namespace smt::noodler {
     }
 
     LenNodePrecision get_resulting_precision_for_conjunction(const LenNodePrecision& p0, const LenNodePrecision& p1) {
-        // If one of the formulae is an underapproximation, then when we find that the resulting conjunction has no solutions,
-        // then we cannot say that for sure - we might have lost some solutions due to imprecision of one of the conjuncts.
-        if (p0 == LenNodePrecision::UNDERAPPROX || p1 == LenNodePrecision::UNDERAPPROX) return LenNodePrecision::UNDERAPPROX;
+        if ((p0 == LenNodePrecision::UNDERAPPROX && p1 == LenNodePrecision::OVERAPPROX) || (p0 == LenNodePrecision::OVERAPPROX && p1 == LenNodePrecision::UNDERAPPROX)) {
+            // We have that one is UNDERAPPROXIMATION and the other one is OVERAPPROXIMATION
+            // For example, we have `not-contains(x, y) AND x != z` where we
+            // p0=underapproximate not-contains to {b, c} whereas its real solutions are {a, b, c}
+            // p1=overapproximate disequation to {a, b, c, d, e} whereas its real solutions are {a, c, d}
+            // The resulting conjuction will have models {b, c}, but in reality it should have {a, c} ---- we cannot claim anything and we throw an error
+            throw std::runtime_error("Attempting to compute precision of a conjunction of an underapproximation an an overapproximation - impossible.");
+        }
 
-        // If both are precise, we have a precise formula
-        if (p0 == LenNodePrecision::PRECISE && p1 == LenNodePrecision::PRECISE) return LenNodePrecision::PRECISE;
+        if (p0 == LenNodePrecision::PRECISE) {
+            // if p1 == underapprox, result is also underapprox
+            // if p1 == precise, result is also precise
+            // if p1 == overapproximation, result is also an overapproximation
+            // ---> just return p1
+            return p1;
+        }
 
-        // At least one of them are overapprox
-        return LenNodePrecision::OVERAPPROX;
+        if (p0 == LenNodePrecision::OVERAPPROX) {
+            // if p1 == precise    --> return overapprox
+            // if p1 == overapprox --> return overapprox
+            // p1 == underapprox is illegal - error should be thrown above
+            return LenNodePrecision::OVERAPPROX;
+        }
+
+        // if (p0 == LenNodePrecision::UNDERAPPROX) {
+            // if p1 == precise     --> return underapprox
+            // if p1 == underapprox --> return underapprox
+            // p1 == overapprox is illegal - error should be thrown above
+        //}
+
+        return LenNodePrecision::UNDERAPPROX; // See above
     }
 
     LenNode substitute_free_vars_for_int_values_rec(const LenNode& node, const std::map<BasicTerm, int>& substitution) {
