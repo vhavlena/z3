@@ -292,12 +292,11 @@ namespace smt::noodler {
 
                 lengths = convert_len_node_to_z3_formula(context, noodler_lengths);
 
-                if (0) {
+                STRACE("str-print-notcontains-lia",
                     std::ofstream out_file("./not-contains-lia.smt2");
                     write_z3_expr_into_stream(this->m, out_file, lengths);
-                    // write_len_formula_as_smt2(noodler_lengths, out_file);
                     out_file.close();
-                }
+                );
 
                 lbool is_lengths_sat = check_len_sat(lengths);
 
