@@ -326,7 +326,7 @@ namespace smt::noodler {
                 // we can block the string assignment only
                 // we also need to check whether no length variables come from the translation of disequations 
                 // and notcontains (all of them should be included in length vars of the procedure)
-                } else if(init_length_sensitive_vars.size() == 0 && main_dec_proc->get_init_length_sensitive_vars().empty()) {
+                } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
                     block_curr_len(block_len);

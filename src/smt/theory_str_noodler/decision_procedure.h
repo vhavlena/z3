@@ -95,6 +95,13 @@ namespace smt::noodler {
             throw std::runtime_error("Unimplemented");
         }
 
+        /**
+         * @brief Get the length sensitive variables
+         */
+        virtual const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const {
+            throw std::runtime_error("Unimplemented");
+        }
+
         virtual ~AbstractDecisionProcedure()=default;
     };
 
@@ -510,7 +517,10 @@ namespace smt::noodler {
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
 
-        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const {
+        /**
+         * @brief Get the length sensitive variables
+         */
+        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const override {
             return this->init_length_sensitive_vars;
         }
     };
