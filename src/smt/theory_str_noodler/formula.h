@@ -140,7 +140,14 @@ namespace smt::noodler {
     };
 
     /**
-     * Return the resulting precision for a conjunction of formulae with precision p0 and p1
+     * Given two precisions p0 and p1 of formulae for certain parts of the current SAT branch (e.g. only not-contains predicates), compute the precision of the result.
+     * 
+     * For example, we have: `not-contains(x, y) AND x != z`, where:
+     *    - we (p0=)overapproximate the not-contains to {a, b, c, d} whereas the real set of models is {a, b}
+     *    - we have (p1=)precise solutions of the disequation {a, c} (to the disequation)
+     * So taking a conjunction of the overapproximation+precise formula for disequation, we have the resulting precision result=overapproximation as
+     *  Models of the conjunction using approximations: {a, b, c, d} && {a, c} = {a, c}
+     *  Models of the real formula, if we could compute it: {a, b} && {a, c} = {a}
      */
     LenNodePrecision get_resulting_precision_for_conjunction(const LenNodePrecision& p0, const LenNodePrecision& p1);
 
@@ -760,7 +767,6 @@ namespace smt::noodler {
         }
     }
 
-    // ***** Convert noodler len nodes to z3 expressions
     /**
      * Context (other formulae) in which a formula is to be used.
      */
@@ -780,7 +786,23 @@ namespace smt::noodler {
 
         int current_quantif_depth = 0;  // To compute de Brujin numbers for quantified variables
     };
+
+    /**
+     * Convert given len_node into z3's expression.
+     * 
+     * The function accepts a context (collections of references to managers/utils) to allow
+     * for easier unit testing. If embedded in theory_str_noodler, one would have to instantiate
+     * and setup a lot of things just to check whether a formula instance is being correctly converted.
+     * 
+     * @note: The function does not correctly handle nested quantifiers when variables have the same names.
+     * 
+     * @param ctx Collection of references to managers and utils used during the conversion.
+     */
     expr_ref convert_len_node_to_z3_formula(LenFormulaContext &ctx, const LenNode &node);
+
+    /**
+     * Helper function to construct quantifier expressions when converting len_nodes into z3's expressions.
+     */
     expr_ref construct_z3_expr_for_len_node_quantifier(LenFormulaContext& ctx, const LenNode& node, enum quantifier_kind quantif_kind);
 
 

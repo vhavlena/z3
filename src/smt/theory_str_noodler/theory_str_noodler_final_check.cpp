@@ -282,15 +282,7 @@ namespace smt::noodler {
             if (result == l_true) {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
 
-                LenFormulaContext context = {
-                    .manager = this->m,
-                    .arith_utilities = this->m_util_a,
-                    .seq_utilities = this->m_util_s,
-                    .quantified_vars = this->quantif_vars,
-                    .known_z3_exprs = this->var_name
-                };
-
-                lengths = convert_len_node_to_z3_formula(context, noodler_lengths);
+                lengths = len_node_to_z3_formula(noodler_lengths);
 
                 STRACE("str-print-notcontains-lia",
                     std::ofstream out_file("./not-contains-lia.smt2");
@@ -1079,174 +1071,15 @@ namespace smt::noodler {
     }
 
     expr_ref theory_str_noodler::len_node_to_z3_formula(const LenNode &node) {
-        switch(node.type) {
-        case LenFormulaType::LEAF:
-            if(node.atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(rational(node.atom_val.get_name().encode().c_str())), m);
-            else if (node.atom_val.get_type() == BasicTermType::Literal) {
-                // for literal, get the exact length of it
-                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
-            } else {
-                auto it = var_name.find(node.atom_val);
-                expr_ref var_expr(m);
-                if(it == var_name.end()) {
-                    // if the variable is not found, it was introduced in the preprocessing/decision procedure
-                    // (either as a string or int var), i.e. we can just create a new z3 variable with the same name
-                    var_expr = mk_int_var(node.atom_val.get_name().encode());
-                } else {
-                    if (m_util_s.is_string(it->second.get()->get_sort())) {
-                        // for string variables we want its length
-                        var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
-                    } else {
-                        // we assume here that all other variables are int, so they map into the predicate they represent
-                        var_expr = it->second;
-                    }
-                }
-                return var_expr;
-            }
 
-        case LenFormulaType::PLUS: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(0), m);
-            expr_ref plus = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                plus = m_util_a.mk_add(plus, len_node_to_z3_formula(node.succ[i]));
-            }
-            return plus;
-        }
+        LenFormulaContext context = {
+            .manager = this->m,
+            .arith_utilities = this->m_util_a,
+            .seq_utilities = this->m_util_s,
+            .quantified_vars = this->quantif_vars,
+            .known_z3_exprs = this->var_name
+        };
 
-        case LenFormulaType::MINUS: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(0), m);
-            if (node.succ.size() == 1) {  // Unary minus (- x)
-                expr_ref child_expr = len_node_to_z3_formula(node.succ[0]);
-                child_expr = m_util_a.mk_uminus(child_expr);
-                return child_expr;
-            }
-            expr_ref minus = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                minus = m_util_a.mk_sub(minus, len_node_to_z3_formula(node.succ[i]));
-            }
-            return minus;
-        }
-
-        case LenFormulaType::TIMES: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(1), m);
-            expr_ref times = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                times = m_util_a.mk_mul(times, len_node_to_z3_formula(node.succ[i]));
-            }
-            return times;
-        }
-
-        case LenFormulaType::EQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-
-            expr_ref eq(m_util_a.mk_eq(left, right), m);
-            return eq;
-        }
-
-        case LenFormulaType::NEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            expr_ref neq(m.mk_not(m_util_a.mk_eq(left, right)), m);
-            return neq;
-        }
-
-        case LenFormulaType::LEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            expr_ref leq(m_util_a.mk_le(left, right), m);
-            return leq;
-        }
-
-        case LenFormulaType::LT: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            // LIA solver fails if we use "L < R" for some reason (it cannot be internalized in smt::theory_lra::imp::internalize_atom, as it expects only <= or >=); we use "!(R <= L)" instead
-            expr_ref lt(m.mk_not(m_util_a.mk_le(right, left)), m);
-            return lt;
-        }
-
-        case LenFormulaType::NOT: {
-            assert(node.succ.size() == 1);
-            expr_ref no(m.mk_not(len_node_to_z3_formula(node.succ[0])), m);
-            return no;
-        }
-
-        case LenFormulaType::AND: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_true(), m);
-            expr_ref andref = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                andref = m.mk_and(andref, len_node_to_z3_formula(node.succ[i]));
-            }
-            return andref;
-        }
-
-        case LenFormulaType::OR: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_false(), m);
-            expr_ref orref = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                orref = m.mk_or(orref, len_node_to_z3_formula(node.succ[i]));
-            }
-            return orref;
-        }
-
-        case LenFormulaType::FORALL: {
-            // add qunatifier variable to the map (if not present)
-            std::string quantif_var_name = node.succ[0].atom_val.get_name().encode();
-            if(!this->quantif_vars.contains(quantif_var_name)) {
-                this->quantif_vars[quantif_var_name] = this->quantif_vars.size();
-            }
-            // occurrences of the quantifier variable are created as z3 variable, not skolem constant
-            expr_ref bodyref = len_node_to_z3_formula(node.succ[1]);
-
-            ptr_vector<sort> sorts;
-            svector<symbol> names;
-            sorts.push_back(m_util_a.mk_int());
-            names.push_back(symbol(quantif_var_name.c_str()));
-
-            expr_ref forall(m.mk_quantifier(quantifier_kind::forall_k, sorts.size(), sorts.data(), names.data(), bodyref, 1), m);
-            return forall;
-        }
-
-        case LenFormulaType::EXISTS: {
-            // add existentially  quantified variable to the map (if not present)
-            std::string quantif_var_name = node.succ[0].atom_val.get_name().encode();
-            if(!this->quantif_vars.contains(quantif_var_name)) {
-                this->quantif_vars[quantif_var_name] = this->quantif_vars.size();
-            }
-            // occurrences of the quantifier variable are created as z3 variable, not skolem constant
-            expr_ref bodyref = len_node_to_z3_formula(node.succ[1]);
-
-            ptr_vector<sort> sorts;
-            svector<symbol> names;
-            sorts.push_back(m_util_a.mk_int());
-            names.push_back(symbol(quantif_var_name.c_str()));
-
-            expr_ref exists(m.mk_quantifier(quantifier_kind::exists_k, sorts.size(), sorts.data(), names.data(), bodyref, 1), m);
-            return exists;
-        }
-
-        case LenFormulaType::TRUE: {
-            return expr_ref(m.mk_true(), m);
-        }
-
-        case LenFormulaType::FALSE: {
-            return expr_ref(m.mk_false(), m);
-        }
-
-        default:
-            util::throw_error("Unexpected length formula type");
-            return {{}, m};
-        }
+        return convert_len_node_to_z3_formula(context, node);
     }
 }
