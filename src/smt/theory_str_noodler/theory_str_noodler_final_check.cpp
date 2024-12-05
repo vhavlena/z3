@@ -324,8 +324,9 @@ namespace smt::noodler {
                     block_curr_len(block_len, false, true);
                 // if there are no length vars comming from the initial formula (or from axiom saturation),
                 // we can block the string assignment only
-                // we also need to check whether no length variables come from the translation of disequations 
-                // and notcontains (all of them should be included in length vars of the procedure)
+                // Note that if we use tag automata for handling disequations/notcontains, the variables inside them 
+                // are included to lenght vars during the procedure. Therefore, if dec_proc->get_init_length_sensitive_vars()
+                // is empty, there are no disequations/notcontains
                 } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
