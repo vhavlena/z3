@@ -1,7 +1,5 @@
 #include <cassert>
 
-#include "util/z3_exception.h"
-
 #include "util.h"
 #include "theory_str_noodler.h"
 #include "inclusion_graph.h"
