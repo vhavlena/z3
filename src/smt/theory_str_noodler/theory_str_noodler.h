@@ -272,6 +272,8 @@ namespace smt::noodler {
         expr_ref mk_int_var(const std::string& name) {
             // quantified int variables we need to create as z3 variables. If they are created as skolem const, the quantification is 
             // ignored (because everything there is a constant).
+            // WARNING: currently, we do not support occurrences of variables with the same name in different 
+            // scopes (both quantified and free)
             auto it = this->quantif_vars.find(name);
             if(it != this->quantif_vars.end()) {
                 return expr_ref(m.mk_var(it->second, m_util_a.mk_int()), m);
