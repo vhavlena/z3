@@ -22,6 +22,7 @@ namespace smt::noodler {
         const seq_util& m_util_s;
         const ast_manager& m;
         bool produce_model;
+        std::unordered_set<BasicTerm> init_length_vars {};
 
         std::optional<zstring> model;
     public:
@@ -36,6 +37,13 @@ namespace smt::noodler {
         }
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
+        /**
+         * @brief Get the length sensitive variables
+         */
+        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const override {
+            return this->init_length_vars;
+        }
     };
 
     class MultMembHeuristicProcedure : public AbstractDecisionProcedure {
@@ -44,6 +52,7 @@ namespace smt::noodler {
         const seq_util& m_util_s;
         const ast_manager& m;
         bool produce_model;
+        std::unordered_set<BasicTerm> init_length_vars {};
 
         std::map<BasicTerm, zstring> models;
     public:
@@ -58,6 +67,13 @@ namespace smt::noodler {
         }
 
         zstring get_model(BasicTerm var, const std::function<rational(BasicTerm)>& get_arith_model_of_var) override;
+
+        /**
+         * @brief Get the length sensitive variables
+         */
+        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const override {
+            return this->init_length_vars;
+        }
     };
 }
 

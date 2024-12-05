@@ -1,17 +1,30 @@
 #include <mata/nfa/builder.hh>
+#include "formula.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "memb_heuristics_procedures.h"
 
 namespace smt::noodler {
+
+    void write_z3_expr_into_stream(ast_manager& manager, std::ostream& stream, expr_ref formula) {
+        ast_pp_util utl(manager);
+        utl.collect(formula);
+        utl.display_decls(stream);
+        stream << "(assert\n";
+        utl.display_expr(stream, formula);
+        stream << "\n)"
+               << "(check-sat)\n"
+               << "(get-model)";
+    }
+
     /**
      * @brief Checks satisfiability of constraints in _todo member variables (e.g. m_word_eq_todo, m_membership_todo,...)
-     * 
+     *
      * It follows these steps:
      *   1) Remove constraints that are not relevant for the solution, adding all relevant constraints to *_todo_rel, ending with
      *        - language equations and diseqations (m_lang_eq_or_diseq_todo_rel)
      *        - word equations and diseqations (m_word_eq_todo_rel and m_word_diseq_todo_rel)
      *        - membership constraints (m_membership_todo_rel)
-     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown) 
+     *        - not contains constraints (m_not_contains_todo, currently cannot be handled and we return unknown)
      *   2) Check if all language eqations and disequations are true (the sides are given as regexes)
      *   3) Create the formula instance and automata assignment from word (dis)eqautions and membership constraints
      *   4) Check if it is satisfiable which consists of
@@ -74,11 +87,11 @@ namespace smt::noodler {
         /***************************** SOLVE WORD (DIS)EQUATIONS + REGULAR MEMBERSHIPS ******************************/
 
         // cache for storing already solved instances. For each instance we store the length formula obtained from the decision procedure.
-        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure 
+        // if we get an instance that we have already solved, we use this stored length formula (if we run the procedure
         // we get the same formula up to alpha reduction).
         if(m_params.m_loop_protect) {
             lbool result = run_loop_protection();
-            if(result == l_true && !m_params.m_produce_models) { // if we want to produce model, we need the exact solution in dec_proc, so we need to run procedure again 
+            if(result == l_true && !m_params.m_produce_models) { // if we want to produce model, we need the exact solution in dec_proc, so we need to run procedure again
                 last_run_was_sat = true;
                 return FC_DONE;
             } else if (result == l_false) {
@@ -198,11 +211,12 @@ namespace smt::noodler {
         // --> before we apply the preprocessing, we need to be sure that it is indeed true.
         // length constraints from initial assignment
         // we want to include all variables from the formula --> e.g.
-        // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need 
+        // s.t = u where u \in ab, |s| > 100. The only length variable is s, but we need
         // to include also length of |u| to propagate the value to |s|
         expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths) == l_false) {
             STRACE("str", tout << "Unsat from initial lengths" << std::endl);
+
             this->statistics.at("stabilization").num_solved_preprocess++;
             // If the instance is both length unsatisfiable and unsatisfiable from preprocessing,
             // we want to kill it after preprocessing as it generates stronger theory lemma (negation of the string part).
@@ -213,6 +227,7 @@ namespace smt::noodler {
                 block_curr_len(lengths, true, true);
             }
             return FC_CONTINUE;
+
         }
 
         // now we know that the initial formula is length-satisfiable
@@ -266,9 +281,17 @@ namespace smt::noodler {
             result = dec_proc->compute_next_solution();
             if (result == l_true) {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
+
                 lengths = len_node_to_z3_formula(noodler_lengths);
+
+                STRACE("str-print-notcontains-lia",
+                    std::ofstream out_file("./not-contains-lia.smt2");
+                    write_z3_expr_into_stream(this->m, out_file, lengths);
+                    out_file.close();
+                );
+
                 lbool is_lengths_sat = check_len_sat(lengths);
-                
+
                 if (is_lengths_sat == l_true) {
                     STRACE("str", tout << "len sat " << mk_pp(lengths, m) << std::endl;);
                     sat_handling(lengths);
@@ -286,6 +309,11 @@ namespace smt::noodler {
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;
                     }
+                } else {
+                    // The solver returned `l_undef`. As not-contains predicates are being reduced to quantified LIA, we are using a solver with quantified instantiation
+                    // that is incomplete and it might return `l_undef` (unknown) on some branches. We want to continue exploring other branches, hoping that some other
+                    // might get solved. Hence we set is_underapprox = true - we don't really know whether this branch has contained any solutions.
+                    ctx.get_fparams().is_underapprox = true;
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)
@@ -294,6 +322,13 @@ namespace smt::noodler {
 
                 if(m.is_false(block_len)) {
                     block_curr_len(block_len, false, true);
+                // if there are no length vars comming from the initial formula (or from axiom saturation),
+                // we can block the string assignment only
+                // Note that if we use tag automata for handling disequations/notcontains, the variables inside them 
+                // are included to lenght vars during the procedure. Therefore, if dec_proc->get_init_length_sensitive_vars()
+                // is empty, there are no disequations/notcontains
+                } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
+                    block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
                     block_curr_len(block_len);
                 }
@@ -325,7 +360,7 @@ namespace smt::noodler {
                      << " with assignment " << ctx.find_assignment(eq.get())
                      << " and its reverse is " << (ctx.is_relevant(eq_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
-            
+
             // check if equation or its reverse are relevant (we check reverse to be safe) and...
             if((ctx.is_relevant(eq.get()) || ctx.is_relevant(eq_rev.get())) &&
                // ...neither equation nor its reverse are saved as relevant yet
@@ -345,7 +380,7 @@ namespace smt::noodler {
                      << " with assignment " << ctx.find_assignment(dis.get())
                      << " and its reverse is " << (ctx.is_relevant(dis_rev.get()) ? "" : "not ") << "relevant" << std::endl;
             );
-            
+
             // check if disequation or its reverse are relevant (we check reverse to be safe) and...
             if((ctx.is_relevant(dis.get()) || ctx.is_relevant(dis_rev.get())) &&
                // ...neither disequation nor its reverse are saved as relevant yet
@@ -363,7 +398,7 @@ namespace smt::noodler {
                 memb_app = m.mk_not(memb_app);
 
             }
-            
+
             STRACE("str",
                 tout << "  " << mk_pp(memb_app.get(), m) << " is " << (ctx.is_relevant(memb_app.get()) ? "" : "not ") << "relevant"
                      << " with assignment " << ctx.find_assignment(memb_app.get())
@@ -392,7 +427,7 @@ namespace smt::noodler {
                      << std::endl;
             );
 
-            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) && 
+            if((ctx.is_relevant(con_expr.get()) || ctx.is_relevant(not_con_expr.get())) &&
                 !this->m_not_contains_todo_rel.contains(not_con_pair)) {
                 this->m_not_contains_todo_rel.push_back(not_con_pair);
             }
@@ -570,7 +605,7 @@ namespace smt::noodler {
     std::vector<TermConversion> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<mata::Symbol>& noodler_alphabet) {
         mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
         auto nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&mata_alphabet));
-        
+
         std::vector<TermConversion> conversions;
         for (const auto& transf : m_conversion_todo) {
             ass.insert({transf.string_var, nfa_sigma_star});
@@ -657,7 +692,18 @@ namespace smt::noodler {
             return l_true;
         }
 
-        int_expr_solver m_int_solver(get_manager(), get_context().get_fparams());
+        // if the length formula has quantifiers --> use quant_lia_solver
+        // TODO: the quant_lia_solver does not support UNSAT cores
+        if(expr_cases::has_quantifier(len_formula, m)) {
+            m_rewrite(len_formula);
+            quant_lia_solver m_quant_int_solver(get_manager());
+            m_quant_int_solver.initialize(get_context());
+
+            lbool is_sat = m_quant_int_solver.check_sat(len_formula);
+            return is_sat;
+        }
+
+        int_expr_solver m_int_solver(get_manager(), get_fparams());
         // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
         bool include_ass = true;
         if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
@@ -710,7 +756,7 @@ namespace smt::noodler {
             app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
             refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
         }
-        
+
         if(m_params.m_loop_protect && add_axiomatized) {
             this->axiomatized_instances.push_back({expr_ref(refinement, this->m), stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
         }
@@ -738,17 +784,17 @@ namespace smt::noodler {
             return false;
         }
         /**
-         * Check each variable occurring within the instance. The instance is suitable for underapproximation if 
-         * 1) predicates are (dis)equations only and 2) language of the variable is a) sigma star (approximated by 
-         * the first condition) b) co-finite (complement is a finite language), or c) singleton meaning that the 
-         * variable is string literal. 
+         * Check each variable occurring within the instance. The instance is suitable for underapproximation if
+         * 1) predicates are (dis)equations only and 2) language of the variable is a) sigma star (approximated by
+         * the first condition) b) co-finite (complement is a finite language), or c) singleton meaning that the
+         * variable is string literal.
          */
         for(const Predicate& pred : instance.get_predicates()) {
             if(!pred.is_eq_or_ineq()) {
                 return false;
             }
             for(const BasicTerm& var : pred.get_vars()) {
-                
+
                 if(aut_ass.at(var)->num_of_states() <= 1) {
                     continue;
                 }
@@ -813,8 +859,9 @@ namespace smt::noodler {
 
         this->statistics.at("length").num_start++;
         dec_proc->init_computation();
-        
+
         lbool result = dec_proc->compute_next_solution();
+
         if (result == l_true) {
             auto [formula, precision] = dec_proc->get_lengths();
             expr_ref lengths = len_node_to_z3_formula(formula);
@@ -830,18 +877,18 @@ namespace smt::noodler {
                     block_curr_len(lengths);
                     this->statistics.at("length").num_finish++;
                     return l_false;
-                } 
+                }
                 else if (len_dec_proc->get_formula().get_predicates().size() > 10) {
                     ctx.get_fparams().is_underapprox = true;
                     block_curr_len(expr_ref(m.mk_false(), m));
                     this->statistics.at("length").num_finish++;
                     return l_false;
-                } 
+                }
                 else {
                     return l_undef;
                 }
             }
-        } 
+        }
         // we could not decide if there is solution, continue with other decision procedure
         return l_undef;
     }
@@ -920,7 +967,7 @@ namespace smt::noodler {
         dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m, m_params.m_produce_models);
         this->statistics.at("multi-memb-heur").num_start++;
         lbool result = dec_proc->compute_next_solution();
-        
+
         if(result != l_undef) this->statistics.at("multi-memb-heur").num_finish++;
         return result;
     }
@@ -1015,150 +1062,25 @@ namespace smt::noodler {
             }
         }
         sat_length_formula = length_formula;
-        add_axiom(length_formula);
+        // It seems thare is problem if the length_formula has quantifiers. In that case we skip adding axioms.
+        if(!expr_cases::has_quantifier(length_formula, m)) {
+            // WARNING: the model generation is not supported for tag automata stuff. 
+            // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
+            // (so-far the internal solver timeouts with quntified axioms)
+            add_axiom(length_formula);
+        }
     }
 
     expr_ref theory_str_noodler::len_node_to_z3_formula(const LenNode &node) {
-        switch(node.type) {
-        case LenFormulaType::LEAF:
-            if(node.atom_val.get_type() == BasicTermType::Length)
-                return expr_ref(m_util_a.mk_int(rational(node.atom_val.get_name().encode().c_str())), m);
-            else if (node.atom_val.get_type() == BasicTermType::Literal) {
-                // for literal, get the exact length of it
-                return expr_ref(m_util_a.mk_int(node.atom_val.get_name().length()), m);
-            } else {
-                auto it = var_name.find(node.atom_val);
-                expr_ref var_expr(m);
-                if(it == var_name.end()) {
-                    // if the variable is not found, it was introduced in the preprocessing/decision procedure
-                    // (either as a string or int var), i.e. we can just create a new z3 variable with the same name 
-                    var_expr = mk_int_var(node.atom_val.get_name().encode());
-                } else {
-                    if (m_util_s.is_string(it->second.get()->get_sort())) {
-                        // for string variables we want its length
-                        var_expr = expr_ref(m_util_s.str.mk_length(it->second), m);
-                    } else {
-                        // we assume here that all other variables are int, so they map into the predicate they represent 
-                        var_expr = it->second;
-                    }
-                }
-                return var_expr;
-            }
 
-        case LenFormulaType::PLUS: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(0), m);
-            expr_ref plus = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                plus = m_util_a.mk_add(plus, len_node_to_z3_formula(node.succ[i]));
-            }
-            return plus;
-        }
+        LenFormulaContext context = {
+            .manager = this->m,
+            .arith_utilities = this->m_util_a,
+            .seq_utilities = this->m_util_s,
+            .quantified_vars = this->quantif_vars,
+            .known_z3_exprs = this->var_name
+        };
 
-        case LenFormulaType::MINUS: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(0), m);
-            expr_ref minus = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                minus = m_util_a.mk_sub(minus, len_node_to_z3_formula(node.succ[i]));
-            }
-            return minus;
-        }
-
-        case LenFormulaType::TIMES: {
-            if (node.succ.size() == 0)
-                return expr_ref(m_util_a.mk_int(1), m);
-            expr_ref times = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                times = m_util_a.mk_mul(times, len_node_to_z3_formula(node.succ[i]));
-            }
-            return times;
-        }
-
-        case LenFormulaType::EQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            expr_ref eq(m_util_a.mk_eq(left, right), m);
-            return eq;
-        }
-
-        case LenFormulaType::NEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            expr_ref neq(m.mk_not(m_util_a.mk_eq(left, right)), m);
-            return neq;
-        }
-
-        case LenFormulaType::LEQ: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            expr_ref leq(m_util_a.mk_le(left, right), m);
-            return leq;
-        }
-
-        case LenFormulaType::LT: {
-            assert(node.succ.size() == 2);
-            expr_ref left = len_node_to_z3_formula(node.succ[0]);
-            expr_ref right = len_node_to_z3_formula(node.succ[1]);
-            // LIA solver fails if we use "L < R" for some reason (it cannot be internalized in smt::theory_lra::imp::internalize_atom, as it expects only <= or >=); we use "!(R <= L)" instead
-            expr_ref lt(m.mk_not(m_util_a.mk_le(right, left)), m);
-            return lt;
-        }
-
-        case LenFormulaType::NOT: {
-            assert(node.succ.size() == 1);
-            expr_ref no(m.mk_not(len_node_to_z3_formula(node.succ[0])), m);
-            return no;
-        }
-
-        case LenFormulaType::AND: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_true(), m);
-            expr_ref andref = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                andref = m.mk_and(andref, len_node_to_z3_formula(node.succ[i]));
-            }
-            return andref;
-        }
-
-        case LenFormulaType::OR: {
-            if(node.succ.size() == 0)
-                return expr_ref(m.mk_false(), m);
-            expr_ref orref = len_node_to_z3_formula(node.succ[0]);
-            for(size_t i = 1; i < node.succ.size(); i++) {
-                orref = m.mk_or(orref, len_node_to_z3_formula(node.succ[i]));
-            }
-            return orref;
-        }
-
-        case LenFormulaType::FORALL: {
-            expr_ref varref = len_node_to_z3_formula(node.succ[0]);
-            expr_ref bodyref = len_node_to_z3_formula(node.succ[1]);
-
-            ptr_vector<sort> sorts;
-            svector<symbol> names;
-            app * var = to_app(varref);
-            sorts.push_back(var->get_sort());
-            names.push_back(var->get_name());
-
-            expr_ref forall(m.mk_quantifier(quantifier_kind::forall_k, sorts.size(), sorts.data(), names.data(), bodyref), m);
-            return forall;
-        }
-
-        case LenFormulaType::TRUE: {
-            return expr_ref(m.mk_true(), m);
-        }
-
-        case LenFormulaType::FALSE: {
-            return expr_ref(m.mk_false(), m);
-        }
-
-        default:
-            util::throw_error("Unexpected length formula type");
-            return {{}, m};
-        }
+        return convert_len_node_to_z3_formula(context, node);
     }
 }

@@ -33,6 +33,7 @@ Eternal glory to Yu-Fang.
 #include "inclusion_graph.h"
 #include "decision_procedure.h"
 #include "expr_solver.h"
+#include "quant_lia_solver.h"
 #include "util.h"
 #include "expr_cases.h"
 #include "regex.h"
@@ -41,6 +42,14 @@ Eternal glory to Yu-Fang.
 #include "counter_automaton.h"
 #include "length_decision_procedure.h"
 #include "unary_decision_procedure.h"
+
+/**
+ * NOTE: way how to print z3 formula in smt2 format (including the declaration)
+ * ast_pp_util utl(m);
+ * utl.collect(formula);
+ * utl.display_decls(std::cout);
+ * utl.display_assert(std::cout, formula);
+ */
 
 namespace smt::noodler {
 
@@ -103,6 +112,9 @@ namespace smt::noodler {
 
         using expr_pair = std::pair<expr_ref, expr_ref>;
         using expr_pair_flag = std::tuple<expr_ref, expr_ref, bool>;
+
+        // mapping of quantifier quards (quantified variables) to z3 vars. z3 represents variables using indices. 
+        std::map<std::string, unsigned> quantif_vars {};
 
         // constraints that are (possibly) to be processed in final_check_eh (added either in relevant_eh or ?assign_eh?)
         // they also need to be popped and pushed in pop_scope_eh and push_scope_eh)
@@ -258,6 +270,14 @@ namespace smt::noodler {
          * @param name Name of the var
          */
         expr_ref mk_int_var(const std::string& name) {
+            // quantified int variables we need to create as z3 variables. If they are created as skolem const, the quantification is 
+            // ignored (because everything there is a constant).
+            // WARNING: currently, we do not support occurrences of variables with the same name in different 
+            // scopes (both quantified and free)
+            auto it = this->quantif_vars.find(name);
+            if(it != this->quantif_vars.end()) {
+                return expr_ref(m.mk_var(it->second, m_util_a.mk_int()), m);
+            }
             app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
             return expr_ref(var, m);
         }

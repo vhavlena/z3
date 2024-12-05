@@ -1667,6 +1667,15 @@ namespace smt::noodler {
             }
             return;
         }
+        // not(prefix x y) -> x != y  where y = at ...
+        // not(prefix x y) -> x != eps
+        if(m_util_s.str.is_at(y)) {
+            literal lit_e = mk_literal(e);
+            expr_ref eps(m_util_s.str.mk_string(""), m);
+            add_axiom({ lit_e, mk_literal(m.mk_not(m.mk_eq(x,y))) });
+            add_axiom({ lit_e, mk_literal(m.mk_not(m.mk_eq(x,eps))) });
+            return;
+        }
 
         expr_ref p = mk_str_var_fresh("nprefix_left");
         expr_ref mx = mk_str_var_fresh("nprefix_midx");

@@ -26,6 +26,9 @@
 #include <iostream>
 
 #include "util/zstring.h"
+#include "ast/ast.h"
+#include "ast/arith_decl_plugin.h"
+#include "ast/seq_decl_plugin.h"
 
 namespace smt::noodler {
     enum struct PredicateType {
@@ -136,6 +139,18 @@ namespace smt::noodler {
         OVERAPPROX,
     };
 
+    /**
+     * Given two precisions p0 and p1 of formulae for certain parts of the current SAT branch (e.g. only not-contains predicates), compute the precision of the result.
+     * 
+     * For example, we have: `not-contains(x, y) AND x != z`, where:
+     *    - we (p0=)overapproximate the not-contains to {a, b, c, d} whereas the real set of models is {a, b}
+     *    - we have (p1=)precise solutions of the disequation {a, c} (to the disequation)
+     * So taking a conjunction of the overapproximation+precise formula for disequation, we have the resulting precision result=overapproximation as
+     *  Models of the conjunction using approximations: {a, b, c, d} && {a, c} = {a, c}
+     *  Models of the real formula, if we could compute it: {a, b} && {a, c} = {a}
+     */
+    LenNodePrecision get_resulting_precision_for_conjunction(const LenNodePrecision& p0, const LenNodePrecision& p1);
+
     enum struct LenFormulaType {
         PLUS,
         MINUS,
@@ -150,6 +165,7 @@ namespace smt::noodler {
         OR,
         TRUE,
         FALSE,
+        EXISTS, // existential quantifier
         FORALL, // quantifier for all
     };
 
@@ -165,14 +181,26 @@ namespace smt::noodler {
     };
 
     static std::ostream& operator<<(std::ostream& os, const LenNode& node) {
+        auto children_iterator = node.succ.begin(); // Some nodes, e.g., quantifiers would like to consume successor nodes
+        bool was_opening_parenthesis_emitted = true;
+
         switch (node.type)
         {
         case LenFormulaType::TRUE:
             return (os << "true");
         case LenFormulaType::FALSE:
             return (os << "false");
-        case LenFormulaType::LEAF:
+        case LenFormulaType::LEAF: {
+            zstring name = node.atom_val.get_name();
+            // Make sure that we print negative numbers in a valid SMT2 format
+            if (node.atom_val.is(BasicTermType::Length)) {
+                if (name[0] == '-') {
+                    os << "(- " << name.encode().substr(1) << ")";
+                    return os;
+                }
+            }
             return (os << node.atom_val.get_name());
+        }
         case LenFormulaType::NOT:
             return os << "(not" << node.succ.at(0) << ")";
         case LenFormulaType::LEQ:
@@ -182,9 +210,13 @@ namespace smt::noodler {
         case LenFormulaType::EQ:
             return os << "(= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
         case LenFormulaType::NEQ:
-            return os << "(!= " << node.succ.at(0) << " " << node.succ.at(1) << ")";
+            return os << "(not (= " << node.succ.at(0) << " " << node.succ.at(1) << "))";
         case LenFormulaType::PLUS:
-            os << "(+";
+            if (node.succ.size() > 1) {
+                os << "(+";
+            } else {
+                was_opening_parenthesis_emitted = false;
+            }
             break;
         case LenFormulaType::MINUS:
             os << "(-";
@@ -193,25 +225,60 @@ namespace smt::noodler {
             os << "(*";
             break;
         case LenFormulaType::AND:
-            os << "(and";
+            if (node.succ.size() > 1) {
+                os << "(and";
+            } else {
+                was_opening_parenthesis_emitted = false;
+            }
             break;
         case LenFormulaType::OR:
-            os << "(or";
+            if (node.succ.size() > 1) {
+                os << "(or";
+            } else {
+                was_opening_parenthesis_emitted = false;
+            }
             break;
-        case LenFormulaType::FORALL:
-            os << "(forall";
+        case LenFormulaType::FORALL: {
+            const auto& quantified_var = *children_iterator;
+            children_iterator++;
+
+            os << "(forall (( " << quantified_var << " Int))";
             break;
-        
+        }
+        case LenFormulaType::EXISTS: {
+            const auto& quantified_var = *children_iterator;
+            children_iterator++;
+            os << "(exists (( " << quantified_var << " Int))";
+            break;
+        }
         default:
             UNREACHABLE();
         }
 
-        for (const auto &succ_node : node.succ) {
-            os << " " << succ_node;
+        for (; children_iterator != node.succ.end(); children_iterator++) {
+            const auto& child = *children_iterator;
+            os << " " << child;
         }
-        os << ")";
+
+        if (was_opening_parenthesis_emitted) {
+            os << ")";
+        }
         return os;
     }
+    /**
+     * Recursively collect all free variables in the given formula.
+     */
+    std::set<BasicTerm> collect_free_vars(const LenNode& formula);
+
+    /**
+     * Write the given formula as SMT2 to the given @p out_stream, including preamble.
+     */
+    void write_len_formula_as_smt2(const LenNode& formula, std::ostream& out_stream);
+
+    /**
+     * Apply the given substitution. Variables are assumed to be named uniquely in the formula.
+     */
+    LenNode substitute_free_vars_for_concrete_values(const LenNode& formula, const std::map<BasicTerm, int> values);
 
     //----------------------------------------------------------------------------------------------------------------------------------
 
@@ -446,9 +513,9 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Count number of variables and sum of lengths of all literals 
+         * @brief Count number of variables and sum of lengths of all literals
          * (represented by literal "" in the map).
-         * 
+         *
          * @param side Side of the term
          * @return std::map<BasicTerm, unsigned> Number of variables / sum of lits lengths
          */
@@ -456,7 +523,7 @@ namespace smt::noodler {
 
         /**
          * @brief Split literals into literals consisting of a single symbol.
-         * 
+         *
          * @return Predicate Modified predicate where each literal is a symbol.
          */
         Predicate split_literals() const;
@@ -536,10 +603,10 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Extract and remove predicate of the type @p type from the formula. 
+         * @brief Extract and remove predicate of the type @p type from the formula.
          * The predicates of the type @p type are stored in the output @p extracted
          * It removes the extracted predicates from the current formula.
-         * 
+         *
          * @param type Predicate type
          * @param[out] extracted Where to store extracted predicates
          */
@@ -553,11 +620,11 @@ namespace smt::noodler {
                 }
             }
             this->predicates = new_predicates;
-        } 
+        }
 
         /**
          * @brief Does the Formula contain a predicate of a type @p type ?
-         * 
+         *
          * @param type Type of the predicate.
          * @return true <-> Formula contains predicate of type @p type.
          */
@@ -586,7 +653,7 @@ namespace smt::noodler {
 
         /**
          * @brief Check whether a formula is quadratic.
-         * 
+         *
          * @return true <-> quadratic
          */
         bool is_quadratic() const {
@@ -614,7 +681,7 @@ namespace smt::noodler {
 
         /**
          * @brief Check whether all predicates match the given type.
-         * 
+         *
          * @param tp Predicate type
          * @return true <-> All predicates are of type @p tp
          */
@@ -629,7 +696,7 @@ namespace smt::noodler {
 
         /**
          * @brief Replace in all predicates
-         * 
+         *
          * @param find What to find
          * @param replace What to replace
          * @return Formula Modified formula according to the replace
@@ -646,7 +713,7 @@ namespace smt::noodler {
 
         /**
          * @brief Split literals into literals consisting of a single symbol.
-         * 
+         *
          * @return Formula Modified formula where each literal is a symbol.
          */
         Formula split_literals() const {
@@ -693,12 +760,51 @@ namespace smt::noodler {
             return "to_int";
         case ConversionType::FROM_INT:
             return "from_int";
-        
+
         default:
             UNREACHABLE();
             return "";
         }
     }
+
+    /**
+     * Context (other formulae) in which a formula is to be used.
+     */
+    struct LenFormulaContext {
+        ast_manager& manager;
+        arith_util&  arith_utilities;
+        seq_util  &  seq_utilities;
+
+        /**
+         * Maps quantified variable names to the quantifier-depth of the corresponding quantifier.
+         *
+         * Necessary to correctly compute de Brujin sequences for the indices, which facilitate
+         * the binding between a quantifier and a new variable.
+         */
+        std::map<std::string, unsigned>& quantified_vars;
+        std::map<BasicTerm, expr_ref>&   known_z3_exprs;
+
+        int current_quantif_depth = 0;  // To compute de Brujin numbers for quantified variables
+    };
+
+    /**
+     * Convert given len_node into z3's expression.
+     * 
+     * The function accepts a context (collections of references to managers/utils) to allow
+     * for easier unit testing. If embedded in theory_str_noodler, one would have to instantiate
+     * and setup a lot of things just to check whether a formula instance is being correctly converted.
+     * 
+     * @note: The function does not correctly handle nested quantifiers when variables have the same names.
+     * 
+     * @param ctx Collection of references to managers and utils used during the conversion.
+     */
+    expr_ref convert_len_node_to_z3_formula(LenFormulaContext &ctx, const LenNode &node);
+
+    /**
+     * Helper function to construct quantifier expressions when converting len_nodes into z3's expressions.
+     */
+    expr_ref construct_z3_expr_for_len_node_quantifier(LenFormulaContext& ctx, const LenNode& node, enum quantifier_kind quantif_kind);
+
 
 } // Namespace smt::noodler.
 

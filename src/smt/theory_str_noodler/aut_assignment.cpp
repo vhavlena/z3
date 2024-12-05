@@ -167,17 +167,26 @@ namespace smt::noodler {
 
         mata::nfa::Nfa::TarjanDiscoverCallback callback {};
         callback.scc_discover = [&flat,&aut](const std::vector<mata::nfa::State>& scc, const std::vector<mata::nfa::State>& tarjan_stack) -> bool {
-            (void)tarjan_stack;
+            (void) tarjan_stack;
 
-            for(const mata::nfa::State& st : scc) {
+            for (const mata::nfa::State& st : scc) {
                 bool one_input_visited = false;
+
                 for (const mata::nfa::SymbolPost& sp : aut.delta[st]) {
                     for (const mata::nfa::State& tgt : scc) {
-                        if(sp.targets.find(tgt) != sp.targets.end()) {
-                            if(one_input_visited) {
+                        if (sp.targets.find(tgt) != sp.targets.end()) {
+
+                            bool is_dummy = smt::noodler::util::is_dummy_symbol(sp.symbol);
+                            if (is_dummy) {  // Dummy symbol is actually an entire set of transitions, so it is the same as seeing transitions with 2 different symbols
                                 flat = false;
                                 return true;
                             }
+
+                            if (one_input_visited) {
+                                flat = false;
+                                return true;
+                            }
+
                             one_input_visited = true;
                         }
                     }

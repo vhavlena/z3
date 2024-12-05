@@ -484,6 +484,13 @@ namespace smt::noodler {
          */
         std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override;
 
+        /**
+         * @brief Get the length sensitive variables
+         */
+        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const override {
+            return this->init_length_sensitive_vars;
+        }
+
     };
 
     static std::string nielsen_label_to_string(const NielsenLabel& lab) {

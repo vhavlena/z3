@@ -84,6 +84,7 @@ z3_add_component(smt
     theory_str_noodler/aut_assignment.cpp
     theory_str_noodler/expr_solver.cpp
     theory_str_noodler/parikh_image.cpp
+    theory_str_noodler/counter_automaton.cpp
     theory_str_noodler/ca_str_constr.cpp
     theory_str_noodler/unary_decision_procedure.cpp
     theory_str_mc.cpp

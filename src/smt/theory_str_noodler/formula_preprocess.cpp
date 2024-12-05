@@ -1548,6 +1548,8 @@ namespace smt::noodler {
                 ret.push_back(bt);
             }
         }
+
+        // TODO: Currently, we cannot unify "A" "A" with "AA".
         return ret;
     }
 
@@ -1667,10 +1669,10 @@ namespace smt::noodler {
             return c1 == c2;
         };
         for(const auto& pr : this->formula.get_predicates()) {            
-            if(pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side(), check)) {
+            if (pr.second.is_inequation() && can_unify(pr.second.get_left_side(), pr.second.get_right_side(), check)) {
                 return true;
             }
-            if(pr.second.is_equation() && pr.second.is_str_const()) {
+            if (pr.second.is_equation() && pr.second.is_str_const()) {
                 zstring left{};
                 zstring right{};
                 for(const BasicTerm& t : pr.second.get_left_side()) {
@@ -1695,8 +1697,12 @@ namespace smt::noodler {
      */
     bool FormulaPreprocessor::can_unify_contain(const Concat& left, const Concat& right) const {
         auto check = [](const Concat& c1, const Concat& c2) -> bool {
-            for(auto it = c1.begin(); it != c1.end(); it++) {
-                if(std::equal(it, it+c2.size(), c2.begin(), c2.end())) {
+            for(size_t i = 0; i < c1.size(); i++) {
+                auto c1_end = c1.begin() + i + c2.size();
+                if (i + c2.size() >= c1.size()) {
+                    c1_end = c1.end();
+                }
+                if(std::equal(c1.begin() + i, c1_end, c2.begin(), c2.end())) {
                     return true;
                 }
             }
@@ -1789,6 +1795,42 @@ namespace smt::noodler {
             this->formula.remove_predicate(i);
         }
         return true;
+    }
+
+    /**
+     * @brief Check whether the system contains trivially unsatisfiable (dis)equations 
+     * containing only literals.
+     * 
+     * @return true the system is unsat
+     */
+    bool FormulaPreprocessor::contains_unsat_literals() {
+
+        auto gather_lits = [&](const Concat& concat) -> std::optional<zstring> {
+            zstring lits;
+            for(const BasicTerm& bt : concat) {
+                if(bt.is_literal()) {
+                    lits = lits + bt.get_name();
+                } else {
+                    return {};
+                }
+            }
+            return lits;
+        };
+
+        for(const auto& [id, pred] : this->formula.get_predicates()) {
+            if(!pred.is_eq_or_ineq()) continue;
+            std::optional<zstring> left = gather_lits(pred.get_left_side());
+            std::optional<zstring> right = gather_lits(pred.get_right_side());
+            if(left.has_value() && right.has_value()) {
+                if(pred.is_equation() && left.value() != right.value()) {
+                    return true;
+                }
+                if(pred.is_inequation() && left.value() == right.value()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     std::string FormulaPreprocessor::print_info(bool print_nfas) {
