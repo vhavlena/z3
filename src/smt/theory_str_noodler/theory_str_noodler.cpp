@@ -90,7 +90,6 @@ namespace smt::noodler {
                 mk_var(enode);
             }
         }
-
         if (ctx.e_internalized(term)) {
             enode *e = ctx.get_enode(term);
             mk_var(e);
@@ -145,11 +144,9 @@ namespace smt::noodler {
             for (app* const a : lens) {
                 util::get_str_variables(a, this->m_util_s, m, this->len_vars, &this->predicate_replace);
             }
-
             expr *ex = ctx.get_asserted_formula(i);
             ctx.mark_as_relevant(ex);
-            string_theory_propagation(ex, true, false);
-            
+            string_theory_propagation(ex, true, false);  
         }
         add_conversion_num_axioms();
         add_len_num_axioms();
@@ -189,10 +186,6 @@ namespace smt::noodler {
                 m_util_s.str.is_is_digit(expr)
                 // we cannot do it for conversions (and for string inequalities which lead to to_code conversions) because otherwise all conversions become relevant and there is a degradation on benchmarks
                 // (this degradation should not happen for other predicates, because they are transformed into simpler atoms such as equation, regular membership... whose relevancy we can check when it is needed)
-                // m_util_s.str.is_stoi(expr) ||
-                // m_util_s.str.is_itos(expr) ||
-                // m_util_s.str.is_le(expr) ||
-                // m_util_s.str.is_lt(expr)
             )) {
             if(neg) ctx.mark_as_relevant(m.mk_not(expr));
             else ctx.mark_as_relevant(expr);
@@ -231,7 +224,6 @@ namespace smt::noodler {
     void theory_str_noodler::propagate_concat_axiom(enode *cat) {
         STRACE("str", tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
-
         app *a_cat = cat->get_expr();
         SASSERT(m_util_s.str.is_concat(a_cat));
         ast_manager &m = get_manager();
@@ -265,10 +257,8 @@ namespace smt::noodler {
 
         // finally assert equality between the two subexpressions
         app_ref eq(m.mk_eq(len_xy, len_x_plus_len_y), m);
-        //ctx.internalize(eq, false);
         SASSERT(eq);
         add_axiom(eq);
-        // std::cout << mk_pp(eq, m) << std::endl;
         this->axiomatized_len_axioms.push_back(eq);
         STRACE("str", tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 
@@ -298,6 +288,7 @@ namespace smt::noodler {
         // generate a stronger axiom for constant strings
         app_ref a_str(str->get_expr(), m);
 
+        // len(str) = |str| for explicit string str
         if (m_util_s.str.is_string(a_str)) {
             STRACE("str-axiom", tout << "[ConstStr Axiom] " << mk_pp(a_str, m) << std::endl);
 
@@ -313,17 +304,9 @@ namespace smt::noodler {
             add_axiom(eq);
             return;
         } else if(!m.is_ite(a_str)) {
-            // build axiom 1: Length(a_str) >= 0
+            // axiom |t| >= 0 where t is a string term
             { 
-                /**
-                 * FIXME: fix some day. Based on some expriments it is better to introduce this axiom when returning 
-                 * length formula from the decision procedure. If the axiom was introduced here, it leads to solving 
-                 * more equations (not exactly sure why, maybe due to the cooperation with LIA solver, maybe it is not 
-                 * properly relevancy propagated...)
-                 */
-                //return; 
                 STRACE("str-axiom", tout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl);
-
                 // build LHS
                 expr_ref len_str(m);
                 len_str = m_util_s.str.mk_length(a_str);
@@ -339,19 +322,10 @@ namespace smt::noodler {
                 STRACE("str", tout << "string axiom 1: " << mk_ismt2_pp(lhs_ge_rhs, m) << std::endl;);
 
                 add_axiom({mk_literal(lhs_ge_rhs)});
-                
- 
                 this->axiomatized_len_axioms.push_back(lhs_ge_rhs);
-                    
-
-                
-                
-                //return;
             }
-
-            // build axiom 2: Length(a_str) == 0 <=> a_str == ""
+            // axiom |t| <= 0 -> t = eps; if var_lengths is set add also t = eps -> |t| = 0
             {
-                // return;
                 STRACE("str-axiom", tout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl);
 
                 // build LHS of iff
@@ -372,16 +346,14 @@ namespace smt::noodler {
                 rhs = m.mk_eq(a_str, empty_str);
                 ctx.internalize(rhs, false);
                 ctx.internalize(lhs, false);
-                // ctx.mark_as_relevant(rhs.get());
-                // ctx.mark_as_relevant(lhs.get());
                 SASSERT(rhs);
                 // build LHS <=> RHS and assert
                 add_axiom(m.mk_or(m.mk_not(lhs), rhs));
+                // generate also the other implication
                 if(var_lengths) {
                     add_axiom(m.mk_or(m.mk_not(rhs), lhs));
                 }
             }
-
         } else {
             // INFO do nothing if ite, because this function is called only in string_theory_propagation where ite is processed
         }
@@ -450,7 +422,7 @@ namespace smt::noodler {
             // RegLan variables should never occur here, they are always eliminated by rewriter I think
             m_util_s.str.is_string(n) // string literal
         ) {
-            // we do not need to handle these, concatenation is handled differently (TODO: explain better?)
+            // we do not need to handle these, concatenation is handled in the decision procedure (it is a basic term)
             // and everything else will be handled during final_check_eh
         } else {
             // if we got here it means that we got some uninterpreted string function (i.e. probably user declared), we just replace it with a fresh string variable
@@ -489,27 +461,14 @@ namespace smt::noodler {
         expr *e = ctx.bool_var2expr(v);
         expr *e1 = nullptr, *e2 = nullptr;
         if (m_util_s.str.is_prefix(e, e1, e2)) {
-            // INFO done in relevant_eh, because there was some problem with adding axioms, Z3 added wrong axiom if it was done here and not in relevant_eh for some reason
-            // INFO in seq_theory they do similar stuff, and they do it here and not in relevant_eh, they also use skolem functions to handle it, might be worth to investigate
-
-            // if (is_true) {
-            //     handle_prefix(e);
-            // } else {
-            //     util::throw_error("unsupported predicate");
-            //     //handle_not_prefix(e);
-            // }
+            // already handled in relevant_eh. It suffices to handle is_prefix only once as it is fully 
+            // axiomatized using basic string constraints ((dis)equations, regexes, and lengths)
         } else if (m_util_s.str.is_suffix(e, e1, e2)) {
-            // INFO done in relevant_eh, because there was some problem with adding axioms, Z3 added wrong axiom if it was done here and not in relevant_eh for some reason
-            // INFO in seq_theory they do similar stuff, and they do it here and not in relevant_eh, they also use skolem functions to handle it, might be worth to investigate
-
-            // if (is_true) {
-            //     handle_suffix(e);
-            // } else {
-            //     util::throw_error("unsupported predicate");
-            //     // handle_not_suffix(e);
-            // }
+            // already handled in relevant_eh. It suffices to handle is_suffix only once as it is fully 
+            // axiomatized using basic string constraints ((dis)equations, regexes, and lengths)
         } else if (m_util_s.str.is_contains(e, e1, e2)) {
-            // FIXME could the problem from previous two also occur here? if yes, handle_contains and handle_not_contains should be in relevant_eh BUT m_not_contains_todo should be updated probably here (if applicable), so we can return unknown
+            // notcontains cannot be fully axiomatized. We need to add it among string constraints solved later in final_check 
+            // (it is not sufficient to add it only once at the beginning of the solver run as it max occurr in different SAT assignments).
             if (is_true) {
                 handle_contains(e);
             } else {
@@ -518,12 +477,11 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_le(e) || m_util_s.str.is_lt(e)) {
             // handled in relevant_eh
         } else if (m_util_s.str.is_in_re(e)) {
-            // INFO the problem from previous cannot occur here - Vojta
+            // regexes are not axiomatized. We store them to be solved later in final_check
             handle_in_re(e, is_true);
         } else if(m.is_bool(e)) {
             ensure_enode(e);
             TRACE("str", tout << "bool literal " << mk_pp(e, m) << " " << is_true << "\n" );
-            // UNREACHABLE();
         } else {
             TRACE("str", tout << "unhandled literal " << mk_pp(e, m) << "\n";);
             UNREACHABLE();
@@ -619,10 +577,6 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::propagate() {
-        // STRACE("str", out << "o propagate" << '\n';);
-
-        // for(const expr_ref& ex : this->len_state_axioms)
-        //     add_axiom(ex);
     }
 
     void theory_str_noodler::push_scope_eh() {
@@ -715,13 +669,10 @@ namespace smt::noodler {
     void theory_str_noodler::add_axiom(expr *const e) {
         STRACE("str_axiom", tout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
 
-
         if (!axiomatized_terms.contains(e)) {
             axiomatized_terms.insert(e);
             if (e == nullptr || get_manager().is_true(e)) return;
-//        string_theory_propagation(e);
             context &ctx = get_context();
-//        SASSERT(!ctx.b_internalized(e));
             if (!ctx.b_internalized(e)) {
                 ctx.internalize(e, false);
             }
@@ -730,8 +681,6 @@ namespace smt::noodler {
             ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
             STRACE("str", ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
-        } else {
-            //STRACE("str", tout << __LINE__ << " " << __FUNCTION__ << "already contains " << mk_pp(e, m) << std::endl;);
         }
     }
 
@@ -1900,10 +1849,6 @@ namespace smt::noodler {
         STRACE("str", tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
-            // if(axiomatized_persist_terms.contains(cont))
-            //     return;
-            // axiomatized_persist_terms.insert(cont);
-
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
                 m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)),
                 m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)))) ), m);
@@ -2317,26 +2262,22 @@ namespace smt::noodler {
 
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
-        STRACE("str", tout << "[Refinement]\nformulas:\n";);
+        STRACE("str", tout << "[Constructing refinement]";);
         for (const auto& we : this->m_word_eq_todo_rel) {
             // we create the equation according to we
-            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
             expr *const e = ctx.mk_eq_atom(we.first, we.second);
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
         }
 
         literal_vector ls;
         for (const auto& wi : this->m_word_diseq_todo_rel) {
-//            expr *const e = mk_eq_atom(wi.first, wi.second);
             expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
             // e might not be internalized
             if(!ctx.e_internalized(e)) {
                 ctx.internalize(e, false);
             }
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
-            //STRACE("str", tout << wi.first << " != " << wi.second << " " << ctx.get_bool_var(e)<< '\n';);
         }
-
         for (const auto& in : this->m_membership_todo_rel) {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
             if(!std::get<2>(in)){
@@ -2346,9 +2287,7 @@ namespace smt::noodler {
                 }
             }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
-            //STRACE("str", tout << wi.first << " != " << wi.second << '\n';);
         }
-
         for(const auto& nc : this->m_not_contains_todo_rel) {
             app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
             refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
