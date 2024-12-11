@@ -340,7 +340,15 @@ namespace smt::noodler {
 
         void set_conflict(const literal_vector& ls);
 
+        /**
+         * @brief Construct a formula representing current conjunction of atomic string constraints currently 
+         * solved in final_check (atoms that are not relevant are omited). It includes (dis)equations, regexes, 
+         * and notcontains.
+         * 
+         * @return expr_ref Conjunction of atomic string constraints
+         */
         expr_ref construct_refinement();
+
         /**
          * @brief Introduce string axioms for a formula @p ex. 
          * 
