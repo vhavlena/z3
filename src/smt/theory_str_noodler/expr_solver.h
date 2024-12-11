@@ -19,8 +19,7 @@ namespace smt::noodler {
     public:
         kernel m_kernel;
     public:
-        int_expr_solver(ast_manager& m, smt_params fp):
-                m(m),erv(m),m_kernel(m, fp){
+        int_expr_solver(ast_manager& m, smt_params fp): m(m),erv(m),m_kernel(m, fp){
             fp.m_string_solver = symbol("none");
             initialized=false;
        }

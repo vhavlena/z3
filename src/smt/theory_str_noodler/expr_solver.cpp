@@ -30,8 +30,7 @@ namespace smt::noodler {
     void int_expr_solver::initialize(context& ctx, bool include_ass) {
         if(!initialized){
             initialized=true;
-            expr_ref_vector Assigns(m),Literals(m);
-            ctx.get_guessed_literals(Literals);
+            expr_ref_vector Assigns(m);
             ctx.get_assignments(Assigns);
             for (unsigned i = 0; i < ctx.get_num_asserted_formulas(); ++i) {
                 STRACE("str-lia", tout<< "check_sat context from asserted: " << mk_pp(ctx.get_asserted_formula(i),m) << std::endl);
@@ -46,15 +45,6 @@ namespace smt::noodler {
                     }
                 }
             }
-        //    for (auto & e : Literals){
-        //        if(ctx.is_relevant(e)) {
-        //            STRACE("str-lia", tout << "check_sat context from guess:" << mk_pp(e, m) << std::endl);
-        //            assert_expr(e);
-        //        }
-        //        STRACE("str-lia", tout << "is relevant: " << ctx.is_relevant(e) << " get_assignment: " <<c tx.get_assignment(e) << std::endl);
-
-        //    }
-
         }
     }
 
@@ -62,7 +52,6 @@ namespace smt::noodler {
         if(!unsat_core){
             erv.push_back(e);
             // m_kernel.assert_expr(e);
-
         } else {
             erv.push_back(e);
             lbool r = m_kernel.check(erv);

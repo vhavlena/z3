@@ -15,9 +15,6 @@
 #include "smt/params/smt_params.h"
 #include "ast/arith_decl_plugin.h"
 #include "ast/seq_decl_plugin.h"
-#include "smt/params/theory_str_params.h"
-#include "util/scoped_vector.h"
-#include "util/union_find.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
@@ -74,10 +71,45 @@ bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s
  */
 bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s);
 
+/**
+ * @brief Check if the expression @p e is of the form to_int(x) = num where num 
+ * is a number (or num = to_int(x)).
+ * 
+ * @param e Expression to be checked
+ * @param m Ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] to_int_arg Argument of to_int (x)
+ * @param[out] num Number on the opposite side
+ * @return true <-> if of the particular form.
+ */
 bool is_to_int_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& to_int_arg, rational& num);
 
+/**
+ * @brief Check if the expression @p e is of the form len(x) = num where num 
+ * is a number (or num = len(x)).
+ * 
+ * @param e Expression to be checked
+ * @param m Ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] len_arg Argument of len (x)
+ * @param[out] num Number on the opposite side
+ * @return true <-> if of the particular form.
+ */
 bool is_len_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& len_arg, rational& num);
 
+/**
+ * @brief Check if the expression @p e is of the form len(x) <= num.
+ * 
+ * @param e Expression to be checked
+ * @param m Ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] len_arg Argument of len (x)
+ * @param[out] num Number on the opposite side of the comparison
+ * @return true <-> if of the particular form.
+ */
 bool is_len_num_leq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& len_arg, rational& num);
 
 /**
