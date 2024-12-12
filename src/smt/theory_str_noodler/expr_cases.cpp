@@ -87,17 +87,10 @@ bool is_len_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_ut
 bool is_len_num_leq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& len_arg, rational& num) {
     expr* left = nullptr, *right = nullptr, *e_not = nullptr;
     if(m_util_a.is_le(e, left, right)) {
-        // if(m_util_a.is_numeral(left, num) && m_util_s.str.is_length(right, len_arg)) {
-        //     return true;
-        // }
         if(m_util_a.is_numeral(right, num) && m_util_s.str.is_length(left, len_arg)) {
             return true;
         }
     } else if(m.is_not(e, e_not) && m_util_a.is_ge(e_not, left, right)) {
-        // if(m_util_a.is_numeral(left, num) && m_util_s.str.is_length(right, len_arg)) {
-        //     num--;
-        //     return true;
-        // }
         if(m_util_a.is_numeral(right, num) && m_util_s.str.is_length(left, len_arg)) {
             num--;
             return true;
