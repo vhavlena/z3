@@ -72,8 +72,7 @@ bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s
 bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s);
 
 /**
- * @brief Check if the expression @p e is of the form to_int(x) = num where num 
- * is a number (or num = to_int(x)).
+ * @brief Check if the expression @p e is of the form to_int(x) = num (or num = to_int(x)) where num is a number .
  * 
  * @param e Expression to be checked
  * @param m Ast manager
