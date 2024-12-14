@@ -86,8 +86,7 @@ bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util
 bool is_to_int_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& to_int_arg, rational& num);
 
 /**
- * @brief Check if the expression @p e is of the form len(x) = num where num 
- * is a number (or num = len(x)).
+ * @brief Check if the expression @p e is of the form len(x) = num (or num = len(x)) where num is a number.
  * 
  * @param e Expression to be checked
  * @param m Ast manager
