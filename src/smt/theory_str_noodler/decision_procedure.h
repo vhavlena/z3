@@ -10,7 +10,6 @@
 #include "formula.h"
 #include "inclusion_graph.h"
 #include "aut_assignment.h"
-#include "state_len.h"
 #include "formula_preprocess.h"
 #include "ca_str_constr.h"
 

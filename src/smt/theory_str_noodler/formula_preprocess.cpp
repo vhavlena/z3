@@ -475,9 +475,9 @@ namespace smt::noodler {
      */
     bool FormulaPreprocessor::propagate_regular_eqs(const std::set<VarNode>& diff1, const std::set<VarNode>& diff2, Predicate& new_pred) const {
         VarNode val1 = *diff1.begin();
-        std::set<int> pos1, pos2;
-        std::map<int, BasicTerm> sorted_map;
-        for(int i = 0; i < diff2.size(); i++) pos1.insert(i + val1.position);
+        std::set<size_t> pos1, pos2;
+        std::map<size_t, BasicTerm> sorted_map;
+        for(size_t i = 0; i < diff2.size(); i++) pos1.insert(i + val1.position);
         for(const auto& t : diff2) {
             pos2.insert(t.position);
             sorted_map.insert({t.position, t.term});
@@ -629,7 +629,7 @@ namespace smt::noodler {
             Concat side = occurrs.begin()->position > 0 ? act_pred.get_right_side() : act_pred.get_left_side();
 
             int start = std::abs(occurrs.begin()->position) - 1;
-            for(int i = start; i < side.size(); i++) {
+            for(size_t i = start; i < side.size(); i++) {
                 std::set<VarNode> vns;
                 // Construct the set of supposed occurences of the symbol side[i]
                 for(const VarNode& vn : occurrs) {
