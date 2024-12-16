@@ -629,7 +629,7 @@ namespace smt::noodler {
             Concat side = occurrs.begin()->position > 0 ? act_pred.get_right_side() : act_pred.get_left_side();
 
             int start = std::abs(occurrs.begin()->position) - 1;
-            for(int i = start; i < (int)side.size(); i++) {
+            for(size_t i = start; i < side.size(); i++) {
                 std::set<VarNode> vns;
                 // Construct the set of supposed occurences of the symbol side[i]
                 for(const VarNode& vn : occurrs) {
