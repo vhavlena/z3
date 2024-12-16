@@ -469,11 +469,6 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_contains(e, e1, e2)) {
             // notcontains cannot be fully axiomatized. We need to add it among string constraints solved later in final_check 
             // (it is not sufficient to add it only once at the beginning of the solver run as it max occurr in different SAT assignments).
-            // if (is_true) {
-            //     handle_contains(e);
-            // } else {
-            //     assign_not_contains(e);
-            // }
             if (!is_true) {
                 assign_not_contains(e);
             }
