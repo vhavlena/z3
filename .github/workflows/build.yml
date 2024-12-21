@@ -34,7 +34,8 @@ jobs:
 
       - name: Compile Z3-Noodler release
         run: |
+          ls
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release ".."
+          cmake -DCMAKE_BUILD_TYPE="Release" ../
           make -j4
