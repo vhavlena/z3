@@ -1,0 +1,40 @@
+name: Various platforms (build-&-test)
+
+on:
+  push:
+    branches: 
+      - master 
+      - devel
+  pull_request:
+    branches: 
+      - master 
+      - devel
+  # allows to run the action from GitHub UI
+  workflow_dispatch:
+
+
+jobs:
+  ubuntu-build:
+    name: "Ubuntu (build-&-test)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: 'VeriFIT'
+          repository: 'mata'
+          branch: devel
+          depth: 1
+
+      - name: Instal Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
+
+      - name: Compile Z3-Noodler release
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j4
