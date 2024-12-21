@@ -32,6 +32,9 @@ jobs:
       #     make release
       #     sudo make install
 
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
       - name: Compile Z3-Noodler release
         run: |
           ls
