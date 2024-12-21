@@ -18,26 +18,25 @@ jobs:
     name: "Ubuntu (build-&-test)"
     runs-on: ubuntu-latest
     steps:
-      # - name: Clone Mata
-      #   uses: GuillaumeFalourd/clone-github-repo-action@v2.3
-      #   with:
-      #     owner: 'VeriFIT'
-      #     repository: 'mata'
-      #     branch: devel
-      #     depth: 1
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: 'VeriFIT'
+          repository: 'mata'
+          branch: devel
+          depth: 1
 
-      # - name: Install Mata
-      #   run: |
-      #     cd mata
-      #     make release
-      #     sudo make install
+      - name: Install Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
 
       - name: Check out repository code
         uses: actions/checkout@v3
 
       - name: Compile Z3-Noodler release
         run: |
-          ls
           mkdir build
           cd build
           cmake -DCMAKE_BUILD_TYPE="Release" ../
