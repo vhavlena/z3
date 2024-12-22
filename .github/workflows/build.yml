@@ -44,6 +44,7 @@ jobs:
         run: |
           mkdir build
           cd build
+          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
           cmake -DCMAKE_BUILD_TYPE="Release" ../
           make -j4
       
