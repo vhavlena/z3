@@ -41,3 +41,11 @@ jobs:
           cd build
           cmake -DCMAKE_BUILD_TYPE="Release" ../
           make -j4
+      
+      - name: Test Z3-Noodler
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE="Release" ../
+          make -j4 test-noodler
+          ./test-noodler
