@@ -26,6 +26,11 @@ jobs:
           branch: devel
           depth: 1
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install catch2
+
       - name: Install Mata
         run: |
           cd mata
@@ -44,8 +49,6 @@ jobs:
       
       - name: Test Z3-Noodler
         run: |
-          mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE="Release" ../
           make -j4 test-noodler
           ./test-noodler
