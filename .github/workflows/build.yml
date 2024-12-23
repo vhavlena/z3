@@ -1,0 +1,97 @@
+name: Various platforms (build-&-test)
+
+on:
+  push:
+    branches: 
+      - master 
+      - devel
+  pull_request:
+    branches: 
+      - master 
+      - devel
+  # allows to run the action from GitHub UI
+  workflow_dispatch:
+
+
+jobs:
+  macos-build:
+    name: "MacOS (build-&-test)"
+    runs-on: macos-15
+    steps:
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: 'VeriFIT'
+          repository: 'mata'
+          branch: devel
+          depth: 1
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install catch2
+
+      - name: Install Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
+
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Compile Z3-Noodler release
+        run: |
+          mkdir build
+          cd build
+          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
+          cmake -DCMAKE_BUILD_TYPE="Release" ../
+          make -j4
+      
+      - name: Test Z3-Noodler
+        run: |
+          cd build
+          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
+          make -j4 test-noodler
+          ./test-noodler
+
+  ubuntu-build:
+    name: "Ubuntu (build-&-test)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: 'VeriFIT'
+          repository: 'mata'
+          branch: devel
+          depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install catch2
+
+      - name: Install Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
+
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Compile Z3-Noodler release
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE="Release" ../
+          make -j4
+      
+      - name: Test Z3-Noodler
+        run: |
+          cd build
+          make -j4 test-noodler
+          ./test-noodler
+
+  

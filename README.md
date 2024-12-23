@@ -1,5 +1,8 @@
 # Z3-Noodler
 
+[![GitHub tag](https://img.shields.io/github/tag/VeriFIT/z3-noodler.svg)](https://github.com/VeriFIT/z3-noodler)
+![Build](https://github.com/VeriFIT/z3-noodler/actions/workflows/build.yml/badge.svg)
+
 Z3-Noodler is an SMT solver for string constraints such as those that occur in symbolic execution and analysis of programs, 
 reasoning about configuration files of cloud services and smart contracts, etc.
 Z3-Noodler is based on the SMT solver [Z3 v4.13.0](https://github.com/Z3Prover/z3/releases/tag/z3-4.13.0), in which it replaces the solver for the theory of strings. 

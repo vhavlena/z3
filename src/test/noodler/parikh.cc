@@ -67,7 +67,7 @@ TEST_CASE("NotContains::mk_parikh_images_encode_same_word_formula simple", "[noo
 
     ca::TagAut tag_automaton = tag_automaton_generator.construct_tag_aut();
 
-    REQUIRE(tag_automaton.nfa.num_of_states() == 6);  // 4 states * 3 copies, but half are needless and removed during trimming
+    REQUIRE(tag_automaton.nfa.num_of_states() == 8);  // 4 states * 3 copies, but half are needless and removed during trimming
 
     std::set<ca::AtomicSymbol> used_symbols = tag_automaton.gather_used_symbols();
 
@@ -138,7 +138,7 @@ TEST_CASE("NotContains::mk_rhs_longer_than_lhs_formula simple", "[noodler]") {
     ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
 
     size_t states_in_row = 8;  // "abc" is 4-state automaton, we concatenate two of these
-    REQUIRE(tag_automaton.nfa.num_of_states() == 18);
+    REQUIRE(tag_automaton.nfa.num_of_states() == 20);
 
     std::set<ca::AtomicSymbol> used_symbols = tag_automaton.gather_used_symbols();
 
@@ -190,7 +190,7 @@ TEST_CASE("NotContains::ensure_symbol_unqueness_using_total_sum simple", "[noodl
     ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
 
     size_t states_in_row = 7;
-    REQUIRE(tag_automaton.nfa.num_of_states() == 15);
+    REQUIRE(tag_automaton.nfa.num_of_states() == 17);
 
     std::set<ca::AtomicSymbol> used_symbols = tag_automaton.gather_used_symbols();
 
@@ -442,7 +442,7 @@ TEST_CASE("NotContains::copies should differ in transition symbols", "[noodler]"
     ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
 
     // size_t states_in_row = 7;
-    REQUIRE(tag_automaton.nfa.num_of_states() == 15);
+    REQUIRE(tag_automaton.nfa.num_of_states() == 17);
 
     BasicTerm var_x = get_var('x');
     auto what_mismatch_labels_do_levels_contain = get_nonsampling_transitions_labeled_with_symbol(tag_automaton, var_x);
@@ -565,7 +565,7 @@ TEST_CASE("Disequations :: tag automaton for a single disequation is correct", "
     ca::TagDiseqGen tag_automaton_generator(diseq1, aut_assignment);
     ca::TagAut      tag_automaton = tag_automaton_generator.construct_tag_aut();
 
-    REQUIRE(tag_automaton.nfa.num_of_states() == 10);
+    REQUIRE(tag_automaton.nfa.num_of_states() == 13);
 
     ca::AtomicSymbol len_x = ca::AtomicSymbol::create_l_symbol(var_x);
     ca::AtomicSymbol len_y = ca::AtomicSymbol::create_l_symbol(var_y);
@@ -601,12 +601,12 @@ void add_all_possible_sampling_transitions(std::vector<TagSetTransition>& transi
     ca::AtomicSymbol mismatch_pos = ca::AtomicSymbol::create_p_symbol(var, copy_idx);
 
     for (size_t predicate_idx = 0; predicate_idx < predicate_count; predicate_idx++) {
-        ca::AtomicSymbol register_store_left = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, AtomicSymbol::PredicateSide::LEFT, copy_idx, transition.symbol);
+        ca::AtomicSymbol register_store_left = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, var, AtomicSymbol::PredicateSide::LEFT, copy_idx, transition.symbol);
         TagSet left_tag_set = {var_len, mismatch_pos, register_store_left};
         TagSetTransition transition_sampling_left = {.source = transition.source, .tag_set = left_tag_set, .target = transition.target};
         transitions.push_back(transition_sampling_left);
 
-        ca::AtomicSymbol register_store_right = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, AtomicSymbol::PredicateSide::RIGHT, copy_idx, transition.symbol);
+        ca::AtomicSymbol register_store_right = ca::AtomicSymbol::create_r_symbol_with_predicate_info(predicate_idx, var, AtomicSymbol::PredicateSide::RIGHT, copy_idx, transition.symbol);
         TagSet right_tag_set = {var_len, mismatch_pos, register_store_right};
         TagSetTransition transition_sampling_right = {.source = transition.source, .tag_set = right_tag_set, .target = transition.target};
         transitions.push_back(transition_sampling_right);
@@ -700,7 +700,7 @@ TEST_CASE("Disequations :: automaton for more predicates is constructed correctl
     ca::AtomicSymbol mismatch_pos_y_2 = ca::AtomicSymbol::create_p_symbol(var_y, 2);
     ca::AtomicSymbol mismatch_pos_z_2 = ca::AtomicSymbol::create_p_symbol(var_z, 2);
 
-    ca::AtomicSymbol register_store_x_1 = ca::AtomicSymbol::create_r_symbol_with_predicate_info(0, AtomicSymbol::PredicateSide::LEFT, 1, 'a');
+    ca::AtomicSymbol register_store_x_1 = ca::AtomicSymbol::create_r_symbol_with_predicate_info(0, var_x, AtomicSymbol::PredicateSide::LEFT, 1, 'a');
 
     ca::AtomicSymbol register_store_y_1 = ca::AtomicSymbol::create_r_symbol(var_y, 1, 'b');
     ca::AtomicSymbol register_store_y_2 = ca::AtomicSymbol::create_r_symbol(var_y, 2, 'b');
@@ -872,7 +872,6 @@ void check_register_stores_for_level(int level, const TagAut& tag_automaton, con
     std::map<RegisterValueImplicationVars, int> seen_register_implications;
 
     const BasicTerm& reg_ord = formula_generator.registers_in_sampling_order[level].atom_val;
-    std::cout << "Using ORD register: " << reg_ord << "\n";
     for (const auto& [transition, var] : formula_generator.get_trans_vars()) {
         mata::nfa::State source_state  = std::get<0>(transition);
         mata::Symbol     symbol_handle = std::get<1>(transition);
@@ -894,9 +893,7 @@ void check_register_stores_for_level(int level, const TagAut& tag_automaton, con
         }
     }
 
-    std::cout << "----\n";
     for (const LenNode& implication : implications_conjunction.succ) {
-        std::cout << implication << "\n";
         assert_register_store_implication_structure(implication, seen_register_implications);
     }
 
@@ -926,7 +923,7 @@ TEST_CASE("Disequations :: check assert_register_values", "[noodler]") {
     size_t num_of_copies = 5;
     size_t num_of_states_in_row = 6;
     ParikhImageDiseqTag formula_generator (tag_automaton, available_tags, num_of_states_in_row);
-    formula_generator.predicate_count = 2;
+    formula_generator.predicates = {diseq1, diseq2};
 
     formula_generator.compute_parikh_image();
 
