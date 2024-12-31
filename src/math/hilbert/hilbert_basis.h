@@ -43,7 +43,7 @@ class hilbert_basis {
     typedef vector<numeral> num_vector;
     static checked_int64<check> to_numeral(rational const& r) {
         if (!r.is_int64()) {
-            throw checked_int64<check>::overflow_exception();
+            throw overflow_exception();
         }
         return checked_int64<check>(r.get_int64());
     }
@@ -115,7 +115,6 @@ class hilbert_basis {
         offset_t operator*() const { return hb.m_basis[m_idx]; }
         iterator& operator++() { ++m_idx; return *this; }
         iterator operator++(int) { iterator tmp = *this; ++*this; return tmp; }
-        bool operator==(iterator const& it) const {return m_idx == it.m_idx; }
         bool operator!=(iterator const& it) const {return m_idx != it.m_idx; }
     };
 

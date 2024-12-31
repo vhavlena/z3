@@ -26,7 +26,7 @@ Revision History:
 bool parse_dimacs(std::istream & s, std::ostream& err, sat::solver & solver);
 
 namespace dimacs {
-    struct lex_error {};
+    struct lex_error : public std::exception {};
 
     class stream_buffer {
         std::istream & m_stream;
@@ -94,7 +94,6 @@ namespace dimacs {
             iterator(drat_parser& p, bool is_eof):p(p), m_eof(is_eof) { if (!m_eof) m_eof = !p.next(); }
             drat_record const& operator*() { return p.m_record; }
             iterator& operator++() { if (!p.next()) m_eof = true; return *this;}
-            bool operator==(iterator const& other) const { return m_eof == other.m_eof; }
             bool operator!=(iterator const& other) const { return m_eof != other.m_eof; }
         };
         

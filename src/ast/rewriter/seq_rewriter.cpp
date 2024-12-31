@@ -2091,6 +2091,10 @@ br_status seq_rewriter::mk_seq_replace_all(expr* a, expr* b, expr* c, expr_ref& 
         result = m().mk_ite(str().mk_is_empty(b), str().mk_empty(a->get_sort()), c);
         return BR_REWRITE2;
     }
+    if (str().is_empty(a) && str().is_empty(c)) {
+        result = a;
+        return BR_DONE;
+    }
     zstring s1, s2;
     expr_ref_vector strs(m());
     if (str().is_string(a, s1) && str().is_string(b, s2)) {
@@ -2494,6 +2498,14 @@ br_status seq_rewriter::mk_str_le(expr* a, expr* b, expr_ref& result) {
 
 br_status seq_rewriter::mk_str_lt(expr* a, expr* b, expr_ref& result) {
     zstring as, bs;
+    if (str().is_empty(b)) {
+        result = m().mk_false();
+        return BR_DONE;
+    }
+    if (str().is_empty(a)) {
+        result = m().mk_not(m().mk_eq(a, b));
+        return BR_REWRITE1;
+    }
     if (str().is_string(a, as) && str().is_string(b, bs)) {
         unsigned sz = std::min(as.length(), bs.length());
         for (unsigned i = 0; i < sz; ++i) {
@@ -3238,6 +3250,7 @@ expr_ref seq_rewriter::mk_antimirov_deriv(expr* e, expr* r, expr* path) {
 
 void seq_rewriter::mk_antimirov_deriv_rec(expr* e, expr* r, expr* path, expr_ref& result) {
     sort* seq_sort = nullptr, * ele_sort = nullptr;
+    expr_ref _r(r, m()), _path(path, m());
     VERIFY(m_util.is_re(r, seq_sort));
     VERIFY(m_util.is_seq(seq_sort, ele_sort));
     SASSERT(ele_sort == e->get_sort());
@@ -3384,8 +3397,10 @@ void seq_rewriter::mk_antimirov_deriv_rec(expr* e, expr* r, expr* path, expr_ref
     else if (re().is_loop(r, r1, lo, hi)) {
         if ((lo == 0 && hi == 0) || hi < lo)
             result = nothing();
-        else
-            result = mk_antimirov_deriv_concat(mk_antimirov_deriv(e, r1, path), re().mk_loop_proper(r1, (lo == 0 ? 0 : lo - 1), hi - 1));
+        else {
+            expr_ref t(re().mk_loop_proper(r1, (lo == 0 ? 0 : lo - 1), hi - 1), m());
+            result = mk_antimirov_deriv_concat(mk_antimirov_deriv(e, r1, path), t);
+        }
     }
     else if (re().is_opt(r, r1))
         result = mk_antimirov_deriv(e, r1, path);
@@ -3451,15 +3466,18 @@ expr_ref seq_rewriter::mk_antimirov_deriv_intersection(expr* e, expr* d1, expr* 
 
 expr_ref seq_rewriter::mk_antimirov_deriv_concat(expr* d, expr* r) {
     expr_ref result(m());
-    // Take reference count of r and d
     expr_ref _r(r, m()), _d(d, m());
     expr* c, * t, * e;
-    if (m().is_ite(d, c, t, e))
-        result = m().mk_ite(c, mk_antimirov_deriv_concat(t, r), mk_antimirov_deriv_concat(e, r));
+    if (m().is_ite(d, c, t, e)) {
+        auto r2 = mk_antimirov_deriv_concat(e, r);
+        auto r1 = mk_antimirov_deriv_concat(t, r);
+        result = m().mk_ite(c, r1, r2);
+    }
     else if (re().is_union(d, t, e))
         result = mk_antimirov_deriv_union(mk_antimirov_deriv_concat(t, r), mk_antimirov_deriv_concat(e, r));
     else
         result = mk_re_append(d, r);
+    SASSERT(result.get());
     return result;
 }
 
@@ -4567,6 +4585,15 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
     if (lift_str_from_to_re(b, b_s)) {
         result = m_br.mk_eq_rw(a, b_s);
         return BR_REWRITE_FULL;
+    }
+    expr* c = nullptr, *d = nullptr, *e = nullptr;
+    if (re().is_concat(b, c, d) && re().is_to_re(c, e) && re().is_full_seq(d)) {
+        result = str().mk_prefix(e, a);
+        return BR_REWRITE1;
+    }
+    if (re().is_concat(b, c, d) && re().is_to_re(d, e) && re().is_full_seq(c)) {
+        result = str().mk_suffix(e, a);
+        return BR_REWRITE1;
     }
     expr* b1 = nullptr;
     expr* eps = nullptr;

@@ -18,7 +18,7 @@ Notes:
 --*/
 #pragma once
 
-#include "ast/sls/sls_engine.h"
+#include "ast/sls/sls_bv_engine.h"
 
 class bvsls_opt_engine : public sls_engine {
     sls_tracker   & m_hard_tracker;
@@ -31,7 +31,6 @@ class bvsls_opt_engine : public sls_engine {
 
 public:
     bvsls_opt_engine(ast_manager & m, params_ref const & p);
-    ~bvsls_opt_engine();
 
     class optimization_result {
     public:

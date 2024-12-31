@@ -39,7 +39,7 @@ Notes:
 #include "model/model_v2_pp.h"
 #include "model/model_evaluator.h"
 #include "sat/sat_solver.h"
-#include "sat/sat_params.hpp"
+#include "params/sat_params.hpp"
 #include "sat/smt/euf_solver.h"
 #include "sat/tactic/goal2sat.h"
 #include "sat/tactic/sat2goal.h"
@@ -78,6 +78,7 @@ class inc_sat_solver : public solver {
     // this allows to access the internal state of the SAT solver and carry on partial results.
     bool                m_internalized_converted; // have internalized formulas been converted back
     expr_ref_vector     m_internalized_fmls;      // formulas in internalized format
+    vector<std::pair<expr_ref, expr_ref>> m_var2value;
 
     typedef obj_map<expr, sat::literal> dep2asm_t;
 
@@ -175,9 +176,23 @@ public:
             (m.is_not(e, e) && is_uninterp_const(e));
     }
 
+    void initialize_values() {
+        if (m_mcs.back())
+            m_mcs.back()->convert_initialize_value(m_var2value);
+
+        for (auto & [var, value] : m_var2value) {
+            sat::bool_var b = m_map.to_bool_var(var);
+            if (b != sat::null_bool_var)
+            m_solver.set_phase(sat::literal(b, m.is_false(value)));
+        else if (get_euf())  
+           ensure_euf()->user_propagate_initialize_value(var, value);
+        }
+    }
+
     lbool check_sat_core(unsigned sz, expr * const * assumptions) override {
         m_solver.pop_to_base_level();
         m_core.reset();
+
         if (m_solver.inconsistent()) return l_false;
         expr_ref_vector _assumptions(m);
         obj_map<expr, expr*> asm2fml;
@@ -202,6 +217,8 @@ public:
         r = internalize_assumptions(sz, _assumptions.data());
         if (r != l_true) return r;
 
+        initialize_values();
+
         init_reason_unknown();
         m_internalized_converted = false;
         bool reason_set = false;
@@ -210,10 +227,10 @@ public:
             r = m_solver.check(m_asms.size(), m_asms.data());
         }
         catch (z3_exception& ex) {
-            IF_VERBOSE(1, verbose_stream() << "exception: " << ex.msg() << "\n";);
+            IF_VERBOSE(1, verbose_stream() << "exception: " << ex.what() << "\n";);
             if (m.inc()) {
                 reason_set = true;
-                set_reason_unknown(std::string("(sat.giveup ") + ex.msg() + ')');
+                set_reason_unknown(std::string("(sat.giveup ") + ex.what() + ')');
             }
             r = l_undef;            
         }
@@ -702,6 +719,10 @@ public:
         ensure_euf()->user_propagate_register_decide(r);
     }
 
+    void user_propagate_initialize_value(expr* var, expr* value) override {
+        m_var2value.push_back({expr_ref(var, m), expr_ref(value, m) });
+    }
+
 
 private:
 
@@ -758,9 +779,9 @@ private:
             }
         }
         catch (tactic_exception & ex) {
-            IF_VERBOSE(1, verbose_stream() << "exception in tactic " << ex.msg() << "\n";);
-            set_reason_unknown(ex.msg());
-            TRACE("sat", tout << "exception: " << ex.msg() << "\n";);
+            IF_VERBOSE(1, verbose_stream() << "exception in tactic " << ex.what() << "\n";);
+            set_reason_unknown(ex.what());
+            TRACE("sat", tout << "exception: " << ex.what() << "\n";);
             m_preprocess = nullptr;
             m_bb_rewriter = nullptr;
             return l_undef;

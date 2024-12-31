@@ -249,7 +249,7 @@ public:
         }
         catch (z3_exception & ex) {
             // convert all Z3 exceptions into tactic exceptions.
-            throw tactic_exception(ex.msg());
+            throw tactic_exception(ex.what());
         }
     }
     
@@ -262,6 +262,9 @@ public:
     void reset_statistics() override {
         m_stats.reset();
     }
+
+    void user_propagate_initialize_value(expr* var, expr* value) override { }
+
 };
 
 tactic * mk_nlsat_tactic(ast_manager & m, params_ref const & p) {

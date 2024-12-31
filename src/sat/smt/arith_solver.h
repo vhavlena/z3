@@ -28,8 +28,6 @@ Author:
 #include "math/polynomial/algebraic_numbers.h"
 #include "math/polynomial/polynomial.h"
 #include "sat/smt/sat_th.h"
-#include "sat/smt/arith_sls.h"
-#include "sat/sat_ddfw.h"
 
 namespace euf {
     class solver;
@@ -186,8 +184,6 @@ namespace arith {
                 coeffs().pop_back();
             }
         };
-   
-        sls m_local_search;
 
         typedef vector<std::pair<rational, lpvar>> var_coeffs;
         vector<rational>         m_columns;
@@ -234,6 +230,7 @@ namespace arith {
 
         // non-linear arithmetic
         scoped_ptr<nla::solver>  m_nla;
+        bool m_use_nra_model = false;
 
         // integer arithmetic
         scoped_ptr<lp::int_solver>   m_lia;
@@ -428,19 +425,11 @@ namespace arith {
          * Facility to put a small box around integer variables used in branch and bounds.
          */
 
-        struct bound_info {
-            rational m_offset;
-            unsigned m_range;
-            bound_info() {}
-            bound_info(rational const& o, unsigned r) :m_offset(o), m_range(r) {}
-        };
         unsigned                  m_bounded_range_idx;  // current size of bounded range.
         literal                   m_bounded_range_lit;  // current bounded range literal
         expr_ref_vector           m_bound_terms; // predicates used for bounds
         expr_ref                  m_bound_predicate;
 
-        obj_map<expr, expr*>      m_predicate2term;
-        obj_map<expr, bound_info> m_term2bound_info;
         bool                      m_model_is_initialized = false;
 
         unsigned small_lemma_size() const { return get_config().m_arith_small_lemma_size; }
@@ -485,6 +474,8 @@ namespace arith {
 
         bool validate_conflict();
 
+        
+
     public:
         solver(euf::solver& ctx, theory_id id);
         ~solver() override;
@@ -512,13 +503,12 @@ namespace arith {
         void internalize(expr* e) override;
         void eq_internalized(euf::enode* n) override;
         void apply_sort_cnstr(euf::enode* n, sort* s) override {}
+        void initialize_value(expr* var, expr* value) override;
         bool is_shared(theory_var v) const override;
         lbool get_phase(bool_var v) override;
         bool include_func_interp(func_decl* f) const override;
         bool enable_ackerman_axioms(euf::enode* n) const override { return !a.is_add(n->get_expr()); }
         bool has_unhandled() const override { return m_not_handled != nullptr; }
-
-        void set_bool_search(sat::ddfw* ddfw) override { m_local_search.set(ddfw); }
 
         // bounds and equality propagation callbacks
         lp::lar_solver& lp() { return *m_solver; }

@@ -86,7 +86,7 @@ class lia2pb_tactic : public tactic {
             return is_target_core(n, u) && u > rational(1);
         }
         
-        struct failed {};
+        struct failed : public std::exception {};
 
         struct visitor {
             imp & m_owner;
@@ -325,7 +325,7 @@ public:
             (*m_imp)(in, result);
         }
         catch (rewriter_exception & ex) {
-            throw tactic_exception(ex.msg());
+            throw tactic_exception(ex.what());
         }
     }
     

@@ -1,5 +1,4 @@
-/*++
-Copyright (c) 2012 Microsoft Corporation
+/*++ Copyright (c) 2012 Microsoft Corporation
 
 Module Name:
 
@@ -118,6 +117,10 @@ public:
 
     void user_propagate_register_expr(expr* e) override {
         m_tactic->user_propagate_register_expr(e);
+    }
+    
+    void user_propagate_initialize_value(expr* var, expr* value) override {
+        m_tactic->user_propagate_initialize_value(var, value);
     }
 
     void user_propagate_register_created(user_propagator::created_eh_t& created_eh) override {
@@ -266,14 +269,14 @@ lbool tactic2solver::check_sat_core2(unsigned num_assumptions, expr * const * as
 
     }
     catch (z3_error & ex) {
-        TRACE("tactic2solver", tout << "exception: " << ex.msg() << "\n";);
+        TRACE("tactic2solver", tout << "exception: " << ex.what() << "\n";);
         m_result->m_proof = pr;
         throw ex;
     }
     catch (z3_exception & ex) {
-        TRACE("tactic2solver", tout << "exception: " << ex.msg() << "\n";);
+        TRACE("tactic2solver", tout << "exception: " << ex.what() << "\n";);
         m_result->set_status(l_undef);
-        m_result->m_unknown = ex.msg();
+        m_result->m_unknown = ex.what();
         m_result->m_proof = pr;
     }
     m_tactic->collect_statistics(m_result->m_stats);

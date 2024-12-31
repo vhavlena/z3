@@ -49,6 +49,8 @@ void smt_params::updt_local_params(params_ref const & _p) {
     m_threads_max_conflicts  = p.threads_max_conflicts();
     m_threads_cube_frequency = p.threads_cube_frequency();
     m_core_validate = p.core_validate();
+    m_sls_enable = p.sls_enable();
+    m_sls_parallel = p.sls_parallel();
     m_logic = _p.get_sym("logic", m_logic);
     m_string_solver = p.string_solver();
     m_up_persist_clauses = p.up_persist_clauses();
@@ -66,6 +68,7 @@ void smt_params::updt_local_params(params_ref const & _p) {
     m_lemmas2console = sp.lemmas2console();
     m_instantiations2console = sp.instantiations2console();
     m_proof_log = sp.proof_log();
+    
 }
 
 void smt_params::updt_params(params_ref const & p) {
@@ -329,7 +332,7 @@ void smt_params::setup_QF_BV() {
 }
 
 void smt_params::setup_QF_AUFBV() {
-    m_array_mode          = AR_SIMPLE;
+    m_array_mode          = AR_FULL;
     m_relevancy_lvl       = 0;
     m_bv_cc               = false;
     m_bb_ext_gates        = true;

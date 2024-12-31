@@ -32,10 +32,10 @@ Revision History:
 class fix_dl_var_tactic : public tactic {
 
     struct is_target {
-        struct failed {};
+        struct failed : public std::exception {};
         ast_manager &          m;
         arith_util &           m_util;
-        expr_fast_mark1 *      m_visited;
+        expr_fast_mark1 *      m_visited = nullptr;
         ptr_vector<expr>       m_todo;
         obj_map<app, unsigned> m_occs;
         obj_map<app, unsigned> m_non_nested_occs;
@@ -215,7 +215,7 @@ class fix_dl_var_tactic : public tactic {
         app * operator()(goal const & g) {
             try {
                 expr_fast_mark1 visited;
-                m_visited = &visited;
+                flet<expr_fast_mark1*> _visited(m_visited, &visited);
                 unsigned sz = g.size();
                 for (unsigned i = 0; i < sz; i++) {
                     process(g.form(i));
@@ -317,7 +317,7 @@ public:
             (*m_imp)(in, result);
         }
         catch (rewriter_exception & ex) {
-            throw tactic_exception(ex.msg());
+            throw tactic_exception(ex.what());
         }
     }
     

@@ -20,6 +20,7 @@ Notes:
 #include "cmd_context/cmd_context.h"
 #include "solver/combined_solver.h"
 #include "solver/tactic2solver.h"
+#include "tactic/tactical.h"
 #include "tactic/smtlogics/qfbv_tactic.h"
 #include "tactic/smtlogics/qflia_tactic.h"
 #include "tactic/smtlogics/qfnia_tactic.h"
@@ -47,9 +48,19 @@ Notes:
 #include "solver/parallel_params.hpp"
 #include "params/tactic_params.hpp"
 #include "parsers/smt2/smt2parser.h"
-#include "sat/sat_params.hpp"
+#include "params/sat_params.hpp"
+
+tactic* mk_tactic_for_logic(ast_manager& m, params_ref const& p, symbol const& logic);
 
 
+class smt_nested_solver_factory : public solver_factory {
+public:
+    solver* operator()(ast_manager& m, params_ref const& p, bool proofs_enabled, bool models_enabled, bool unsat_core_enabled, symbol const& logic) override {
+        auto t = mk_tactic_for_logic(m, p, logic);
+        auto s = mk_tactic2solver(m, t, p, proofs_enabled, models_enabled, unsat_core_enabled, logic);
+        return s;
+    }
+};
 
 tactic * mk_tactic_for_logic(ast_manager & m, params_ref const & p, symbol const & logic) {
     if (logic=="QF_UF")
@@ -57,27 +68,27 @@ tactic * mk_tactic_for_logic(ast_manager & m, params_ref const & p, symbol const
     else if (logic=="QF_BV")
         return mk_qfbv_tactic(m, p);        
     else if (logic=="QF_IDL")
-        return mk_qfidl_tactic(m, p);
+        return annotate_tactic("qfidl-tactic", mk_qfidl_tactic(m, p));
     else if (logic=="QF_LIA")
-        return mk_qflia_tactic(m, p);
+        return annotate_tactic("qflia-tactic", mk_qflia_tactic(m, p));
     else if (logic=="QF_LRA")
-        return mk_qflra_tactic(m, p);
+        return annotate_tactic("qflra-tactic", mk_qflra_tactic(m, p));
     else if (logic=="QF_NIA")
-        return mk_qfnia_tactic(m, p);
+        return annotate_tactic("qfnia-tactic", mk_qfnia_tactic(m, p));
     else if (logic=="QF_NRA")
-        return mk_qfnra_tactic(m, p);
+        return annotate_tactic("qfnra-tactic", mk_qfnra_tactic(m, p));
     else if (logic=="QF_AUFLIA")
-        return mk_qfauflia_tactic(m, p);
+        return annotate_tactic("qfauflia-tactic", mk_qfauflia_tactic(m, p));
     else if (logic=="QF_AUFBV")
-        return mk_qfaufbv_tactic(m, p);
+        return annotate_tactic("qfaufbv-tactic", mk_qfaufbv_tactic(m, p));
     else if (logic=="QF_ABV")
-        return mk_qfaufbv_tactic(m, p);
+        return annotate_tactic("qfaufbv-tactic", mk_qfaufbv_tactic(m, p));
     else if (logic=="QF_UFBV")
-        return mk_qfufbv_tactic(m, p);
+        return annotate_tactic("qfufbv-tactic", mk_qfufbv_tactic(m, p));
     else if (logic=="AUFLIA")
-        return mk_auflia_tactic(m, p);
+        return annotate_tactic("auflia-tactic", mk_auflia_tactic(m, p));
     else if (logic=="AUFLIRA")
-        return mk_auflira_tactic(m, p);
+        return annotate_tactic("auflira-tactic", mk_auflira_tactic(m, p));
     else if (logic=="AUFNIRA")
         return mk_aufnira_tactic(m, p);
     else if (logic=="UFNIA")
@@ -91,7 +102,7 @@ tactic * mk_tactic_for_logic(ast_manager & m, params_ref const & p, symbol const
     else if (logic=="LIA")
         return mk_lia_tactic(m, p);
     else if (logic=="UFBV")
-        return mk_ufbv_tactic(m, p);
+        return annotate_tactic("ufbv", mk_ufbv_tactic(m, p));
     else if (logic=="BV")
         return mk_ufbv_tactic(m, p);
     else if (logic=="QF_FP")

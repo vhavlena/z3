@@ -4,9 +4,12 @@ z3_add_component(nlsat
     nlsat_evaluator.cpp
     nlsat_explain.cpp
     nlsat_interval_set.cpp
+    nlsat_simplify.cpp
     nlsat_solver.cpp
     nlsat_types.cpp
-  COMPONENT_DEPENDENCIES
+    nlsat_simple_checker.cpp
+    nlsat_variable_ordering_strategy.cpp
+    COMPONENT_DEPENDENCIES
     polynomial
     sat
   PYG_FILES

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_compiler_flags_overrides.cmake")
-project(Z3 VERSION 4.13.0.0 LANGUAGES CXX)
+project(Z3 VERSION 4.13.4.0 LANGUAGES CXX)
 
 ################################################################################
 # Project version
@@ -191,6 +191,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif (WIN32)
   message(STATUS "Platform: Windows")
   list(APPEND Z3_COMPONENT_CXX_DEFINES "-D_WINDOWS")
+  # workaround for #7420
+  list(APPEND Z3_COMPONENT_CXX_DEFINES "-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR")  
 elseif (EMSCRIPTEN)
   message(STATUS "Platform: Emscripten")
   z3_add_cxx_flag("-pthread" REQUIRED)
@@ -256,6 +258,21 @@ if (Z3_SINGLE_THREADED)
 else()
   message(STATUS "Thread-safe build")
 endif()
+
+
+################################################################################
+# Use polling based timeout. This avoids spawning threads for timer tasks
+################################################################################
+option(Z3_POLLING_TIMER
+  "Use polling based timeout checks"
+  OFF
+)
+if (Z3_POLLING_TIMER)
+  list(APPEND Z3_COMPONENT_CXX_DEFINES "-DPOLLING_TIMER")
+  message(STATUS "Polling based timer")
+endif()
+
+
 
 ################################################################################
 # FP math

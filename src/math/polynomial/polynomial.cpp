@@ -91,7 +91,7 @@ namespace polynomial {
     */
     class power : public std::pair<var, unsigned> {
     public:
-        power():std::pair<var, unsigned>() {}
+        power() = default;
         power(var v, unsigned d):std::pair<var, unsigned>(v, d) {}
         var get_var() const { return first; }
         unsigned degree() const { return second; }
@@ -189,6 +189,10 @@ namespace polynomial {
                 return true;
             }
         };
+
+        bool operator==(monomial const& other) const {
+            return eq_proc()(this, &other);
+        }
 
         static unsigned get_obj_size(unsigned sz) { return sizeof(monomial) + sz * sizeof(power); }
         
@@ -1891,7 +1895,7 @@ namespace polynomial {
            Invoke add(...), addmul(...) several times, and then invoke mk() to obtain the final polynomial.
         */
         class som_buffer {
-            imp *              m_owner;
+            imp *              m_owner = nullptr;
             monomial2pos       m_m2pos;
             numeral_vector     m_tmp_as;
             monomial_vector    m_tmp_ms;
@@ -1935,8 +1939,6 @@ namespace polynomial {
             }
 
         public:
-            som_buffer():m_owner(nullptr) {}
-
             void reset() {
                 if (empty())
                     return;
@@ -2232,12 +2234,10 @@ namespace polynomial {
            In this buffer, each monomial can be added at most once.
         */
         class cheap_som_buffer {
-            imp *              m_owner;
+            imp *              m_owner = nullptr;
             numeral_vector     m_tmp_as;
             monomial_vector    m_tmp_ms;
         public:
-            cheap_som_buffer():m_owner(nullptr) {}
-
             void set_owner(imp * o) { m_owner = o; }
             bool empty() const { return m_tmp_ms.empty(); }
 
@@ -2500,30 +2500,139 @@ namespace polynomial {
             return p;
         }
 
-        void gcd_simplify(polynomial * p) {
-            if (m_manager.finite()) return;
+        void gcd_simplify(polynomial_ref& p, manager::ineq_type t) {
             auto& m = m_manager.m();
             unsigned sz = p->size();
             if (sz == 0) 
                 return;
             unsigned g = 0;
-            for (unsigned i = 0; i < sz; i++) {
+            for (unsigned i = 0; i < sz; i++) {                
                 if (!m.is_int(p->a(i))) {
+                    gcd_simplify_slow(p, t);
                     return;
                 }
+                if (t != EQ && is_unit(p->m(i)))
+                    continue;
                 int j = m.get_int(p->a(i));
-                if (j == INT_MIN || j == 1 || j == -1)
+                if (j == INT_MIN) {
+                    gcd_simplify_slow(p, t);
+                    return;
+                }
+                if (j == 1 || j == -1)
                     return;
                 g = u_gcd(abs(j), g);
                 if (g == 1) 
                     return;
             }
-            scoped_mpz r(m), gg(m);
+            scoped_mpz gg(m);
             m.set(gg, g);
-            for (unsigned i = 0; i < sz; ++i) {
-                m.div_gcd(p->a(i), gg, r);
-                m.set(p->a(i), r);
+            apply_gcd_simplify(gg, p, t);            
+        }
+
+        void apply_gcd_simplify(mpz & g, polynomial_ref& p, manager::ineq_type t) {
+           
+            auto& m = m_manager.m();
+
+#if 0
+            m.display(verbose_stream() << "gcd ", g);
+            p->display(verbose_stream() << "\n", m_manager, false);
+            char const* tt = "";
+            switch (t) {
+            case ineq_type::GT: tt = ">"; break;
+            case ineq_type::LT: tt = "<"; break;
+            case ineq_type::EQ: tt = "="; break;
             }
+            verbose_stream() << " " << tt << " 0\n ->\n";
+#endif
+            scoped_mpz r(m);
+            unsigned sz = p->size();
+            m_som_buffer.reset();
+            for (unsigned i = 0; i < sz; ++i) {
+                if (t != EQ && is_unit(p->m(i))) {
+                    scoped_mpz one(m);
+                    m.set(one, 1);
+                    if (t == GT) {
+                        // p - 2 - 1 >= 0
+                        // p div 2 + floor((-2 - 1 ) / 2) >= 0
+                        // p div 2 + floor(-3 / 2) >= 0
+                        // p div 2 - 2 >= 0
+                        // p div 2 - 1 > 0
+                        // 
+                        // p + k > 0
+                        // p + k - 1 >= 0
+                        // p div g + (k - 1) div g >= 0
+                        // p div g + (k - 1) div g + 1 > 0
+                        m.sub(p->a(i), one, r);
+                        bool is_neg = m.is_neg(r);
+                        if (is_neg) {
+                            m.neg(r);
+                            m.add(r, g, r);
+                            m.sub(r, one, r);
+                            m.div_gcd(r, g, r);
+                            m.neg(r);
+                        }
+                        else {
+                            m.div_gcd(r, g, r);
+                        }
+                        m.add(r, one, r);
+                    }
+                    else {
+                        // p + k < 0 
+                        // p + k + 1 <= 0
+                        // p div g + (k + 1 + g - 1) div g <= 0
+                        // p div g + (k + 1 + g - 1) div g - 1 < 0
+
+                        m.add(p->a(i), one, r);
+                        bool is_neg = m.is_neg(r);
+
+                        if (is_neg) {
+                            // p - k <= 0
+                            // p <= k
+                            // p div g <= k div g
+                            // p div g - k div g <= 0
+                            // p div g - k div g - 1 < 0
+                            m.neg(r);
+                            m.div_gcd(r, g, r);
+                            m.neg(r);
+                            m.sub(r, one, r);
+                        }
+                        else {
+                            m.div_gcd(p->a(i), g, r);
+                            m.add(p->a(i), g, r);
+                            m.div_gcd(r, g, r);
+                            m.sub(r, one, r);
+                        }
+
+                    }
+                }
+                else {
+                    m.div_gcd(p->a(i), g, r);                    
+                }
+                if (!m.is_zero(r))
+                    m_som_buffer.add(r, p->m(i));
+            }
+            p = m_som_buffer.mk();
+            
+            // p->display(verbose_stream(), m_manager, false);
+            // verbose_stream() << " " << tt << " 0\n";
+        }
+
+        void gcd_simplify_slow(polynomial_ref& p, manager::ineq_type t) {
+            auto& m = m_manager.m();
+            unsigned sz = p->size();
+            scoped_mpz g(m);
+            m.set(g, 0);
+            for (unsigned i = 0; i < sz; i++) {
+                auto const& a = p->a(i);
+                if (m.is_one(a) || m.is_minus_one(a))
+                    return;
+                if (t != EQ && is_unit(p->m(i)))
+                    continue;
+                m.gcd(a, g, g);
+                if (m.is_one(g))
+                    return;
+            }
+            apply_gcd_simplify(g, p, t);
         }
 
         polynomial * mk_zero() {
@@ -2959,11 +3068,9 @@ namespace polynomial {
         }
 
         class newton_interpolator_vector {
-            imp *                           m_imp;
+            imp *                           m_imp = nullptr;
             ptr_vector<newton_interpolator> m_data;
         public:
-            newton_interpolator_vector():m_imp(nullptr) {}
-
             ~newton_interpolator_vector() {
                 flush();
             }
@@ -3221,9 +3328,16 @@ namespace polynomial {
         };
 
         bool_vector  m_found_vars;
-        void vars(polynomial const * p, var_vector & xs) {
-            xs.reset();
+        void begin_vars_incremental() {
             m_found_vars.reserve(num_vars(), false);
+        }
+        void end_vars_incremental(var_vector& xs) {
+            // reset m_found_vars
+            unsigned sz = xs.size();
+            for (unsigned i = 0; i < sz; i++)
+                m_found_vars[xs[i]] = false;
+        }
+        void vars(polynomial const * p, var_vector & xs) {
             unsigned sz = p->size();
             for (unsigned i = 0; i < sz; i++) {
                 monomial * m = p->m(i);
@@ -3236,10 +3350,6 @@ namespace polynomial {
                     }
                 }
             }
-            // reset m_found_vars
-            sz = xs.size();
-            for (unsigned i = 0; i < sz; i++)
-                m_found_vars[xs[i]] = false;
         }
 
         typedef sbuffer<power, 32>    power_buffer;
@@ -6045,6 +6155,49 @@ namespace polynomial {
             }
             return true;
         }
+       
+        bool ge(polynomial const* p, polynomial const* q) {
+            unsigned sz1 = p->size();
+            unsigned sz2 = q->size();
+            unsigned i = 0, j = 0;
+            while (i < sz1 || j < sz2) {
+                auto * m1 = i < sz1 ? p->m(i) : q->m(j);
+                auto & a1 = i < sz1 ? p->a(i) : q->a(j);
+                auto * m2 = j < sz2 ? q->m(j) : p->m(i);
+                auto & a2 = j < sz2 ? q->a(j) : p->a(i);
+
+                if (i < sz1 && j == sz2 && m1->is_unit()) {
+                    if (!m_manager.is_pos(a1))
+                        return false;
+                    ++i;
+                    continue;
+                }
+
+                if (i == sz1 && j < sz2 && m2->is_unit()) {
+                    if (!m_manager.is_neg(a2))
+                        return false;
+                    ++j;
+                    continue;
+                }
+
+                if (i == sz1 || j == sz2)
+                    break;
+
+                if (!(*m1 == *m2)) {
+                    if (m_manager.is_pos(a1) && m1->is_square()) {
+                        ++i;
+                        continue;
+                    }
+                    return false;
+                }
+                if (m_manager.eq(a1, a2) || (m1->is_square() && m_manager.ge(a1, a2))) {
+                    ++i, ++j;
+                    continue;
+                }
+                return false;               
+            }
+            return i == sz1 && j == sz2;           
+        }
 
         // Functor used to compute the maximal degree of each variable in a polynomial p.
         class var_max_degree {
@@ -6269,6 +6422,27 @@ namespace polynomial {
             return R.mk();
         }        
 
+        // x*q = p
+        // 
+        // md = degree of x in p
+        // P = m0 + ...
+        // m0 = x^dm*m1
+        // m1 * p^dm * q^{md - dm}  
+        // P' = m1 + ...
+        // property would be that x*q = p => P > 0 <=> P' > 0
+        // requires that q > 0
+        // Reasoning:
+        //    P > 0 
+        // <=> { since q > 0 }
+        //    q^md * P > 0
+        // <=>
+        //    q^md*x^dm*m0 + .. > 0
+        // <=>
+        //    q^{md-dm}*(xq)^dm*m0 + ... > 0
+        // <=>
+        //    q^{md-dm}*p^dm + .. > 0
+        // <=>
+        //    P' > 0
         void substitute(polynomial const* r, var x, polynomial const* p, polynomial const* q, polynomial_ref& result) {
             unsigned md = degree(r, x);
             if (md == 0) {
@@ -6902,8 +7076,8 @@ namespace polynomial {
         return m_imp->hash(p);
     }
 
-    void manager::gcd_simplify(polynomial * p) {
-        m_imp->gcd_simplify(p);
+    void manager::gcd_simplify(polynomial_ref& p, ineq_type t) {
+        m_imp->gcd_simplify(p, t);
     }
 
     polynomial * manager::coeff(polynomial const * p, var x, unsigned k) {
@@ -7228,13 +7402,33 @@ namespace polynomial {
         return m_imp->is_nonneg(p);
     }
 
+    bool manager::ge(polynomial const* p, polynomial const* q) {
+        return m_imp->ge(p, q);
+    }
+
+
     void manager::rename(unsigned sz, var const * xs) {
         return m_imp->rename(sz, xs);
     }
 
     void manager::vars(polynomial const * p, var_vector & xs) {
+        xs.reset();
+        m_imp->begin_vars_incremental();
+        m_imp->vars(p, xs);
+        m_imp->end_vars_incremental(xs);
+    }
+
+    void manager::vars_incremental(polynomial const * p, var_vector & xs) {
         m_imp->vars(p, xs);
     }
+    void manager::begin_vars_incremental() {
+        m_imp->begin_vars_incremental();
+    }
+    
+    void manager::end_vars_incremental(var_vector & xs) {
+        m_imp->end_vars_incremental(xs);        
+    }
+
 
     polynomial * manager::substitute(polynomial const * p, var2mpq const & x2v) {
         return m_imp->substitute(p, x2v);
@@ -7293,17 +7487,20 @@ namespace polynomial {
         return m_imp->eval(p, x2v, r);
     }
 
-    void manager::display(std::ostream & out, monomial const * m, display_var_proc const & proc, bool user_star) const {
+    std::ostream& manager::display(std::ostream & out, monomial const * m, display_var_proc const & proc, bool user_star) const {
         m->display(out, proc, user_star);
+        return out;
     }
 
-    void manager::display(std::ostream & out, polynomial const * p, display_var_proc const & proc, bool use_star) const {
+    std::ostream& manager::display(std::ostream & out, polynomial const * p, display_var_proc const & proc, bool use_star) const {
         SASSERT(m_imp->consistent_coeffs(p));
         p->display(out, m_imp->m_manager, proc, use_star);
+        return out;
     }
 
-    void manager::display_smt2(std::ostream & out, polynomial const * p, display_var_proc const & proc) const {
+    std::ostream& manager::display_smt2(std::ostream & out, polynomial const * p, display_var_proc const & proc) const {
         p->display_smt2(out, m_imp->m_manager, proc);
+        return out;
     }
 };
 

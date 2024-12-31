@@ -314,6 +314,26 @@ def test_fpmath(cc):
         FPMATH_FLAGS=""
         return "UNKNOWN"
 
+def test_atomic_required(cc):
+    t = TempFile('tstatomic.cpp')
+    t.add("""
+    #include <atomic>
+    std::atomic<int> x;
+    std::atomic<short> y;
+    std::atomic<char> z;
+    std::atomic<long long> w;
+    int main() {
+        ++z;
+        ++y;
+        ++w;
+        return ++x;
+    }
+    """)
+    t.commit()
+    fails_without = exec_compiler_cmd([cc, CPPFLAGS, '', 'tstatomic.cpp', LDFLAGS, '']) != 0
+    ok_with = exec_compiler_cmd([cc, CPPFLAGS, '', 'tstatomic.cpp', LDFLAGS + ' -latomic', '']) == 0
+    return fails_without and ok_with
+
 
 def find_jni_h(path):
     for root, dirs, files in os.walk(path):
@@ -555,19 +575,19 @@ def set_version(major, minor, build, revision):
             print("Set Assembly Version (BUILD):", VER_MAJOR, VER_MINOR, VER_BUILD, VER_TWEAK)
             return
 
-    # use parameters to set up version if not provided by script args            
+    # use parameters to set up version if not provided by script args
     VER_MAJOR = major
     VER_MINOR = minor
     VER_BUILD = build
     VER_TWEAK = revision
 
-    # update VER_TWEAK base on github     
+    # update VER_TWEAK base on github
     if GIT_DESCRIBE:
         branch = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
         VER_TWEAK = int(check_output(['git', 'rev-list', '--count', 'HEAD']))
-    
+
     print("Set Assembly Version (DEFAULT):", VER_MAJOR, VER_MINOR, VER_BUILD, VER_TWEAK)
-    
+
 def get_version():
     return (VER_MAJOR, VER_MINOR, VER_BUILD, VER_TWEAK)
 
@@ -1858,7 +1878,7 @@ class JavaDLLComponent(Component):
                           os.path.join('api', 'java', 'Native'))
             elif IS_OSX and IS_ARCH_ARM64:
                 out.write('\t$(SLINK) $(SLINK_OUT_FLAG)libz3java$(SO_EXT) $(SLINK_FLAGS) -arch arm64 %s$(OBJ_EXT) libz3$(SO_EXT)\n' %
-                          os.path.join('api', 'java', 'Native'))                
+                          os.path.join('api', 'java', 'Native'))
             else:
                 out.write('\t$(SLINK) $(SLINK_OUT_FLAG)libz3java$(SO_EXT) $(SLINK_FLAGS) %s$(OBJ_EXT) libz3$(SO_EXT)\n' %
                           os.path.join('api', 'java', 'Native'))
@@ -1987,11 +2007,11 @@ class MLComponent(Component):
             src_dir = self.to_src_dir
             mk_dir(os.path.join(BUILD_DIR, self.sub_dir))
             api_src = get_component(API_COMPONENT).to_src_dir
-            # remove /GL and -std=c++17; the ocaml tools don't like them.
+            # remove /GL and -std=c++20; the ocaml tools don't like them.
             if IS_WINDOWS:
                 out.write('CXXFLAGS_OCAML=$(CXXFLAGS:/GL=)\n')
             else:
-                out.write('CXXFLAGS_OCAML=$(subst -std=c++17,,$(CXXFLAGS))\n')
+                out.write('CXXFLAGS_OCAML=$(subst -std=c++20,,$(CXXFLAGS))\n')
 
             substitutions = { 'VERSION': "{}.{}.{}.{}".format(VER_MAJOR, VER_MINOR, VER_BUILD, VER_TWEAK) }
 
@@ -2480,7 +2500,7 @@ def mk_config():
     config = open(os.path.join(BUILD_DIR, 'config.mk'), 'w')
     global CXX, CC, GMP, GUARD_CF, STATIC_BIN, GIT_HASH, CPPFLAGS, CXXFLAGS, LDFLAGS, EXAMP_DEBUG_FLAG, FPMATH_FLAGS, LOG_SYNC, SINGLE_THREADED, IS_ARCH_ARM64
     if IS_WINDOWS:
-        CXXFLAGS = '/nologo /Zi /D WIN32 /D _WINDOWS /EHsc /GS /Gd /std:c++17'
+        CXXFLAGS = '/nologo /Zi /D WIN32 /D _WINDOWS /EHsc /GS /Gd /std:c++20 -D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR'
         config.write(
             'CC=cl\n'
             'CXX=cl\n'
@@ -2596,10 +2616,13 @@ def mk_config():
             CPPFLAGS = '%s -D_MP_INTERNAL' % CPPFLAGS
         if GIT_HASH:
             CPPFLAGS = '%s -DZ3GITHASH=%s' % (CPPFLAGS, GIT_HASH)
-        CXXFLAGS = '%s -std=c++17' % CXXFLAGS
+        CXXFLAGS = '%s -std=c++20' % CXXFLAGS
         CXXFLAGS = '%s -fvisibility=hidden -fvisibility-inlines-hidden -c' % CXXFLAGS
         FPMATH = test_fpmath(CXX)
         CXXFLAGS = '%s %s' % (CXXFLAGS, FPMATH_FLAGS)
+        atomic_required = test_atomic_required(CXX)
+        if atomic_required:
+            LDFLAGS  = '%s -latomic' % LDFLAGS
         if LOG_SYNC:
             CXXFLAGS = '%s -DZ3_LOG_SYNC' % CXXFLAGS
         if SINGLE_THREADED:
@@ -2676,7 +2699,7 @@ def mk_config():
         config.write('CC=%s\n' % CC)
         config.write('CXX=%s\n' % CXX)
         config.write('CXXFLAGS=%s %s\n' % (CPPFLAGS, CXXFLAGS))
-        config.write('CFLAGS=%s %s\n' % (CPPFLAGS, CXXFLAGS.replace('-std=c++17', '')))
+        config.write('CFLAGS=%s %s\n' % (CPPFLAGS, CXXFLAGS.replace('-std=c++20', '')))
         config.write('EXAMP_DEBUG_FLAG=%s\n' % EXAMP_DEBUG_FLAG)
         config.write('CXX_OUT_FLAG=-o \n')
         config.write('C_OUT_FLAG=-o \n')
@@ -2710,6 +2733,7 @@ def mk_config():
             print('Prefix:         %s' % PREFIX)
             print('64-bit:         %s' % is64())
             print('FP math:        %s' % FPMATH)
+            print('libatomic:      %s' % ('required' if atomic_required else 'not required'))
             print("Python pkg dir: %s" % PYTHON_PACKAGE_DIR)
             if GPROF:
                 print('gprof:          enabled')
@@ -2854,7 +2878,7 @@ def update_version():
     revision = VER_TWEAK
 
     print("UpdateVersion:", get_full_version_string(major, minor, build, revision))
-    
+
     if major is None or minor is None or build is None or revision is None:
         raise MKException("set_version(major, minor, build, revision) must be used before invoking update_version()")
     if not ONLY_MAKEFILES:
@@ -3068,7 +3092,7 @@ def mk_bindings(api_files):
           z3py_output_dir=get_z3py_dir(),
           dotnet_output_dir=dotnet_output_dir,
           java_input_dir=java_input_dir,
-          java_output_dir=java_output_dir,                                  
+          java_output_dir=java_output_dir,
           java_package_name=java_package_name,
           ml_output_dir=ml_output_dir,
           ml_src_dir=ml_output_dir

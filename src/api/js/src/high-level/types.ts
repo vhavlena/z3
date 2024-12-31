@@ -37,6 +37,7 @@ export type AnyExpr<Name extends string = 'main'> =
 export type AnyAst<Name extends string = 'main'> = AnyExpr<Name> | AnySort<Name> | FuncDecl<Name>;
 
 /** @hidden */
+// prettier-ignore
 export type SortToExprMap<S extends AnySort<Name>, Name extends string = 'main'> = S extends BoolSort
   ? Bool<Name>
   : S extends ArithSort<Name>
@@ -50,6 +51,7 @@ export type SortToExprMap<S extends AnySort<Name>, Name extends string = 'main'>
   : never;
 
 /** @hidden */
+// prettier-ignore
 export type CoercibleFromMap<S extends CoercibleToExpr<Name>, Name extends string = 'main'> = S extends bigint
   ? Arith<Name>
   : S extends number | CoercibleRational
@@ -69,12 +71,13 @@ export type CoercibleToBitVec<Bits extends number = number, Name extends string 
 export type CoercibleRational = { numerator: bigint | number; denominator: bigint | number };
 
 /** @hidden */
-export type CoercibleToExpr<Name extends string = 'main'> = number | bigint | boolean | CoercibleRational | Expr<Name>;
+export type CoercibleToExpr<Name extends string = 'main'> = number | string | bigint | boolean | CoercibleRational | Expr<Name>;
 
 /** @hidden */
 export type CoercibleToArith<Name extends string = 'main'> = number | string | bigint | CoercibleRational | Arith<Name>;
 
 /** @hidden */
+// prettier-ignore
 export type CoercibleToMap<T extends AnyExpr<Name>, Name extends string = 'main'> = T extends Bool<Name>
   ? boolean | Bool<Name>
   : T extends IntNum<Name>
@@ -357,6 +360,8 @@ export interface Context<Name extends string = 'main'> {
   readonly BitVec: BitVecCreation<Name>;
   /** @category Expressions */
   readonly Array: SMTArrayCreation<Name>;
+  /** @category Expressions */
+  readonly Set: SMTSetCreation<Name>;
 
   ////////////////
   // Operations //
@@ -428,6 +433,15 @@ export interface Context<Name extends string = 'main'> {
 
   /** @category Operations */
   Or(...args: Probe<Name>[]): Probe<Name>;
+
+  /** @category Operations */
+  PbEq(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name>;
+
+  /** @category Operations */
+  PbGe(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name>;
+
+  /** @category Operations */
+  PbLe(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name>;
 
   // Quantifiers
 
@@ -602,6 +616,39 @@ export interface Context<Name extends string = 'main'> {
   substitute(t: Expr<Name>, ...substitutions: [Expr<Name>, Expr<Name>][]): Expr<Name>;
 
   simplify(expr: Expr<Name>): Promise<Expr<Name>>;
+  
+  /** @category Operations */
+  SetUnion<ElemSort extends AnySort<Name>>(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort>;
+  
+  /** @category Operations */
+  SetIntersect<ElemSort extends AnySort<Name>>(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort>;
+  
+  /** @category Operations */
+  SetDifference<ElemSort extends AnySort<Name>>(a: SMTSet<Name, ElemSort>, b: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort>;
+  
+  /** @category Operations */
+  SetHasSize<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, size: bigint | number | string | IntNum<Name>): Bool<Name>;
+
+  /** @category Operations */
+  SetAdd<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort>;
+
+  /** @category Operations */
+  SetDel<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort>;
+
+  /** @category Operations */
+  SetComplement<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort>;
+  
+  /** @category Operations */
+  EmptySet<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort>;
+
+  /** @category Operations */
+  FullSet<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort>;
+  
+  /** @category Operations */
+  isMember<ElemSort extends AnySort<Name>>(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>, set: SMTSet<Name, ElemSort>): Bool<Name>;
+
+  /** @category Operations */
+  isSubset<ElemSort extends AnySort<Name>>(a: SMTSet<Name, ElemSort>, b: SMTSet<Name, ElemSort>): Bool<Name>;
 }
 
 export interface Ast<Name extends string = 'main', Ptr = unknown> {
@@ -663,6 +710,13 @@ export interface Solver<Name extends string = 'main'> {
   check(...exprs: (Bool<Name> | AstVector<Name, Bool<Name>>)[]): Promise<CheckSatResult>;
 
   model(): Model<Name>;
+
+  /**
+   * Manually decrease the reference count of the solver
+   * This is automatically done when the solver is garbage collected,
+   * but calling this eagerly can help release memory sooner.
+   */
+  release(): void;
 }
 
 export interface Optimize<Name extends string = 'main'> {
@@ -695,8 +749,14 @@ export interface Optimize<Name extends string = 'main'> {
   check(...exprs: (Bool<Name> | AstVector<Name, Bool<Name>>)[]): Promise<CheckSatResult>;
 
   model(): Model<Name>;
-}
 
+  /**
+   * Manually decrease the reference count of the optimize
+   * This is automatically done when the optimize is garbage collected,
+   * but calling this eagerly can help release memory sooner.
+   */
+  release(): void;
+}
 
 /** @hidden */
 export interface ModelCtor<Name extends string> {
@@ -746,6 +806,13 @@ export interface Model<Name extends string = 'main'> extends Iterable<FuncDecl<N
     decl: FuncDecl<Name, DomainSort, RangeSort>,
     defaultValue: CoercibleToMap<SortToExprMap<RangeSort, Name>, Name>,
   ): FuncInterp<Name>;
+
+  /**
+   * Manually decrease the reference count of the model
+   * This is automatically done when the model is garbage collected,
+   * but calling this eagerly can help release memory sooner.
+   */
+  release(): void;
 }
 
 /**
@@ -1540,10 +1607,59 @@ export interface SMTArray<
 }
 
 /**
+ * Set Implemented using Arrays
+ * 
+ * @typeParam ElemSort The sort of the element of the set
+ * @category Sets
+ */
+export type SMTSetSort<Name extends string = 'main', ElemSort extends AnySort<Name> = Sort<Name>> = SMTArraySort<Name, [ElemSort], BoolSort<Name>>;
+
+
+/** @category Sets*/
+export interface SMTSetCreation<Name extends string> {
+  sort<ElemSort extends AnySort<Name>>(elemSort: ElemSort): SMTSetSort<Name, ElemSort>;
+
+  const<ElemSort extends AnySort<Name>>(name: string, elemSort: ElemSort): SMTSet<Name, ElemSort>;
+
+  consts<ElemSort extends AnySort<Name>>(names: string | string[], elemSort: ElemSort): SMTSet<Name, ElemSort>[];
+  
+  empty<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort>;
+  
+  val<ElemSort extends AnySort<Name>>(values: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>[], sort: ElemSort): SMTSet<Name, ElemSort>;
+}
+
+/**
+ * Represents Set expression
+ *
+ * @typeParam ElemSort The sort of the element of the set
+ * @category Arrays
+ */
+export interface SMTSet<Name extends string = 'main', ElemSort extends AnySort<Name> = Sort<Name>>  extends Expr<Name, SMTSetSort<Name, ElemSort>, Z3_ast> {
+  readonly __typename: 'Array';
+  
+  elemSort(): ElemSort;
+
+  union(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort>;
+  intersect(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort>;
+  diff(b: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort>;
+  
+  hasSize(size: bigint | number | string | IntNum<Name>): Bool<Name>;
+
+  add(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort>;
+  del(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort>;
+  complement(): SMTSet<Name, ElemSort>;
+  
+  contains(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): Bool<Name>;
+  subsetOf(b: SMTSet<Name, ElemSort>): Bool<Name>;
+
+}
+
+/**
  * Defines the expression type of the body of a quantifier expression
  *
  * @category Quantifiers
  */
+// prettier-ignore
 export type BodyT<
   Name extends string = 'main',
   QVarSorts extends NonEmptySortArray<Name> = [Sort<Name>, ...Sort<Name>[]],

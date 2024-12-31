@@ -13,118 +13,118 @@ Author:
 
     Nikolaj Bjorner (nbjorner) 2024-02-21
 
+
 --*/
 
 #include "sat/smt/sls_solver.h"
 #include "sat/smt/euf_solver.h"
-
-
+#include "ast/sls/sls_context.h"
+#include "ast/for_each_expr.h"
 
 namespace sls {
 
-    solver::solver(euf::solver& ctx):
-        th_euf_solver(ctx, symbol("sls"), ctx.get_manager().mk_family_id("sls")) {}
+
+    solver::solver(euf::solver& ctx) :
+        th_euf_solver(ctx, symbol("sls"), ctx.get_manager().mk_family_id("sls"))
+    {}
+
+#ifdef SINGLE_THREAD
+
+#else
 
     solver::~solver() {
-        if (m_bvsls) {
-            m_bvsls->cancel();            
-            m_thread.join();
-        }
+        finalize();
     }
 
-    void solver::push_core() {
-        if (s().scope_lvl() == s().search_lvl() + 1)
-            init_local_search();
-    }
-    
-    void solver::pop_core(unsigned n) {
-        if (s().scope_lvl() - n <= s().search_lvl())
-            sample_local_search();
+    params_ref solver::get_params() {
+        return s().params();
     }
 
-    void solver::simplify() {
-    
+    void solver::set_value(expr* t, expr* v) {
+        ctx.user_propagate_initialize_value(t, v);
     }
+
+    void solver::force_phase(sat::literal lit) {
+        ctx.s().set_phase(lit);
+    }
+
+    void solver::set_has_new_best_phase(bool b) {
+
+    }
+
+    bool solver::get_best_phase(sat::bool_var v) {
+        return false;
+    }
+
+    expr* solver::bool_var2expr(sat::bool_var v) {
+        return ctx.bool_var2expr(v);
+    }
+
+    void solver::set_finished() {
+        ctx.s().set_canceled();
+    }
+
+    unsigned solver::get_num_bool_vars() const {
+        return s().num_vars();
+    }
+
+    void solver::finalize() {
+        if (!m_smt_plugin)
+            return;
         
+        m_smt_plugin->finalize(m_model, m_st);
+        m_model = nullptr;
+        m_smt_plugin = nullptr;
+    }
 
-    void solver::init_local_search() {
-        if (m_bvsls) {
-            m_bvsls->cancel();
-            m_thread.join();
-            if (m_result == l_true) {
-                verbose_stream() << "Found model using local search - INIT\n";
-                exit(1);
-            }
+    bool solver::unit_propagate() {
+        force_push();
+        if (m_smt_plugin && !m_checking) {
+            expr_ref_vector fmls(m);
+            m_checking = true;
+            m_smt_plugin->check(fmls, ctx.top_level_clauses());
+            return true;
         }
-        // set up state for local search solver here
-
-        m_m = alloc(ast_manager, m);
-        ast_translation tr(m, *m_m);
-        
-        m_completed = false;
-        m_result = l_undef;
-        m_bvsls = alloc(bv::sls, *m_m);
-        // walk clauses, add them
-        // walk trail stack until search level, add units
-        // encapsulate bvsls within the arguments of run-local-search.
-        // ensure bvsls does not touch ast-manager.
-
-        unsigned trail_sz = s().trail_size();
-        for (unsigned i = 0; i < trail_sz; ++i) {
-            auto lit = s().trail_literal(i);
-            if (s().lvl(lit) > s().search_lvl())
-                break;
-            expr_ref fml = literal2expr(lit);
-            m_bvsls->assert_expr(tr(fml.get()));
-        }
-        unsigned num_vars = s().num_vars();
-        for (unsigned i = 0; i < 2*num_vars; ++i) {
-            auto l1 = ~sat::to_literal(i);
-            auto const& wlist = s().get_wlist(l1);
-            for (sat::watched const& w : wlist) {
-                if (!w.is_binary_non_learned_clause())
-                    continue;
-                sat::literal l2 = w.get_literal();
-                if (l1.index() > l2.index())
-                    continue;
-                expr_ref fml(m.mk_or(literal2expr(l1), literal2expr(l2)), m);
-                m_bvsls->assert_expr(tr(fml.get()));
-            }
-        }
-        for (auto clause : s().clauses()) {
-            expr_ref_vector cls(m);
-            for (auto lit : *clause)
-                cls.push_back(literal2expr(lit));
-            expr_ref fml(m.mk_or(cls), m);
-            m_bvsls->assert_expr(tr(fml.get()));
-        }
-
-        // use phase assignment from literals?
-        std::function<bool(expr*, unsigned)> eval = [&](expr* e, unsigned r) {
+        if (!m_smt_plugin)
             return false;
-        };
-
-        m_bvsls->init();
-        m_bvsls->init_eval(eval);
-        m_bvsls->updt_params(s().params());
-
-        m_thread = std::thread([this]() { run_local_search(); });        
+        if (!m_smt_plugin->completed())
+            return false;
+        m_smt_plugin->finalize(m_model, m_st);
+        m_smt_plugin = nullptr;
+        return true;
     }
 
-    void solver::sample_local_search() {
-        if (m_completed) {
-            m_thread.join();
-            if (m_result == l_true) {
-                verbose_stream() << "Found model using local search\n";
-                exit(1);
+    void solver::pop_core(unsigned n) {
+        if (!m_smt_plugin)
+            return;
+
+        unsigned scope_lvl = s().scope_lvl();
+        if (s().search_lvl() == scope_lvl - n) {
+            for (; m_trail_lim < s().init_trail_size(); ++m_trail_lim) {
+                auto lit = s().trail_literal(m_trail_lim);
+                m_smt_plugin->add_unit(lit);
             }
         }
+#if 0
+        if (ctx.has_new_best_phase())
+            m_smt_plugin->import_phase_from_smt();
+
+#endif
+
+        m_smt_plugin->import_from_sls();
     }
 
-    void solver::run_local_search() {
-        lbool r = (*m_bvsls)();
-        m_result = r;
-        m_completed = true;
+    void solver::init_search() {
+        if (m_smt_plugin)
+            finalize();
+        m_smt_plugin = alloc(sls::smt_plugin, *this);
+        m_checking = false;
     }
 
+    std::ostream& solver::display(std::ostream& out) const {
+        return out << "theory-sls\n";
+    }
+     
+
+#endif
 }

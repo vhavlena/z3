@@ -203,6 +203,7 @@ public:
 
     bool is_urem_any(expr * e, expr * & dividend,  expr * & divisor);
     br_status mk_eq_core(expr * lhs, expr * rhs, expr_ref & result);
+    br_status mk_eq_bv2int(expr* lhs, expr* rhs, expr_ref& result);
     br_status mk_ite_core(expr * c, expr * t, expr * e, expr_ref & result);
     br_status mk_distinct(unsigned num_args, expr * const * args, expr_ref & result);
 
@@ -222,7 +223,7 @@ public:
 
 #define MK_BV_BINARY(OP)                         \
     expr_ref OP(expr* a, expr* b) {              \
-        expr_ref result(m);                    \
+        expr_ref result(m), _a(a, m), _b(b, m);  \
         if (BR_FAILED == OP(a, b, result))       \
             result = m_util.OP(a, b);            \
         return result;                           \
@@ -237,6 +238,7 @@ public:
 
     MK_BV_BINARY(mk_bv_urem);
     MK_BV_BINARY(mk_ule);
+    MK_BV_BINARY(mk_sle);
     MK_BV_BINARY(mk_bv_add);
     MK_BV_BINARY(mk_bv_mul);
     MK_BV_BINARY(mk_bv_sub);
@@ -247,6 +249,13 @@ public:
         if (BR_FAILED == mk_bv2int(a, result)) 
             result = m_util.mk_bv2int(a);
         return result;        
+    }
+
+    expr_ref mk_bv_neg(expr* a) {
+        expr_ref result(a, m);
+        if (BR_FAILED == mk_uminus(a, result))
+            result = m_util.mk_bv_neg(a);
+        return result;
     }
 
 

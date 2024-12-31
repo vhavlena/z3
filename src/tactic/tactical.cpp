@@ -30,6 +30,7 @@ class binary_tactical : public tactic {
 protected:
     tactic_ref      m_t1;
     tactic_ref      m_t2;
+    bool            m_clean = true;
     
 public:
 
@@ -61,8 +62,11 @@ public:
     }
         
     void cleanup() override {
+        if (m_clean)
+            return;
         m_t1->cleanup();
         m_t2->cleanup();
+        m_clean = true;
     }
     
     void reset() override {
@@ -103,7 +107,8 @@ public:
 
     char const* name() const override { return "and_then"; }
 
-    void operator()(goal_ref const & in, goal_ref_buffer& result) override { 
+    void operator()(goal_ref const & in, goal_ref_buffer& result) override {
+        m_clean = false;
 
         bool proofs_enabled = in->proofs_enabled();
         bool cores_enabled  = in->unsat_core_enabled();
@@ -211,6 +216,10 @@ public:
 
     void user_propagate_register_decide(user_propagator::decide_eh_t& decide_eh) override {
         m_t2->user_propagate_register_decide(decide_eh);
+    }
+
+    void user_propagate_initialize_value(expr* var, expr* value) override {
+        m_t2->user_propagate_initialize_value(var, value);
     }
 
 };
@@ -353,7 +362,7 @@ public:
                     throw;
                 }
                 catch (z3_exception& ex) {
-                    IF_VERBOSE(10, verbose_stream() << ex.msg() << " in or-else\n");
+                    IF_VERBOSE(10, verbose_stream() << ex.what() << " in or-else\n");
                     throw;
                 }
                 catch (const std::exception &ex) {
@@ -378,6 +387,12 @@ public:
     }
 
     tactic * translate(ast_manager & m) override { return translate_core<or_else_tactical>(m); }
+
+    void user_propagate_initialize_value(expr* var, expr* value) override {
+        for (auto t : m_ts)
+            t->user_propagate_initialize_value(var, value);
+    }
+
 };
 
 tactic * or_else(unsigned num, tactic * const * ts) {
@@ -429,20 +444,10 @@ tactic * or_else(tactic * t1, tactic * t2, tactic * t3, tactic * t4, tactic * t5
     return or_else(10, ts);
 }
 
-class no_par_tactical : public tactic {
-public:
-    char const* name() const override { return "par"; }
-    void operator()(goal_ref const & in, goal_ref_buffer& result) override {
-        throw default_exception("par_tactical is unavailable in single threaded mode");
-    }
-    tactic * translate(ast_manager & m) override { return nullptr; }
-    void cleanup() override {}
-};
-
 #ifdef SINGLE_THREAD
 
-tactic * par(unsigned num, tactic * const * ts) {
-    return alloc(no_par_tactical);
+tactic* par(unsigned num, tactic* const* ts) {
+    return alloc(or_else_tactical, num, ts);
 }
 
 #else
@@ -531,7 +536,7 @@ public:
             catch (tactic_exception & ex) {
                 if (i == 0) {
                     ex_kind = TACTIC_EX;
-                    ex_msg = ex.msg();
+                    ex_msg = ex.what();
                 }
             }
             catch (z3_error & err) {
@@ -543,7 +548,7 @@ public:
             catch (z3_exception & z3_ex) {
                 if (i == 0) {
                     ex_kind = DEFAULT_EX;
-                    ex_msg = z3_ex.msg();
+                    ex_msg = z3_ex.what();
                 }
             }
         };
@@ -591,21 +596,11 @@ tactic * par(tactic * t1, tactic * t2, tactic * t3, tactic * t4) {
     return par(4, ts);
 }
 
-class no_par_and_then_tactical : public tactic {
-public:
-    char const* name() const override { return "par_then"; }
-    void operator()(goal_ref const & in, goal_ref_buffer& result) override {
-        throw default_exception("par_and_then is not available in single threaded mode");
-    }
-    tactic * translate(ast_manager & m) override { return nullptr; }
-    void cleanup() override {}
-};
-
 
 #ifdef SINGLE_THREAD
 
 tactic * par_and_then(tactic * t1, tactic * t2) {
-    return alloc(no_par_and_then_tactical);
+    return alloc(and_then_tactical, t1, t2);
 }
 
 #else
@@ -688,7 +683,7 @@ public:
                             curr_failed = true;
                             failed      = true;
                             ex_kind     = TACTIC_EX;
-                            ex_msg      = ex.msg();
+                            ex_msg      = ex.what();
                         }
                     }
                 }
@@ -710,7 +705,7 @@ public:
                             curr_failed = true;
                             failed      = true;
                             ex_kind     = DEFAULT_EX;
-                            ex_msg      = z3_ex.msg();
+                            ex_msg      = z3_ex.what();
                         }
                     }
                 }
@@ -862,6 +857,7 @@ tactic * par_and_then(unsigned num, tactic * const * ts) {
 class unary_tactical : public tactic {
 protected:
     tactic_ref m_t;
+    bool m_clean = true;
 
 
 public:
@@ -870,11 +866,12 @@ public:
         SASSERT(t);  
     }
 
-    void operator()(goal_ref const & in, goal_ref_buffer& result) override { 
+    void operator()(goal_ref const & in, goal_ref_buffer& result) override {
+        m_clean = false;
         m_t->operator()(in, result);
     }
    
-    void cleanup(void) override { m_t->cleanup(); }
+    void cleanup(void) override { if (!m_clean) m_t->cleanup(); m_clean = true; }
     void collect_statistics(statistics & st) const override { m_t->collect_statistics(st); }
     void reset_statistics() override { m_t->reset_statistics(); }    
     void updt_params(params_ref const & p) override { m_t->updt_params(p); }
@@ -884,6 +881,7 @@ public:
     void set_progress_callback(progress_callback * callback) override { m_t->set_progress_callback(callback); }
     void user_propagate_register_expr(expr* e) override { m_t->user_propagate_register_expr(e); }
     void user_propagate_clear() override { m_t->user_propagate_clear(); }
+    void user_propagate_initialize_value(expr* var, expr* value) override { m_t->user_propagate_initialize_value(var, value); }
 
 protected:
 
@@ -1147,6 +1145,7 @@ public:
     char const* name() const override { return "cond"; }
     
     void operator()(goal_ref const & in, goal_ref_buffer & result) override {
+        m_clean = false;
         if (m_p->operator()(*(in.get())).is_true()) 
             m_t1->operator()(in, result);
         else
@@ -1157,6 +1156,11 @@ public:
         tactic * new_t1 = m_t1->translate(m);
         tactic * new_t2 = m_t2->translate(m);
         return alloc(cond_tactical, m_p.get(), new_t1, new_t2);
+    }
+
+    void user_propagate_initialize_value(expr* var, expr* value) override {
+        m_t1->user_propagate_initialize_value(var, value);
+        m_t2->user_propagate_initialize_value(var, value);
     }
 };
 

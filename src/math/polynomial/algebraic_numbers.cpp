@@ -121,9 +121,6 @@ namespace algebraic_numbers {
             m_y = pm().mk_var();
         }
 
-        ~imp() {
-        }
-
         bool acell_inv(algebraic_cell const& c) {
             auto s = upm().eval_sign_at(c.m_p_sz, c.m_p, lower(&c));
             return s == sign_zero || c.m_sign_lower == (s == sign_neg);
@@ -2594,25 +2591,28 @@ namespace algebraic_numbers {
 
         void int_lt(numeral const & a, numeral & b) {
             scoped_mpz v(qm());
+            if (!a.is_basic())
+                refine_until_prec(const_cast<numeral&>(a), 1);
             if (a.is_basic()) {
                 qm().floor(basic_value(a), v);
                 qm().dec(v);
             }
-            else {
-                bqm().floor(qm(), lower(a.to_algebraic()), v);
-            }
+            else                 
+                bqm().floor(qm(), lower(a.to_algebraic()), v);            
             m_wrapper.set(b, v);
         }
 
         void int_gt(numeral const & a, numeral & b) {
             scoped_mpz v(qm());
+            if (!a.is_basic()) 
+                refine_until_prec(const_cast<numeral&>(a), 1);
             if (a.is_basic()) {
                 qm().ceil(basic_value(a), v);
                 qm().inc(v);
             }
-            else {
+            else                
                 bqm().ceil(qm(), upper(a.to_algebraic()), v);
-            }
+            
             m_wrapper.set(b, v);
         }
 

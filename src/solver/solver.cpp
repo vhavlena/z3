@@ -95,7 +95,7 @@ lbool solver::get_consequences(expr_ref_vector const& asms, expr_ref_vector cons
             return l_undef;
         }
         else {
-            set_reason_unknown(ex.msg());
+            set_reason_unknown(ex.what());
         }
         throw;
     }
@@ -317,10 +317,9 @@ lbool solver::check_sat(unsigned num_assumptions, expr * const * assumptions) {
     try {
         r = check_sat_core(num_assumptions, assumptions);
     }
-    catch (...) {
-        if (!get_manager().limit().inc(0)) {
-            dump_state(num_assumptions, assumptions);
-        }
+    catch (std::exception& ex) {
+        if (reason_unknown() == "")
+            set_reason_unknown(ex.what());
         throw;
     }
     if (r == l_undef && !get_manager().inc()) {

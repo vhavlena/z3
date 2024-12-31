@@ -1,8 +1,6 @@
 name: Publish Docker image
 
 on:
-  schedule:
-    - cron: "0 1 * * 0" # every Sunday at 1 am
   workflow_dispatch: # on button click
 
 permissions:
@@ -41,7 +39,7 @@ jobs:
             type=edge
             type=sha,prefix=ubuntu-20.04-bare-z3-sha-
       - name: Build and push Bare Z3 Docker Image
-        uses: docker/build-push-action@v5.1.0
+        uses: docker/build-push-action@v6.10.0
         with:  
           context: .
           push: true

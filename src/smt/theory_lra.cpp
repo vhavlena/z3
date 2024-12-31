@@ -154,6 +154,7 @@ class theory_lra::imp {
     svector<delayed_atom>  m_asserted_atoms;        
     ptr_vector<expr>       m_not_handled;
     ptr_vector<app>        m_underspecified;
+    ptr_vector<app>        m_bv_terms;
     vector<ptr_vector<api_bound> > m_use_list;        // bounds where variables are used.
 
     // attributes for incremental version:
@@ -469,6 +470,13 @@ class theory_lra::imp {
                     if (!ctx().relevancy()) mk_power_axiom(n, n1, n2);
                     st.to_ensure_var().push_back(n1);
                     st.to_ensure_var().push_back(n2);
+                }
+                else if (a.is_band(n) || a.is_shl(n) || a.is_ashr(n) || a.is_lshr(n)) {
+                    m_bv_terms.push_back(to_app(n));
+                    ctx().push_trail(push_back_vector(m_bv_terms));
+                    mk_bv_axiom(to_app(n));
+                    for (expr* arg : *to_app(n))
+                        st.to_ensure_var().push_back(arg);                    
                 }
                 else if (!a.is_div0(n)) {
                     found_unsupported(n);
@@ -989,6 +997,15 @@ public:
             return l_undef;
         }
         return lp().compare_values(vi, k, b->get_value()) ? l_true : l_false;
+    }
+
+    void initialize_value(expr* var, expr* value) {
+        rational r;
+        if (!a.is_numeral(value, r)) {
+            IF_VERBOSE(5, verbose_stream() << "numeric constant expected in initialization " << mk_pp(var, m) << " := " << mk_pp(value, m) << "\n");
+            return;
+        }
+        lp().move_lpvar_to_value(get_lpvar(var), r);
     }
 
     void new_eq_eh(theory_var v1, theory_var v2) {
@@ -1563,7 +1580,7 @@ public:
     }
 
     final_check_status eval_power(expr* e) {
-        expr* x, * y;
+        expr* x = nullptr, * y = nullptr;
         rational r;
         VERIFY(a.is_power(e, x, y));
         if (a.is_numeral(x, r) && r == 0 && a.is_numeral(y, r) && r == 0)
@@ -1602,6 +1619,7 @@ public:
         if (!lp().is_feasible() || lp().has_changed_columns()) 
             is_sat = make_feasible();
         final_check_status st = FC_DONE;
+        bool int_undef = false;
         switch (is_sat) {
         case l_true:
             TRACE("arith", display(tout));            
@@ -1612,6 +1630,7 @@ public:
             case FC_CONTINUE:
                 return FC_CONTINUE;
             case FC_GIVEUP:
+                int_undef = true;
                 TRACE("arith", tout << "check-lia giveup\n";);
                 if (ctx().get_fparams().m_arith_ignore_int)
                     st = FC_CONTINUE;
@@ -1633,6 +1652,9 @@ public:
                 ++m_stats.m_assume_eqs;
                 return FC_CONTINUE;
             }
+
+            if (!int_undef && !check_bv_terms())
+                return FC_CONTINUE;
             
             for (expr* e : m_not_handled) {
                 if (!ctx().is_relevant(e))
@@ -2432,6 +2454,180 @@ public:
 
         return null_literal;
     }
+
+    bool check_bv_terms() {
+        for (app* n : m_bv_terms) {
+            if (!check_bv_term(n)) {
+                ++m_stats.m_bv_axioms;
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+    bool check_bv_term(app* n) {
+        unsigned sz = 0;
+        expr* _x = nullptr, * _y = nullptr;
+        if (!ctx().is_relevant(ctx().get_enode(n)))
+            return true;
+        expr_ref vx(m), vy(m),vn(m);
+        rational valn, valx, valy;
+        bool is_int;
+        VERIFY(a.is_band(n, sz, _x, _y) || a.is_shl(n, sz, _x, _y) || a.is_ashr(n, sz, _x, _y) || a.is_lshr(n, sz, _x, _y));
+        if (!get_value(ctx().get_enode(_x), vx) || !get_value(ctx().get_enode(_y), vy) || !get_value(ctx().get_enode(n), vn)) {
+            IF_VERBOSE(2, verbose_stream() << "could not get value of " << mk_pp(n, m) << "\n");
+            found_unsupported(n);
+            return true;
+        }
+        if (!a.is_numeral(vn, valn, is_int) || !is_int || !a.is_numeral(vx, valx, is_int) || !is_int || !a.is_numeral(vy, valy, is_int) || !is_int) {
+            IF_VERBOSE(2, verbose_stream() << "could not get value of " << mk_pp(n, m) << "\n");
+            found_unsupported(n);
+            return true;
+        }
+        rational N = rational::power_of_two(sz);
+        valx = mod(valx, N);
+        valy = mod(valy, N);
+        expr_ref x(a.mk_mod(_x, a.mk_int(N)), m);
+        expr_ref y(a.mk_mod(_y, a.mk_int(N)), m);
+        SASSERT(0 <= valn && valn < N);
+        
+        // x mod 2^{i + 1} >= 2^i means the i'th bit is 1.
+        auto bitof = [&](expr* x, unsigned i) { 
+            expr_ref r(m);
+            r = a.mk_ge(a.mk_mod(x, a.mk_int(rational::power_of_two(i+1))), a.mk_int(rational::power_of_two(i)));
+            return mk_literal(r);
+        };
+
+        if (a.is_band(n)) {
+            IF_VERBOSE(2, verbose_stream() << "band: " << mk_bounded_pp(n, m) << " " << valn << " := " << valx << "&" << valy << "\n");
+            for (unsigned i = 0; i < sz; ++i) {
+                bool xb = valx.get_bit(i);
+                bool yb = valy.get_bit(i);
+                bool nb = valn.get_bit(i);
+                if (xb && yb && !nb)
+                    ctx().mk_th_axiom(get_id(), ~bitof(x, i), ~bitof(y, i), bitof(n, i));
+                else if (nb && !xb)
+                    ctx().mk_th_axiom(get_id(), ~bitof(n, i), bitof(x, i));
+                else if (nb && !yb)
+                    ctx().mk_th_axiom(get_id(), ~bitof(n, i), bitof(y, i));
+                else
+                    continue;
+                return false;
+            }
+        }
+        if (a.is_shl(n)) {
+            SASSERT(valy >= 0);
+            if (valy >= sz || valy == 0)
+                return true;
+            unsigned k = valy.get_unsigned();
+            sat::literal eq = th.mk_eq(n, a.mk_mod(a.mk_mul(_x, a.mk_int(rational::power_of_two(k))), a.mk_int(N)), false);
+            if (ctx().get_assignment(eq) == l_true)
+                return true;            
+            ctx().mk_th_axiom(get_id(), ~th.mk_eq(y, a.mk_int(k), false), eq);
+            IF_VERBOSE(2, verbose_stream() << "shl: " << mk_bounded_pp(n, m) << " " << valn << " := " << valx << " << " << valy << "\n");
+            return false;
+        }
+        if (a.is_lshr(n)) {
+            SASSERT(valy >= 0);
+            if (valy >= sz || valy == 0)
+                return true;
+            unsigned k = valy.get_unsigned();
+            sat::literal eq = th.mk_eq(n, a.mk_idiv(x, a.mk_int(rational::power_of_two(k))), false);
+            if (ctx().get_assignment(eq) == l_true)
+                return true;            
+            ctx().mk_th_axiom(get_id(), ~th.mk_eq(y, a.mk_int(k), false), eq);
+            IF_VERBOSE(2, verbose_stream() << "lshr: " << mk_bounded_pp(n, m) << " " << valn << " := " << valx << " >>l " << valy << "\n");
+            return false;
+        }
+        if (a.is_ashr(n)) {
+            SASSERT(valy >= 0);
+            if (valy >= sz || valy == 0)
+                return true;
+            unsigned k = valy.get_unsigned();
+            sat::literal signx = mk_literal(a.mk_ge(x, a.mk_int(N/2)));
+            sat::literal eq;
+            expr* xdiv2k;
+            switch (ctx().get_assignment(signx)) {
+            case l_true:
+                // x < 0 & y = k -> n = (x div 2^k - 2^{N-k}) mod 2^N
+                xdiv2k = a.mk_idiv(x, a.mk_int(rational::power_of_two(k)));
+                eq = th.mk_eq(n, a.mk_mod(a.mk_add(xdiv2k, a.mk_int(-rational::power_of_two(sz - k))), a.mk_int(N)), false);
+                if (ctx().get_assignment(eq) == l_true)
+                    return true;
+                break;
+            case l_false:
+                // x >= 0 & y = k -> n = x div 2^k
+                xdiv2k = a.mk_idiv(x, a.mk_int(rational::power_of_two(k)));
+                eq = th.mk_eq(n, xdiv2k, false);
+                if (ctx().get_assignment(eq) == l_true)
+                    return true;
+                break;
+            case l_undef:
+                ctx().mark_as_relevant(signx);
+                return false;
+            }
+            ctx().mk_th_axiom(get_id(), ~th.mk_eq(y, a.mk_int(k), false), ~signx, eq); 
+            return false;
+        }
+        return true;
+    }
+
+    expr_ref mk_le(expr* x, expr* y) {
+        if (a.is_numeral(y))
+            return expr_ref(a.mk_le(x, y), m);
+        if (a.is_numeral(x))
+            return expr_ref(a.mk_ge(y, x), m);
+        return expr_ref(a.mk_le(a.mk_sub(x, y), a.mk_numeral(rational(0), x->get_sort())), m);
+    }
+
+    void mk_bv_axiom(app* n) {
+        unsigned sz = 0;
+        expr* _x = nullptr, * _y = nullptr;
+        VERIFY(a.is_band(n, sz, _x, _y) || a.is_shl(n, sz, _x, _y) || a.is_ashr(n, sz, _x, _y) || a.is_lshr(n, sz, _x, _y));
+        rational N = rational::power_of_two(sz);
+        expr_ref x(a.mk_mod(_x, a.mk_int(N)), m);
+        expr_ref y(a.mk_mod(_y, a.mk_int(N)), m);
+
+        // 0 <= n < 2^sz
+        
+        ctx().mk_th_axiom(get_id(), mk_literal(a.mk_ge(n, a.mk_int(0))));
+        ctx().mk_th_axiom(get_id(), mk_literal(a.mk_le(n, a.mk_int(N - 1))));
+
+        if (a.is_band(n)) {
+                       
+            // x&y <= x
+            // x&y <= y
+            // TODO? x = y => x&y = x
+
+            ctx().mk_th_axiom(get_id(), mk_literal(mk_le(n, x)));
+            ctx().mk_th_axiom(get_id(), mk_literal(mk_le(n, y)));
+        }
+        else if (a.is_shl(n)) {
+            // y >= sz => n = 0
+            // y = 0 => n = x
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_ge(y, a.mk_int(sz))), mk_literal(m.mk_eq(n, a.mk_int(0))));
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_eq(y, a.mk_int(0))), mk_literal(m.mk_eq(n, x)));
+        }
+        else if (a.is_lshr(n)) {
+            // y >= sz => n = 0
+            // y = 0 => n = x
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_ge(y, a.mk_int(sz))), mk_literal(m.mk_eq(n, a.mk_int(0))));
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_eq(y, a.mk_int(0))), mk_literal(m.mk_eq(n, x)));
+        }
+        else if (a.is_ashr(n)) {
+            // y >= sz & x < 2^{sz-1} => n = 0
+            // y >= sz & x >= 2^{sz-1} => n = -1
+            // y = 0 => n = x
+            auto signx = mk_literal(a.mk_ge(x, a.mk_int(N/2)));
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_ge(a.mk_mod(y, a.mk_int(N)), a.mk_int(sz))), signx, mk_literal(m.mk_eq(n, a.mk_int(0))));
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_ge(a.mk_mod(y, a.mk_int(N)), a.mk_int(sz))), ~signx, mk_literal(m.mk_eq(n, a.mk_int(N-1))));
+            ctx().mk_th_axiom(get_id(), ~mk_literal(a.mk_eq(a.mk_mod(y, a.mk_int(N)), a.mk_int(0))), mk_literal(m.mk_eq(n, x)));            
+        }
+        else
+            UNREACHABLE();
+    }
+
 
     void mk_bound_axioms(api_bound& b) {
         if (!ctx().is_searching()) {
@@ -3245,7 +3441,7 @@ public:
               tout << "@" << ctx().get_scope_level() << (is_conflict ? " conflict":" lemma");
               for (auto const& p : m_params) tout << " " << p;
               tout << "\n";
-              display_evidence(tout, m_explanation););
+              display_evidence(tout << core << " ", m_explanation););
         for (auto ev : m_explanation) 
             set_evidence(ev.ci(), m_core, m_eqs);
 
@@ -3267,6 +3463,8 @@ public:
             for (literal & c : m_core) {
                 c.neg();
                 ctx().mark_as_relevant(c);
+                if (ctx().get_assignment(c) == l_true)
+                    return;
             }
             TRACE("arith", ctx().display_literals_verbose(tout, m_core) << "\n";);
             ctx().mk_th_axiom(get_id(), m_core.size(), m_core.data());
@@ -3429,7 +3627,33 @@ public:
         lpvar vi = get_lpvar(v);
         u_dependency* dep = nullptr;
         return lp().has_upper_bound(vi, dep, val, is_strict);
+    }
 
+    bool solve_for(enode* n, expr_ref& term) {
+        theory_var v = n->get_th_var(get_id());
+        if (!is_registered_var(v))
+            return false;
+        lpvar vi = get_lpvar(v);
+        lp::lar_term t;
+        rational coeff;
+        if (!lp().solve_for(vi, t, coeff))
+            return false;
+        rational lc(1);
+        if (is_int(v)) {
+            lc = denominator(coeff);
+            for (auto const& cv : t)
+                lc = lcm(denominator(cv.coeff()), lc);
+            if (lc != 1) {
+                coeff *= lc;
+                t *= lc;
+            }
+        }
+        term = mk_term(t, is_int(v));
+        if (coeff != 0)
+            term = a.mk_add(a.mk_numeral(coeff, is_int(v)), term);
+        if (lc != 1)
+            term = a.mk_idiv(term, a.mk_numeral(lc, true));
+        return true;
     }
 
     bool get_upper(enode* n, expr_ref& r) {
@@ -3486,10 +3710,8 @@ public:
 
     bool validate_eq(enode* x, enode* y) {
         static bool s_validating = false;
-        static unsigned s_count = 0;
         if (s_validating)
             return true;
-        ++s_count;
         flet<bool> _svalid(s_validating, true);
         context nctx(m, ctx().get_fparams(), ctx().get_params());
         add_background(nctx);
@@ -3797,19 +4019,10 @@ public:
      * Facility to put a small box around integer variables used in branch and bounds.
      */
 
-    struct bound_info {
-        rational m_offset;
-        unsigned m_range;
-        bound_info() {}
-        bound_info(rational const& o, unsigned r):m_offset(o), m_range(r) {}
-    };
     unsigned                  m_bounded_range_idx;  // current size of bounded range.
     literal                   m_bounded_range_lit;  // current bounded range literal
     expr_ref_vector           m_bound_terms; // predicates used for bounds
     expr_ref                  m_bound_predicate;
-    
-    obj_map<expr, expr*>      m_predicate2term;
-    obj_map<expr, bound_info> m_term2bound_info;
 
     unsigned init_range() const { return 5; }
     unsigned max_range() const { return 20; }
@@ -3819,8 +4032,6 @@ public:
         m_bounded_range_lit = null_literal;
         m_bound_terms.reset();
         m_bound_predicate = nullptr;
-        m_predicate2term.reset();
-        m_term2bound_info.reset();
     }
 
 
@@ -3878,6 +4089,9 @@ void theory_lra::assign_eh(bool_var v, bool is_true) {
 lbool theory_lra::get_phase(bool_var v) {
     return m_imp->get_phase(v);
 }
+void theory_lra::initialize_value(expr* var, expr* value) {
+    m_imp->initialize_value(var, value);
+}
 void theory_lra::new_eq_eh(theory_var v1, theory_var v2) {
     m_imp->new_eq_eh(v1, v2);
 }
@@ -3912,7 +4126,7 @@ final_check_status theory_lra::final_check_eh() {
 }
 bool theory_lra::is_shared(theory_var v) const {
     return m_imp->is_shared(v);
-}
+}    
 bool theory_lra::can_propagate() {
     return m_imp->can_propagate();
 }
@@ -3952,6 +4166,10 @@ bool theory_lra::get_lower(enode* n, rational& r, bool& is_strict) {
 bool theory_lra::get_upper(enode* n, rational& r, bool& is_strict) {
     return m_imp->get_upper(n, r, is_strict);
 }
+bool theory_lra::solve_for(enode* n, expr_ref& r) {
+    return m_imp->solve_for(n, r);
+}
+
 void theory_lra::display(std::ostream & out) const {
     m_imp->display(out);
 }

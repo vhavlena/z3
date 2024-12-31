@@ -946,6 +946,17 @@ void seq_util::str::get_concat(expr* e, expr_ref_vector& es) const {
     }
 }
 
+void seq_util::str::get_concat(expr* e, ptr_vector<expr>& es) const {
+    expr* e1, * e2;
+    while (is_concat(e, e1, e2)) {
+        get_concat(e1, es);
+        e = e2;
+    }
+    if (!is_empty(e)) {
+        es.push_back(e);
+    }
+}
+
 /*
 Returns true if s is an expression of the form (l = |u|) |u|-k or (-k)+|u| or |u|+(-k).
 Also returns true and assigns k=0 and l=s if s is |u|.
@@ -1165,11 +1176,13 @@ expr* seq_util::rex::mk_loop_proper(expr* r, unsigned lo, unsigned hi)
         // avoid creating a loop with both bounds 0
         // such an expression is invalid as a loop
         // it is BY DEFINITION = epsilon
-        return mk_epsilon(seq_sort);
+        r = mk_epsilon(seq_sort);
+        return r;
     }
-    if (lo == 1 && hi == 1)
+    if (lo == 1 && hi == 1) {
         // do not create a loop unless it actually is a loop
         return r;
+    }
     parameter params[2] = { parameter(lo), parameter(hi) };
     return m.mk_app(m_fid, OP_RE_LOOP, 2, params, 1, &r);
 }
