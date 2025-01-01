@@ -170,10 +170,8 @@ endif()
 # target_include_directories(libz3 PRIVATE ${PROJECT_SOURCE_DIR}/extern/lib/mata/include)
 # target_link_libraries(libz3 PRIVATE libmata)
 
-if (NOT EMSCRIPTEN)
-  find_library(LIBMATA mata)
-  target_link_libraries(libz3 PRIVATE ${LIBMATA})
-endif()
+find_library(LIBMATA mata)
+target_link_libraries(libz3 PRIVATE ${LIBMATA})
 
 # This is currently only for the OpenMP flags. It needs to be set
 # via `target_link_libraries()` rather than `z3_append_linker_flag_list_to_target()`
