@@ -39,11 +39,11 @@ Detailed instruction for binding building for Z3-Noodler:
     npm run build:wasm
     ```
 6) You can add dependency to this binding by adding the following to your `package.json` file:
-```
-"dependencies": {
-    "z3-solver": "file:PATH/TO/THIS/DIRECTORY"
-}
-```
+    ```
+    "dependencies": {
+        "z3-solver": "file:PATH/TO/THIS/DIRECTORY"
+    }
+    ```
 
 ### Build on your own
 
