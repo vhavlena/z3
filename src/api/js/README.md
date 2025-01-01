@@ -41,7 +41,7 @@ Detailed instruction for binding building for Z3-Noodler:
 6) You can add dependency to this binding by adding the following to your `package.json` file:
 ```
 "dependencies": {
-    "z3-solver": "file: PATH/TO/THIS/DIRECTORY"
+    "z3-solver": "file:PATH/TO/THIS/DIRECTORY"
 }
 ```
 
