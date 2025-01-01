@@ -4587,11 +4587,11 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
         return BR_REWRITE_FULL;
     }
     expr* c = nullptr, *d = nullptr, *e = nullptr;
-    if (re().is_concat(b, c, d) && re().is_to_re(c, e) && re().is_full_seq(d)) {
+    if (false && re().is_concat(b, c, d) && re().is_to_re(c, e) && re().is_full_seq(d)) { // FIXME: NOODLER replacing regexes to prefix is not beneficial for noodler
         result = str().mk_prefix(e, a);
         return BR_REWRITE1;
     }
-    if (re().is_concat(b, c, d) && re().is_to_re(d, e) && re().is_full_seq(c)) {
+    if (false && re().is_concat(b, c, d) && re().is_to_re(d, e) && re().is_full_seq(c)) { // FIXME: NOODLER replacing regexes to suffix is not beneficial for noodler
         result = str().mk_suffix(e, a);
         return BR_REWRITE1;
     }
