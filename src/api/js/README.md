@@ -12,7 +12,7 @@ You'll need to have emscripten set up, along with all of its dependencies. The e
 Then run `npm i` to install dependencies, `npm run build:ts` to build the TypeScript wrapper, and `npm run build:wasm` to build the wasm artifact.
 
 Detailed instruction for binding building for Z3-Noodler:
-1) Get emscripten trough [emsdk](https://github.com/emscripten-core/emsdk) and :
+1) Get emscripten trough [emsdk](https://github.com/emscripten-core/emsdk) and activate its environment:
     ```shell
     git clone 'https://github.com/emscripten-core/emsdk'
     cd emdsk
@@ -21,7 +21,7 @@ Detailed instruction for binding building for Z3-Noodler:
     source emsdk_env.sh
     cd ..
     ```
-2) Get and install [Mata](https://github.com/VeriFIT/mata/) library (it will be installed into `emsdk` environment):
+2) Get and install [Mata](https://github.com/VeriFIT/mata/) library (it will be installed into `emsdk` environment, so no need `sudo` or a worry if `mata` is already installed):
     ```shell
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
@@ -30,7 +30,7 @@ Detailed instruction for binding building for Z3-Noodler:
     emmake make install
     cd ..
     ```
-3) Find the line on the installation output that contains the path to `libmata.a` and copy this path on line 77 of `scripts/build-wasm.ts`
+3) Find the line on the installation output that contains the path to `libmata.a` and copy it onto line 77 of `scripts/build-wasm.ts`
 4) Create an empty `build` directory in the root of `z3-noodler` directory.
 5) From this directory run following commands to build the binding:
     ```shell
