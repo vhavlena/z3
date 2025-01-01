@@ -173,7 +173,6 @@ namespace recfun {
             void compute_scores(expr* e, obj_map<expr, unsigned>& scores);
 
         public:
-            plugin();
             ~plugin() override;
             void finalize() override;
 
@@ -238,7 +237,6 @@ namespace recfun {
 
     public:
         util(ast_manager &m);
-        ~util();
 
         ast_manager & m() { return m_manager; }
         family_id get_family_id() const { return m_fid; }
@@ -251,6 +249,8 @@ namespace recfun {
         bool is_macro(func_decl* f) { return is_defined(f) && get_def(f).is_macro(); }
         bool is_num_rounds(expr * e) const { return is_app_of(e, m_fid, OP_NUM_ROUNDS); }
         bool owns_app(app * e) const { return e->get_family_id() == m_fid; }
+        bool contains_def(expr* e); // expression contains a def
+
 
         //<! don't use native theory if recursive function declarations are not populated with defs
         bool has_defs() const { return m_plugin->has_defs(); }

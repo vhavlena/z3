@@ -4,6 +4,12 @@ import { init, killThreads } from '../jest';
 import { Arith, Bool, Model, Quantifier, Z3AssertionError, Z3HighLevel, AstVector } from './types';
 import { expectType } from 'ts-expect';
 
+// this should not be necessary but there may be a Jest bug
+// https://github.com/jestjs/jest/issues/7874
+afterEach(() => {
+  global.gc && global.gc();
+});
+
 /**
  * Generate all possible solutions from given assumptions.
  *
@@ -155,6 +161,19 @@ describe('high-level', () => {
   });
 
   describe('booleans', () => {
+    it('can use pseudo-boolean constraints', async () => {
+      const { Bool, PbEq, Solver } = api.Context('main');
+      const x = Bool.const('x');
+      const y = Bool.const('y');
+
+      const solver = new Solver();
+      solver.add(PbEq([x, y], [1, 1], 1));
+      expect(await solver.check()).toStrictEqual('sat');
+
+      solver.add(x.eq(y));
+      expect(await solver.check()).toStrictEqual('unsat');
+    });
+
     it("proves De Morgan's Law", async () => {
       const { Bool, Not, And, Eq, Or } = api.Context('main');
       const [x, y] = [Bool.const('x'), Bool.const('y')];
@@ -373,7 +392,7 @@ describe('high-level', () => {
       const y = BitVec.const('y', 32);
 
       await prove(Implies(Concat(x, y).eq(Concat(y, x)), x.eq(y)));
-    });
+    }, 10_000 /* timeout ms */);
 
     it('finds x and y such that: x ^ y - 103 == x * y', async () => {
       const { BitVec, isBitVecVal } = api.Context('main');
@@ -447,7 +466,7 @@ describe('high-level', () => {
       await prove(Eq(arr2.select(0), FIVE_VAL));
       await prove(Not(Eq(arr2.select(0), BitVec.val(6, 256))));
       await prove(Eq(arr2.store(idx, val).select(idx), constArr.store(idx, val).select(idx)));
-    });
+    }, 10_000 /* timeout ms */);
 
     it('Finds arrays that differ but that sum to the same', async () => {
       const Z3 = api.Context('main');
@@ -497,6 +516,133 @@ describe('high-level', () => {
       // expectType<
       //   SMTArray<'main', [BitVecSort<160>], BitVecSort<256>>
       // >(Z3_STORAGE);
+    });
+  });
+
+  describe('sets', () => {
+    it('Example 1', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+
+      const conjecture = set.contains(a).and(set.contains(b)).implies(Z3.EmptySet(Z3.Int.sort()).neq(set));
+      await prove(conjecture);
+    });
+
+    it('Example 2', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+
+      const conjecture = set.contains(a).and(set.contains(b)).implies(Z3.Set.val([a, b], Z3.Int.sort()).subsetOf(set));
+      await prove(conjecture);
+    });
+
+    it('Example 3', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+
+      const conjecture = set.contains(a).and(set.contains(b)).and(Z3.Set.val([a, b], Z3.Int.sort()).eq(set));
+      await solve(conjecture);
+    });
+
+    it('Intersection 1', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+      const abset = Z3.Set.val([a, b], Z3.Int.sort());
+
+      const conjecture = set.intersect(abset).subsetOf(abset);
+      await prove(conjecture);
+    });
+    
+    it('Intersection 2', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+      const abset = Z3.Set.val([a, b], Z3.Int.sort());
+
+      const conjecture = set.subsetOf(set.intersect(abset));
+      await solve(conjecture);
+    });
+
+    it('Union 1', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+      const abset = Z3.Set.val([a, b], Z3.Int.sort());
+
+      const conjecture = set.subsetOf(set.union(abset));
+      await prove(conjecture);
+    });
+    
+    it('Union 2', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+      const abset = Z3.Set.val([a, b], Z3.Int.sort());
+
+      const conjecture = set.union(abset).subsetOf(abset);
+      await solve(conjecture);
+    });
+    
+    it('Complement 1', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const a = Z3.Int.const('a');
+
+      const conjecture = set.complement().complement().eq(set)
+      await prove(conjecture);
+    });
+    it('Complement 2', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+      const a = Z3.Int.const('a');
+
+      const conjecture = set.contains(a).implies(Z3.Not(set.complement().contains(a)))
+      await prove(conjecture);
+    });
+    
+    it('Difference', async () => {
+      const Z3 = api.Context('main');
+
+      const [set1, set2] = Z3.Set.consts('set1 set2', Z3.Int.sort());
+      const a = Z3.Int.const('a');
+
+      const conjecture = set1.contains(a).implies(Z3.Not(set2.diff(set1).contains(a)))
+      
+      await prove(conjecture);
+    });
+    
+    it('FullSet', async () => {
+      const Z3 = api.Context('main');
+
+      const set = Z3.Set.const('set', Z3.Int.sort());
+
+      const conjecture = set.complement().eq(Z3.FullSet(Z3.Int.sort()).diff(set));
+      
+      await prove(conjecture);
+    });
+
+    it('SetDel', async () => {
+      const Z3 = api.Context('main');
+
+      const empty = Z3.Set.empty(Z3.Int.sort());
+      const [a, b] = Z3.Int.consts('a b');
+
+      const conjecture = empty.add(a).add(b).del(a).del(b).eq(empty);
+      
+      await prove(conjecture);
     });
   });
 
@@ -700,7 +846,7 @@ describe('high-level', () => {
   });
 
   describe('optimize', () => {
-    it("maximization problem over reals", async () => {
+    it('maximization problem over reals', async () => {
       const { Real, Optimize } = api.Context('main');
 
       const opt = new Optimize();
@@ -710,9 +856,9 @@ describe('high-level', () => {
 
       opt.add(x.ge(0), y.ge(0), z.ge(0));
       opt.add(x.le(1), y.le(1), z.le(1));
-      opt.maximize(x.mul(7).add(y.mul(9)).sub(z.mul(3)))
+      opt.maximize(x.mul(7).add(y.mul(9)).sub(z.mul(3)));
 
-      const result = await opt.check()
+      const result = await opt.check();
       expect(result).toStrictEqual('sat');
       const model = opt.model();
       expect(model.eval(x).eqIdentity(Real.val(1))).toBeTruthy();
@@ -720,7 +866,7 @@ describe('high-level', () => {
       expect(model.eval(z).eqIdentity(Real.val(0))).toBeTruthy();
     });
 
-    it("minimization problem over integers using addSoft", async () => {
+    it('minimization problem over integers using addSoft', async () => {
       const { Int, Optimize } = api.Context('main');
 
       const opt = new Optimize();
@@ -736,7 +882,7 @@ describe('high-level', () => {
       opt.add(z.le(5));
       opt.minimize(z);
 
-      const result = await opt.check()
+      const result = await opt.check();
       expect(result).toStrictEqual('sat');
       const model = opt.model();
       expect(model.eval(x).eqIdentity(Int.val(1))).toBeTruthy();
@@ -744,5 +890,4 @@ describe('high-level', () => {
       expect(model.eval(z).eqIdentity(Int.val(5))).toBeTruthy();
     });
   });
-
 });

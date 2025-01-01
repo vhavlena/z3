@@ -90,15 +90,19 @@ namespace recfun {
         return r;
     }
 
-    bool def::contains_def(util& u, expr * e) {
+    bool util::contains_def(expr * e) {
         struct def_find_p : public i_expr_pred {
             util& u;
             def_find_p(util& u): u(u) {}
             bool operator()(expr* a) override { return is_app(a) && u.is_defined(to_app(a)->get_decl()); }
         };
-        def_find_p p(u);
-        check_pred cp(p, m, false);
+        def_find_p p(*this);
+        check_pred cp(p, m(), false);
         return cp(e);
+    }
+
+    bool def::contains_def(util& u, expr * e) {
+        return u.contains_def(e);
     }
 
     // does `e` contain any `ite` construct?
@@ -166,8 +170,6 @@ namespace recfun {
         vector<branch>      m_branches;
 
     public:
-        case_state() : m_reg(), m_branches() {}
-        
         bool empty() const { return m_branches.empty(); }
 
         branch pop_branch() {
@@ -238,23 +240,18 @@ namespace recfun {
     {
         VERIFY(m_cases.empty() && "cases cannot already be computed");
         SASSERT(n_vars == m_domain.size());
-
         TRACEFN("compute cases " << mk_pp(rhs, m));
-
-        unsigned case_idx = 0;
-
-        std::string name("case-");       
-        name.append(m_name.str());
-
-        m_vars.append(n_vars, vars);
-        m_rhs = rhs;
 
         if (!is_macro)
             for (expr* e : subterms::all(m_rhs))
                 if (is_lambda(e))
                     throw default_exception("recursive definitions with lambdas are not supported");
-        
+
+
+        unsigned case_idx = 0;
         expr_ref_vector conditions(m);
+        m_vars.append(n_vars, vars);
+        m_rhs = rhs;        
 
         // is the function a macro (unconditional body)?
         if (is_macro || n_vars == 0 || !contains_ite(u, rhs)) {
@@ -262,7 +259,6 @@ namespace recfun {
             add_case(0, conditions, rhs);
             return;
         }
-
 
         
         // analyze control flow of `rhs`, accumulating guards and
@@ -291,6 +287,9 @@ namespace recfun {
 
                     expr* cond = nullptr, *th = nullptr, *el = nullptr; 
                     if (m.is_ite(e, cond, th, el) && contains_def(u, cond)) {
+                        // skip
+                    }
+                    if (m.is_ite(e, cond, th, el) && !contains_def(u, th) && !contains_def(u, el)) {
                         // skip
                     }
                     else if (m.is_ite(e)) {
@@ -361,9 +360,6 @@ namespace recfun {
           m_plugin(dynamic_cast<decl::plugin*>(m.get_plugin(m_fid))) {
     }
 
-    util::~util() {
-    }
-
     def * util::decl_fun(symbol const& name, unsigned n, sort *const * domain, sort * range, bool is_generated) {
         return alloc(def, m(), m_fid, name, n, domain, range, is_generated);
     }
@@ -412,7 +408,6 @@ namespace recfun {
     }
 
     namespace decl {
-        plugin::plugin() : decl_plugin(), m_defs(), m_case_defs() {}
         plugin::~plugin() { finalize(); }
 
         void plugin::finalize() {
@@ -558,15 +553,16 @@ namespace recfun {
 
         expr_ref plugin::redirect_ite(replace& subst, unsigned n, var * const* vars, expr * e) {
             expr_ref result(e, m());
+            util u(m());
             while (true) {
                 obj_map<expr, unsigned> scores;
                 compute_scores(result, scores);
                 unsigned max_score = 0;
                 expr* max_expr = nullptr;
-                for (auto const& kv : scores) {
-                    if (m().is_ite(kv.m_key) && kv.m_value > max_score) {
-                        max_expr = kv.m_key;
-                        max_score = kv.m_value;
+                for (auto const& [k, v] : scores) {
+                    if (m().is_ite(k) && v > max_score && u.contains_def(k)) {
+                        max_expr = k;
+                        max_score = v;
                     }
                 }
                 if (max_score <= 4) 

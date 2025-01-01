@@ -18,6 +18,7 @@ Revision History:
 
 --*/
 #include<typeinfo>
+#include "util/debug.h"
 #include "util/z3_version.h"
 #include "api/api_context.h"
 #include "ast/ast_pp.h"
@@ -305,7 +306,7 @@ namespace api {
                 set_error_code(Z3_MEMOUT_FAIL, nullptr);
             break;
             case ERR_PARSER: 
-                set_error_code(Z3_PARSER_ERROR, ex.msg());
+                set_error_code(Z3_PARSER_ERROR, ex.what());
                 break;
             case ERR_INI_FILE: 
                 set_error_code(Z3_INVALID_ARG, nullptr);
@@ -319,7 +320,7 @@ namespace api {
             }
         }
         else {
-            set_error_code(Z3_EXCEPTION, ex.msg()); 
+            set_error_code(Z3_EXCEPTION, ex.what()); 
         }
     }
     
@@ -393,6 +394,7 @@ extern "C" {
         Z3_TRY;
         LOG_Z3_mk_context_rc(c);
         memory::initialize(UINT_MAX);
+        set_default_exit_action(exit_action::throw_exception);
         Z3_context r = reinterpret_cast<Z3_context>(alloc(api::context, reinterpret_cast<ast_context_params*>(c), true));
         RETURN_Z3(r);
         Z3_CATCH_RETURN_NO_HANDLE(nullptr);

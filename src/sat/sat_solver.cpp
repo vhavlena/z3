@@ -29,7 +29,7 @@ Revision History:
 #include "sat/sat_solver.h"
 #include "sat/sat_integrity_checker.h"
 #include "sat/sat_lookahead.h"
-#include "sat/sat_ddfw.h"
+#include "sat/sat_ddfw_wrapper.h"
 #include "sat/sat_prob.h"
 #include "sat/sat_anf_simplifier.h"
 #include "sat/sat_cut_simplifier.h"
@@ -518,12 +518,12 @@ namespace sat {
     }
 
     bool solver::propagate_bin_clause(literal l1, literal l2) {
-        if (value(l2) == l_false) {
+        if (value(l2) == l_false && value(l1) != l_true) {
             m_stats.m_bin_propagate++;
             assign(l1, justification(lvl(l2), l2));            
             return true;
         }
-        if (value(l1) == l_false) {
+        if (value(l1) == l_false && value(l2) != l_true) {
             m_stats.m_bin_propagate++;
             assign(l2, justification(lvl(l1), l1));
             return true;
@@ -1012,7 +1012,7 @@ namespace sat {
     }
 
     bool solver::propagate_literal(literal l, bool update) {
-        literal l1, l2;
+        literal l1;
 
         bool keep;
         unsigned curr_level = lvl(l);
@@ -1243,8 +1243,11 @@ namespace sat {
             m_cleaner(true);
             return do_local_search(num_lits, lits);
         }
-        if ((m_config.m_num_threads > 1 || m_config.m_local_search_threads > 0 || 
-             m_config.m_ddfw_threads > 0) && !m_par && !m_ext) {
+        if ((m_config.m_num_threads > 1 || m_config.m_ddfw_threads > 0) && !m_par && !m_ext) {
+            SASSERT(scope_lvl() == 0);
+            return check_par(num_lits, lits);
+        }
+        if (m_config.m_local_search_threads > 0 && !m_par && (!m_ext || m_ext->is_pb())) {
             SASSERT(scope_lvl() == 0);
             return check_par(num_lits, lits);
         }
@@ -1314,7 +1317,7 @@ namespace sat {
     }
 
     bool solver::should_cancel() {
-        if (limit_reached() || memory_exceeded()) {
+        if (limit_reached() || memory_exceeded() || m_solver_canceled) {
             return true;
         }
         if (m_config.m_restart_max <= m_restarts) {
@@ -1362,7 +1365,7 @@ namespace sat {
         }
         literal_vector _lits;
         scoped_limits scoped_rl(rlimit());
-        m_local_search = alloc(ddfw);
+        m_local_search = alloc(ddfw_wrapper);
         scoped_ls _ls(*this);
         SASSERT(m_local_search);
         m_local_search->add(*this);
@@ -1439,7 +1442,7 @@ namespace sat {
     lbool solver::do_ddfw_search(unsigned num_lits, literal const* lits) {
         if (m_ext) return l_undef;
         SASSERT(!m_local_search);
-        m_local_search = alloc(ddfw);
+        m_local_search = alloc(ddfw_wrapper);
         return invoke_local_search(num_lits, lits);
     }
 
@@ -1460,15 +1463,17 @@ namespace sat {
         if (!rlimit().inc()) {
             return l_undef;
         }
-        if (m_ext)
+        if (m_ext && !m_ext->is_pb())
             return l_undef;
 
-        scoped_ptr_vector<i_local_search> ls;
-        scoped_ptr_vector<solver> uw;
+
         int num_extra_solvers = m_config.m_num_threads - 1;
         int num_local_search  = static_cast<int>(m_config.m_local_search_threads);
         int num_ddfw      = m_ext ? 0 : static_cast<int>(m_config.m_ddfw_threads);
         int num_threads = num_extra_solvers + 1 + num_local_search + num_ddfw;        
+        vector<reslimit> lims(num_ddfw);
+        scoped_ptr_vector<i_local_search> ls;
+        scoped_ptr_vector<solver> uw;
         for (int i = 0; i < num_local_search; ++i) {
             local_search* l = alloc(local_search);
             l->updt_params(m_params);
@@ -1477,10 +1482,10 @@ namespace sat {
             ls.push_back(l);
         }
 
-        vector<reslimit> lims(num_ddfw);            
+           
         // set up ddfw search
         for (int i = 0; i < num_ddfw; ++i) {
-            ddfw* d = alloc(ddfw);
+            ddfw_wrapper* d = alloc(ddfw_wrapper);
             d->updt_params(m_params);
             d->set_seed(m_config.m_random_seed + i);
             d->add(*this);
@@ -1559,7 +1564,7 @@ namespace sat {
                 ex_kind = ERROR_EX;                
             }
             catch (z3_exception & ex) {
-                ex_msg = ex.msg();
+                ex_msg = ex.what();
                 ex_kind = DEFAULT_EX;    
             }
         };
@@ -1593,6 +1598,7 @@ namespace sat {
         if (!canceled) {
             rlimit().reset_cancel();
         }
+        par.reset();
         set_par(nullptr, 0);
         ls.reset();
         uw.reset();
@@ -1959,6 +1965,7 @@ namespace sat {
 
     void solver::init_search() {
         m_model_is_current        = false;
+        m_solver_canceled         = false;
         m_phase_counter           = 0;
         m_search_state            = s_unsat;
         m_search_unsat_conflicts  = m_config.m_search_unsat_conflicts;
@@ -2925,6 +2932,7 @@ namespace sat {
                 bool_var v = m_trail[i].var();
                 m_best_phase[v] = m_phase[v];
             }
+            set_has_new_best_phase(true);
         }
     }
 
@@ -3711,6 +3719,8 @@ namespace sat {
     }
 
     void solver::user_pop(unsigned num_scopes) {
+        if (m_user_scope_literals.empty())
+            return;
         unsigned old_sz = m_user_scope_literals.size() - num_scopes;
         bool_var max_var = m_user_scope_literals[old_sz].var();        
         m_user_scope_literals.shrink(old_sz);
@@ -4569,7 +4579,6 @@ namespace sat {
     void solver::extract_fixed_consequences(literal_set const& unfixed_lits, literal_set const& assumptions, bool_var_set& unfixed_vars, vector<literal_vector>& conseq) {
         for (literal lit: unfixed_lits) {
             TRACE("sat", tout << "extract: " << lit << " " << value(lit) << " " << lvl(lit) << "\n";);
-
             if (lvl(lit) <= 1 && value(lit) == l_true) {
                 extract_fixed_consequences(lit, assumptions, unfixed_vars, conseq);
             }
@@ -4596,7 +4605,8 @@ namespace sat {
         case justification::NONE:
             break;
         case justification::BINARY:
-            if (!check_domain(lit, ~js.get_literal())) return false;
+            if (!check_domain(lit, ~js.get_literal())) 
+                return false;
             s |= m_antecedents.find(js.get_literal().var());
             break;
         case justification::CLAUSE: {
@@ -4670,9 +4680,9 @@ namespace sat {
         SASSERT(m_todo_antecedents.empty());
         m_todo_antecedents.push_back(lit);
         while (!m_todo_antecedents.empty()) {
-            if (extract_fixed_consequences1(m_todo_antecedents.back(), assumptions, unfixed, conseq)) {
+            auto lit = m_todo_antecedents.back();
+            if (extract_fixed_consequences1(lit, assumptions, unfixed, conseq)) 
                 m_todo_antecedents.pop_back();
-            }
         }
     }
 
@@ -4724,7 +4734,7 @@ namespace sat {
                 num_lits += c.size();
             }
         }
-        unsigned total_cls = num_cls + num_ter + num_bin;
+        unsigned total_cls = num_cls + num_ter + num_bin + num_ext;
         double mem = static_cast<double>(memory::get_allocation_size())/static_cast<double>(1024*1024);
         out << "(sat-status\n";
         out << "  :inconsistent    " << (m_inconsistent ? "true" : "false") << "\n";

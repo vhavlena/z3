@@ -134,7 +134,6 @@ namespace smt {
             unsigned_vector                   m_limit;
         public:
             exclusion_table(ast_manager& m): m(m), m_lhs(m), m_rhs(m) {}
-            ~exclusion_table() { }
             bool empty() const { return m_table.empty(); }
             void update(expr* e, expr* r);
             bool contains(expr* e, expr* r) const;
@@ -563,6 +562,7 @@ namespace smt {
         void enforce_length_coherence(enode* n1, enode* n2);
 
         void add_length_limit(expr* s, unsigned k, bool is_searching);
+        void init_length_limit_for_contains(expr* c);
 
         // model-check the functions that convert integers to strings and the other way.
         void add_int_string(expr* e);

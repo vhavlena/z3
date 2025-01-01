@@ -213,8 +213,15 @@ namespace smt {
         return out;
     }
 
+    bool kernel::solve_for(expr* e, expr_ref& term) {
+        smt::enode* n = m_imp->m_kernel.find_enode(e);        
+        if (!n)
+            return false;
+        return m_imp->m_kernel.solve_for(n, term);        
+    }
+
     expr* kernel::congruence_root(expr * e) {
-        smt::enode* n = m_imp->m_kernel.find_enode(e);
+        smt::enode* n = m_imp->m_kernel.find_enode(e);        
         if (!n)
             return e;
         return n->get_root()->get_expr();
@@ -304,6 +311,10 @@ namespace smt {
 
     void kernel::user_propagate_register_decide(user_propagator::decide_eh_t& r) {
         m_imp->m_kernel.user_propagate_register_decide(r);
+    }
+    
+    void kernel::user_propagate_initialize_value(expr* var, expr* value) {
+        m_imp->m_kernel.user_propagate_initialize_value(var, value);
     }
 
 };

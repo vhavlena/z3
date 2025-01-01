@@ -1073,6 +1073,13 @@ class ExprRef(AstRef):
             _z3_assert(is_app(self), "Z3 application expected")
         return FuncDeclRef(Z3_get_app_decl(self.ctx_ref(), self.as_ast()), self.ctx)
 
+    def kind(self):
+        """Return the Z3 internal kind of a function application."""
+        if z3_debug():
+            _z3_assert(is_app(self), "Z3 application expected")
+        return Z3_get_decl_kind(self.ctx_ref(), Z3_get_app_decl(self.ctx_ref(), self.ast))
+        
+
     def num_args(self):
         """Return the number of arguments of a Z3 application.
 
@@ -1393,7 +1400,7 @@ def is_app_of(a, k):
     >>> is_app_of(n, Z3_OP_MUL)
     False
     """
-    return is_app(a) and a.decl().kind() == k
+    return is_app(a) and a.kind() == k
 
 
 def If(a, b, c, ctx=None):
@@ -5445,10 +5452,10 @@ def EnumSort(name, values, ctx=None):
     num = len(values)
     _val_names = (Symbol * num)()
     for i in range(num):
-        _val_names[i] = to_symbol(values[i])
+        _val_names[i] = to_symbol(values[i], ctx)
     _values = (FuncDecl * num)()
     _testers = (FuncDecl * num)()
-    name = to_symbol(name)
+    name = to_symbol(name, ctx)
     S = DatatypeSortRef(Z3_mk_enumeration_sort(ctx.ref(), name, num, _val_names, _values, _testers), ctx)
     V = []
     for i in range(num):
@@ -6725,6 +6732,30 @@ class ModelRef(Z3PPObject):
         model = Z3_model_translate(self.ctx.ref(), self.model, target.ref())
         return ModelRef(model, target)
 
+    def project(self, vars, fml):
+        """Perform model-based projection on fml with respect to vars.
+        Assume that the model satisfies fml. Then compute a projection fml_p, such
+        that vars do not occur free in fml_p, fml_p is true in the model and
+        fml_p => exists vars . fml
+        """
+        ctx = self.ctx.ref()
+        _vars = (Ast * len(vars))()
+        for i in range(len(vars)):
+            _vars[i] = vars[i].as_ast()
+        return _to_expr_ref(Z3_qe_model_project(ctx, self.model, len(vars), _vars, fml.ast), self.ctx)
+
+    def project_with_witness(self, vars, fml):
+        """Perform model-based projection, but also include realizer terms for the projected variables"""
+        ctx = self.ctx.ref()
+        _vars = (Ast * len(vars))()
+        for i in range(len(vars)):
+            _vars[i] = vars[i].as_ast()
+        defs = AstMap()
+        result = Z3_qe_model_project_with_witness(ctx, self.model, len(vars), _vars, fml.ast, defs.map)
+        result = _to_expr_ref(result, self.ctx)
+        return result, defs
+
+
     def __copy__(self):
         return self.translate(self.ctx)
 
@@ -6732,9 +6763,12 @@ class ModelRef(Z3PPObject):
         return self.translate(self.ctx)
 
 
-def Model(ctx=None):
+def Model(ctx=None, eval = {}):
     ctx = _get_ctx(ctx)
-    return ModelRef(Z3_mk_model(ctx.ref()), ctx)
+    mdl = ModelRef(Z3_mk_model(ctx.ref()), ctx)
+    for k, v in eval.items():
+        mdl.update_value(k, v)
+    return mdl
 
 
 def is_as_array(n):
@@ -6798,7 +6832,7 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> len(st)
-        6
+        7
         """
         return int(Z3_stats_size(self.ctx.ref(), self.stats))
 
@@ -6812,11 +6846,11 @@ class Statistics:
         sat
         >>> st = s.statistics()
         >>> len(st)
-        6
+        7
         >>> st[0]
         ('nlsat propagations', 2)
         >>> st[1]
-        ('nlsat stages', 2)
+        ('nlsat restarts', 1)
         """
         if idx >= len(self):
             raise IndexError
@@ -7317,6 +7351,12 @@ class Solver(Z3PPObject):
         """
         return _to_expr_ref(Z3_solver_congruence_next(self.ctx.ref(), self.solver, t.ast), self.ctx)
 
+    def solve_for(self, t):
+        t = _py2expr(t, self.ctx)
+        """Retrieve a solution for t relative to linear equations maintained in the current state.
+        The function primarily works for SimpleSolver and when there is a solution using linear arithmetic."""
+        return _to_expr_ref(Z3_solver_solve_for(self.ctx.ref(), self.solver, t.ast), self.ctx)
+
     def proof(self):
         """Return a proof for the last `check()`. Proof construction must be enabled."""
         return _to_expr_ref(Z3_solver_get_proof(self.ctx.ref(), self.solver), self.ctx)
@@ -7352,6 +7392,13 @@ class Solver(Z3PPObject):
         levels = (ctypes.c_uint * len(trail))()
         Z3_solver_get_levels(self.ctx.ref(), self.solver, trail.vector, len(trail), levels)
         return trail, levels
+
+    def set_initial_value(self, var, value):
+        """initialize the solver's state by setting the initial value of var to value
+        """
+        s = var.sort()
+        value = s.cast(value)
+        Z3_solver_set_initial_value(self.ctx.ref(), self.solver, var.ast, value.ast)
 
     def trail(self):
         """Return trail of the solver state after a check() call.
@@ -7926,9 +7973,12 @@ _on_model_eh = on_model_eh_type(_global_on_model)
 class Optimize(Z3PPObject):
     """Optimize API provides methods for solving using objective functions and weighted soft constraints"""
 
-    def __init__(self, ctx=None):
+    def __init__(self, optimize=None, ctx=None):
         self.ctx = _get_ctx(ctx)
-        self.optimize = Z3_mk_optimize(self.ctx.ref())
+        if optimize is None:
+            self.optimize = Z3_mk_optimize(self.ctx.ref())
+        else:
+            self.optimize = optimize
         self._on_models_id = None
         Z3_optimize_inc_ref(self.ctx.ref(), self.optimize)
 
@@ -7940,6 +7990,13 @@ class Optimize(Z3PPObject):
             Z3_optimize_dec_ref(self.ctx.ref(), self.optimize)
         if self._on_models_id is not None:
             del _on_models[self._on_models_id]
+
+    def __enter__(self):
+        self.push()
+        return self
+
+    def __exit__(self, *exc_info):
+        self.pop()
 
     def set(self, *args, **keys):
         """Set a configuration option.
@@ -8028,6 +8085,13 @@ class Optimize(Z3PPObject):
         if sys.version_info.major >= 3 and isinstance(arg, Iterable):
             return [asoft(a) for a in arg]
         return asoft(arg)
+
+    def set_initial_value(self, var, value):
+        """initialize the solver's state by setting the initial value of var to value
+        """
+        s = var.sort()
+        value = s.cast(value)
+        Z3_optimize_set_initial_value(self.ctx.ref(), self.optimize, var.ast, value.ast)
 
     def maximize(self, arg):
         """Add objective function to maximize."""
@@ -9430,7 +9494,7 @@ _ROUNDING_MODES = frozenset({
 def set_default_rounding_mode(rm, ctx=None):
     global _dflt_rounding_mode
     if is_fprm_value(rm):
-        _dflt_rounding_mode = rm.decl().kind()
+        _dflt_rounding_mode = rm.kind()
     else:
         _z3_assert(_dflt_rounding_mode in _ROUNDING_MODES, "illegal rounding mode")
         _dflt_rounding_mode = rm
@@ -10220,7 +10284,7 @@ def FPs(names, fpsort, ctx=None):
     >>> x.ebits()
     8
     >>> fpMul(RNE(), fpAdd(RNE(), x, y), z)
-    x + y * z
+    (x + y) * z
     """
     ctx = _get_ctx(ctx)
     if isinstance(names, str):
@@ -11210,6 +11274,32 @@ def Length(s):
     s = _coerce_seq(s)
     return ArithRef(Z3_mk_seq_length(s.ctx_ref(), s.as_ast()), s.ctx)
 
+def SeqMap(f, s):
+    """Map function 'f' over sequence 's'"""
+    ctx = _get_ctx2(f, s)
+    s = _coerce_seq(s, ctx)
+    return _to_expr_ref(Z3_mk_seq_map(s.ctx_ref(), f.as_ast(), s.as_ast()), ctx)
+
+def SeqMapI(f, i, s):
+    """Map function 'f' over sequence 's' at index 'i'"""
+    ctx = _get_ctx(f, s)
+    s = _coerce_seq(s, ctx)
+    if not is_expr(i):
+        i = _py2expr(i)
+    return _to_expr_ref(Z3_mk_seq_mapi(s.ctx_ref(), f.as_ast(), i.as_ast(), s.as_ast()), ctx)
+
+def SeqFoldLeft(f, a, s):
+    ctx = _get_ctx2(f, s)
+    s = _coerce_seq(s, ctx)
+    a = _py2expr(a)
+    return _to_expr_ref(Z3_mk_seq_foldl(s.ctx_ref(), f.as_ast(), a.as_ast(), s.as_ast()), ctx)
+
+def SeqFoldLeftI(f, i, a, s):
+    ctx = _get_ctx2(f, s)
+    s = _coerce_seq(s, ctx)
+    a = _py2expr(a)
+    i = _py2epxr(i)
+    return _to_expr_ref(Z3_mk_seq_foldli(s.ctx_ref(), f.as_ast(), i.as_ast(), a.as_ast(), s.as_ast()), ctx)
 
 def StrToInt(s):
     """Convert string expression to integer
@@ -11611,7 +11701,7 @@ def user_prop_diseq(ctx, cb, x, y):
     prop.diseq(x, y)
     prop.cb = old_cb
 
-def user_prop_decide(ctx, cb, t, idx, phase):
+def user_prop_decide(ctx, cb, t_ref, idx, phase):
     prop = _prop_closures.get(ctx)
     old_cb = prop.cb
     prop.cb = cb
@@ -11675,6 +11765,7 @@ class UserPropagateBase:
         self.final = None
         self.eq = None
         self.diseq = None
+        self.decide = None
         self.created = None
         if ctx:
             self.fresh_ctx = ctx

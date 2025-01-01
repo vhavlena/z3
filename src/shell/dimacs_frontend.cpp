@@ -23,7 +23,7 @@ Revision History:
 #include "util/rlimit.h"
 #include "util/gparams.h"
 #include "sat/dimacs.h"
-#include "sat/sat_params.hpp"
+#include "params/sat_params.hpp"
 #include "sat/sat_solver.h"
 #include "sat/tactic/goal2sat.h"
 #include "sat/tactic/sat2goal.h"
@@ -110,7 +110,6 @@ static void track_clauses(sat::solver const& src,
         dst.mk_var(false, true);
     }
     sat::literal_vector lits;
-    sat::literal lit;
     sat::clause * const * it  = src.begin_clauses();
     sat::clause * const * end = src.end_clauses();
     svector<sat::solver::bin_clause> bin_clauses;

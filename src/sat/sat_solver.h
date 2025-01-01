@@ -90,7 +90,7 @@ namespace sat {
     
     class solver : public solver_core {
     public:
-        struct abort_solver {};
+        struct abort_solver : public std::exception {};
     protected:
         enum search_state { s_sat, s_unsat };
 
@@ -152,6 +152,7 @@ namespace sat {
         bool_vector             m_phase; 
         bool_vector             m_best_phase;
         bool_vector             m_prev_phase;
+        bool                    m_new_best_phase = false;
         svector<char>           m_assigned_since_gc;
         search_state            m_search_state; 
         unsigned                m_search_unsat_conflicts;
@@ -177,6 +178,7 @@ namespace sat {
         clause_wrapper_vector   m_clauses_to_reinit;
         std::string             m_reason_unknown;
         bool                    m_trim = false;
+        bool                    m_solver_canceled = false;
 
         visit_helper            m_visited;
 
@@ -227,7 +229,7 @@ namespace sat {
         friend class parallel;
         friend class lookahead;
         friend class local_search;
-        friend class ddfw;
+        friend class ddfw_wrapper;
         friend class prob;
         friend class unit_walk;
         friend struct mk_stat;
@@ -287,6 +289,7 @@ namespace sat {
         random_gen& rand() { return m_rand; }
 
         void set_trim() { m_trim = true; }
+        void set_canceled() { m_solver_canceled = true; }
 
     protected:
         void reset_var(bool_var v, bool ext, bool dvar);
@@ -378,6 +381,9 @@ namespace sat {
         bool was_eliminated(literal l) const { return was_eliminated(l.var()); }
         void set_phase(literal l) override { if (l.var() < num_vars()) m_best_phase[l.var()] = m_phase[l.var()] = !l.sign(); }
         bool get_phase(bool_var b) { return m_phase.get(b, false); }
+        bool get_best_phase(bool_var b) { return m_best_phase.get(b, false); }
+        void set_has_new_best_phase(bool b) { m_new_best_phase = b; }
+        bool has_new_best_phase() const { return m_new_best_phase; }
         void move_to_front(bool_var b);
         unsigned scope_lvl() const { return m_scope_lvl; }
         unsigned search_lvl() const { return m_search_lvl; }
@@ -400,7 +406,7 @@ namespace sat {
             }
         }
         void update_assign(literal l, justification j) {
-            if (j.level() == 0 && !m_trim) 
+            if (j.level() == 0 && !m_trim && lvl(l) != 0) 
                 m_justification[l.var()] = j;
         }
         void assign_unit(literal l) { assign(l, justification(0)); }

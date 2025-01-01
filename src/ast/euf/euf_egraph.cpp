@@ -82,8 +82,11 @@ namespace euf {
 
     void egraph::reinsert_equality(enode* p) {
         SASSERT(p->is_equality());        
-        if (p->value() != l_true && p->get_arg(0)->get_root() == p->get_arg(1)->get_root()) 
+        if (p->value() != l_true && p->get_arg(0)->get_root() == p->get_arg(1)->get_root()) {
             queue_literal(p, nullptr);
+            if (p->value() == l_false && !m_on_propagate_literal) 
+                set_conflict(p->get_arg(0), p->get_arg(1), p->m_lit_justification);
+        }
     }
 
     void egraph::queue_literal(enode* p, enode* ante) {        
@@ -107,8 +110,8 @@ namespace euf {
     void egraph::update_children(enode* n) {
         for (enode* child : enode_args(n)) 
             child->get_root()->add_parent(n);
-        for (enode* child : enode_args(n))  
-            SASSERT(child->get_root()->m_parents.back() == n);
+        DEBUG_CODE(for (enode* child : enode_args(n))  
+                       SASSERT(child->get_root()->m_parents.back() == n););
         m_updates.push_back(update_record(n, update_record::update_children()));
     }
 
@@ -201,6 +204,18 @@ namespace euf {
         }
     }
 
+    void egraph::new_diseq(enode* n, void* reason) {
+        force_push();
+        SASSERT(m.is_eq(n->get_expr()));
+        auto j = justification::external(reason);
+        auto a = n->get_arg(0), b = n->get_arg(1);
+        auto r1 = a->get_root(), r2 = b->get_root();
+        if (r1 == r2)
+            set_conflict(a, b, j);
+        else 
+            set_value(n, l_false, j);                
+    }
+
     void egraph::new_diseq(enode* n) {
         SASSERT(n->is_equality());
         SASSERT(n->value() == l_false);
@@ -231,7 +246,7 @@ namespace euf {
             for (auto const& q : euf::enode_th_vars(r2))
                 if (p.get_id() == q.get_id()) 
                     add_th_diseq(p.get_id(), p.get_var(), q.get_var(), n);
-    }
+        }
     }
 
 

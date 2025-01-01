@@ -21,7 +21,7 @@ Author:
 #include "ast/ast_ll_pp.h"
 #include "ast/arith_decl_plugin.h"
 #include "smt/smt_solver.h"
-#include "sat/sat_params.hpp"
+#include "params/sat_params.hpp"
 #include "sat/smt/euf_proof_checker.h"
 #include "sat/smt/arith_theory_checker.h"
 #include "sat/smt/q_theory_checker.h"
@@ -294,9 +294,6 @@ namespace euf {
         add_plugin(alloc(smt_theory_checker_plugin, m)); 
         add_plugin(alloc(tseitin::theory_checker, m));
         add_plugin(alloc(bv::theory_checker, m));
-    }
-
-    theory_checker::~theory_checker() {
     }
 
     void theory_checker::add_plugin(theory_checker_plugin* p) {

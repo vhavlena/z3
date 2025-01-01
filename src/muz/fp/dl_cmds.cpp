@@ -56,8 +56,7 @@ struct dl_context {
         m_cmd(ctx),
         m_collected_cmds(collected_cmds),
         m_ref_count(0),
-        m_decl_plugin(nullptr),
-        m_trail() {}
+        m_decl_plugin(nullptr) {}
 
     void inc_ref() {
         ++m_ref_count;
@@ -265,12 +264,12 @@ public:
                 status = dlctx.rel_query(1, &m_target);
             }
             catch (z3_error & ex) {
-                ctx.regular_stream() << "(error \"query failed: " << ex.msg() << "\")" << std::endl;
+                ctx.regular_stream() << "(error \"query failed: " << ex.what() << "\")" << std::endl;
                 print_statistics(ctx);
                 throw ex;
             }
             catch (z3_exception& ex) {
-                ctx.regular_stream() << "(error \"query failed: " << ex.msg() << "\")" << std::endl;
+                ctx.regular_stream() << "(error \"query failed: " << ex.what() << "\")" << std::endl;
                 query_exn = true;
             }
         }

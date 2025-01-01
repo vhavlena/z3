@@ -21,7 +21,7 @@ Revision History:
 --*/
 #pragma once
 
-#include <type_traits>
+#include <cstddef>
 #include "util/memory_manager.h"
 #include "debug.h"
 
@@ -31,7 +31,7 @@ protected:
     T *      m_buffer = reinterpret_cast<T*>(m_initial_buffer);
     unsigned m_pos = 0;
     unsigned m_capacity = INITIAL_SIZE;
-    typename std::aligned_storage<sizeof(T), alignof(T)>::type m_initial_buffer[INITIAL_SIZE];
+    alignas(T) std::byte m_initial_buffer[INITIAL_SIZE * sizeof(T)];
 
     void free_memory() {
         if (m_buffer != reinterpret_cast<T*>(m_initial_buffer)) {
@@ -276,6 +276,6 @@ public:
 template<typename T, unsigned INITIAL_SIZE=16>
 class sbuffer : public buffer<T, false, INITIAL_SIZE> {
 public:
-    sbuffer(): buffer<T, false, INITIAL_SIZE>() {}
+    sbuffer() = default;
     sbuffer(unsigned sz, const T& elem) : buffer<T, false, INITIAL_SIZE>(sz,elem) {}
 };

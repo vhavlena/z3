@@ -18,7 +18,6 @@ Author:
 
 #include "util/top_sort.h"
 #include "sat/smt/sat_smt.h"
-#include "sat/sat_ddfw.h"
 #include "ast/euf/euf_egraph.h"
 #include "model/model.h"
 #include "smt/params/smt_params.h"
@@ -137,16 +136,18 @@ namespace euf {
 
         sat::status status() const { return sat::status::th(false, get_id()); }
 
-        /**
-        * Local search interface
-        */
-        virtual void set_bool_search(sat::ddfw* ddfw) {}
+        virtual euf::enode_pair get_justification_eq(size_t j);
+
 
         virtual void set_bounds_begin() {}
 
         virtual void set_bounds_end(unsigned num_literals) {}
 
         virtual void set_bounds(enode* n) {}
+
+        virtual void finalize() {}
+
+        virtual void initialize_value(expr* v, expr* value) { IF_VERBOSE(5, verbose_stream() << "value initialzation is not supported for theory\n"); }
 
     };
 
@@ -224,6 +225,7 @@ namespace euf {
         bool is_root(theory_var v) const { return var2enode(v)->is_root(); }
         void push() override { m_num_scopes++; }
         void pop(unsigned n) override;
+
 
         unsigned random();
     };

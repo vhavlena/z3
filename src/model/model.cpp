@@ -39,6 +39,7 @@ Revision History:
 #include "model/datatype_factory.h"
 #include "model/numeral_factory.h"
 #include "model/fpa_factory.h"
+#include "model/char_factory.h"
 
 
 model::model(ast_manager & m):
@@ -94,7 +95,7 @@ bool model::eval_expr(expr * e, expr_ref & result, bool model_completion) {
     }
     catch (model_evaluator_exception & ex) {
         (void)ex;
-        TRACE("model_evaluator", tout << ex.msg() << "\n";);
+        TRACE("model_evaluator", tout << ex.what() << "\n";);
         return false;
     }
 }
@@ -103,12 +104,14 @@ value_factory* model::get_factory(sort* s) {
     if (m_factories.plugins().empty()) {
         seq_util su(m);
         fpa_util fu(m);
+        m_factories.register_plugin(alloc(basic_factory, m, 0));
         m_factories.register_plugin(alloc(array_factory, m, *this));
         m_factories.register_plugin(alloc(datatype_factory, m, *this));
         m_factories.register_plugin(alloc(bv_factory, m));
         m_factories.register_plugin(alloc(arith_factory, m));
         m_factories.register_plugin(alloc(seq_factory, m, su.get_family_id(), *this));
         m_factories.register_plugin(alloc(fpa_value_factory, m, fu.get_family_id()));
+        //m_factories.register_plugin(alloc(char_factory, m, char_decl_plugin(m).get_family_id());
     }
     family_id fid = s->get_family_id();
     return m_factories.get_plugin(fid);
@@ -248,6 +251,7 @@ void model::compress(bool force_inline) {
     // by substituting in auxiliary definitions that can be eliminated.
 
     func_decl_ref_vector pinned(m);
+    ptr_vector<func_decl> sorted_decls;
     while (true) {
         top_sort ts(m);
         collect_deps(ts);
@@ -259,6 +263,7 @@ void model::compress(bool force_inline) {
         ts.m_occur_count.reset();
         for (func_decl * f : ts.top_sorted()) 
             collect_occs(ts, f);
+        sorted_decls.reset();
         
         // remove auxiliary declarations that are not used.
         for (func_decl * f : ts.top_sorted()) {
@@ -267,11 +272,13 @@ void model::compress(bool force_inline) {
                 unregister_decl(f);
                 removed.insert(f);
             }
+            else
+                sorted_decls.push_back(f);
         }
+        std::swap(m_decls, sorted_decls);
         if (removed.empty())
             break;
         TRACE("model", tout << "remove\n"; for (func_decl* f : removed) tout << f->get_name() << "\n";);
-        remove_decls(m_decls, removed);
         remove_decls(m_func_decls, removed);
         remove_decls(m_const_decls, removed);
     }

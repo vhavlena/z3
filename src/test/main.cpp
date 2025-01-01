@@ -134,7 +134,7 @@ void parse_cmd_line_args(int argc, char ** argv, bool& do_display_usage, bool& t
                 gparams::set(key, value);
             }
             catch (z3_exception& ex) {
-                std::cerr << ex.msg() << "\n";
+                std::cerr << ex.what() << "\n";
             }
         }
         i++;
@@ -188,6 +188,7 @@ int main(int argc, char ** argv) {
     TST(total_order);
     TST(dl_table);
     TST(dl_context);
+    TST(dlist);
     TST(dl_util);
     TST(dl_product_relation);
     TST(dl_relation);
@@ -268,4 +269,6 @@ int main(int argc, char ** argv) {
     TST(euf_bv_plugin);
     TST(euf_arith_plugin);
     TST(sls_test);
+    TST(scoped_vector);
+    TST(sls_seq_plugin);
 }

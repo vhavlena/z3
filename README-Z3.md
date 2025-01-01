@@ -12,11 +12,15 @@ Z3 can be built using [Visual Studio][1], a [Makefile][2] or using [CMake][3]. I
 
 See the [release notes](RELEASE_NOTES.md) for notes on various stable releases of Z3.
 
+[![Try the online Z3 Guide](z3guide.jpeg)](https://microsoft.github.io/z3guide/)
+
+
+
 ## Build status
 
-| Azure Pipelines | Code Coverage | Open Bugs | Android Build | WASM Build | Windows Build |
-| --------------- | --------------|-----------|---------------|------------|---------------|
-| [![Build Status](https://dev.azure.com/Z3Public/Z3/_apis/build/status/Z3Prover.z3?branchName=master)](https://dev.azure.com/Z3Public/Z3/_build/latest?definitionId=1&branchName=master) | [![CodeCoverage](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml) | [![Open Issues](https://github.com/Z3Prover/z3/actions/workflows/wip.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wip.yml) |[![Android Build](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml) | [![WASM Build](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml) | [![Windows](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml)
+| Azure Pipelines | Code Coverage | Open Bugs | Android Build | WASM Build | Windows Build | Pyodide Build |
+| --------------- | --------------|-----------|---------------|------------|---------------|---------------|
+| [![Build Status](https://dev.azure.com/Z3Public/Z3/_apis/build/status/Z3Prover.z3?branchName=master)](https://dev.azure.com/Z3Public/Z3/_build/latest?definitionId=1&branchName=master) | [![CodeCoverage](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/coverage.yml) | [![Open Issues](https://github.com/Z3Prover/z3/actions/workflows/wip.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wip.yml) |[![Android Build](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/android-build.yml) | [![WASM Build](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/wasm.yml) | [![Windows](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/Windows.yml) | [![Pyodide Build](https://github.com/Z3Prover/z3/actions/workflows/pyodide.yml/badge.svg)](https://github.com/Z3Prover/z3/actions/workflows/pyodide.yml)
 
 <a href="https://github.com/z3prover/z3/pkgs/container/z3">Docker image</a>.
 
@@ -46,7 +50,7 @@ cd build
 nmake
 ```
 
-Z3 uses C++17. The recommended version of Visual Studio is therefore VS2019. 
+Z3 uses C++20. The recommended version of Visual Studio is therefore VS2019. 
 
 ## Building Z3 using make and GCC/Clang
 
@@ -163,7 +167,7 @@ See [``examples/ml``](examples/ml) for examples.
 
 ### ``Python``
 
-You can install the Python wrapper for Z3 for the latest release from pypi using the command
+You can install the Python wrapper for Z3 for the latest release from pypi using the command:
 
 ```bash
    pip install z3-solver
@@ -206,7 +210,7 @@ See [``examples/python``](examples/python) for examples.
 
 ### ``Julia``
 
-The Julia package [Z3.jl](https://github.com/ahumenberger/Z3.jl) wraps the C++ API of Z3. Information about updating and building the Julia bindings can be found in [src/api/julia](src/api/julia).
+The Julia package [Z3.jl](https://github.com/ahumenberger/Z3.jl) wraps the C API of Z3. A previous version of it wrapped the C++ API: Information about updating and building the Julia bindings can be found in [src/api/julia](src/api/julia).
 
 ### ``Web Assembly`` / ``TypeScript`` / ``JavaScript``
 
@@ -226,7 +230,7 @@ to Z3's C API. For more information, see [MachineArithmetic/README.md](https://g
 * Default input format is [SMTLIB2](http://smtlib.cs.uiowa.edu)
 
 * Other native foreign function interfaces:
-* [C++ API](https://z3prover.github.io/api/html/group__cppapi.html)
+* [C++ API](https://z3prover.github.io/api/html/namespacez3.html)
 * [.NET API](https://z3prover.github.io/api/html/namespace_microsoft_1_1_z3.html)
 * [Java API](https://z3prover.github.io/api/html/namespacecom_1_1microsoft_1_1z3.html)
 * [Python API](https://z3prover.github.io/api/html/namespacez3py.html) (also available in [pydoc format](https://z3prover.github.io/api/html/z3.html))
@@ -235,5 +239,8 @@ to Z3's C API. For more information, see [MachineArithmetic/README.md](https://g
 * OCaml
 * [Julia](https://github.com/ahumenberger/Z3.jl)
 * [Smalltalk](https://github.com/shingarov/MachineArithmetic/blob/pure-z3/MachineArithmetic/README.md) (supports Pharo and Smalltalk/X)
+
+## Power Tools
+* The [Axiom Profiler](https://github.com/viperproject/axiom-profiler-2) currently developed by ETH Zurich
 
 

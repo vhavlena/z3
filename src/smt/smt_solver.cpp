@@ -252,6 +252,10 @@ namespace {
             m_context.user_propagate_register_decide(c);
         }
 
+        void user_propagate_initialize_value(expr* var, expr* value) override {
+            m_context.user_propagate_initialize_value(var, value);
+        }
+
         struct scoped_minimize_core {
             smt_solver& s;
             expr_ref_vector m_assumptions;
@@ -333,6 +337,7 @@ namespace {
 
         expr* congruence_next(expr* e) override { return m_context.congruence_next(e); }
         expr* congruence_root(expr* e) override { return m_context.congruence_root(e); }
+        bool  solve_for(expr* e, expr_ref& term) override { return m_context.solve_for(e, term); }
 
 
         expr_ref_vector cube(expr_ref_vector& vars, unsigned cutoff) override {

@@ -525,4 +525,8 @@ namespace euf {
         return n;
     }
 
+    void solver::add_clause(unsigned n, sat::literal const* lits) {
+        m_top_level_clauses.push_back(sat::literal_vector(n, lits));
+        m_trail.push(push_back_vector(m_top_level_clauses));
+    }
 }

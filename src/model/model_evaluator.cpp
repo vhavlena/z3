@@ -457,7 +457,7 @@ struct evaluator_cfg : public default_rewriter_cfg {
                 if (interp) {
                     var_subst vs(m, false);
                     result = vs(fi->get_interp(), num, args);
-                    result = m.mk_ite(m.mk_eq(m_au.mk_real(rational(0)), args[1]), result, m.mk_app(f, num, args));
+                    result = m.mk_ite(m.mk_eq(m_au.mk_numeral(rational(0), args[1]->get_sort()), args[1]), result, m.mk_app(f, num, args));
                     return BR_DONE;
                 }
             }
@@ -480,6 +480,10 @@ struct evaluator_cfg : public default_rewriter_cfg {
                 result = m.mk_app(f, num, args);
                 return BR_DONE;
             }
+        }
+        else if (m_dt.is_constructor(f)) {
+            result = m.mk_app(f, num, args);
+            return BR_DONE;
         }
 
         if (fi) {
@@ -849,7 +853,7 @@ bool model_evaluator::eval(expr* t, expr_ref& r, bool model_completion) {
     }
     catch (model_evaluator_exception &ex) {
         (void)ex;
-        TRACE("model_evaluator", tout << ex.msg () << "\n";);
+        TRACE("model_evaluator", tout << ex.what () << "\n";);
         return false;
     }
 }

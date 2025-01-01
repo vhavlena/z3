@@ -3,6 +3,10 @@
   Author: Nikolaj Bjorner, Lev Nachmanson
 */
 
+#ifndef SINGLE_THREAD
+#include <thread>
+#endif
+#include <fstream>
 #include "math/lp/lar_solver.h"
 #include "math/lp/nra_solver.h"
 #include "nlsat/nlsat_solver.h"
@@ -11,6 +15,7 @@
 #include "util/map.h"
 #include "util/uint_set.h"
 #include "math/lp/nla_core.h"
+#include "smt/params/smt_params_helper.hpp"
 
 
 namespace nra {
@@ -29,7 +34,7 @@ struct solver::imp {
     scoped_ptr<scoped_anum_vector>   m_values; // values provided by LRA solver
     scoped_ptr<scoped_anum> m_tmp1, m_tmp2;
     nla::core&                m_nla_core;
-
+    
     imp(lp::lar_solver& s, reslimit& lim, params_ref const& p, nla::core& nla_core): 
         lra(s), 
         m_limit(lim),
@@ -157,7 +162,25 @@ struct solver::imp {
 
         TRACE("nra", m_nlsat->display(tout));
 
+        smt_params_helper p(m_params);
+        if (p.arith_nl_log()) {
+            static unsigned id = 0;
+            std::stringstream strm;
+
+#ifndef SINGLE_THREAD            
+            std::thread::id this_id = std::this_thread::get_id();
+            strm << "nla_" << this_id << "." << (++id) << ".smt2";
+#else
+            strm << "nla_" << (++id) << ".smt2";
+#endif
+            std::ofstream out(strm.str());
+            m_nlsat->display_smt2(out);
+            out << "(check-sat)\n";
+            out.close();
+        }
+
         lbool r = l_undef;
+        statistics& st = m_nla_core.lp_settings().stats().m_st;
         try {
             r = m_nlsat->check();
         }
@@ -166,9 +189,11 @@ struct solver::imp {
                 r = l_undef;
             }
             else {
+                m_nlsat->collect_statistics(st);
                 throw;
             }
         }
+        m_nlsat->collect_statistics(st);
         TRACE("nra",
               m_nlsat->display(tout << r << "\n");
               display(tout);
@@ -211,6 +236,7 @@ struct solver::imp {
         }
         return r;
     }   
+
 
     void add_monic_eq_bound(mon_eq const& m) {
         if (!lra.column_has_lower_bound(m.var()) && 
@@ -352,6 +378,7 @@ struct solver::imp {
         }
         
         lbool r = l_undef;
+        statistics& st = m_nla_core.lp_settings().stats().m_st;
         try {
             r = m_nlsat->check();
         }
@@ -360,9 +387,11 @@ struct solver::imp {
                 r = l_undef;
             }
             else {
+                m_nlsat->collect_statistics(st);
                 throw;
             }
         }
+        m_nlsat->collect_statistics(st);
         
         switch (r) {
         case l_true:
@@ -643,7 +672,7 @@ nlsat::anum_manager& solver::am() {
 scoped_anum& solver::tmp1() { return m_imp->tmp1(); }
 
 scoped_anum& solver::tmp2() { return m_imp->tmp2(); }
-
+ 
 
 void solver::updt_params(params_ref& p) {
     m_imp->updt_params(p);

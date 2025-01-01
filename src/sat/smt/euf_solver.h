@@ -100,15 +100,6 @@ namespace euf {
             scope(unsigned l) : m_var_lim(l) {}
         };
 
-        struct local_search_config {
-            double cb = 0.0;
-            unsigned L = 20;
-            unsigned t = 45;
-            unsigned max_no_improve = 500000;
-            double sp = 0.0003;
-        };
-
-
         size_t* to_ptr(sat::literal l) { return TAG(size_t*, reinterpret_cast<size_t*>((size_t)(l.index() << 4)), 1); }
         size_t* to_ptr(size_t jst) { return TAG(size_t*, reinterpret_cast<size_t*>(jst), 2); }
         bool is_literal(size_t* p) const { return GET_TAG(p) == 1; }
@@ -127,7 +118,6 @@ namespace euf {
         sat::sat_internalizer&           si;
         relevancy                        m_relevancy;
         smt_params                       m_config;
-        local_search_config              m_ls_config;
         euf::egraph                      m_egraph;
         trail_stack                      m_trail;
         stats                            m_stats;
@@ -154,6 +144,7 @@ namespace euf {
         svector<scope>                   m_scopes;
         scoped_ptr_vector<th_solver>     m_solvers;
         ptr_vector<th_solver>            m_id2solver;
+        
 
         constraint* m_conflict = nullptr;
         constraint* m_eq = nullptr;
@@ -173,6 +164,7 @@ namespace euf {
         symbol                           m_smt = symbol("smt");            
         expr_ref_vector                  m_clause;
         expr_ref_vector                  m_expr_args;
+        vector<sat::literal_vector>      m_top_level_clauses;
 
 
         // internalization
@@ -186,6 +178,8 @@ namespace euf {
         bool internalize_root(app* e, bool sign, ptr_vector<enode> const& args);
         euf::enode* mk_true();
         euf::enode* mk_false();
+
+        vector<std::pair<expr_ref, expr_ref>> m_initial_values;
 
         // replay
         typedef std::tuple<expr_ref, unsigned, sat::bool_var> reinit_t;
@@ -229,12 +223,11 @@ namespace euf {
         void log_antecedents(literal l, literal_vector const& r, th_proof_hint* hint);
         void log_justification(literal l, th_explain const& jst);
         void log_justifications(literal l, unsigned explain_size, bool is_euf);
+        enode_pair get_justification_eq(size_t j);
         void log_rup(literal l, literal_vector const& r);
 
 
         eq_proof_hint* mk_hint(symbol const& th, literal lit);
-
-
 
         void init_proof();
         void on_clause(unsigned n, literal const* lits, sat::status st) override;
@@ -353,7 +346,6 @@ namespace euf {
         void add_assumptions(sat::literal_set& assumptions) override;
         bool tracking_assumptions() override;
         std::string reason_unknown() override { return m_reason_unknown; }
-        lbool local_search(bool_vector& phase) override;
 
         void propagate(literal lit, ext_justification_idx idx);
         bool propagate(enode* a, enode* b, ext_justification_idx idx);
@@ -482,6 +474,12 @@ namespace euf {
         bool enable_ackerman_axioms(expr* n) const;
         bool is_fixed(euf::enode* n, expr_ref& val, sat::literal_vector& explain);
 
+        // void add_assertion(expr* f);
+        // expr_ref_vector const& get_assertions() { return m_assertions; }
+        void add_clause(unsigned n, sat::literal const* lits);
+        vector <sat::literal_vector> const& top_level_clauses() const { return m_top_level_clauses; }
+        model_ref get_sls_model();
+
         // relevancy
 
         bool relevancy_enabled() const { return m_relevancy.enabled(); }
@@ -558,6 +556,8 @@ namespace euf {
             check_for_user_propagator();
             m_user_propagator->add_expr(e);
         }
+
+        void user_propagate_initialize_value(expr* var, expr* value);
 
         // solver factory
         ::solver* mk_solver() { return m_mk_solver(); }

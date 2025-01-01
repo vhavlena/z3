@@ -63,12 +63,20 @@ namespace smt {
     class model_generator;
     class context;
 
-    struct cancel_exception {};
+    struct cancel_exception : public std::exception {
+        char const * what() const noexcept override { return "smt-canceled"; }
+    };
 
     struct enode_pp {
         context const& ctx;
         enode*   n;
         enode_pp(enode* n, context const& ctx): ctx(ctx), n(n) {}
+    };
+
+    struct replay_unit {
+        expr_ref m_unit;
+        bool     m_sign;
+        bool     m_relevant;
     };
 
     class context {
@@ -122,6 +130,8 @@ namespace smt {
         class parallel*             m_par = nullptr;
         unsigned                    m_par_index = 0;
         bool                        m_internalizing_assertions = false;
+        lbool                       m_sls_completed = l_undef;
+
 
         // -----------------------------------
         //
@@ -182,8 +192,7 @@ namespace smt {
         clause_vector               m_aux_clauses;
         clause_vector               m_lemmas;
         vector<clause_vector>       m_clauses_to_reinit;
-        expr_ref_vector             m_units_to_reassert;
-        svector<char>               m_units_to_reassert_sign;
+        vector<replay_unit>         m_units_to_reassert;
         literal_vector              m_assigned_literals;
         typedef std::pair<clause*, literal_vector> tmp_clause;
         vector<tmp_clause>          m_tmp_clauses;
@@ -246,6 +255,16 @@ namespace smt {
         vector<literal_vector> m_th_case_split_sets;
         u_map< vector<literal_vector> > m_literal2casesplitsets; // returns the case split literal sets that a literal participates in
 
+
+        // ----------------------------------
+        //
+        // Value initialization
+        //
+        // ----------------------------------
+        vector<std::pair<expr_ref, expr_ref>> m_values;
+        void initialize_value(expr* var, expr* value);
+
+
         // -----------------------------------
         //
         // Accessors
@@ -271,6 +290,11 @@ namespace smt {
         void updt_params(params_ref const& p);
 
         bool get_cancel_flag();
+
+        void set_sls_completed() {
+            if (m_sls_completed == l_undef)
+                m_sls_completed = l_true;
+        }
 
         region & get_region() {
             return m_region;
@@ -603,6 +627,9 @@ namespace smt {
         friend class set_var_theory_trail;
         void set_var_theory(bool_var v, theory_id tid);
 
+
+        bool has_sls_model();
+
         // -----------------------------------
         //
         // Backtracking support
@@ -923,6 +950,8 @@ namespace smt {
             mk_th_clause(tid, num_lits, lits, num_params, params, CLS_TH_AXIOM);
         }
 
+        void mk_th_axiom(theory_id tid, literal l1, unsigned num_params = 0, parameter * params = nullptr);
+
         void mk_th_axiom(theory_id tid, literal l1, literal l2, unsigned num_params = 0, parameter * params = nullptr);
 
         void mk_th_axiom(theory_id tid, literal l1, literal l2, literal l3, unsigned num_params = 0, parameter * params = nullptr);
@@ -1155,6 +1184,7 @@ namespace smt {
         bool guess(bool_var var, lbool phase);
 
     protected:
+        bool m_has_case_split = true;
         bool decide();
 
         void update_phase_cache_counter();
@@ -1165,9 +1195,9 @@ namespace smt {
         void rescale_bool_var_activity();
 
     public:
-        void inc_bvar_activity(bool_var v) {
+        void inc_bvar_activity(bool_var v, double inc = 1.0) {
             double & act = m_activity[v];
-            act += m_bvar_inc;
+            act += m_bvar_inc * inc;
             if (act > ACTIVITY_LIMIT)
                 rescale_bool_var_activity();
             m_case_split_queue->activity_increased_eh(v);
@@ -1345,11 +1375,6 @@ namespace smt {
         bool can_propagate() const;
 
 
-        // Retrieve arithmetic values. 
-        bool get_arith_lo(expr* e, rational& lo, bool& strict);
-        bool get_arith_up(expr* e, rational& up, bool& strict);
-        bool get_arith_value(expr* e, rational& value);
-
         // -----------------------------------
         //
         // Model checking... (must be improved)
@@ -1357,6 +1382,8 @@ namespace smt {
         // -----------------------------------
     public:
         bool get_value(enode * n, expr_ref & value);
+
+        bool solve_for(enode* n, expr_ref& term);
 
         // -----------------------------------
         //
@@ -1775,6 +1802,8 @@ namespace smt {
                 throw default_exception("user propagator must be initialized");
             m_user_propagator->register_decide(r);
         }
+
+        void user_propagate_initialize_value(expr* var, expr* value);
 
         bool watches_fixed(enode* n) const;
 

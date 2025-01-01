@@ -142,6 +142,7 @@ static inline unsigned get_num_1bits(uint64_t v) {
     v = (v + (v >> 4)) & 0x0F0F0F0F0F0F0F0F;
     uint64_t r = (v * 0x0101010101010101) >> 56;
     SASSERT(c == r);
+    return static_cast<unsigned>(r);
 #endif
 }
 
@@ -324,6 +325,16 @@ void force_ptr_array_size(T & v, unsigned sz) {
         v.resize(sz);
     }
 }
+
+template<typename T>
+class ptr_iterator {
+    T const* b;
+    T const* e;
+public:
+    ptr_iterator(T const* b, T const* e): b(b), e(e) {}
+    T const* begin() const { return b; }
+    T const* end() const { return e; }
+};
 
 class random_gen {
     unsigned m_data;

@@ -79,11 +79,16 @@ public:
     bool contains(zstring const& other) const;
     int  indexofu(zstring const& other, unsigned offset) const;
     int  last_indexof(zstring const& other) const;
-    zstring extract(unsigned lo, unsigned hi) const;
+    zstring extract(unsigned offset, unsigned length) const;
     zstring operator+(zstring const& other) const;
     bool operator==(const zstring& other) const;
     bool operator!=(const zstring& other) const;
     unsigned hash() const;
+
+    void reset() { m_buffer.reset(); }
+    zstring& operator+=(zstring const& other) { m_buffer.append(other.m_buffer); return *this; }
+    uint32_t const* begin() const { return m_buffer.begin(); }
+    uint32_t const* end() const { return m_buffer.end(); }
 
     friend std::ostream& operator<<(std::ostream &os, const zstring &str);
     friend bool operator<(const zstring& lhs, const zstring& rhs);

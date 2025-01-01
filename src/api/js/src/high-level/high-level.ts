@@ -86,6 +86,8 @@ import {
   CoercibleToArith,
   NonEmptySortArray,
   FuncEntry,
+  SMTSetSort,
+  SMTSet,
 } from './types';
 import { allSatisfy, assert, assertExhaustive } from './utils';
 
@@ -176,6 +178,10 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
 
     function _assertContext(...ctxs: (Context<Name> | { ctx: Context<Name> })[]) {
       ctxs.forEach(other => assert('ctx' in other ? ctx === other.ctx : ctx === other, 'Context mismatch'));
+    }
+
+    function _assertPtr<T extends Number>(ptr: T | null): asserts ptr is T {
+      if (ptr == null) throw new TypeError('Expected non-null pointer');
     }
 
     // call this after every nontrivial call to the underlying API
@@ -735,7 +741,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       },
 
       val<Bits extends number>(
-        value: bigint | number | boolean,
+        value: bigint | number | boolean | string,
         bits: Bits | BitVecSort<Bits, Name>,
       ): BitVecNum<Bits, Name> {
         if (value === true) {
@@ -791,6 +797,33 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         return new ArrayImpl<[DomainSort], RangeSort>(check(Z3.mk_const_array(contextPtr, domain.ptr, value.ptr)));
       },
     };
+    const Set = {
+      // reference: https://z3prover.github.io/api/html/namespacez3py.html#a545f894afeb24caa1b88b7f2a324ee7e
+      sort<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSetSort<Name, ElemSort> {
+        return Array.sort(sort, Bool.sort());
+      },
+      const<ElemSort extends AnySort<Name>>(name: string, sort: ElemSort) : SMTSet<Name, ElemSort> {
+        return new SetImpl<ElemSort>(
+          check(Z3.mk_const(contextPtr, _toSymbol(name), Array.sort(sort, Bool.sort()).ptr)),
+        );
+      },
+      consts<ElemSort extends AnySort<Name>>(names: string | string[], sort: ElemSort) : SMTSet<Name, ElemSort>[] {
+        if (typeof names === 'string') {
+          names = names.split(' ');
+        }
+        return names.map(name => Set.const(name, sort));
+      },
+      empty<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort> {
+        return EmptySet(sort);
+      },
+      val<ElemSort extends AnySort<Name>>(values: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>[], sort: ElemSort): SMTSet<Name, ElemSort> {
+        var result = EmptySet(sort);
+        for (const value of values) {
+          result = SetAdd(result, value);
+        }
+        return result;
+      }
+    }
 
     ////////////////
     // Operations //
@@ -955,6 +988,57 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
           ),
         );
       }
+    }
+
+    function PbEq(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name> {
+      _assertContext(...args);
+      if (args.length !== coeffs.length) {
+        throw new Error('Number of arguments and coefficients must match');
+      }
+      return new BoolImpl(
+        check(
+          Z3.mk_pbeq(
+            contextPtr,
+            args.map(arg => arg.ast),
+            coeffs,
+            k,
+          ),
+        ),
+      );
+    }
+
+    function PbGe(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name> {
+      _assertContext(...args);
+      if (args.length !== coeffs.length) {
+        throw new Error('Number of arguments and coefficients must match');
+      }
+      return new BoolImpl(
+        check(
+          Z3.mk_pbge(
+            contextPtr,
+            args.map(arg => arg.ast),
+            coeffs,
+            k,
+          ),
+        ),
+      );
+    }
+
+    function PbLe(args: [Bool<Name>, ...Bool<Name>[]], coeffs: [number, ...number[]], k: number): Bool<Name> {
+      _assertContext(...args);
+      if (args.length !== coeffs.length) {
+        throw new Error('Number of arguments and coefficients must match');
+      }
+      return new BoolImpl(
+        check(
+          Z3.mk_pble(
+            contextPtr,
+            args.map(arg => arg.ast),
+            coeffs,
+            k,
+          ),
+        ),
+      );
     }
 
     function ForAll<QVarSorts extends NonEmptySortArray<Name>>(
@@ -1194,6 +1278,49 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       >;
     }
 
+    function SetUnion<ElemSort extends AnySort<Name>>(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_set_union(contextPtr, args.map(arg => arg.ast))));
+    }
+    
+    function SetIntersect<ElemSort extends AnySort<Name>>(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_set_intersect(contextPtr, args.map(arg => arg.ast))));
+    }
+    
+    function SetDifference<ElemSort extends AnySort<Name>>(a: SMTSet<Name, ElemSort>, b: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_set_difference(contextPtr, a.ast, b.ast)));
+    }
+    
+    function SetHasSize<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, size: bigint | number | string | IntNum<Name>): Bool<Name> {
+      const a = typeof size === 'object'? Int.sort().cast(size) : Int.sort().cast(size);
+      return new BoolImpl(check(Z3.mk_set_has_size(contextPtr, set.ast, a.ast)));
+    }
+
+    function SetAdd<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort> {
+      const arg = set.elemSort().cast(elem as any);
+      return new SetImpl<ElemSort>(check(Z3.mk_set_add(contextPtr, set.ast, arg.ast)));
+    }
+    function SetDel<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>, elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort> {
+      const arg = set.elemSort().cast(elem as any);
+      return new SetImpl<ElemSort>(check(Z3.mk_set_del(contextPtr, set.ast, arg.ast)));
+    }
+    function SetComplement<ElemSort extends AnySort<Name>>(set: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_set_complement(contextPtr, set.ast)));
+    }
+    
+    function EmptySet<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_empty_set(contextPtr, sort.ptr)));
+    }
+    function FullSet<ElemSort extends AnySort<Name>>(sort: ElemSort): SMTSet<Name, ElemSort> {
+      return new SetImpl<ElemSort>(check(Z3.mk_full_set(contextPtr, sort.ptr)));
+    }
+    function isMember<ElemSort extends AnySort<Name>>(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>, set: SMTSet<Name, ElemSort>): Bool<Name> {
+      const arg = set.elemSort().cast(elem as any);
+      return new BoolImpl(check(Z3.mk_set_member(contextPtr, arg.ast, set.ast)));
+    }
+    function isSubset<ElemSort extends AnySort<Name>>(a: SMTSet<Name, ElemSort>, b: SMTSet<Name, ElemSort>): Bool<Name> {
+      return new BoolImpl(check(Z3.mk_set_subset(contextPtr, a.ast, b.ast)));
+    }
+
     class AstImpl<Ptr extends Z3_ast> implements Ast<Name, Ptr> {
       declare readonly __typename: Ast['__typename'];
       readonly ctx: Context<Name>;
@@ -1203,7 +1330,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         const myAst = this.ast;
 
         Z3.inc_ref(contextPtr, myAst);
-        cleanup.register(this, () => Z3.dec_ref(contextPtr, myAst));
+        cleanup.register(this, () => Z3.dec_ref(contextPtr, myAst), this);
       }
 
       get ast(): Z3_ast {
@@ -1240,8 +1367,12 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
     class SolverImpl implements Solver<Name> {
       declare readonly __typename: Solver['__typename'];
 
-      readonly ptr: Z3_solver;
       readonly ctx: Context<Name>;
+      private _ptr: Z3_solver | null;
+      get ptr(): Z3_solver {
+        _assertPtr(this._ptr);
+        return this._ptr;
+      }
 
       constructor(ptr: Z3_solver | string = Z3.mk_solver(contextPtr)) {
         this.ctx = ctx;
@@ -1251,9 +1382,9 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         } else {
           myPtr = ptr;
         }
-        this.ptr = myPtr;
+        this._ptr = myPtr;
         Z3.solver_inc_ref(contextPtr, myPtr);
-        cleanup.register(this, () => Z3.solver_dec_ref(contextPtr, myPtr));
+        cleanup.register(this, () => Z3.solver_dec_ref(contextPtr, myPtr), this);
       }
 
       set(key: string, value: any): void {
@@ -1327,21 +1458,32 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         Z3.solver_from_string(contextPtr, this.ptr, s);
         throwIfError();
       }
+
+      release() {
+        Z3.solver_dec_ref(contextPtr, this.ptr);
+        // Mark the ptr as null to prevent double free
+        this._ptr = null;
+        cleanup.unregister(this);
+      }
     }
 
     class OptimizeImpl implements Optimize<Name> {
       declare readonly __typename: Optimize['__typename'];
 
-      readonly ptr: Z3_optimize;
       readonly ctx: Context<Name>;
+      private _ptr: Z3_optimize | null;
+      get ptr(): Z3_optimize {
+        _assertPtr(this._ptr);
+        return this._ptr;
+      }
 
       constructor(ptr: Z3_optimize = Z3.mk_optimize(contextPtr)) {
         this.ctx = ctx;
         let myPtr: Z3_optimize;
         myPtr = ptr;
-        this.ptr = myPtr;
+        this._ptr = myPtr;
         Z3.optimize_inc_ref(contextPtr, myPtr);
-        cleanup.register(this, () => Z3.optimize_dec_ref(contextPtr, myPtr));
+        cleanup.register(this, () => Z3.optimize_dec_ref(contextPtr, myPtr), this);
       }
 
       set(key: string, value: any): void {
@@ -1363,11 +1505,11 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         });
       }
 
-      addSoft(expr: Bool<Name>, weight: number | bigint | string | CoercibleRational, id: number | string = "") {
+      addSoft(expr: Bool<Name>, weight: number | bigint | string | CoercibleRational, id: number | string = '') {
         if (isCoercibleRational(weight)) {
           weight = `${weight.numerator}/${weight.denominator}`;
         }
-        check(Z3.optimize_assert_soft(contextPtr, this.ptr, expr.ast, weight.toString(), _toSymbol(id)))
+        check(Z3.optimize_assert_soft(contextPtr, this.ptr, expr.ast, weight.toString(), _toSymbol(id)));
       }
 
       addAndTrack(expr: Bool<Name>, constant: Bool<Name> | string) {
@@ -1395,9 +1537,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
           _assertContext(expr);
           return expr.ast;
         });
-        const result = await asyncMutex.runExclusive(() =>
-          check(Z3.optimize_check(contextPtr, this.ptr, assumptions)),
-        );
+        const result = await asyncMutex.runExclusive(() => check(Z3.optimize_check(contextPtr, this.ptr, assumptions)));
         switch (result) {
           case Z3_lbool.Z3_L_FALSE:
             return 'unsat';
@@ -1422,17 +1562,28 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         Z3.optimize_from_string(contextPtr, this.ptr, s);
         throwIfError();
       }
-    }
 
+      release() {
+        Z3.optimize_dec_ref(contextPtr, this.ptr);
+        this._ptr = null;
+        cleanup.unregister(this);
+      }
+    }
 
     class ModelImpl implements Model<Name> {
       declare readonly __typename: Model['__typename'];
       readonly ctx: Context<Name>;
+      private _ptr: Z3_model | null;
+      get ptr(): Z3_model {
+        _assertPtr(this._ptr);
+        return this._ptr;
+      }
 
-      constructor(readonly ptr: Z3_model = Z3.mk_model(contextPtr)) {
+      constructor(ptr: Z3_model = Z3.mk_model(contextPtr)) {
         this.ctx = ctx;
+        this._ptr = ptr;
         Z3.model_inc_ref(contextPtr, ptr);
-        cleanup.register(this, () => Z3.model_dec_ref(contextPtr, ptr));
+        cleanup.register(this, () => Z3.model_dec_ref(contextPtr, ptr), this);
       }
 
       length() {
@@ -1594,6 +1745,12 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         _assertContext(sort);
         return new AstVectorImpl(check(Z3.model_get_sort_universe(contextPtr, this.ptr, sort.ptr)));
       }
+
+      release() {
+        Z3.model_dec_ref(contextPtr, this.ptr);
+        this._ptr = null;
+        cleanup.unregister(this);
+      }
     }
 
     class FuncEntryImpl implements FuncEntry<Name> {
@@ -1604,7 +1761,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       constructor(readonly ptr: Z3_func_entry) {
         this.ctx = ctx;
         Z3.func_entry_inc_ref(contextPtr, ptr);
-        cleanup.register(this, () => Z3.func_entry_dec_ref(contextPtr, ptr));
+        cleanup.register(this, () => Z3.func_entry_dec_ref(contextPtr, ptr), this);
       }
 
       numArgs() {
@@ -1627,7 +1784,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       constructor(readonly ptr: Z3_func_interp) {
         this.ctx = ctx;
         Z3.func_interp_inc_ref(contextPtr, ptr);
-        cleanup.register(this, () => Z3.func_interp_dec_ref(contextPtr, ptr));
+        cleanup.register(this, () => Z3.func_interp_dec_ref(contextPtr, ptr), this);
       }
 
       elseValue(): Expr<Name> {
@@ -1922,7 +2079,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
         this.ptr = myPtr;
 
         Z3.tactic_inc_ref(contextPtr, myPtr);
-        cleanup.register(this, () => Z3.tactic_dec_ref(contextPtr, myPtr));
+        cleanup.register(this, () => Z3.tactic_dec_ref(contextPtr, myPtr), this);
       }
     }
 
@@ -2451,6 +2608,41 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       }
     }
 
+    class SetImpl<ElemSort extends Sort<Name>> extends ExprImpl<Z3_ast, ArraySortImpl<[ElemSort], BoolSort<Name>>> implements SMTSet<Name, ElemSort> {
+      declare readonly __typename: 'Array';
+
+      elemSort(): ElemSort {
+        return this.sort.domain();
+      }
+      union(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort> {
+        return SetUnion(this, ...args);
+      }
+      intersect(...args: SMTSet<Name, ElemSort>[]): SMTSet<Name, ElemSort> {
+        return SetIntersect(this, ...args);
+      }
+      diff(b: SMTSet<Name, ElemSort>): SMTSet<Name, ElemSort> {
+        return SetDifference(this, b);
+      }
+      hasSize(size: string | number | bigint | IntNum<Name>): Bool<Name> {
+        return SetHasSize(this, size);
+      }
+      add(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort> {
+        return SetAdd(this, elem);
+      }
+      del(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): SMTSet<Name, ElemSort> {
+        return SetDel(this, elem);
+      }
+      complement(): SMTSet<Name, ElemSort> {
+        return SetComplement(this);
+      }
+      contains(elem: CoercibleToMap<SortToExprMap<ElemSort, Name>, Name>): Bool<Name> {
+        return isMember(elem, this);
+      }
+      subsetOf(b: SMTSet<Name, ElemSort>): Bool<Name> {
+        return isSubset(this, b);
+      }
+    }
+
     class QuantifierImpl<
         QVarSorts extends NonEmptySortArray<Name>,
         QSort extends BoolSort<Name> | SMTArraySort<Name, QVarSorts>,
@@ -2586,7 +2778,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       constructor(readonly ptr: Z3_ast_vector = Z3.mk_ast_vector(contextPtr)) {
         this.ctx = ctx;
         Z3.ast_vector_inc_ref(contextPtr, ptr);
-        cleanup.register(this, () => Z3.ast_vector_dec_ref(contextPtr, ptr));
+        cleanup.register(this, () => Z3.ast_vector_dec_ref(contextPtr, ptr), this);
       }
 
       length(): number {
@@ -2684,7 +2876,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       constructor(readonly ptr: Z3_ast_map = Z3.mk_ast_map(contextPtr)) {
         this.ctx = ctx;
         Z3.ast_map_inc_ref(contextPtr, ptr);
-        cleanup.register(this, () => Z3.ast_map_dec_ref(contextPtr, ptr));
+        cleanup.register(this, () => Z3.ast_map_dec_ref(contextPtr, ptr), this);
       }
 
       [Symbol.iterator](): Iterator<[Key, Value]> {
@@ -2832,6 +3024,7 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       Real,
       BitVec,
       Array,
+      Set,
 
       ////////////////
       // Operations //
@@ -2849,6 +3042,9 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       Not,
       And,
       Or,
+      PbEq,
+      PbGe,
+      PbLe,
       ForAll,
       Exists,
       Lambda,
@@ -2891,6 +3087,18 @@ export function createApi(Z3: Z3Core): Z3HighLevel {
       // Loading //
       /////////////
       ast_from_string,
+
+      SetUnion,
+      SetIntersect,
+      SetDifference,
+      SetHasSize,
+      SetAdd,
+      SetDel,
+      SetComplement,
+      EmptySet,
+      FullSet,
+      isMember,
+      isSubset,
     };
     cleanup.register(ctx, () => Z3.del_context(contextPtr));
     return ctx;

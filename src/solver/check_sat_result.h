@@ -68,7 +68,8 @@ public:
     virtual proof * get_proof_core() = 0;
     virtual std::string reason_unknown() const = 0;
     virtual void set_reason_unknown(char const* msg) = 0;
-    void set_reason_unknown(event_handler& eh);
+    void set_reason_unknown(event_handler& eh, char const* msg);
+    void set_reason_unknown(event_handler& eh, std::exception& ex);
     virtual void get_labels(svector<symbol> & r) = 0;
     virtual ast_manager& get_manager() const = 0;
 
@@ -98,7 +99,6 @@ struct simple_check_sat_result : public check_sat_result {
     std::string     m_unknown;
     
     simple_check_sat_result(ast_manager & m);
-    ~simple_check_sat_result() override;
     ast_manager& get_manager() const override { return m_proof.get_manager(); }
     void collect_statistics(statistics & st) const override;
     void get_unsat_core(expr_ref_vector & r) override;

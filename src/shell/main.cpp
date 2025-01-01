@@ -125,6 +125,13 @@ void display_usage() {
     std::cout << "  module_name.param_name=value  for setting module parameters.\n";
     std::cout << "Use 'z3 -p' for the complete list of global and module parameters.\n";
 }
+
+static bool validate_is_ulong(char const* s) {
+    for (; *s; ++s)
+        if (*s < '0' || *s > '9')
+            return false;
+    return true;
+}
    
 static void parse_cmd_line_args(std::string& input_file, int argc, char ** argv) {
     long timeout = 0;
@@ -223,6 +230,8 @@ static void parse_cmd_line_args(std::string& input_file, int argc, char ** argv)
             else if (strcmp(opt_name, "v") == 0) {
                 if (!opt_arg)
                     error("option argument (-v:level) is missing.");
+                if (!validate_is_ulong(opt_arg))
+                    error("invalid argument for -v option, it must be a non-negative integer.");
                 long lvl = strtol(opt_arg, nullptr, 10);
                 set_verbosity_level(lvl);
             }
@@ -232,6 +241,8 @@ static void parse_cmd_line_args(std::string& input_file, int argc, char ** argv)
             else if (strcmp(opt_name, "T") == 0) {
                 if (!opt_arg)
                     error("option argument (-T:timeout) is missing.");
+                if (!validate_is_ulong(opt_arg))
+                    error("invalid argument for -T option, it must be a non-negative integer.");
                 timeout = strtol(opt_arg, nullptr, 10);
             }
             else if (strcmp(opt_name, "t") == 0) {
@@ -419,7 +430,7 @@ int STD_CALL main(int argc, char ** argv) {
     }
     catch (z3_exception & ex) {
         // unhandled exception
-        std::cerr << "ERROR: " << ex.msg() << "\n";
+        std::cerr << "ERROR: " << ex.what() << "\n";
         if (ex.has_error_code())
             return ex.error_code();
         else

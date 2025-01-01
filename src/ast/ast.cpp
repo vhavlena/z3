@@ -58,7 +58,7 @@ parameter::parameter(parameter const& other) : m_val(other.m_val) {
 }
 
 void parameter::init_eh(ast_manager & m) {
-    if (is_ast()) {
+    if (is_ast()) { 
         m.inc_ref(get_ast());
     }
 }
@@ -1008,7 +1008,8 @@ sort* basic_decl_plugin::join(unsigned n, expr* const* es) {
 }
 
 sort* basic_decl_plugin::join(sort* s1, sort* s2) {
-    if (s1 == s2) return s1;
+    if (s1 == s2)
+        return s1;
     if (s1->get_family_id() == arith_family_id &&
         s2->get_family_id() == arith_family_id) {
         if (s1->get_decl_kind() == REAL_SORT) {
@@ -1016,6 +1017,10 @@ sort* basic_decl_plugin::join(sort* s1, sort* s2) {
         }
         return s2;
     }
+    if (s1 == m_bool_sort && s2->get_family_id() == arith_family_id)
+        return s2;
+    if (s2 == m_bool_sort && s1->get_family_id() == arith_family_id)
+        return s1;
     std::ostringstream buffer;
     buffer << "Sorts " << mk_pp(s1, *m_manager) << " and " << mk_pp(s2, *m_manager) << " are incompatible";
     throw ast_exception(buffer.str());
@@ -1709,7 +1714,7 @@ ast * ast_manager::register_node_core(ast * n) {
 
     n->m_id = is_decl(n) ? m_decl_id_gen.mk() : m_expr_id_gen.mk();        
 
-//    track_id(*this, n, 77);
+  //  track_id(*this, n, 9213);
     
 //    TRACE("ast", tout << (s_count++) << " Object " << n->m_id << " was created.\n";);
     TRACE("mk_var_bug", tout << "mk_ast: " << n->m_id << "\n";);
@@ -2075,7 +2080,7 @@ bool ast_manager::check_sorts(ast const * n) const {
         return true;
     }
     catch (ast_exception & ex) {
-        warning_msg("%s", ex.msg());
+        warning_msg("%s", ex.what());
         return false;
     }
 }
