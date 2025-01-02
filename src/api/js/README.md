@@ -32,7 +32,7 @@ Detailed instruction for binding building for Z3-Noodler:
     ```
 3) Find the line on the installation output that contains the path to `libmata.a` and copy it onto line 77 of `scripts/build-wasm.ts`
 4) Create an empty `build` directory in the root of `z3-noodler` directory.
-5) From this directory run following commands to build the binding:
+5) Run the following commands while in this directory (where this readme is) to build the binding:
     ```shell
     npm install
     npm run build:ts
