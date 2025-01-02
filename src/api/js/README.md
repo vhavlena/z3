@@ -12,12 +12,38 @@ You'll need to have emscripten set up, along with all of its dependencies. The e
 Then run `npm i` to install dependencies, `npm run build:ts` to build the TypeScript wrapper, and `npm run build:wasm` to build the wasm artifact.
 
 Detailed instruction for binding building for Z3-Noodler:
-1. create folder `build-wasm` for the WASM build of libz3.a
-2. inside `build-wasm` run `emcmake cmake -DZ3_BUILD_LIBZ3_SHARED=FALSE -DZ3_SINGLE_THREADED=TRUE ..`
-3. build WASM library using `emmake make libz3` (the static library `libz3.a` should be created after that)
-4. copy the WASM static library of `mata` to `build-wasm` (see instructions in the Mata repository for the WASM build)
-5. run `npm i`, `npm run build:ts`, and `npm run build:wasm` 
-
+1) Get emscripten trough [emsdk](https://github.com/emscripten-core/emsdk) and activate its environment:
+    ```shell
+    git clone 'https://github.com/emscripten-core/emsdk'
+    cd emdsk
+    ./emsdk install 3.1.73
+    ./emsdk activate 3.1.73
+    source emsdk_env.sh
+    cd ..
+    ```
+2) Get and install [Mata](https://github.com/VeriFIT/mata/) library (it will be installed into `emsdk` environment, so no need `sudo` or a worry if `mata` is already installed):
+    ```shell
+    git clone 'https://github.com/VeriFIT/mata.git'
+    cd mata
+    mkdir build && cd build
+    emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMATA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF ..
+    emmake make install
+    cd ..
+    ```
+3) Find the line on the installation output that contains the path to `libmata.a` and copy it onto line 77 of `scripts/build-wasm.ts`
+4) Create an empty `build` directory in the root of `z3-noodler` directory.
+5) Run the following commands while in this directory (where this readme is) to build the binding:
+    ```shell
+    npm install
+    npm run build:ts
+    npm run build:wasm
+    ```
+6) You can add dependency to this binding by adding the following to your `package.json` file:
+    ```
+    "dependencies": {
+        "z3-solver": "file:PATH/TO/THIS/DIRECTORY"
+    }
+    ```
 
 ### Build on your own
 
