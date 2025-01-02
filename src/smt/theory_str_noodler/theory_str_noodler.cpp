@@ -140,7 +140,11 @@ namespace smt::noodler {
         for (unsigned i = 0; i < nFormulas; ++i) {
             STRACE("str-init-formula", tout << "Initial asserted formula " << i << ": " << expr_ref(ctx.get_asserted_formula(i), m) << std::endl;);
             obj_hashtable<app> lens;
-            util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
+            // it seems Z3 is asserting formulae under quantification separately; 
+            // we can skip quantified formulae as the lenght variables were computed before.
+            if(!is_quantifier(ctx.get_asserted_formula(i))) {
+                util::get_len_exprs(to_app(ctx.get_asserted_formula(i)), m_util_s, m, lens);
+            }
             for (app* const a : lens) {
                 util::get_str_variables(a, this->m_util_s, m, this->len_vars, &this->predicate_replace);
             }

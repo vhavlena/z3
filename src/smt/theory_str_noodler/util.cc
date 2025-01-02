@@ -125,6 +125,11 @@ namespace smt::noodler::util {
         }
 
         for(unsigned i = 0; i < ex->get_num_args(); i++) {
+            // it seems Z3 is asserting formulae under quantification separately; 
+            // we can skip quantified formulae as the lenght variables were computed before.
+            if(is_quantifier(ex->get_arg(i))) {
+                return;
+            }
             SASSERT(is_app(ex->get_arg(i)));
             app *arg = to_app(ex->get_arg(i));
             get_len_exprs(arg, m_util_s, m, res);
