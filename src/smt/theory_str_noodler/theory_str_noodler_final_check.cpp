@@ -107,7 +107,7 @@ namespace smt::noodler {
         bool contains_eqs_and_diseqs_only = this->m_not_contains_todo_rel.empty() && this->m_conversion_todo.empty();
 
         // nothing is trivially SAT
-        if(contains_eqs_and_diseqs_only && this->m_word_eq_todo_rel.empty() && this->m_word_diseq_todo_rel.empty() && this->m_membership_todo_rel.empty() && this->m_lang_eq_or_diseq_todo_rel.empty() ) {
+        if(contains_eqs_and_diseqs_only && this->m_word_eq_todo_rel.empty() && this->m_word_diseq_todo_rel.empty() && this->m_membership_todo_rel.empty() ) {
             return FC_DONE;
         }
 
