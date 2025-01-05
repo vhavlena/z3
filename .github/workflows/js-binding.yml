@@ -29,9 +29,10 @@ jobs:
     steps:
 
       - name: Setup emscripten
-        uses: lovasoa/setup-emscripten@master
+        uses: mymindstorm/setup-emsdk@v14
         with:
-          emscripten-version: '1.38.47'
+          version: 1.38.40
+          actions-cache-folder: 'emsdk-cache'
 
       - name: Clone Mata
         uses: GuillaumeFalourd/clone-github-repo-action@v2.3
