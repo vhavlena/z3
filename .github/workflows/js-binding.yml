@@ -70,12 +70,13 @@ jobs:
           sed -i "s|REPLACE THIS TEXT WITH THE PATH TO libmata.a|${EMSDK}/upstream/emscripten/cache/sysroot/lib/libmata.a|g" scripts/build-wasm.ts
           npm install
           npm run build:ts
-      
-      - name: Build wasm
-        run: |
-          emsdk install ${EM_VERSION}
-          emsdk activate ${EM_VERSION}
-          source $(dirname $(which emsdk))/emsdk_env.sh
-          which node
-          which clang++
           npm run build:wasm
+      
+      # - name: Build wasm
+      #   run: |
+      #     emsdk install ${EM_VERSION}
+      #     emsdk activate ${EM_VERSION}
+      #     source $(dirname $(which emsdk))/emsdk_env.sh
+      #     which node
+      #     which clang++
+      #     npm run build:wasm
