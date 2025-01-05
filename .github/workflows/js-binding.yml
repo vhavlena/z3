@@ -57,9 +57,11 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
 
-      - name: Compile Z3-Noodler release
+      - name: Compile JS Binding for Z3-Noodler
         run: |
-          echo $EMSDK
           mkdir build
           cd src/api/js
-          sed -i 's/REPLACE THIS TEXT WITH THE PATH TO libmata.a/'
+          sed -i "s|REPLACE THIS TEXT WITH THE PATH TO libmata.a|${EMSDK}/upstream/emscripten/cache/sysroot/lib/libmata.a|g" scripts/build-wasm.ts
+          npm install
+          npm run build:ts
+          npm run build:wasm
