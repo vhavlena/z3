@@ -28,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
@@ -52,10 +55,9 @@ jobs:
           cd mata
           mkdir build && cd build
           emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMATA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF ..
-          sudo emmake make install
+          emmake make install
 
-      - name: Check out repository code
-        uses: actions/checkout@v3
+      
 
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v14
