@@ -31,7 +31,7 @@ jobs:
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 1.38.40
+          version: 3.1.73
           actions-cache-folder: 'emsdk-cache'
 
       - name: Clone Mata
